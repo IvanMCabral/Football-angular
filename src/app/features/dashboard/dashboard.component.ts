@@ -1,0 +1,290 @@
+
+import { Component, inject, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { RouterLink, Router } from '@angular/router';
+import { HttpClient } from '@angular/common/http';
+import { Observable, of, firstValueFrom, BehaviorSubject } from 'rxjs';
+import { map, catchError, shareReplay, tap } from 'rxjs/operators';
+import { TeamService } from '../teams/services/team.service';
+import { MatchService } from '../matches/services/match.service';
+import { AuthService } from '../../core/services/auth.service';
+import { ToastService } from '../../core/services/toast.service';
+import { environment } from '../../environments/environment';
+
+interface UserStats {
+  matchesPlayed: number;
+  matchesWon: number;
+  matchesLost: number;
+  winPercentage: number;
+}
+
+interface WorldStatus {
+  clubs: number;
+  players: number;
+  matches: number;
+}
+
+interface CareerStatus {
+  careerId: string | null;
+  userSessionTeamId: string | null;
+  currentRound: number;
+  totalRounds: number;
+  isFinished: boolean;
+  careerPhase: string | null; // PRE_MATCH, IN_MATCH, POST_MATCH, WAITING_USER, FINISHED
+  season: number;
+}
+
+interface RecentActivity {
+  message: string;
+  timestamp: Date;
+  type: 'player' | 'team' | 'match' | 'squad';
+}
+
+@Component({
+  selector: 'app-dashboard',
+  standalone: true,
+  imports: [CommonModule, RouterLink],
+  templateUrl: './dashboard.component.html',
+  styleUrls: ['./dashboard.component.css']
+})
+export class DashboardComponent implements OnInit {
+  private teamService = inject(TeamService);
+  private matchService = inject(MatchService);
+  private authService = inject(AuthService);
+  private http = inject(HttpClient);
+  private router = inject(Router);
+  private toastService = inject(ToastService);
+
+  // BehaviorSubject para career status reactivo
+  private careerStatusSubject = new BehaviorSubject<CareerStatus | null>(null);
+  careerStatus$ = this.careerStatusSubject.asObservable();
+
+  username$?: Observable<string>;
+  userStats$?: Observable<UserStats>;
+  worldStatus$?: Observable<WorldStatus>;
+  recentActivities: RecentActivity[] = [];
+  
+  loading = false;
+  generatingPlayers = false;
+
+
+  ngOnInit(): void {
+    console.log('[DASHBOARD] ngOnInit called');
+    this.loadDashboardData();
+  }
+
+  /**
+   * Carga el career status y lo emite al BehaviorSubject
+   */
+  private loadCareerStatus(): void {
+    this.http.get<any>(`${environment.apiUrl}/career/status`).pipe(
+      map(status => {
+        if (status && status.careerId) {
+          return {
+            careerId: status.careerId,
+            userSessionTeamId: status.userSessionTeamId || null,
+            currentRound: status.currentRound || 1,
+            totalRounds: status.totalRounds || 38,
+            isFinished: status.isFinished || false,
+            careerPhase: status.careerPhase || 'PRE_MATCH',
+            season: status.season || 1
+          } as CareerStatus;
+        }
+        return null;
+      }),
+      catchError(err => {
+        console.log('[DASHBOARD] No hay carrera activa');
+        return of(null);
+      })
+    ).subscribe(status => {
+      console.log('[DASHBOARD] Career status cargado:', status);
+      this.careerStatusSubject.next(status);
+    });
+  }
+
+  /**
+   * Refresca el career status (usado después de delete)
+   */
+  private refreshCareerStatus(): void {
+    this.loadCareerStatus();
+  }
+
+  loadDashboardData(): void {
+    // Username como observable, para template async
+    this.username$ = this.authService.getUserInfo().pipe(
+      map(info => info.username),
+      catchError(err => {
+        console.error('[DASHBOARD] Error loading user info', err);
+        return of('');
+      }),
+      shareReplay(1)
+    );
+
+    // Cargar career status y emitir al BehaviorSubject
+    this.loadCareerStatus();
+
+    this.userStats$ = this.http.get<UserStats>(`${environment.apiUrl}/dashboard/user-stats`).pipe(
+      shareReplay(1),
+      catchError(err => {
+        console.error('[DASHBOARD] Error loading user stats', err);
+        return of({ matchesPlayed: 0, matchesWon: 0, matchesLost: 0, winPercentage: 0 });
+      })
+    );
+
+
+    // Inicializar Observables (async pipe se encarga del subscribe)
+    this.worldStatus$ = this.http.get<WorldStatus>('http://localhost:8080/api/v1/dashboard/world-status').pipe(
+      shareReplay(1),
+      catchError(err => {
+        console.error('[DASHBOARD] Error loading world status', err);
+        return of({ clubs: 0, players: 0, matches: 0 });
+      })
+    );
+
+    this.userStats$ = this.http.get<UserStats>(`${environment.apiUrl}/dashboard/user-stats`).pipe(
+      shareReplay(1),
+      catchError(err => {
+        console.error('[DASHBOARD] Error loading user stats', err);
+        return of({ matchesPlayed: 0, matchesWon: 0, matchesLost: 0, winPercentage: 0 });
+      })
+    );
+
+    // Load recent activities (mock for now)
+    this.recentActivities = [
+      { message: 'Created player: John Doe (GK, 28y)', timestamp: new Date(), type: 'player' },
+      { message: 'Assigned 5 players to Manchester Red', timestamp: new Date(), type: 'squad' },
+      { message: 'Custom Match: Team A 2-1 Team B', timestamp: new Date(), type: 'match' }
+    ];
+  }
+
+
+
+  // Obsoleto: ya no se usa subscribe manual
+  // loadCareerStatus(): void {}
+
+
+
+
+  onPlayNow(): void {
+    // Este botón solo aparece cuando !careerStatus, así que siempre ir a setup
+    console.log('[DASHBOARD] Starting new career, going to setup');
+    this.router.navigate(['/career/setup']);
+  }
+
+  onContinueCareer(): void {
+    console.log('[DASHBOARD] Continuing career...');
+    this.router.navigate(['/squad']);
+  }
+
+  /**
+   * NUEVO: Jugar Próxima Fecha
+   * Llama al endpoint POST /api/v1/career/{careerId}/next-round
+   * que avanza la fase de WAITING_USER a PRE_MATCH
+   */
+  onPlayNextRound(): void {
+    if (!confirm('¿Comenzar la siguiente fecha? Podrás ajustar táctica y formación antes de que_startMatch los partidos.')) {
+      return;
+    }
+    
+    console.log('[DASHBOARD] 🎮 Solicitando avanzar a siguiente fecha...');
+    this.loading = true;
+    
+    firstValueFrom(this.careerStatus$).then(status => {
+      if (!status?.careerId) {
+        this.loading = false;
+        this.toastService.error('No se encontró la carrera');
+        return;
+      }
+      
+      console.log('[DASHBOARD] 📋 careerId:', status.careerId);
+      console.log('[DASHBOARD] 📋 currentRound:', status.currentRound);
+      console.log('[DASHBOARD] 📋 careerPhase:', status.careerPhase);
+      
+      this.http.post<any>(`${environment.apiUrl}/career/${status.careerId}/next-round`, {}).subscribe({
+        next: (response) => {
+          console.log('[DASHBOARD] ✅ Respuesta de next-round:', response);
+          this.loading = false;
+          
+          if (response.success) {
+            this.toastService.success('📅 ' + response.message);
+            
+            if (response.currentRound && response.careerPhase === 'PRE_MATCH') {
+              this.router.navigate([`/games/${response.careerId}/round/${response.currentRound}/live`]);
+            } else if (response.tournamentFinished) {
+              this.router.navigate([`/games/${response.careerId}/champion`]);
+            } else {
+              this.router.navigate(['/squad']);
+            }
+            
+            this.refreshCareerStatus();
+          } else {
+            this.toastService.error('Error: ' + response.message);
+          }
+        },
+        error: (err) => {
+          this.loading = false;
+          console.error('[DASHBOARD] ❌ Error en next-round:', err);
+          const errorMsg = err.error?.message || err.message || 'Error desconocido';
+          this.toastService.error('No se pudo avanzar: ' + errorMsg);
+        }
+      });
+    }).catch(err => {
+      this.loading = false;
+      console.error('[DASHBOARD] ❌ Error obteniendo career status:', err);
+      this.toastService.error('Error al obtener estado de carrera');
+    });
+  }
+
+  /**
+   * Verifica si el usuario puede jugar la próxima fecha
+   */
+  canPlayNextRound(status: CareerStatus | null): boolean {
+    return status !== null && 
+           status.careerPhase === 'WAITING_USER' && 
+           !status.isFinished;
+  }
+
+  onDeleteCareer(): void {
+    if (!confirm('Are you sure you want to delete your career? This action cannot be undone.')) {
+      return;
+    }
+    console.log('[DASHBOARD] Deleting career...');
+    this.http.delete(`${environment.apiUrl}/career/reset`).subscribe({
+      next: () => {
+        console.log('[DASHBOARD] Career deleted successfully');
+        // Refrescar el observable para que el UI reaccione inmediatamente
+        this.refreshCareerStatus();
+      },
+      error: (err) => {
+        console.error('[DASHBOARD] Error deleting career:', err);
+        alert('Error deleting career. Please try again.');
+      }
+    });
+  }
+
+  onGenerateRandomPlayers(): void {
+    if (this.generatingPlayers) return;
+
+    this.generatingPlayers = true;
+    const count = 10;
+
+    // Call backend to generate random players
+    this.http.post('/api/v1/career/random-players', { count }).subscribe({
+      next: () => {
+        this.generatingPlayers = false;
+        this.toastService.success(`✨ ${count} random players generated successfully!`);
+        // Reinicializar Observable para refrescar stats
+    this.worldStatus$ = this.http.get<WorldStatus>(`${environment.apiUrl}/dashboard/world-status`).pipe(
+          shareReplay(1),
+          catchError(err => of({ clubs: 0, players: 0, matches: 0 }))
+        );
+      },
+      error: (err) => {
+        this.generatingPlayers = false;
+        this.toastService.error('Failed to generate players: ' + (err.error?.message || 'Unknown error'));
+      }
+    });
+  }
+
+
+}

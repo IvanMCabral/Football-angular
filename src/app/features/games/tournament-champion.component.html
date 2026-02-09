@@ -1,0 +1,103 @@
+<div class="champion-container">
+  <div class="champion-banner">
+    <div class="trophy-animation">🏆</div>
+    <h1>¡Torneo Finalizado!</h1>
+    <div class="champion-card" *ngIf="champion">
+      <div class="champion-badge">CAMPEÓN</div>
+      <h2>{{ champion.teamName }}</h2>
+      <div class="champion-stats">
+        <div class="stat">
+          <span class="stat-label">Puntos</span>
+          <span class="stat-value">{{ champion.points }}</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Victorias</span>
+          <span class="stat-value">{{ champion.wins }}</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Dif. Goles</span>
+          <span class="stat-value">{{ champion.goalDifference > 0 ? '+' : '' }}{{ champion.goalDifference }}</span>
+        </div>
+      </div>
+    </div>
+    <div *ngIf="!champion && !errorMsg" class="loading">Cargando campeón...</div>
+    <div *ngIf="errorMsg" class="error">{{ errorMsg }}</div>
+  </div>
+
+  <div class="final-standings-section">
+    <h3>🏆 Clasificación Final</h3>
+    <div class="podium" *ngIf="standings.length >= 3">
+      <div class="podium-place second">
+        <div class="medal">🥈</div>
+        <div class="place-number">2°</div>
+        <div class="place-team">{{ standings[1]?.teamName }}</div>
+        <div class="place-points">{{ standings[1]?.points }} pts</div>
+      </div>
+      <div class="podium-place first">
+        <div class="medal">🥇</div>
+        <div class="place-number">1°</div>
+        <div class="place-team">{{ standings[0]?.teamName }}</div>
+        <div class="place-points">{{ standings[0]?.points }} pts</div>
+      </div>
+      <div class="podium-place third">
+        <div class="medal">🥉</div>
+        <div class="place-number">3°</div>
+        <div class="place-team">{{ standings[2]?.teamName }}</div>
+        <div class="place-points">{{ standings[2]?.points }} pts</div>
+      </div>
+    </div>
+
+    <div class="table-container">
+      <table class="final-table">
+        <thead>
+          <tr>
+            <th>Pos</th>
+            <th>Equipo</th>
+            <th>PJ</th>
+            <th>G</th>
+            <th>E</th>
+            <th>P</th>
+            <th>GF</th>
+            <th>GC</th>
+            <th>DG</th>
+            <th>PTS</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let standing of standings; let i = index" [class.champion-row]="i === 0">
+            <td class="position">
+              <span *ngIf="i === 0">🏆</span>
+              <span *ngIf="i === 1">🥈</span>
+              <span *ngIf="i === 2">🥉</span>
+              <span *ngIf="i > 2">{{ i + 1 }}</span>
+            </td>
+            <td class="team-name">{{ standing.teamName }}</td>
+            <td>{{ standing.played }}</td>
+            <td>{{ standing.won }}</td>
+            <td>{{ standing.drawn }}</td>
+            <td>{{ standing.lost }}</td>
+            <td>{{ standing.goalsFor }}</td>
+            <td>{{ standing.goalsAgainst }}</td>
+            <td [class.positive]="standing.goalDifference > 0" 
+                [class.negative]="standing.goalDifference < 0">
+              {{ standing.goalDifference > 0 ? '+' : '' }}{{ standing.goalDifference }}
+            </td>
+            <td class="points">{{ standing.points }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button *ngIf="careerPhase === 'FINISHED'" (click)="continueToNewSeason()" class="btn btn-success">
+      🚀 Jugar Siguiente Temporada
+    </button>
+    <button (click)="backToGame()" class="btn btn-primary">
+      🏠 Volver al Torneo
+    </button>
+    <button (click)="backToDashboard()" class="btn btn-secondary">
+      📊 Ir al Dashboard
+    </button>
+  </div>
+</div>

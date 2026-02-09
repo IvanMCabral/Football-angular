@@ -1,0 +1,11 @@
+@if (message) {
+  <div class="error-container">
+    <div class="error-icon">⚠️</div>
+    <div class="error-content">
+      <p class="error-message">{{ message }}</p>
+      @if (showRetry) {
+        <button (click)="onRetry()" class="retry-button">Try Again</button>
+      }
+    </div>
+  </div>
+}

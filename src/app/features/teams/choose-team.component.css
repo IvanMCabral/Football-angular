@@ -1,0 +1,6 @@
+.choose-team-container { padding: 2rem; max-width: 400px; margin: 2rem auto; text-align: center; border: 1px solid #eee; border-radius: 8px; background: #fff; }
+ul { list-style: none; padding: 0; }
+li { padding: 0.75rem; margin: 0.5rem 0; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; }
+li.selected { background: #e3f2fd; border-color: #1976d2; }
+.error-message { color: #d32f2f; margin-top: 1rem; }
+.success-message { color: #388e3c; margin-top: 1rem; }

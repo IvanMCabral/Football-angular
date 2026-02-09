@@ -1,0 +1,49 @@
+<div class="matches-container">
+  <div class="matches-header">
+    <h1>Matches</h1>
+    <a routerLink="/matches/create" class="create-button">+ Schedule Match</a>
+  </div>
+
+  @if (loading) {
+    <app-loading-spinner></app-loading-spinner>
+  } @else if (errorMessage) {
+    <app-error-message
+      [message]="errorMessage"
+      [showRetry]="true"
+      (retry)="loadMatches()"
+    ></app-error-message>
+  } @else if (matches.length === 0) {
+    <div class="empty-state">
+      <div class="empty-icon">🏆</div>
+      <h2>No matches scheduled</h2>
+      <p>Schedule your first match to get started</p>
+      <a routerLink="/matches/create" class="create-button">Schedule Match</a>
+    </div>
+  } @else {
+    <div class="matches-list">
+      @for (match of matches; track match.id) {
+        <a [routerLink]="['/matches', match.id]" class="match-card" [class.completed]="match.status === 'SIMULATED'">
+          <div class="match-status">
+            <span [class]="'status-badge ' + match.status.toLowerCase()">
+              {{ formatStatus(match.status) }}
+            </span>
+          </div>
+          <div class="match-content">
+            <div class="teams">
+              <span class="team home">{{ getTeamName(match.homeTeamId) }}</span>
+              <span class="vs">vs</span>
+              <span class="team away">{{ getTeamName(match.awayTeamId) }}</span>
+            </div>
+            @if (match.result) {
+              <div class="result">
+                <span class="goals">{{ match.result.homeGoals }} - {{ match.result.awayGoals }}</span>
+              </div>
+            }
+            <div class="date">{{ formatDate(match.scheduledAt) }}</div>
+          </div>
+          <div class="match-arrow">→</div>
+        </a>
+      }
+    </div>
+  }
+</div>

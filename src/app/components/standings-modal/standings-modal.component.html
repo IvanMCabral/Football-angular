@@ -1,0 +1,85 @@
+<div class="standings-modal">
+  <h2 mat-dialog-title>
+    <span class="title-icon">🏆</span>
+    Tabla de Posiciones
+  </h2>
+
+  <mat-dialog-content>
+    <ng-container *ngIf="loading$ | async; else content">
+      <div class="loading">
+        <div class="spinner"></div>
+        <p>Cargando tablas de posiciones...</p>
+      </div>
+    </ng-container>
+
+    <ng-template #content>
+      <ng-container *ngIf="error$ | async as error; else standingsContent">
+        <div class="error">
+          <span class="error-icon">⚠️</span>
+          <p>{{ error }}</p>
+          <button mat-button (click)="loadStandings()">Reintentar</button>
+        </div>
+      </ng-container>
+
+      <ng-template #standingsContent>
+        <mat-tab-group [selectedIndex]="selectedTabIndex$ | async" animationDuration="200ms">
+
+          <mat-tab *ngFor="let div of divisions$ | async; let i = index">
+            <ng-template mat-tab-label>
+              <span class="division-tab" [class]="'division-tab-color-' + i" [class.user-division]="div.isUserDivision">
+                <span *ngIf="div.isUserDivision" class="user-badge">👑</span>
+                {{ div.divisionName }}
+              </span>
+            </ng-template>
+
+            <div class="division-content">
+              <table class="standings-table">
+                <thead>
+                  <tr>
+                    <th class="pos">Pos</th>
+                    <th class="team">Equipo</th>
+                    <th class="stat">PJ</th>
+                    <th class="stat">G</th>
+                    <th class="stat">E</th>
+                    <th class="stat">P</th>
+                    <th class="stat">GF</th>
+                    <th class="stat">GC</th>
+                    <th class="stat">DG</th>
+                    <th class="stat points">PTS</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let team of div.standings; let i = index"
+                      [class.highlight]="team.teamId === userTeamId">
+                    <td class="pos">{{ i + 1 }}</td>
+                    <td class="team">
+                      <span *ngIf="team.teamId === userTeamId" class="user-team-marker">⭐</span>
+                      {{ team.teamName }}
+                    </td>
+                    <td class="stat">{{ team.played }}</td>
+                    <td class="stat">{{ team.won }}</td>
+                    <td class="stat">{{ team.drawn }}</td>
+                    <td class="stat">{{ team.lost }}</td>
+                    <td class="stat">{{ team.goalsFor }}</td>
+                    <td class="stat">{{ team.goalsAgainst }}</td>
+                    <td class="stat">{{ team.goalDifference > 0 ? '+' : '' }}{{ team.goalDifference }}</td>
+                    <td class="stat points">{{ team.points }}</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <div *ngIf="div.standings.length === 0" class="no-data">
+                Sin datos disponibles
+              </div>
+            </div>
+          </mat-tab>
+
+        </mat-tab-group>
+      </ng-template>
+    </ng-template>
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-raised-button color="primary" (click)="close()">Cerrar</button>
+  </mat-dialog-actions>
+</div>

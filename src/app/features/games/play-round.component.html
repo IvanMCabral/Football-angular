@@ -1,0 +1,40 @@
+<!--
+Diseño mejorado para mostrar los partidos de la primera fecha y su resultado en tiempo real.
+-->
+<div class="play-round-container">
+  <h2>Primera Fecha</h2>
+  <div *ngIf="loading" class="loading">Simulando partidos...</div>
+  <div *ngIf="!loading && animatedMatches.length > 0">
+    <table class="match-table">
+      <thead>
+        <tr>
+          <th>Partido</th>
+          <th>Minuto</th>
+          <th>Resultado</th>
+          <th>Evento</th>
+          <th>Estado</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let anim of animatedMatches">
+          <td>
+            {{ teamNameMap[anim.match.homeTeamId] || anim.match.homeTeamId }}
+            vs
+            {{ teamNameMap[anim.match.awayTeamId] || anim.match.awayTeamId }}
+          </td>
+          <td>{{ anim.currentMinute }}</td>
+          <td>{{ anim.partialHomeGoals }} - {{ anim.partialAwayGoals }}</td>
+          <td>
+            <span *ngIf="anim.currentEvent">{{ anim.currentEvent.minute }}' - {{ anim.currentEvent.description }}</span>
+          </td>
+          <td>
+            <span *ngIf="anim.finished">Finalizado</span>
+            <span *ngIf="!anim.finished">Jugando</span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div *ngIf="!loading && animatedMatches.length === 0" class="no-matches">No hay partidos para la primera fecha.</div>
+  <a routerLink="../" class="back-btn">Volver</a>
+</div>

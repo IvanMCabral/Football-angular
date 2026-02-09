@@ -1,0 +1,51 @@
+<div class="promotions-dialog">
+  <h2 mat-dialog-title>📊 Ascensos y Descensos</h2>
+
+  <mat-dialog-content>
+    <mat-tab-group>
+
+      <mat-tab label="⬆️ Ascensos">
+        <div class="tab-content">
+          <div *ngIf="promoted.length === 0" class="empty-state">
+            <p>No hay ascensos esta temporada.</p>
+          </div>
+
+          <div *ngIf="promoted.length > 0" class="promotions-list">
+            <div *ngFor="let p of promoted" class="promotion-item promoted">
+              <div class="arrow">⬆️</div>
+              <div class="team-info">
+                <span class="team-name">{{ p.teamName }}</span>
+                <span class="movement">{{ p.fromDivisionName }} → {{ p.toDivisionName }}</span>
+              </div>
+              <div class="position-badge">{{ p.fromPosition }}°</div>
+            </div>
+          </div>
+        </div>
+      </mat-tab>
+
+      <mat-tab label="⬇️ Descensos">
+        <div class="tab-content">
+          <div *ngIf="relegated.length === 0" class="empty-state">
+            <p>No hay descensos esta temporada.</p>
+          </div>
+
+          <div *ngIf="relegated.length > 0" class="promotions-list">
+            <div *ngFor="let p of relegated" class="promotion-item relegated">
+              <div class="arrow">⬇️</div>
+              <div class="team-info">
+                <span class="team-name">{{ p.teamName }}</span>
+                <span class="movement">{{ p.fromDivisionName }} → {{ p.toDivisionName }}</span>
+              </div>
+              <div class="position-badge">{{ p.fromPosition }}°</div>
+            </div>
+          </div>
+        </div>
+      </mat-tab>
+
+    </mat-tab-group>
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button mat-dialog-close>Cerrar</button>
+  </mat-dialog-actions>
+</div>

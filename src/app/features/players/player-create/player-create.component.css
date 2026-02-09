@@ -1,0 +1,134 @@
+.container {
+  padding: 2rem;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.random-section {
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  background: #fff3e0;
+  border-radius: 8px;
+}
+
+.random-section h3 {
+  margin-top: 0;
+  color: #FF9800;
+}
+
+.random-controls {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.random-controls label {
+  font-weight: 600;
+}
+
+.form-control-inline {
+  width: 100px;
+  padding: 0.5rem;
+  border: 2px solid #FF9800;
+  border-radius: 4px;
+  font-size: 1rem;
+}
+
+.btn-random {
+  padding: 1rem 2rem;
+  background: #FF9800;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.btn-random:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.btn-random:hover:not(:disabled) {
+  background: #F57C00;
+}
+
+hr {
+  margin: 2rem 0;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 1rem;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.form-group {
+  margin-bottom: 1rem;
+}
+
+label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: bold;
+}
+
+.form-control {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.actions {
+  display: flex;
+  gap: 1rem;
+}
+
+button {
+  padding: 0.75rem 1.5rem;
+  background: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.btn-cancel {
+  padding: 0.75rem 1.5rem;
+  background: #999;
+  color: white;
+  text-decoration: none;
+  border-radius: 4px;
+  display: inline-block;
+  text-align: center;
+}
+
+.error {
+  color: red;
+  margin-top: 1rem;
+  padding: 1rem;
+  background: #ffebee;
+  border-radius: 4px;
+}
+
+.success {
+  color: green;
+  margin-top: 1rem;
+  padding: 1rem;
+  background: #e8f5e9;
+  border-radius: 4px;
+}

@@ -1,0 +1,335 @@
+/* Dialog Container */
+.fixture-modal {
+  background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+  color: #ffffff;
+}
+
+h2[mat-dialog-title] {
+  margin: 0;
+  padding: 20px 24px;
+  border-bottom: 2px solid #667eea;
+  background: linear-gradient(90deg, #16213e 0%, #1a1a2e 100%);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.title-icon {
+  font-size: 28px;
+}
+
+.title-subtitle {
+  font-size: 14px;
+  color: #b8b8d1;
+  font-weight: normal;
+  margin-left: auto;
+}
+
+mat-dialog-content {
+  padding: 0;
+  background: transparent;
+  color: #fff;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+/* Loading State */
+.loading,
+.error {
+  padding: 60px 40px;
+  text-align: center;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(102, 126, 234, 0.2);
+  border-top-color: #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.error {
+  color: #fc8181;
+}
+
+.error-icon {
+  font-size: 48px;
+}
+
+/* Material Tabs Theme */
+::ng-deep .mat-mdc-tab-group {
+  --mdc-tab-indicator-active-indicator-color: #ffd700;
+  --mat-tab-header-active-label-text-color: #ffd700;
+  --mat-tab-header-active-focus-label-text-color: #ffd700;
+  --mat-tab-header-active-hover-label-text-color: #ffd700;
+  --mat-tab-header-inactive-label-text-color: #b8b8d1;
+}
+
+::ng-deep .mat-mdc-tab-header {
+  background: rgba(45, 53, 97, 0.8);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+::ng-deep .mat-mdc-tab-body-wrapper {
+  padding: 20px;
+}
+
+/* Division Tab Styles */
+.division-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  font-weight: 500;
+  font-size: 14px;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.division-tab-color-0 {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.division-tab-color-1 {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  color: white;
+}
+
+.division-tab-color-2 {
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  color: white;
+}
+
+.division-tab-color-3 {
+  background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+  color: #1a1a2e;
+}
+
+.user-division {
+  color: #ffd700 !important;
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+  background: linear-gradient(135deg, #ffd700 0%, #ff8c00 100%) !important;
+  color: #1a1a2e !important;
+}
+
+.user-badge {
+  font-size: 16px;
+}
+
+.division-content {
+  padding: 8px;
+}
+
+/* Round Section */
+.round-section {
+  margin-bottom: 20px;
+  background: rgba(31, 37, 68, 0.6);
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.round-section.current-round {
+  border-color: rgba(255, 215, 0, 0.5);
+  box-shadow: 0 0 15px rgba(255, 215, 0, 0.1);
+}
+
+.round-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-weight: 600;
+  font-size: 16px;
+  color: #fff;
+}
+
+.round-header-color-0 {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.round-header-color-1 {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+
+.round-header-color-2 {
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+}
+
+.round-header-color-3 {
+  background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+}
+
+.round-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.bye-badge {
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.no-matches {
+  padding: 24px;
+  text-align: center;
+  color: #718096;
+  font-style: italic;
+}
+
+.round-matches {
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Fixture Card */
+.fixture-card {
+  background: rgba(26, 26, 46, 0.8);
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: all 0.2s ease;
+}
+
+.fixture-card:hover {
+  transform: translateX(4px);
+  border-color: rgba(255, 215, 0, 0.3);
+}
+
+.fixture-card.completed {
+  border-color: rgba(72, 187, 120, 0.5);
+  background: rgba(26, 46, 26, 0.5);
+}
+
+.match-status {
+  display: inline-block;
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-weight: 600;
+  margin: 8px 16px;
+}
+
+.status-PENDING {
+  background: rgba(255, 255, 255, 0.1);
+  color: #b8b8d1;
+}
+
+.status-IN_PROGRESS {
+  background: linear-gradient(135deg, #f6e05e 0%, #d69e2e 100%);
+  color: #1a1a2e;
+}
+
+.status-COMPLETED {
+  background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+  color: white;
+}
+
+.match-body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  gap: 16px;
+}
+
+.team {
+  flex: 1;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 500;
+  color: #ffffff;
+}
+
+.score {
+  min-width: 100px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.score-value {
+  font-size: 24px;
+  font-weight: bold;
+  color: #67e8f9;
+}
+
+.score-vs {
+  font-size: 14px;
+  color: #718096;
+  font-weight: 600;
+  letter-spacing: 2px;
+}
+
+/* Dialog Actions */
+mat-dialog-actions {
+  background: linear-gradient(90deg, #16213e 0%, #1a1a2e 100%);
+  padding: 16px 24px;
+  border-top: 1px solid rgba(102, 126, 234, 0.3);
+}
+
+::ng-deep .mat-mdc-raised-button.mat-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white !important;
+}
+
+/* Free Teams Section */
+.free-teams-section {
+  margin-top: 24px;
+  padding: 20px;
+  background: rgba(31, 37, 68, 0.6);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 107, 107, 0.3);
+}
+
+.free-teams-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  color: #ff6b6b;
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.free-icon {
+  font-size: 24px;
+}
+
+.free-title {
+  font-size: 18px;
+}
+
+.free-teams-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.free-team-card {
+  background: rgba(255, 107, 107, 0.2);
+  color: #ff6b6b;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-weight: 500;
+  border: 1px solid rgba(255, 107, 107, 0.4);
+}

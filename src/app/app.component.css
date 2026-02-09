@@ -1,0 +1,68 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.main-content {
+  flex: 1;
+  background-color: #f5f5f5;
+}
+
+.footer {
+  background: #1e3c72;
+  color: white;
+  text-align: center;
+  padding: 2rem;
+  margin-top: 2rem;
+}
+
+.footer p {
+  margin: 0;
+}
+
+/* Fixture Modal Panel - Full Width */
+.fixture-modal-panel .mat-mdc-dialog-container {
+  --mdc-dialog-container-shape: 16px;
+  max-width: 95vw !important;
+  width: 95vw !important;
+}
+
+.fixture-modal-panel {
+  max-width: 95vw !important;
+  width: 95vw !important;
+}
+
+@media (min-width: 1400px) {
+  .fixture-modal-panel .mat-mdc-dialog-container {
+    max-width: 1400px !important;
+    width: 1400px !important;
+  }
+  
+  .fixture-modal-panel {
+    max-width: 1400px !important;
+  }
+}
+
+/* Standings Modal Panel */
+.standings-modal-panel .mat-mdc-dialog-container {
+  --mdc-dialog-container-shape: 16px;
+  max-width: 95vw !important;
+  width: 95vw !important;
+}
+
+.standings-modal-panel {
+  max-width: 95vw !important;
+  width: 95vw !important;
+}
+
+@media (min-width: 1200px) {
+  .standings-modal-panel .mat-mdc-dialog-container {
+    max-width: 1100px !important;
+    width: 1100px !important;
+  }
+  
+  .standings-modal-panel {
+    max-width: 1100px !important;
+  }
+}

@@ -1,0 +1,32 @@
+<div class="round-live-container" *ngIf="vm$ | async as vm">
+
+  <div class="header">
+    <h2>Fecha {{ vm.roundNumber }} - En Vivo</h2>
+    <div class="controls">
+      <button *ngIf="!vm.allFinished && !vm.isRoundPaused" (click)="pauseAll()" class="btn btn-pause">⏸️ Pausar Todos</button>
+      <button *ngIf="!vm.allFinished && vm.isRoundPaused" (click)="resumeAll()" class="btn btn-resume">▶️ Reanudar Todos</button>
+      <a [routerLink]="['/games', vm.gameId]" class="btn btn-back">Volver</a>
+    </div>
+  </div>
+
+  <div *ngIf="vm.errorMsg" class="error">{{ vm.errorMsg }}</div>
+
+  <div class="matches-grid">
+    <app-match-card
+      *ngFor="let rm of vm.matches"
+      [match]="rm.match"
+      [state]="rm.state"
+      [isUserMatch]="rm.isUserMatch"
+      [homeTeamName]="getTeamName(rm.match.homeTeamId, vm.teamNameMap)"
+      [awayTeamName]="getTeamName(rm.match.awayTeamId, vm.teamNameMap)"
+      (tacticChange)="onTacticChange(rm.match, $event)">
+    </app-match-card>
+  </div>
+
+  <div class="footer" *ngIf="vm.allFinished">
+    <h3>¡Fecha {{ vm.roundNumber }} Finalizada!</h3>
+    <button (click)="goToRoundSummary()" class="btn btn-primary btn-large">
+      📋 Ver Resumen de Fecha
+    </button>
+  </div>
+</div>

@@ -1,0 +1,69 @@
+<div class="container">
+  <h2>🏆 Manage Leagues & Teams</h2>
+  
+  <!-- League Selector -->
+  <div class="section">
+    <h3>Select a League</h3>
+    <select [(ngModel)]="selectedLeagueId" (change)="onLeagueChange()" class="league-select">
+      <option [value]="null">-- Select League --</option>
+      <option *ngFor="let league of (leagues$ | async)" [value]="league.realLeagueId">{{ league.name }}</option>
+    </select>
+  </div>
+
+  <!-- Teams in Selected League -->
+  <div class="section" *ngIf="selectedLeagueId">
+    <h3>Teams in {{ selectedLeagueName$ | async }}</h3>
+    <div class="teams-grid">
+      <div *ngFor="let team of (teamsInLeague$ | async)" class="team-card">
+        <h4>{{ team.name }}</h4>
+        <p>{{ team.city || 'N/A' }}, {{ team.country }}</p>
+        <div class="team-actions">
+          <button (click)="viewRoster(team)" class="btn-roster">📋 Roster</button>
+          <button (click)="removeTeam(team)" class="btn-remove">❌ Remove</button>
+        </div>
+      </div>
+      <div *ngIf="(teamsInLeague$ | async)?.length === 0" class="empty-state">
+        No teams in this league yet
+      </div>
+    </div>
+  </div>
+
+  <!-- Available Teams (not in any league) -->
+  <div class="section" *ngIf="selectedLeagueId">
+    <h3>Add Teams to League</h3>
+    <div class="teams-grid">
+      <div *ngFor="let team of (availableTeams$ | async)" class="team-card available">
+        <h4>{{ team.name }}</h4>
+        <p>{{ team.city || 'N/A' }}, {{ team.country }}</p>
+        <button (click)="addTeam(team)" class="btn-add">➕ Add to League</button>
+      </div>
+      <div *ngIf="(availableTeams$ | async)?.length === 0" class="empty-state">
+        No available teams to add
+      </div>
+    </div>
+  </div>
+
+  <!-- Roster View Modal -->
+  <div *ngIf="(selectedTeamForRoster$ | async) as selectedTeam" class="modal-overlay" (click)="closeRoster()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <h3>{{ selectedTeam.name }} - Roster</h3>
+      <div class="roster-info">
+        <p><strong>Squad Size:</strong> {{ (rosterPlayers$ | async)?.length || 0 }}</p>
+      </div>
+      <div class="roster-list">
+        <div *ngFor="let player of (rosterPlayers$ | async)" class="player-item">
+          <span class="player-name">{{ player.name }}</span>
+          <span class="player-position">{{ player.position }}</span>
+          <span class="player-rating">⭐ {{ player.overallRating }}</span>
+          <button (click)="removePlayerFromRoster(player)" class="btn-remove-player">Remove</button>
+        </div>
+        <div *ngIf="(rosterPlayers$ | async)?.length === 0" class="empty-state">
+          No players in this team
+        </div>
+      </div>
+      <button (click)="closeRoster()" class="btn-close">Close</button>
+    </div>
+  </div>
+
+  <a routerLink="/dashboard" class="btn-back">← Back to Dashboard</a>
+</div>

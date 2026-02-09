@@ -1,0 +1,112 @@
+<div class="match-live-container">
+  <h2>Partido en Vivo</h2>
+  
+  <div *ngIf="errorMsg" class="error">{{ errorMsg }}</div>
+  
+  <div *ngIf="matchState" class="match-info">
+    <!-- Equipos y resultado -->
+    <div class="teams-section">
+      <div class="team home-team">
+        <h3>{{ teamNameMap[matchState.homeTeamId] || 'Equipo Local' }}</h3>
+        <div class="score">{{ matchState.score.home }}</div>
+      </div>
+      <div class="vs">VS</div>
+      <div class="team away-team">
+        <h3>{{ teamNameMap[matchState.awayTeamId] || 'Equipo Visitante' }}</h3>
+        <div class="score">{{ matchState.score.away }}</div>
+      </div>
+    </div>
+
+    <!-- Minuto actual y estado -->
+    <div class="match-status">
+      <div class="minute">Minuto {{ matchState.currentMinute }}'</div>
+      <div class="status" [class.running]="matchState.status === 'RUNNING'" 
+                          [class.paused]="matchState.status === 'PAUSED'"
+                          [class.finished]="matchState.status === 'FINISHED'">
+        {{ getStatusText(matchState.status) }}
+      </div>
+    </div>
+
+    <!-- Controles -->
+    <div class="controls" *ngIf="matchState.status !== 'FINISHED'">
+      <button *ngIf="matchState.status === 'RUNNING'" 
+              (click)="pauseMatch()" 
+              class="btn btn-pause">
+        ⏸️ Pausar
+      </button>
+      <button *ngIf="matchState.status === 'PAUSED'" 
+              (click)="resumeMatch()" 
+              class="btn btn-resume">
+        ▶️ Reanudar
+      </button>
+      <button (click)="stopMatch()" class="btn btn-stop">
+        ⏹️ Cancelar Partido
+      </button>
+    </div>
+
+    <!-- Tácticas -->
+    <div class="tactics" *ngIf="matchState.status !== 'FINISHED'">
+      <div class="tactic-control">
+        <h4>{{ teamNameMap[matchState.homeTeamId] || 'Local' }}</h4>
+        <div class="tactic-buttons">
+          <button (click)="changeTactic('HOME', 'DEFEND')" 
+                  [class.active]="matchState.homeTactic === 'DEFEND'"
+                  class="btn-tactic">
+            🛡️ Defensiva
+          </button>
+          <button (click)="changeTactic('HOME', 'BALANCED')" 
+                  [class.active]="matchState.homeTactic === 'BALANCED'"
+                  class="btn-tactic">
+            ⚖️ Normal
+          </button>
+          <button (click)="changeTactic('HOME', 'ATTACK')" 
+                  [class.active]="matchState.homeTactic === 'ATTACK'"
+                  class="btn-tactic">
+            ⚔️ Ofensiva
+          </button>
+        </div>
+      </div>
+      <div class="tactic-control">
+        <h4>{{ teamNameMap[matchState.awayTeamId] || 'Visitante' }}</h4>
+        <div class="tactic-buttons">
+          <button (click)="changeTactic('AWAY', 'DEFEND')" 
+                  [class.active]="matchState.awayTactic === 'DEFEND'"
+                  class="btn-tactic">
+            🛡️ Defensiva
+          </button>
+          <button (click)="changeTactic('AWAY', 'BALANCED')" 
+                  [class.active]="matchState.awayTactic === 'BALANCED'"
+                  class="btn-tactic">
+            ⚖️ Normal
+          </button>
+          <button (click)="changeTactic('AWAY', 'ATTACK')" 
+                  [class.active]="matchState.awayTactic === 'ATTACK'"
+                  class="btn-tactic">
+            ⚔️ Ofensiva
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Eventos recientes -->
+    <div class="events" *ngIf="matchState.events && matchState.events.length > 0">
+      <h4>Eventos Recientes</h4>
+      <div class="event-list">
+        <div *ngFor="let event of matchState.events" class="event">
+          <span class="event-minute">{{ event.minute }}'</span>
+          <span class="event-icon">{{ getEventIcon(event.eventType) }}</span>
+          <span class="event-desc">{{ event.description }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Botón volver -->
+    <div class="back-section" *ngIf="matchState.status === 'FINISHED'">
+      <a [routerLink]="['/games', gameId]" class="back-btn">Volver al Juego</a>
+    </div>
+  </div>
+
+  <div *ngIf="!matchState && !errorMsg" class="loading">
+    Cargando partido...
+  </div>
+</div>

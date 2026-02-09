@@ -1,0 +1,216 @@
+.champion-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 2rem;
+}
+.champion-banner {
+  text-align: center;
+  color: white;
+  padding: 3rem 1rem;
+  margin-bottom: 2rem;
+}
+.trophy-animation {
+  font-size: 6rem;
+  animation: bounce 1s infinite alternate;
+  margin-bottom: 1rem;
+}
+@keyframes bounce {
+  from { transform: translateY(0); }
+  to { transform: translateY(-20px); }
+}
+.champion-banner h1 {
+  font-size: 3rem;
+  margin: 1rem 0;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+.champion-card {
+  background: white;
+  color: #1e3c72;
+  border-radius: 16px;
+  padding: 2rem;
+  max-width: 600px;
+  margin: 2rem auto;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+}
+.champion-badge {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  color: white;
+  padding: 0.5rem 1.5rem;
+  border-radius: 20px;
+  display: inline-block;
+  font-weight: bold;
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+}
+.champion-card h2 {
+  font-size: 2.5rem;
+  margin: 1rem 0;
+}
+.champion-stats {
+  display: flex;
+  justify-content: space-around;
+  margin-top: 2rem;
+  gap: 1rem;
+}
+.stat {
+  text-align: center;
+}
+.stat-label {
+  display: block;
+  font-size: 0.9rem;
+  color: #666;
+  margin-bottom: 0.5rem;
+}
+.stat-value {
+  display: block;
+  font-size: 2rem;
+  font-weight: bold;
+  color: #667eea;
+}
+.loading, .error {
+  color: white;
+  font-size: 1.2rem;
+  margin: 2rem 0;
+}
+.error {
+  color: #ff5252;
+}
+.final-standings-section {
+  max-width: 1200px;
+  margin: 0 auto;
+  background: white;
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+}
+.final-standings-section h3 {
+  text-align: center;
+  color: #1e3c72;
+  font-size: 2rem;
+  margin-bottom: 2rem;
+}
+.podium {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 1rem;
+  margin-bottom: 3rem;
+  padding: 0 2rem;
+}
+.podium-place {
+  text-align: center;
+  padding: 1.5rem 1rem;
+  border-radius: 12px;
+  background: #f8f9fa;
+  min-width: 150px;
+}
+.podium-place.first {
+  background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+  transform: translateY(-20px);
+  min-width: 180px;
+}
+.podium-place.second {
+  background: linear-gradient(135deg, #c0c0c0 0%, #e8e8e8 100%);
+}
+.podium-place.third {
+  background: linear-gradient(135deg, #cd7f32 0%, #daa06d 100%);
+}
+.medal {
+  font-size: 3rem;
+  margin-bottom: 0.5rem;
+}
+.place-number {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #1e3c72;
+  margin-bottom: 0.5rem;
+}
+.place-team {
+  font-weight: 600;
+  color: #1e3c72;
+  margin-bottom: 0.25rem;
+}
+.place-points {
+  font-size: 0.9rem;
+  color: #666;
+}
+.table-container {
+  overflow-x: auto;
+}
+.final-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.final-table th {
+  background: #1e3c72;
+  color: white;
+  padding: 1rem 0.5rem;
+  text-align: center;
+  font-weight: 600;
+}
+.final-table td {
+  padding: 1rem 0.5rem;
+  text-align: center;
+  border-bottom: 1px solid #e0e0e0;
+}
+.final-table .champion-row {
+  background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+  font-weight: bold;
+}
+.position {
+  font-size: 1.2rem;
+}
+.team-name {
+  text-align: left !important;
+  font-weight: 500;
+}
+.points {
+  font-weight: bold;
+  font-size: 1.1rem;
+  color: #2ecc71;
+}
+.positive {
+  color: #27ae60;
+}
+.negative {
+  color: #e74c3c;
+}
+.actions {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 3rem;
+  flex-wrap: wrap;
+}
+.btn {
+  padding: 1rem 2rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+.btn-primary {
+  background: white;
+  color: #667eea;
+}
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(255, 255, 255, 0.3);
+}
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+}
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+.btn-success {
+  background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+  color: white;
+}
+.btn-success:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(72, 187, 120, 0.4);
+}

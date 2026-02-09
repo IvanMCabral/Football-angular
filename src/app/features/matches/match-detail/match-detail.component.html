@@ -1,0 +1,23 @@
+<div class="match-detail-container">
+  <h1>Match Progress</h1>
+  <div *ngIf="loading">Loading match progress...</div>
+  <div *ngIf="error">{{ error }}</div>
+  <div *ngIf="!loading && !error && currentState">
+    <h2>Minute: {{ currentState.minute }}</h2>
+    <div class="score">
+      <span>Home: {{ currentState.homeGoals }}</span>
+      <span>Away: {{ currentState.awayGoals }}</span>
+    </div>
+    <div class="status">Status: {{ currentState.status }}</div>
+    <div class="events">
+      <h3>Events</h3>
+      <ul>
+        <li *ngFor="let event of currentState.events">
+          <strong>{{ event.minute }}'</strong> - {{ event.type }} - {{ event.playerName }}: {{ event.description }}
+        </li>
+      </ul>
+    </div>
+    <div *ngIf="isFinished" class="finished">Match finished!</div>
+  </div>
+  <a routerLink="/matches" class="back-link">← Back to matches</a>
+</div>

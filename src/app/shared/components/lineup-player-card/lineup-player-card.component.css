@@ -1,0 +1,74 @@
+.lineup-player-card {
+  border: 2px solid #cbd5e0;
+  border-radius: 8px;
+  padding: 0.75rem;
+  background: white;
+}
+
+.lineup-player-card.goalkeeper {
+  border-color: #ecc94b;
+  background: #fffff0;
+}
+
+.lineup-player-card.defender {
+  border-color: #4299e1;
+  background: #ebf8ff;
+}
+
+.lineup-player-card.midfielder {
+  border-color: #48bb78;
+  background: #f0fff4;
+}
+
+.lineup-player-card.attacker {
+  border-color: #f56565;
+  background: #fff5f5;
+}
+
+.lineup-player-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.lineup-player-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.lineup-player-position {
+  background: #4a5568;
+  color: white;
+  padding: 0.1rem 0.4rem;
+  border-radius: 8px;
+  font-size: 0.7rem;
+}
+
+.lineup-player-stats {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.25rem;
+}
+
+.lineup-overall {
+  font-weight: bold;
+  color: #2d3748;
+}
+
+.lineup-energy {
+  font-size: 0.85rem;
+  color: #48bb78;
+  font-weight: 600;
+}
+
+.lineup-energy.low-energy {
+  color: #f56565;
+}
+
+.lineup-player-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: #718096;
+}

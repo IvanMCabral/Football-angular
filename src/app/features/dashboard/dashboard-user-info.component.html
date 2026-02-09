@@ -1,0 +1,10 @@
+<div class="user-info-card" *ngIf="username">
+  <div class="user-info-header">
+    <span class="user-icon">👤</span>
+    <span class="user-name">{{ username }}</span>
+  </div>
+  <div *ngIf="teamName" class="user-team">
+    <span class="team-icon">⚽</span>
+    <span class="team-name">{{ teamName }}</span>
+  </div>
+</div>

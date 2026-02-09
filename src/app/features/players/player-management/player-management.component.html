@@ -1,0 +1,62 @@
+<div class="container">
+  <h2 class="section-title">⚽ Manage Players & Teams</h2>
+
+  <!-- Team Selector (Session Teams from Redis) -->
+  <div class="section">
+    <h3>Select Team</h3>
+    <select [(ngModel)]="selectedTeamId" (change)="onTeamChange()" class="select-control">
+      <option value="">-- Select Team --</option>
+      <option *ngFor="let team of teams$ | async" [value]="team.sessionTeamId">{{ team.name }} ({{ team.country }})</option>
+    </select>
+    <p *ngIf="(teams$ | async)?.length === 0" class="warning-text">No teams created yet. Create teams first!</p>
+  </div>
+
+  <!-- Player Management Columns -->
+  <div class="columns-container" *ngIf="selectedTeamId">
+    <!-- Assigned Players (Team Squad) -->
+    <div class="column">
+      <h3>🏟️ Team Squad</h3>
+      <div class="players-list">
+        <div *ngFor="let player of assignedPlayers$ | async" class="player-card">
+          <div class="player-info">
+            <h4>{{ player.name }}</h4>
+            <p class="player-details">
+              <span class="position">{{ player.position }}</span>
+              <span class="age">Age: {{ player.age }}</span>
+              <span class="overall">OVR: {{ player.overall }}</span>
+            </p>
+          </div>
+          <button (click)="removePlayerFromTeam(player)" class="btn-remove">
+            ➖ Remove
+          </button>
+        </div>
+        <div *ngIf="(assignedPlayers$ | async)?.length === 0" class="empty-state">
+          No players in team squad
+        </div>
+      </div>
+    </div>
+
+    <!-- Available Players (No Team) -->
+    <div class="column">
+      <h3>🆓 Available Players</h3>
+      <div class="players-list">
+        <div *ngFor="let player of availablePlayers$ | async" class="player-card">
+          <div class="player-info">
+            <h4>{{ player.name }}</h4>
+            <p class="player-details">
+              <span class="position">{{ player.position }}</span>
+              <span class="age">Age: {{ player.age }}</span>
+              <span class="overall">OVR: {{ player.overall }}</span>
+            </p>
+          </div>
+          <button (click)="addPlayerToTeam(player)" class="btn-add">
+            ➕ Add
+          </button>
+        </div>
+        <div *ngIf="(availablePlayers$ | async)?.length === 0" class="empty-state">
+          No available players
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

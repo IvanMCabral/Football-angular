@@ -1,0 +1,35 @@
+<div class="modal-backdrop" (click)="close()"></div>
+<div class="modal-content">
+  <h2>Fixture de Partidos</h2>
+  <button class="close-btn" (click)="close()">×</button>
+  <div *ngIf="matches.length; else noFixture">
+    <ng-container *ngFor="let round of getRounds(matches)">
+      <h3 class="fixture-round">Fecha {{ round }}</h3>
+      <table class="fixture-table">
+        <thead>
+          <tr>
+            <th>Local</th>
+            <th>Visitante</th>
+            <th>Fecha</th>
+            <th>Acción</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let match of getMatchesForRound(round)">
+            <td>{{ teamNameMap[match.homeTeamId] || match.homeTeamId }}</td>
+            <td>{{ teamNameMap[match.awayTeamId] || match.awayTeamId }}</td>
+            <td>{{ match.scheduledAt | date:'short' }}</td>
+            <td>
+              <button class="play-live-btn" (click)="playLive(match)">
+                ▶️ Jugar en Vivo
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </ng-container>
+  </div>
+  <ng-template #noFixture>
+    <p>No hay partidos programados.</p>
+  </ng-template>
+</div>

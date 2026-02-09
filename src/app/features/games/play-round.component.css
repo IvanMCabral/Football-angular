@@ -1,0 +1,73 @@
+.play-round-container {
+  max-width: 600px;
+  margin: 2rem auto;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(30,60,114,0.08);
+  padding: 2.5rem 2rem 2rem 2rem;
+  text-align: center;
+}
+h2 {
+  color: #1e3c72;
+  margin-bottom: 2rem;
+}
+.match-card {
+  background: #f5f7fa;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  padding: 1.2rem 1rem;
+  box-shadow: 0 1px 4px rgba(30,60,114,0.05);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.teams {
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+.team {
+  color: #1e3c72;
+}
+.vs {
+  margin: 0 0.7rem;
+  color: #888;
+}
+.result {
+  font-size: 1.1rem;
+  margin-top: 0.2rem;
+}
+.score {
+  font-weight: bold;
+  color: #2a5298;
+  margin-right: 0.7rem;
+}
+.status {
+  color: #1e3c72;
+  font-size: 0.98rem;
+}
+.loading {
+  color: #1e3c72;
+  font-size: 1.1rem;
+  margin-bottom: 2rem;
+}
+.no-matches {
+  color: #888;
+  margin: 2rem 0;
+}
+.back-btn {
+  display: inline-block;
+  margin-top: 2rem;
+  padding: 0.8rem 2.2rem;
+  border-radius: 8px;
+  background: #f5f7fa;
+  color: #1e3c72;
+  border: 1.5px solid #1e3c72;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.2s, color 0.2s;
+}
+.back-btn:hover {
+  background: #e3eafc;
+  color: #16305a;
+}

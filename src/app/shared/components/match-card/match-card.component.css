@@ -1,0 +1,168 @@
+.match-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 1rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  border: 2px solid transparent;
+  transition: all 0.3s ease;
+}
+
+.match-card.user-match {
+  border-color: #ffd700;
+  background: linear-gradient(135deg, #fff 0%, #fffbeb 100%);
+}
+
+.match-card.finished {
+  opacity: 0.85;
+}
+
+.match-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.match-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #667eea;
+}
+
+.user-match .match-label {
+  color: #d69e2e;
+}
+
+.match-status {
+  font-size: 0.7rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.status-NOT_STARTED { background: #edf2f7; color: #718096; }
+.status-RUNNING { background: #c6f6d5; color: #276749; }
+.status-PAUSED { background: #fefcbf; color: #975a16; }
+.status-FINISHED { background: #e2e8f0; color: #4a5568; }
+
+.match-teams {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.team {
+  flex: 1;
+  text-align: center;
+}
+
+.team-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #2d3748;
+  margin-bottom: 0.25rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.team-score {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #1a202c;
+}
+
+.vs {
+  font-size: 0.75rem;
+  color: #a0aec0;
+  font-weight: 600;
+}
+
+.match-minute {
+  text-align: center;
+  font-size: 0.8rem;
+  color: #718096;
+  margin-top: 0.5rem;
+  font-weight: 500;
+}
+
+.tactics-section {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.tactics-section h4 {
+  margin: 0 0 0.5rem;
+  font-size: 0.8rem;
+  color: #4a5568;
+}
+
+.tactics-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.tactic-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tactic-group label {
+  font-size: 0.7rem;
+  color: #718096;
+  width: 80px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tactic-buttons {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.btn-tactic {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 6px;
+  background: #f7fafc;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s;
+}
+
+.btn-tactic:hover {
+  background: #edf2f7;
+}
+
+.btn-tactic.active {
+  background: #667eea;
+  color: white;
+}
+
+.events-mini {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.event-mini {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: #4a5568;
+}
+
+.event-minute {
+  font-weight: 600;
+  color: #667eea;
+}

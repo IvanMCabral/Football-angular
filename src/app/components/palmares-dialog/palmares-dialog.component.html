@@ -1,0 +1,88 @@
+<div class="palmares-dialog">
+  <h2 mat-dialog-title>📜 Palmarés</h2>
+
+  <mat-dialog-content>
+    <!-- Selector de división -->
+    <div class="selector-container">
+      <mat-form-field appearance="outline" class="division-select">
+        <mat-label>Liga / División</mat-label>
+        <mat-select [(value)]="selectedDivisionId" (selectionChange)="onDivisionChange()">
+          @for (division of divisions; track division.divisionId) {
+            <mat-option [value]="division.divisionId">
+              {{ division.displayName }}
+            </mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs-container">
+      <!-- Tab: Últimos Campeones -->
+      <div class="tab" [class.active]="activeTab === 'champions'">
+        <button class="tab-btn" (click)="activeTab = 'champions'">
+          🏆 Últimos Campeones
+        </button>
+        <div class="tab-content">
+          @if (loadingChampions) {
+            <div class="loading">Cargando...</div>
+          } @else if (champions.length === 0) {
+            <div class="empty-state">
+              <p>No hay campeones en esta división.</p>
+            </div>
+          } @else {
+            <div class="champions-list">
+              @for (entry of champions; track entry.season) {
+                <div class="champion-item">
+                  <div class="season-badge">T{{ entry.season }}</div>
+                  <div class="champion-info">
+                    <span class="trophy">🏆</span>
+                    <span class="team-name">{{ entry.championTeamName }}</span>
+                    @if (entry.championCoachName) {
+                      <span class="coach-name">(DT: {{ entry.championCoachName }})</span>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      </div>
+
+      <!-- Tab: TOPs Históricos -->
+      <div class="tab" [class.active]="activeTab === 'tops'">
+        <button class="tab-btn" (click)="activeTab = 'tops'">
+          ⭐ TOP Históricos
+        </button>
+        <div class="tab-content">
+          @if (loadingTops) {
+            <div class="loading">Cargando...</div>
+          } @else if (topTeams.length === 0) {
+            <div class="empty-state">
+              <p>No hay títulos registrados en esta división.</p>
+            </div>
+          } @else {
+            <div class="tops-grid">
+              @for (topTeam of topTeams; track topTeam.teamId) {
+                <div class="top-card" [class.gold]="$index === 0" [class.silver]="$index === 1" [class.bronze]="$index === 2">
+                  <div class="top-rank">#{{ $index + 1 }}</div>
+                  <div class="top-info">
+                    <span class="top-team">{{ topTeam.teamName }}</span>
+                    @if (topTeam.coachName) {
+                      <span class="top-coach">{{ topTeam.coachName }}</span>
+                    }
+                  </div>
+                  <div class="top-titles">{{ topTeam.titles }} {{ topTeam.titles === 1 ? 'título' : 'títulos' }}</div>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button mat-dialog-close>Cerrar</button>
+  </mat-dialog-actions>
+</div>

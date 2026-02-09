@@ -1,0 +1,26 @@
+<div *ngIf="errorMsg; else loadedOrLoading">
+  <div class="error-msg">{{ errorMsg }}</div>
+  <button type="button" (click)="openFixtureModal()">Ver Fixture</button>
+</div>
+<ng-template #loadedOrLoading>
+  <div *ngIf="game && getValue(game.id); else loading">
+    <app-dashboard-user-info [username]="username" [teamName]="teamName"></app-dashboard-user-info>
+    <h2>Game Details</h2>
+    <div class="game-detail-card">
+      <div><strong>ID:</strong> {{ getValue(game.id) }}</div>
+      <div><strong>Name:</strong> {{ game.name }}</div>
+      <div><strong>Created At:</strong> {{ game.createdAt | date:'short' }}</div>
+      <div><strong>User ID:</strong> {{ getValue(game.userId) }}</div>
+      <div *ngIf="game.teamId"><strong>Team ID:</strong> {{ getValue(game.teamId) }}</div>
+    </div>
+    <div class="game-detail-actions">
+      <button type="button" class="action-btn play-btn" (click)="playFirstRound()">Jugar partido</button>
+      <button type="button" class="action-btn fixture-btn" (click)="openFixtureModal()">Ver Fixture</button>
+      <a routerLink="/dashboard" class="action-btn back-btn">Volver al Dashboard</a>
+    </div>
+    <app-dashboard-fixture-modal *ngIf="showFixtureModal" [matches]="fixtureMatches" [close]="closeFixtureModal.bind(this)" [teamNameMap]="teamNameMap" [gameId]="getValue(game.id)"></app-dashboard-fixture-modal>
+  </div>
+  <ng-template #loading>
+    <div>Loading game details...</div>
+  </ng-template>
+</ng-template>

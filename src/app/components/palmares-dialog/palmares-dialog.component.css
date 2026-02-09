@@ -1,0 +1,245 @@
+/* Dialog Container */
+.palmares-dialog {
+  min-width: 500px;
+  max-width: 600px;
+  background: #1a1a2e;
+  color: #fff;
+}
+
+h2[mat-dialog-title] {
+  margin: 0;
+  padding: 16px 24px;
+  border-bottom: 1px solid #333;
+  background: #16213e;
+  color: #fff;
+}
+
+mat-dialog-content {
+  padding: 0;
+  background: #1a1a2e;
+}
+
+/* Division Selector */
+.selector-container {
+  padding: 16px 24px;
+  background: #16213e;
+  border-bottom: 1px solid #333;
+}
+
+.division-select {
+  width: 100%;
+}
+
+::ng-deep .division-select .mat-mdc-form-field-subscript-wrapper {
+  display: none;
+}
+
+::ng-deep .division-select .mat-mdc-text-field-wrapper {
+  background: #0f3460;
+}
+
+::ng-deep .division-select .mat-mdc-form-field-label,
+::ng-deep .division-select .mat-mdc-select-value {
+  color: #fff !important;
+}
+
+/* Tabs */
+.tabs-container {
+  padding: 16px 24px;
+}
+
+.tab-btn {
+  width: 50%;
+  padding: 12px 16px;
+  background: #16213e;
+  border: none;
+  color: #888;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.tab-btn:first-child {
+  border-radius: 8px 0 0 0;
+}
+
+.tab-btn:last-child {
+  border-radius: 0 8px 0 0;
+}
+
+.tab.active .tab-btn {
+  background: #1a1a2e;
+  color: #ffd700;
+  border-bottom: 2px solid #ffd700;
+}
+
+.tab-content {
+  padding: 16px 0;
+  max-height: 350px;
+  overflow-y: auto;
+}
+
+.loading {
+  text-align: center;
+  padding: 2rem;
+  color: #888;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 2rem;
+  color: #666;
+}
+
+/* Champions List */
+.champions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.champion-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background: linear-gradient(135deg, #f6e05e 0%, #d69e2e 100%);
+  border-radius: 8px;
+  border: 1px solid #b7791f;
+}
+
+.season-badge {
+  background: rgba(0,0,0,0.2);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-weight: bold;
+  font-size: 0.8rem;
+  color: #744210;
+}
+
+.champion-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.trophy {
+  font-size: 1.1rem;
+}
+
+.team-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #744210;
+}
+
+.coach-name {
+  font-size: 0.75rem;
+  color: #975a16;
+}
+
+/* TOPs Grid */
+.tops-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.75rem;
+}
+
+.top-card {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: #16213e;
+  border-radius: 8px;
+  border: 1px solid #333;
+}
+
+.top-card.gold {
+  background: linear-gradient(135deg, #ffd700 0%, #ffb700 100%);
+  border-color: #daa520;
+}
+
+.top-card.silver {
+  background: linear-gradient(135deg, #c0c0c0 0%, #a0a0a0 100%);
+  border-color: #808080;
+}
+
+.top-card.bronze {
+  background: linear-gradient(135deg, #cd7f32 0%, #b87333 100%);
+  border-color: #8b4513;
+}
+
+.top-rank {
+  font-weight: bold;
+  font-size: 1.1rem;
+  min-width: 32px;
+  color: #ffd700;
+}
+
+.top-card.gold .top-rank,
+.top-card.silver .top-rank,
+.top-card.bronze .top-rank {
+  color: #fff;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+}
+
+.top-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.top-team {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #fff;
+}
+
+.top-card.gold .top-team,
+.top-card.silver .top-team,
+.top-card.bronze .top-team {
+  color: #fff;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+}
+
+.top-coach {
+  font-size: 0.7rem;
+  color: #888;
+}
+
+.top-card.gold .top-coach,
+.top-card.silver .top-coach,
+.top-card.bronze .top-coach {
+  color: rgba(255,255,255,0.9);
+}
+
+.top-titles {
+  background: rgba(255,215,0,0.15);
+  padding: 0.25rem 0.6rem;
+  border-radius: 12px;
+  font-weight: bold;
+  font-size: 0.85rem;
+  color: #ffd700;
+}
+
+.top-card.gold .top-titles,
+.top-card.silver .top-titles,
+.top-card.bronze .top-titles {
+  background: rgba(255,255,255,0.25);
+  color: #fff;
+}
+
+/* Dialog Actions */
+mat-dialog-actions {
+  padding: 8px 24px;
+  border-top: 1px solid #333;
+  background: #16213e;
+}
+
+::ng-deep .mat-mdc-button {
+  color: #ffd700 !important;
+}

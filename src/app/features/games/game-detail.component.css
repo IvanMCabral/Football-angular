@@ -1,0 +1,60 @@
+.game-detail-card {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  padding: 2rem;
+  margin-bottom: 2rem;
+  font-size: 1.1rem;
+}
+h2 {
+  margin-bottom: 1.5rem;
+}
+a {
+  color: #1e3c72;
+  text-decoration: underline;
+  font-weight: 500;
+}
+.game-detail-actions {
+  display: flex;
+  gap: 1.5rem;
+  margin-top: 2rem;
+}
+.action-btn {
+  display: inline-block;
+  padding: 1rem 2.2rem;
+  font-size: 1.1rem;
+  border-radius: 8px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+  box-shadow: 0 2px 8px rgba(30, 60, 114, 0.08);
+  text-decoration: none;
+  text-align: center;
+}
+.fixture-btn {
+  background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+  color: #fff;
+}
+.fixture-btn:hover {
+  background: linear-gradient(135deg, #2a5298 0%, #1e3c72 100%);
+  color: #fff;
+}
+.back-btn {
+  background: #f5f7fa;
+  color: #1e3c72;
+  border: 1.5px solid #1e3c72;
+}
+.back-btn:hover {
+  background: #e3eafc;
+  color: #16305a;
+}
+.play-btn {
+  background: linear-gradient(135deg, #2ecc40 0%, #27ae60 100%);
+  color: #fff;
+  margin-right: 0.5rem;
+}
+.play-btn:hover {
+  background: linear-gradient(135deg, #27ae60 0%, #2ecc40 100%);
+  color: #fff;
+}

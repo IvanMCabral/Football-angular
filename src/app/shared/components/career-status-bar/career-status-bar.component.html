@@ -1,0 +1,52 @@
+<div class="career-status-bar" *ngIf="careerStatus">
+  <!-- Temporada -->
+  <div class="status-item" *ngIf="careerStatus.season">
+    <span class="status-label">Temporada</span>
+    <span class="status-value">{{careerStatus.season}}</span>
+  </div>
+  <div class="status-divider" *ngIf="careerStatus.season"></div>
+
+  <!-- Fase de temporada activa -->
+  <ng-container *ngIf="careerStatus.careerPhase !== 'FINISHED'">
+    <div class="status-item">
+      <span class="status-label">Jornada</span>
+      <span class="status-value">{{careerStatus.currentRound}} / {{careerStatus.totalRounds}}</span>
+    </div>
+    <div class="status-divider"></div>
+  </ng-container>
+
+  <!-- Torneo finalizado -->
+  <ng-container *ngIf="careerStatus.careerPhase === 'FINISHED'">
+    <div class="status-item">
+      <span class="status-label">Estado</span>
+      <span class="status-value" style="color: #ffd700;">🏆 Temporada Finalizada</span>
+    </div>
+    <div class="status-divider"></div>
+  </ng-container>
+
+  <div class="status-item">
+    <span class="status-label">Plantilla</span>
+    <span class="status-value">{{careerStatus.squadSize}} / 25</span>
+  </div>
+  <div class="status-divider"></div>
+  <div class="status-item">
+    <span class="status-label">Libres</span>
+    <span class="status-value">{{careerStatus.freePlayersCount}}</span>
+  </div>
+  <div class="status-divider"></div>
+  <div class="status-item fixture-item">
+    <button class="btn-action" (click)="onFixtureClick()">📅 Ver Fixture</button>
+  </div>
+  <div class="status-divider"></div>
+  <div class="status-item fixture-item">
+    <button class="btn-standings" (click)="onStandingsClick()">🏆 Tabla</button>
+  </div>
+  <div class="status-divider"></div>
+  <div class="status-item fixture-item">
+    <button class="btn-action" (click)="onPalmaresClick()">📜 Palmarés</button>
+  </div>
+  <div class="status-divider"></div>
+  <div class="status-item fixture-item">
+    <button class="btn-promotions" (click)="onPromotionsClick()">📊 Ascensos</button>
+  </div>
+</div>

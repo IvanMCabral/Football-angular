@@ -1,0 +1,212 @@
+/* Modal Container */
+.standings-modal {
+  width: 85vw;
+  max-width: 1100px;
+  background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+  color: #ffffff;
+}
+
+h2[mat-dialog-title] {
+  margin: 0;
+  padding: 20px 24px;
+  border-bottom: 2px solid #667eea;
+  background: linear-gradient(90deg, #16213e 0%, #1a1a2e 100%);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.title-icon {
+  font-size: 28px;
+}
+
+mat-dialog-content {
+  padding: 0;
+  background: transparent;
+  color: #fff;
+  max-height: 65vh;
+  overflow-y: auto;
+}
+
+/* Loading & Error States */
+.loading,
+.error {
+  padding: 60px 40px;
+  text-align: center;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(102, 126, 234, 0.2);
+  border-top-color: #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.error {
+  color: #fc8181;
+}
+
+.error-icon {
+  font-size: 48px;
+}
+
+/* Material Tabs Theme */
+::ng-deep .mat-mdc-tab-group {
+  --mdc-tab-indicator-active-indicator-color: #ffd700;
+  --mat-tab-header-active-label-text-color: #ffd700;
+  --mat-tab-header-active-focus-label-text-color: #ffd700;
+  --mat-tab-header-active-hover-label-text-color: #ffd700;
+  --mat-tab-header-inactive-label-text-color: #b8b8d1;
+}
+
+::ng-deep .mat-mdc-tab-header {
+  background: rgba(45, 53, 97, 0.8);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+::ng-deep .mat-mdc-tab-body-wrapper {
+  padding: 16px;
+}
+
+/* Division Tab Styles */
+.division-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  font-weight: 500;
+  font-size: 14px;
+  border-radius: 8px;
+}
+
+.division-tab-color-0 {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.division-tab-color-1 {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  color: white;
+}
+
+.division-tab-color-2 {
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  color: white;
+}
+
+.division-tab-color-3 {
+  background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+  color: #1a1a2e;
+}
+
+.user-division {
+  box-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
+}
+
+.user-badge {
+  font-size: 16px;
+}
+
+.division-content {
+  padding: 8px;
+}
+
+/* Standings Table */
+.standings-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: rgba(26, 26, 46, 0.8);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.standings-table th,
+.standings-table td {
+  padding: 12px 8px;
+  text-align: center;
+}
+
+.standings-table th {
+  background: linear-gradient(135deg, #2d3561 0%, #1f2544 100%);
+  color: #ffd700;
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.standings-table tr {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.standings-table tr:last-child {
+  border-bottom: none;
+}
+
+.standings-table tbody tr:hover {
+  background: rgba(102, 126, 234, 0.1);
+}
+
+.standings-table tbody tr.highlight {
+  background: rgba(255, 215, 0, 0.15);
+  border-left: 3px solid #ffd700;
+}
+
+.pos {
+  width: 50px;
+  font-weight: bold;
+  color: #667eea;
+}
+
+.team {
+  text-align: left !important;
+  padding-left: 16px !important;
+  font-weight: 500;
+}
+
+.user-team-marker {
+  margin-right: 6px;
+  font-size: 14px;
+}
+
+.stat {
+  font-size: 13px;
+  color: #b8b8d1;
+}
+
+.stat.points {
+  font-weight: bold;
+  color: #ffd700;
+  font-size: 15px;
+}
+
+.no-data {
+  text-align: center;
+  padding: 40px;
+  color: #718096;
+  font-style: italic;
+}
+
+/* Dialog Actions */
+mat-dialog-actions {
+  background: linear-gradient(90deg, #16213e 0%, #1a1a2e 100%);
+  padding: 16px 24px;
+  border-top: 1px solid rgba(102, 126, 234, 0.3);
+}
+
+::ng-deep .mat-mdc-raised-button.mat-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white !important;
+}

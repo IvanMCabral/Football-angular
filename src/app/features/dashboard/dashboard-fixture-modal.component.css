@@ -1,0 +1,67 @@
+.modal-backdrop {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.3);
+  z-index: 1000;
+}
+.modal-content {
+  position: fixed;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.2);
+  padding: 2rem;
+  z-index: 1001;
+  min-width: 350px;
+  max-width: 90vw;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+.close-btn {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: none;
+  border: none;
+  font-size: 2rem;
+  cursor: pointer;
+  color: #1e3c72;
+}
+.fixture-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+  display: block;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+.fixture-table th, .fixture-table td {
+  border: 1px solid #eee;
+  padding: 0.5rem 1rem;
+  text-align: left;
+}
+.fixture-table th {
+  background: #f5f7fa;
+  color: #1e3c72;
+}
+.fixture-round {
+  margin-top: 1.5rem;
+  font-size: 1.25rem;
+  color: #1e3c72;
+}
+.play-live-btn {
+  padding: 0.4rem 0.8rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+.play-live-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}

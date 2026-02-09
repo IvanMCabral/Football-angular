@@ -1,0 +1,25 @@
+<nav class="navbar">
+  <div class="navbar-container">
+    <a routerLink="/" class="navbar-brand">
+      <span class="brand-icon">⚽</span>
+      <span class="brand-name">Football Manager</span>
+    </a>
+
+    <button class="navbar-toggle" (click)="toggleMenu()" [class.active]="menuOpen">
+      <span></span>
+      <span></span>
+      <span></span>
+    </button>
+
+    <div class="navbar-menu" [class.active]="menuOpen">
+      @if (isAuthenticated$ | async) {
+        <a routerLink="/dashboard" routerLinkActive="active" class="nav-link">Dashboard</a>
+        <a routerLink="/matches" routerLinkActive="active" class="nav-link">Matches</a>
+        <button (click)="logout()" class="nav-button logout">Logout</button>
+      } @else {
+        <a routerLink="/login" routerLinkActive="active" class="nav-link">Login</a>
+        <a routerLink="/register" class="nav-button register">Register</a>
+      }
+    </div>
+  </div>
+</nav>

@@ -1,0 +1,19 @@
+<div class="login-container">
+  <h1>Login</h1>
+  <form [formGroup]="loginForm" (ngSubmit)="onSubmit()">
+    <div>
+      <input type="email" formControlName="email" placeholder="Email" />
+      <div *ngIf="isFieldInvalid('email')" class="error">Email inválido</div>
+    </div>
+    <div>
+      <input type="password" formControlName="password" placeholder="Contraseña" />
+      <div *ngIf="isFieldInvalid('password')" class="error">Contraseña inválida</div>
+    </div>
+    <button type="submit" [disabled]="loading || loginForm.invalid">Entrar</button>
+    <app-loading-spinner *ngIf="loading"></app-loading-spinner>
+    <app-error-message *ngIf="errorMessage" [message]="errorMessage"></app-error-message>
+  </form>
+  <div style="margin-top:1rem;">
+    <a routerLink="/register">¿No tienes cuenta? Regístrate</a>
+  </div>
+</div>

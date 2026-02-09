@@ -1,0 +1,171 @@
+<div class="dashboard-container">
+
+  <!-- Hero Section with Play Button -->
+  <section class="hero-section">
+    <h1 class="welcome-title">⚽ MY FOOTBALL UNIVERSE</h1>
+    <p class="welcome-subtitle">Welcome back, {{ username$ | async }}!</p>
+    
+    <!-- No Career: Single Button -->
+    <!-- TEST: el contenido dentro de este ng-container debería verse si careerStatus$ emite cualquier valor -->
+<!-- Si NO hay carrera, mostrar botón para crear -->
+<div *ngIf="(careerStatus$ | async) === null">
+  <div class="play-card play-new">
+    <button class="play-button" (click)="onPlayNow()">CREAR CARRERA</button>
+  </div>
+</div>
+<!-- Si hay carrera, mostrar continuar/borrar o temporada completada -->
+<div *ngIf="(careerStatus$ | async) as careerStatus">
+  <!-- Active Career: Two Buttons -->
+  <div class="career-actions" *ngIf="careerStatus && !careerStatus.isFinished">
+    <!-- NUEVO: Botón Jugar Próxima Fecha (solo si está en WAITING_USER) -->
+    <button *ngIf="careerStatus.careerPhase === 'WAITING_USER'" 
+            class="action-button primary play-next" 
+            (click)="onPlayNextRound()" 
+            [disabled]="loading">
+      <span class="action-icon">⚽</span>
+      <span class="action-text">
+        <span class="action-label">Jugar Fecha {{careerStatus.currentRound + 1}}</span>
+        <span class="action-subtitle">Confirmar para iniciar</span>
+      </span>
+    </button>
+    
+    <!-- Botón Continuar Career (si no está en WAITING_USER) -->
+    <button *ngIf="careerStatus.careerPhase !== 'WAITING_USER'" 
+            class="action-button primary" 
+            (click)="onContinueCareer()" 
+            [disabled]="loading">
+      <span class="action-icon">▶️</span>
+      <span class="action-text">
+        <span class="action-label">Continue Career</span>
+        <span class="action-subtitle">Round {{careerStatus.currentRound}}/{{careerStatus.totalRounds}}</span>
+      </span>
+    </button>
+    
+    <button class="action-button danger" (click)="onDeleteCareer()" [disabled]="loading">
+      <span class="action-icon">🗑️</span>
+      <span class="action-text">
+        <span class="action-label">Delete Career</span>
+        <span class="action-subtitle">Start over</span>
+      </span>
+    </button>
+  </div>
+  <!-- Finished Career: Single Button -->
+  <div class="play-card play-finished" *ngIf="careerStatus && careerStatus.isFinished">
+    <button class="play-button" (click)="onPlayNow()" [disabled]="loading">
+      <span class="play-label">🏆 SEASON COMPLETED</span>
+      <span class="play-subtitle">Start a new season</span>
+    </button>
+  </div>
+</div>
+<ng-template #careerLoading>
+  <!-- Optionally, put skeleton loader/spinner here -->
+</ng-template>
+
+  </section>
+
+  <hr class="section-divider" />
+
+  <!-- My Stats Section -->
+  <section class="stats-section">
+    <h2 class="section-title">📊 MY STATS AS MANAGER</h2>
+    <div class="stats-grid" *ngIf="userStats$ | async as userStats">
+      <div class="stat-card">
+        <div class="stat-value">{{userStats.matchesPlayed}}</div>
+        <div class="stat-label">Matches</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">{{userStats.matchesWon}}</div>
+        <div class="stat-label">Wins</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">{{userStats.matchesLost}}</div>
+        <div class="stat-label">Losses</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">{{userStats.winPercentage}}%</div>
+        <div class="stat-label">Win %</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- World Status Section -->
+  <section class="stats-section">
+    <h2 class="section-title">🌍 WORLD STATUS</h2>
+    <div class="stats-grid world-stats" *ngIf="worldStatus$ | async as worldStatus; else loadingWorldStatus">
+      <div class="stat-card">
+        <div class="stat-value">{{worldStatus.clubs}}</div>
+        <div class="stat-label">Clubs</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">{{worldStatus.players}}</div>
+        <div class="stat-label">Players</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">{{worldStatus.matches}}</div>
+        <div class="stat-label">Matches</div>
+      </div>
+    </div>
+    <ng-template #loadingWorldStatus>
+      <div class="stats-grid world-stats">
+        <div class="stat-card">
+          <div class="skeleton-loader"></div>
+          <div class="stat-label">Clubs</div>
+        </div>
+        <div class="stat-card">
+          <div class="skeleton-loader"></div>
+          <div class="stat-label">Players</div>
+        </div>
+        <div class="stat-card">
+          <div class="skeleton-loader"></div>
+          <div class="stat-label">Matches</div>
+        </div>
+      </div>
+    </ng-template>
+  </section>
+
+  <!-- Quick Actions Section -->
+  <section class="actions-section">
+    <h2 class="section-title">⚡ QUICK ACTIONS</h2>
+    <div class="actions-container">
+      <a routerLink="/teams/create" class="action-button">
+        <span class="action-icon">➕</span>
+        <span class="action-label">Create Club</span>
+      </a>
+      
+      <a routerLink="/players/create" class="action-button">
+        <span class="action-icon">👤</span>
+        <span class="action-label">Create Player</span>
+      </a>
+
+      <a routerLink="/players/manage" class="action-button">
+        <span class="action-icon">⚽</span>
+        <span class="action-label">Manage Players & Teams</span>
+      </a>
+
+      <a routerLink="/teams/manage" class="action-button">
+        <span class="action-icon">⚙️</span>
+        <span class="action-label">Manage Leagues & Teams</span>
+      </a>
+      
+      <a routerLink="/matches" class="action-button">
+        <span class="action-icon">🏟️</span>
+        <span class="action-label">View Matches</span>
+      </a>
+      
+      <a routerLink="/matches/create" class="action-button">
+        <span class="action-icon">🎯</span>
+        <span class="action-label">Schedule Match</span>
+      </a>
+    </div>
+  </section>
+
+  <!-- Recent Activity Section -->
+  <section class="activity-section" *ngIf="recentActivities.length > 0">
+    <h2 class="section-title">📋 RECENT ACTIVITY</h2>
+    <ul class="activity-list">
+      <li *ngFor="let activity of recentActivities" class="activity-item">
+        • {{activity.message}}
+      </li>
+    </ul>
+  </section>
+</div>

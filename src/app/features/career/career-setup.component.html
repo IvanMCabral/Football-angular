@@ -1,0 +1,138 @@
+<div class="career-setup-container">
+  <div class="setup-card">
+    <h1>🎮 SELECCIONA TUS OPCIONES DE PARTIDA</h1>
+    <p class="subtitle">Configura tu nueva carrera y comienza tu camino a la gloria</p>
+
+    <div *ngIf="loading$ | async" class="loading-state">
+      <div class="spinner"></div>
+      <p>Cargando datos...</p>
+    </div>
+
+    <div *ngIf="error$ | async as error" class="error-message">
+      {{ error }}
+    </div>
+
+    <div *ngIf="!(loading$ | async) && !(error$ | async)" class="setup-form">
+      <!-- Liga -->
+      <div class="form-group">
+        <label>⚽ Liga</label>
+        <select [(ngModel)]="selectedLeagueId" (ngModelChange)="onLeagueChange()" class="form-select">
+          <option [value]="null">Selecciona una liga...</option>
+          <option *ngFor="let league of (leagues$ | async)" [value]="league.realLeagueId">
+            {{ league.name }} ({{ league.country }})
+          </option>
+        </select>
+        <small *ngIf="selectedLeagueId" class="hint">
+          {{ totalTeamsInLeague$ | async }} equipos disponibles en esta liga
+        </small>
+      </div>
+
+      <!-- Equipos por División -->
+      <div class="form-group" *ngIf="selectedLeagueId && (availableTeamsPerDivision$ | async)?.length">
+        <label>📊 Equipos por División</label>
+        <select [(ngModel)]="selectedTeamsPerDivision" (change)="onTeamsPerDivisionChange()" class="form-select">
+          <option [value]="null">Una sola división (todos los equipos)</option>
+          <option *ngFor="let opt of (availableTeamsPerDivision$ | async)" [value]="opt">
+            {{ opt }} equipos
+          </option>
+        </select>
+      </div>
+
+      <!-- Preview de Divisiones -->
+      <div *ngIf="selectedLeagueId && selectedTeamsPerDivision && (divisionPreviews$ | async) as divisions" class="divisions-preview">
+        <h3>📋 Vista Previa de Divisiones</h3>
+        <p class="preview-hint">Los equipos se ordenan automáticamente por OVR</p>
+        
+        <div class="divisions-grid">
+          <div *ngFor="let division of divisions" class="division-card">
+            <div class="division-header">
+              <h4>{{ division.name }}</h4>
+              <span class="team-count">{{ division.teams.length }} equipos</span>
+            </div>
+            <div class="division-teams">
+              <div 
+                *ngFor="let team of division.teams; let i = index" 
+                class="team-item"
+                [class.selected]="team.worldTeamId === selectedTeamId"
+                (click)="selectTeam(team.worldTeamId)"
+              >
+                <div class="team-rank">#{{ i + 1 }}</div>
+                <div class="team-info">
+                  <span class="team-name">{{ team.name }}</span>
+                  <span class="team-formation">{{ team.formation }}</span>
+                </div>
+                <div class="team-ovr">
+                  <span class="ovr-value">{{ team.ovr }}</span>
+                  <span class="ovr-label">OVR</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Equipo (única división) -->
+      <div class="form-group" *ngIf="selectedLeagueId && !selectedTeamsPerDivision">
+        <label>🏆 Equipo</label>
+        <select 
+          [(ngModel)]="selectedTeamId" 
+          class="form-select" 
+          [disabled]="!selectedLeagueId"
+        >
+          <option [value]="null">Selecciona un equipo...</option>
+          <option *ngFor="let team of (teamsWithOVR$ | async)" [value]="team.worldTeamId">
+            {{ team.name }} ({{ team.ovr }} OVR)
+          </option>
+        </select>
+      </div>
+
+      <!-- Equipo (múltiples divisiones) -->
+      <div class="form-group" *ngIf="selectedLeagueId && selectedTeamsPerDivision && (divisionPreviews$ | async) as divisions">
+        <label>🏆 Equipo</label>
+        <select 
+          [(ngModel)]="selectedTeamId" 
+          class="form-select" 
+          [disabled]="!selectedLeagueId"
+        >
+          <option [value]="null">Selecciona un equipo...</option>
+          <ng-container *ngFor="let division of divisions">
+            <option *ngFor="let team of division.teams" [value]="team.worldTeamId">
+              {{ team.name }} ({{ team.ovr }} OVR) - {{ division.name }}
+            </option>
+          </ng-container>
+        </select>
+      </div>
+
+      <!-- Dificultad -->
+      <div class="form-group">
+        <label>⚡ Dificultad</label>
+        <select [(ngModel)]="selectedDifficulty" class="form-select">
+          <option [value]="null">Selecciona dificultad...</option>
+          <option *ngFor="let diff of difficulties" [value]="diff.value">
+            {{ diff.label }}
+          </option>
+        </select>
+      </div>
+
+      <!-- Velocidad de Juego -->
+      <div class="form-group">
+        <label>🏃 Velocidad de Juego</label>
+        <select [(ngModel)]="selectedGameSpeed" class="form-select">
+          <option [value]="null">Selecciona velocidad...</option>
+          <option *ngFor="let speed of gameSpeeds" [value]="speed.value">
+            {{ speed.label }}
+          </option>
+        </select>
+      </div>
+
+      <!-- Start Button -->
+      <button 
+        (click)="startCareer()" 
+        class="btn-start"
+        [disabled]="!selectedLeagueId || !selectedTeamId || !selectedDifficulty || !selectedGameSpeed || creating"
+      >
+        🚀 INICIAR CARRERA
+      </button>
+    </div>
+  </div>
+</div>

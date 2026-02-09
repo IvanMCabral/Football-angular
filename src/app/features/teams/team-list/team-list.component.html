@@ -1,0 +1,62 @@
+<div class="container" *ngIf="sessionTeams$ | async as sessionTeams">
+  <div class="header">
+    <h1>🏟️ Equipos en Session</h1>
+    <p class="subtitle">Estos equipos están guardados en tu sesión (Redis), no en la base de datos</p>
+  </div>
+   
+  <div class="actions-bar">
+    <a routerLink="/teams/create" class="btn btn-primary">➕ Crear Nuevo Equipo</a>
+    <button (click)="loadSessionTeams()" class="btn btn-secondary" [disabled]="loading">
+      {{ loading ? 'Cargando...' : '🔄 Refrescar' }}
+    </button>
+  </div>
+   
+  <div *ngIf="loading" class="loading">
+    <div class="spinner"></div>
+    <p>Cargando equipos...</p>
+  </div>
+   
+  <div *ngIf="!loading && sessionTeams.length === 0" class="empty-state">
+    <div class="empty-icon">🏟️</div>
+    <h3>No hay equipos en tu sesión</h3>
+    <p>Crea equipos personalizados o aleatorios para empezar</p>
+    <a routerLink="/teams/create" class="btn btn-primary">Crear Primer Equipo</a>
+  </div>
+   
+  <div *ngIf="!loading && sessionTeams.length > 0" class="teams-grid">
+    <div *ngFor="let team of sessionTeams" class="team-card" [class.cloned]="team.origin === 'CLONED'" [class.custom]="team.origin === 'CUSTOM'" [class.random]="team.origin === 'RANDOM'">
+      <div class="team-header">
+        <h3>{{ team.name }}</h3>
+        <span class="origin-badge">{{ getOriginLabel(team.origin) }}</span>
+      </div>
+      <div class="team-info">
+        <div class="info-row">
+          <span class="label">🌍 País:</span>
+          <span class="value">{{ team.country }}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">💰 Presupuesto:</span>
+          <span class="value">{{ formatBudget(team.budget) }}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">📋 Formación:</span>
+          <span class="value">{{ team.formation }}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">😊 Moral:</span>
+          <span class="value">{{ team.morale }}%</span>
+        </div>
+        <div class="info-row">
+          <span class="label">⭐ Reputación:</span>
+          <span class="value">{{ team.reputation }}</span>
+        </div>
+      </div>
+      <div class="team-actions">
+        <a [routerLink]="['/teams', team.sessionTeamId]" class="btn-small btn-view">Ver Squad</a>
+        <button (click)="deleteTeam(team)" class="btn-small btn-delete">🗑️ Eliminar</button>
+      </div>
+    </div>
+  </div>
+   
+  <div *ngIf="errorMessage" class="error">{{ errorMessage }}</div>
+</div>

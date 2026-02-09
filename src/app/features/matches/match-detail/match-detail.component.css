@@ -1,0 +1,38 @@
+.match-detail-container {
+  padding: 2rem;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.score {
+  font-size: 1.5rem;
+  margin: 1rem 0;
+  display: flex;
+  gap: 2rem;
+}
+
+.status {
+  margin-bottom: 1rem;
+}
+
+.events ul {
+  list-style: none;
+  padding: 0;
+}
+
+.events li {
+  margin-bottom: 0.5rem;
+}
+
+.finished {
+  color: green;
+  font-weight: bold;
+  margin-top: 1rem;
+}
+
+.back-link {
+  display: inline-block;
+  margin-top: 2rem;
+  color: #1976d2;
+  text-decoration: none;
+}

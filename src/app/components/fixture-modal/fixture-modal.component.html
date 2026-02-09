@@ -1,0 +1,93 @@
+<div class="fixture-modal">
+  <h2 mat-dialog-title>
+    <span class="title-icon">📅</span>
+    Fixture Completo
+    <span class="title-subtitle">{{ totalRounds }} fechas</span>
+  </h2>
+
+  <mat-dialog-content>
+    <ng-container *ngIf="loading$ | async; else content">
+      <div class="loading">
+        <div class="spinner"></div>
+        <p>Cargando fixtures...</p>
+      </div>
+    </ng-container>
+
+    <ng-template #content>
+      <ng-container *ngIf="error$ | async as error; else fixturesContent">
+        <div class="error">
+          <span class="error-icon">⚠️</span>
+          <p>{{ error }}</p>
+          <button mat-button (click)="loadAllFixtures()">Reintentar</button>
+        </div>
+      </ng-container>
+
+      <ng-template #fixturesContent>
+        <mat-tab-group [selectedIndex]="selectedTabIndex$ | async" animationDuration="200ms">
+
+          <mat-tab *ngFor="let div of divisions$ | async; let i = index">
+            <ng-template mat-tab-label>
+              <span class="division-tab" [class]="'division-tab-color-' + i" [class.user-division]="div.isUserDivision">
+                <span *ngIf="div.isUserDivision" class="user-badge">👑</span>
+                {{ div.divisionName }}
+              </span>
+            </ng-template>
+
+            <div class="division-content">
+              <div *ngFor="let round of div.rounds" class="round-section" [class.current-round]="round.round === currentRound">
+                <div class="round-header" [class]="'round-header-color-' + (i % 4)">
+                  <span class="round-title">Fecha {{ round.round }}</span>
+                  <span *ngIf="round.byeTeam" class="bye-badge">BYE: {{ round.byeTeam }}</span>
+                </div>
+
+                <div *ngIf="round.matches.length === 0" class="no-matches">
+                  Sin partidos programados
+                </div>
+
+                <div class="round-matches">
+                  <div *ngFor="let match of round.matches"
+                       class="fixture-card"
+                       [class.completed]="match.status === 'COMPLETED'">
+
+                    <div class="match-status" [class]="getStatusClass(match.status)">
+                      {{ getStatusLabel(match.status) }}
+                    </div>
+
+                    <div class="match-body">
+                      <div class="team home">{{ match.homeTeamName }}</div>
+                      <div class="score">
+                        <span *ngIf="match.status === 'COMPLETED'" class="score-value">
+                          {{ match.homeGoals }} - {{ match.awayGoals }}
+                        </span>
+                        <span *ngIf="match.status !== 'COMPLETED'" class="score-vs">VS</span>
+                      </div>
+                      <div class="team away">{{ match.awayTeamName }}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </mat-tab>
+
+        </mat-tab-group>
+
+        <!-- Free Teams Section -->
+        <div *ngIf="freeTeams.length > 0" class="free-teams-section">
+          <div class="free-teams-header">
+            <span class="free-icon">🚫</span>
+            <span class="free-title">Equipos Libres ({{freeTeams.length}})</span>
+          </div>
+          <div class="free-teams-list">
+            <div *ngFor="let team of freeTeams" class="free-team-card">
+              {{ team.name }}
+            </div>
+          </div>
+        </div>
+      </ng-template>
+    </ng-template>
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-raised-button color="primary" (click)="close()">Cerrar</button>
+  </mat-dialog-actions>
+</div>
