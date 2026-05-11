@@ -23,6 +23,12 @@
               <button class="play-live-btn" (click)="playLive(match)">
                 ▶️ Jugar en Vivo
               </button>
+              <a *ngIf="canShowDetail(match)"
+                 [routerLink]="['/careers', careerId, 'matches', match.id, 'detail']"
+                 class="detail-btn"
+                 (click)="close()">
+                📊 Detalle
+              </a>
             </td>
           </tr>
         </tbody>
