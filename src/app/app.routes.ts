@@ -16,6 +16,7 @@ import { CareerSetupComponent } from './features/career/career-setup.component';
 import { MatchListComponent } from './features/matches/match-list/match-list.component';
 import { MatchDetailComponent } from './features/matches/match-detail/match-detail.component';
 import { MatchCreateComponent } from './features/matches/match-create/match-create.component';
+import { V24MatchDetailPageComponent } from './features/match-detail/pages/v24-match-detail-page.component';
 
 import { GameDetailComponent } from './features/games/game-detail.component';
 import { PlayRoundComponent } from './features/games/play-round.component';
@@ -41,6 +42,7 @@ export const routes: Routes = [
   { path: 'matches', component: MatchListComponent, canActivate: [authGuard] },
   { path: 'matches/create', component: MatchCreateComponent, canActivate: [authGuard] },
   { path: 'matches/:id', component: MatchDetailComponent, canActivate: [authGuard] },
+  { path: 'careers/:careerId/matches/:matchId/detail', component: V24MatchDetailPageComponent, canActivate: [authGuard] },
   { path: 'games/:id', component: GameDetailComponent, canActivate: [authGuard] },
   { path: 'games/:gameId/round/:round/live', component: RoundLiveComponent, canActivate: [authGuard] },
   { path: 'games/:gameId/round/:round/summary', component: RoundSummaryComponent, canActivate: [authGuard] },
