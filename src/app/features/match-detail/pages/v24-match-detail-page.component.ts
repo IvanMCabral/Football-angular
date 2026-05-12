@@ -189,11 +189,43 @@ import { MatchDetail } from '../models/match-detail.model';
           </div>
         </div>
 
-        <!-- Shots Section (Deferred) -->
+        <!-- Shots Section (Shot Map) -->
         <div class="section">
           <h3 class="section-title">Shot Map</h3>
-          <div class="deferred-state">
-            Shot map will be available in a future update.
+          <div *ngIf="!hasShotMap()" class="empty-state">
+            Shot map is not available for this match.
+          </div>
+          <div *ngIf="hasShotMap()" class="shot-map-container">
+            <div class="shot-map-summary">
+              <span>{{ shotMapEvents().length }} shots with coordinates</span>
+              <span class="separator">•</span>
+              <span>{{ shotGoalsCount() }} goals</span>
+              <span class="separator">•</span>
+              <span *ngIf="averageShotXg() !== null">Avg xG {{ averageShotXg()!.toFixed(2) }}</span>
+            </div>
+            <div class="pitch-container" role="img" aria-label="Shot map showing shot positions">
+              <!-- Pitch background elements -->
+              <div class="pitch"></div>
+              <div class="pitch-line center-line"></div>
+              <div class="pitch-line penalty-area"></div>
+              <div class="pitch-line six-yard-box"></div>
+              <div class="pitch-label goal-label">Goal</div>
+
+              <!-- Shot dots -->
+              <div
+                *ngFor="let event of shotMapEvents()"
+                class="shot-dot"
+                [class.goal]="isGoalEvent(event)"
+                [style.left.%]="clampCoordinate(event.shotCoordinate!.x)"
+                [style.top.%]="clampCoordinate(event.shotCoordinate!.y)"
+                [title]="formatShotTooltip(event)"
+                [attr.aria-label]="formatShotTooltip(event)"
+              ></div>
+            </div>
+            <div class="shot-map-legend">
+              <span class="legend-item"><span class="legend-dot goal"></span> Goal</span>
+              <span class="legend-item"><span class="legend-dot shot"></span> Shot / Block / Miss</span>
+            </div>
           </div>
         </div>
       </div>
@@ -492,6 +524,128 @@ import { MatchDetail } from '../models/match-detail.model';
     .dash {
       color: #ccc;
     }
+    /* Shot Map */
+    .shot-map-container {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .shot-map-summary {
+      font-size: 13px;
+      color: #666;
+    }
+    .pitch-container {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 50 / 33;
+      background-color: #2d8c3c;
+      border-radius: 4px;
+      overflow: hidden;
+      border: 2px solid #fafafa;
+    }
+    .pitch {
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(90deg, rgba(255,255,255,0.15) 1px, transparent 1px),
+        linear-gradient(rgba(255,255,255,0.15) 1px, transparent 1px);
+      background-size: 10% 11.11%;
+    }
+    .pitch-line {
+      position: absolute;
+      border: 1px solid rgba(255,255,255,0.3);
+    }
+    .center-line {
+      left: 50%;
+      top: 0;
+      bottom: 0;
+      width: 0;
+      border-width: 0 1px 0 0;
+      border-style: solid;
+      border-color: rgba(255,255,255,0.3);
+    }
+    .penalty-area {
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 40%;
+      height: 44%;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-radius: 2px;
+    }
+    .six-yard-box {
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 18%;
+      height: 22%;
+      border: 1px solid rgba(255,255,255,0.35);
+      border-radius: 1px;
+    }
+    .pitch-label {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      color: rgba(255,255,255,0.5);
+      font-size: 10px;
+      font-weight: bold;
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      letter-spacing: 1px;
+    }
+    .goal-label {
+      right: 4px;
+    }
+    .shot-dot {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      background-color: #ff9800;
+      border: 2px solid rgba(255,255,255,0.7);
+      cursor: pointer;
+      transition: transform 0.1s ease;
+      z-index: 1;
+    }
+    .shot-dot:hover {
+      transform: translate(-50%, -50%) scale(1.4);
+      z-index: 2;
+    }
+    .shot-dot.goal {
+      background-color: #4caf50;
+      width: 14px;
+      height: 14px;
+      border-width: 2px;
+    }
+    .shot-dot.goal:hover {
+      transform: translate(-50%, -50%) scale(1.3);
+    }
+    .shot-map-legend {
+      display: flex;
+      gap: 16px;
+      font-size: 12px;
+      color: #666;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .legend-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+    .legend-dot.goal {
+      background-color: #4caf50;
+      border: 1px solid #388e3c;
+    }
+    .legend-dot.shot {
+      background-color: #ff9800;
+      border: 1px solid #f57c00;
+    }
   `]
 })
 export class V24MatchDetailPageComponent implements OnInit {
@@ -549,5 +703,47 @@ export class V24MatchDetailPageComponent implements OnInit {
     if (!this.detail?.playerRatings?.length) return -1;
     const allSorted = [...this.detail.playerRatings].sort((a, b) => b.rating - a.rating);
     return allSorted.findIndex(p => p.playerId === player.playerId);
+  }
+
+  // ========== V24D5E5: Shot Map helpers ==========
+
+  hasShotMap(): boolean {
+    if (!this.detail?.timeline?.length) return false;
+    return this.detail.timeline.some(e => e.shotCoordinate != null);
+  }
+
+  shotMapEvents(): import('../models/match-detail.model').MatchEvent[] {
+    if (!this.detail?.timeline) return [];
+    return this.detail.timeline.filter(e => e.shotCoordinate != null);
+  }
+
+  shotGoalsCount(): number {
+    return this.shotMapEvents().filter(e => e.type === 'GOAL' && e.shotCoordinate != null).length;
+  }
+
+  isGoalEvent(event: import('../models/match-detail.model').MatchEvent): boolean {
+    return event.type === 'GOAL';
+  }
+
+  clampCoordinate(value: number | undefined | null): number {
+    if (value == null) return 50;
+    return Math.max(0, Math.min(100, value));
+  }
+
+  formatShotTooltip(event: import('../models/match-detail.model').MatchEvent): string {
+    const parts: string[] = [`${event.minute}'`];
+    if (event.playerName) parts.push(event.playerName);
+    parts.push(event.type);
+    if (event.xg != null) parts.push(`xG ${event.xg.toFixed(2)}`);
+    if (event.shotCoordinate?.location) parts.push(event.shotCoordinate.location.replace(/_/g, ' '));
+    return parts.join(' • ');
+  }
+
+  averageShotXg(): number | null {
+    const events = this.shotMapEvents();
+    if (!events.length) return null;
+    const withXg = events.filter(e => e.xg != null);
+    if (!withXg.length) return null;
+    return withXg.reduce((sum, e) => sum + (e.xg ?? 0), 0) / withXg.length;
   }
 }
