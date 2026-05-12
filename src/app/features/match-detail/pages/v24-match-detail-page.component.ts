@@ -5,19 +5,12 @@ import { MatchDetailApiService } from '../services/match-detail-api.service';
 import { MatchDetail } from '../models/match-detail.model';
 
 /**
- * V24D5E3: Read-only V24 Match Detail Page
+ * V24D5E4: Add Player Ratings UI
  *
- * Route: /careers/:careerId/matches/:matchId/detail
- *
- * Reads V24 detailed match data from:
- * GET /api/careers/{careerId}/matches/{matchId}/detail
- *
- * Behavior:
- * - 200 → renders MatchDetail (summary + timeline + stats)
- * - 404 / null → renders friendly "unavailable" state
- * - 500 → renders error with retry button
- * - playerRatings empty → shows deferred message
- * - shotCoordinate null → shows deferred message for shot map
+ * Shows per-player ratings when playerRatings is non-empty.
+ * Empty state for old matches or missing data.
+ * Sorted by rating descending, top-rated player highlighted.
+ * Grouped by team (home first, then away).
  *
  * No mutations. No career-state changes.
  */
@@ -140,11 +133,59 @@ import { MatchDetail } from '../models/match-detail.model';
           </div>
         </div>
 
-        <!-- Players Section (Deferred) -->
+        <!-- Players Section -->
         <div class="section">
           <h3 class="section-title">Players</h3>
-          <div class="deferred-state">
+          <div *ngIf="!hasPlayerRatings()" class="deferred-state">
             Player ratings are not available yet.
+          </div>
+          <div *ngIf="hasPlayerRatings()" class="players-container">
+            <div class="team-players" *ngFor="let team of playerRatingsByTeam()">
+              <div class="team-label">{{ team.label }}</div>
+              <table class="players-table">
+                <thead>
+                  <tr>
+                    <th>Player</th>
+                    <th>Pos</th>
+                    <th>Rating</th>
+                    <th>G</th>
+                    <th>A</th>
+                    <th>KP</th>
+                    <th>Sh</th>
+                    <th>Cards</th>
+                    <th>Inj</th>
+                    <th>Subs</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let p of team.players; let i = index"
+                      [class.top-rated]="i === 0 && team.label === 'Away Team' && getTopRatedOverallIndex(p) === getTopRatedOverallIndex(team.players[0])"
+                      [class.home-top]="i === 0 && team.label === 'Home Team'">
+                    <td class="player-name">{{ p.playerName }}</td>
+                    <td class="player-pos">{{ p.position }}</td>
+                    <td class="player-rating" [class.rating-top]="i === 0" [class.rating-high]="p.rating >= 7.0" [class.rating-low]="p.rating < 6.0">
+                      {{ p.rating.toFixed(1) }}
+                    </td>
+                    <td>{{ p.goals }}</td>
+                    <td>{{ p.assists }}</td>
+                    <td>{{ p.keyPasses }}</td>
+                    <td>{{ p.shots }}</td>
+                    <td class="cards-cell">
+                      <span *ngIf="p.cards > 0" class="card-badge" [class.yellow]="p.cards === 1" [class.red]="p.cards >= 2">{{ p.cards }}</span>
+                      <span *ngIf="p.cards === 0" class="dash">–</span>
+                    </td>
+                    <td>
+                      <span *ngIf="p.injuries > 0" class="injury-badge">{{ p.injuries }}</span>
+                      <span *ngIf="p.injuries === 0" class="dash">–</span>
+                    </td>
+                    <td>
+                      <span *ngIf="p.substitutions > 0">{{ p.substitutions }}</span>
+                      <span *ngIf="p.substitutions === 0" class="dash">–</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
 
@@ -366,6 +407,91 @@ import { MatchDetail } from '../models/match-detail.model';
       font-style: italic;
       padding: 12px 0;
     }
+    .players-container {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .team-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #555;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .players-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .players-table th {
+      text-align: left;
+      padding: 6px 8px;
+      background-color: #f5f5f5;
+      color: #666;
+      font-weight: 600;
+      font-size: 11px;
+      text-transform: uppercase;
+      border-bottom: 2px solid #e0e0e0;
+    }
+    .players-table td {
+      padding: 6px 8px;
+      border-bottom: 1px solid #f0f0f0;
+      color: #333;
+    }
+    .players-table tr:hover td {
+      background-color: #fafafa;
+    }
+    .players-table tr.top-rated td,
+    .players-table tr.home-top td {
+      background-color: #f5fff5;
+    }
+    .player-name {
+      font-weight: 500;
+    }
+    .player-pos {
+      color: #777;
+      font-size: 12px;
+    }
+    .player-rating {
+      font-weight: bold;
+    }
+    .rating-top {
+      color: #2e7d32;
+    }
+    .rating-high {
+      color: #1565c0;
+    }
+    .rating-low {
+      color: #c62828;
+    }
+    .cards-cell {
+      text-align: center;
+    }
+    .card-badge {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: bold;
+    }
+    .card-badge.yellow {
+      background-color: #fff9c4;
+      color: #f9a825;
+    }
+    .card-badge.red {
+      background-color: #ffcdd2;
+      color: #c62828;
+    }
+    .injury-badge {
+      color: #0288d1;
+      font-weight: bold;
+      font-size: 12px;
+    }
+    .dash {
+      color: #ccc;
+    }
   `]
 })
 export class V24MatchDetailPageComponent implements OnInit {
@@ -401,5 +527,27 @@ export class V24MatchDetailPageComponent implements OnInit {
 
   retry(): void {
     this.ngOnInit();
+  }
+
+  hasPlayerRatings(): boolean {
+    return this.detail?.playerRatings != null && this.detail.playerRatings.length > 0;
+  }
+
+  playerRatingsByTeam(): { label: string; players: import('../models/match-detail.model').PlayerMatchRating[] }[] {
+    if (!this.detail?.playerRatings?.length) return [];
+    const home = this.detail.playerRatings.filter(p => p.teamId === this.detail!.homeTeamId);
+    const away = this.detail.playerRatings.filter(p => p.teamId === this.detail!.awayTeamId);
+    const sorted = (list: import('../models/match-detail.model').PlayerMatchRating[]) =>
+      [...list].sort((a, b) => b.rating - a.rating);
+    return [
+      { label: 'Home Team', players: sorted(home) },
+      { label: 'Away Team', players: sorted(away) }
+    ].filter(t => t.players.length > 0);
+  }
+
+  getTopRatedOverallIndex(player: import('../models/match-detail.model').PlayerMatchRating): number {
+    if (!this.detail?.playerRatings?.length) return -1;
+    const allSorted = [...this.detail.playerRatings].sort((a, b) => b.rating - a.rating);
+    return allSorted.findIndex(p => p.playerId === player.playerId);
   }
 }
