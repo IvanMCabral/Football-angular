@@ -115,6 +115,37 @@ import { MatchDetail } from '../models/match-detail.model';
           </div>
         </div>
 
+        <!-- Post-Match Condition Summary (V24D6G6A) -->
+        <div class="section post-match-summary" *ngIf="!loading && !error && detail !== null">
+          <h3 class="section-title">Post-Match Condition</h3>
+          <div class="condition-summary">
+            <div class="condition-row" *ngIf="hasInjuryEvents()">
+              <span class="condition-badge injury-badge">🤕</span>
+              <span class="condition-text">{{ postMatchConditionLabel() }}</span>
+            </div>
+            <div class="condition-row" *ngIf="!hasInjuryEvents()">
+              <span class="condition-badge neutral-badge">✅</span>
+              <span class="condition-text">{{ postMatchConditionLabel() }}</span>
+            </div>
+            <ul class="injury-list" *ngIf="hasInjuryEvents()">
+              <li *ngFor="let p of injuredPlayerSummary()" class="injury-item">
+                <span class="injury-player">{{ p.playerName }}</span>
+                <span class="injury-minute">{{ p.minute }}'</span>
+              </li>
+            </ul>
+            <div class="condition-row discipline-row" *ngIf="yellowCardCount() > 0 || redCardCount() > 0">
+              <span class="discipline-summary">
+                <span *ngIf="yellowCardCount() > 0" class="card-count">
+                  <span class="card-badge yellow-badge">🟨</span> {{ yellowCardCount() }} yellow card{{ yellowCardCount() > 1 ? 's' : '' }}
+                </span>
+                <span *ngIf="redCardCount() > 0" class="card-count">
+                  <span class="card-badge red-badge">🟥</span> {{ redCardCount() }} red card{{ redCardCount() > 1 ? 's' : '' }}
+                </span>
+              </span>
+            </div>
+          </div>
+        </div>
+
         <!-- Timeline Section -->
         <div class="section">
           <h3 class="section-title">Timeline</h3>
@@ -440,6 +471,73 @@ import { MatchDetail } from '../models/match-detail.model';
       border-bottom: 2px solid #f0f0f0;
     }
 
+    /* === V24D6G6A Post-Match Condition Summary === */
+    .post-match-summary {
+      background: #fff;
+      border-left: 4px solid #1976d2;
+    }
+    .condition-summary {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .condition-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+    }
+    .condition-badge {
+      font-size: 16px;
+      width: 24px;
+      text-align: center;
+    }
+    .injury-badge { color: #c62828; }
+    .neutral-badge { color: #2e7d32; }
+    .condition-text {
+      font-weight: 600;
+      color: #333;
+    }
+    .injury-list {
+      list-style: none;
+      margin: 4px 0 0 32px;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .injury-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+    }
+    .injury-player {
+      color: #1a1a2e;
+      font-weight: 500;
+    }
+    .injury-minute {
+      color: #888;
+      font-size: 12px;
+    }
+    .discipline-row {
+      margin-top: 4px;
+      padding-top: 8px;
+      border-top: 1px solid #f0f0f0;
+    }
+    .discipline-summary {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .card-count {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 13px;
+      color: #555;
+    }
+
     /* === Empty state === */
     .empty-state {
       color: #aaa;
@@ -746,6 +844,40 @@ export class V24MatchDetailPageComponent implements OnInit {
       withTop(home, 'Home Team'),
       withTop(away, 'Away Team')
     ].filter(t => t.players.length > 0);
+  }
+
+  // === Post-Match Condition Summary (V24D6G6A) ===
+  injuryEvents(): import('../models/match-detail.model').MatchEvent[] {
+    return (this.detail?.timeline ?? []).filter(e => e.type === 'INJURY');
+  }
+
+  injuryEventsCount(): number { return this.injuryEvents().length; }
+
+  hasInjuryEvents(): boolean { return this.injuryEventsCount() > 0; }
+
+  yellowCardEvents(): import('../models/match-detail.model').MatchEvent[] {
+    return (this.detail?.timeline ?? []).filter(e => e.type === 'YELLOW_CARD');
+  }
+
+  redCardEvents(): import('../models/match-detail.model').MatchEvent[] {
+    return (this.detail?.timeline ?? []).filter(e => e.type === 'RED_CARD');
+  }
+
+  yellowCardCount(): number { return this.yellowCardEvents().length; }
+  redCardCount(): number { return this.redCardEvents().length; }
+
+  injuredPlayerSummary(): { playerName: string; minute: number }[] {
+    return this.injuryEvents().map(e => ({
+      playerName: e.playerName || 'Unknown',
+      minute: e.minute
+    }));
+  }
+
+  postMatchConditionLabel(): string {
+    if (this.hasInjuryEvents()) {
+      return `🤕 ${this.injuryEventsCount()} injury event${this.injuryEventsCount() > 1 ? 's' : ''} occurred`;
+    }
+    return 'No injury events recorded for this match.';
   }
 
   // === Shot Map helpers ===
