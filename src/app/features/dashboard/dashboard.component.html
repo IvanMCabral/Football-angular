@@ -18,9 +18,17 @@
   <!-- Active Career: Two Buttons -->
   <div class="career-actions" *ngIf="careerStatus && !careerStatus.isFinished">
     <!-- NUEVO: Botón Jugar Próxima Fecha (solo si está en WAITING_USER) -->
-    <button *ngIf="careerStatus.careerPhase === 'WAITING_USER'" 
-            class="action-button primary play-next" 
-            (click)="onPlayNextRound()" 
+    <div *ngIf="careerStatus.careerPhase === 'WAITING_USER'" class="squad-warning-container">
+      <div *ngIf="hasSquadConditionWarning()" class="squad-condition-warning" role="alert">
+        <span class="warning-icon">⚠️</span>
+        <span class="warning-text">
+          <strong>Squad condition:</strong> {{squadConditionWarningText()}}
+        </span>
+        <span class="warning-cta">Review your lineup before simulating.</span>
+      </div>
+      <button
+            class="action-button primary play-next"
+            (click)="onPlayNextRound()"
             [disabled]="loading">
       <span class="action-icon">⚽</span>
       <span class="action-text">
@@ -28,6 +36,7 @@
         <span class="action-subtitle">Confirmar para iniciar</span>
       </span>
     </button>
+    </div>
     
     <!-- Botón Continuar Career (si no está en WAITING_USER) -->
     <button *ngIf="careerStatus.careerPhase !== 'WAITING_USER'" 

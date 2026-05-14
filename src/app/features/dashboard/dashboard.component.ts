@@ -10,6 +10,7 @@ import { MatchService } from '../matches/services/match.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { environment } from '../../environments/environment';
+import { SessionPlayer } from '../../shared/models/player.model';
 
 interface UserStats {
   matchesPlayed: number;
@@ -59,11 +60,15 @@ export class DashboardComponent implements OnInit {
   private careerStatusSubject = new BehaviorSubject<CareerStatus | null>(null);
   careerStatus$ = this.careerStatusSubject.asObservable();
 
+  // Squad data for condition warnings
+  private squadSubject = new BehaviorSubject<SessionPlayer[]>([]);
+  squad$ = this.squadSubject.asObservable();
+
   username$?: Observable<string>;
   userStats$?: Observable<UserStats>;
   worldStatus$?: Observable<WorldStatus>;
   recentActivities: RecentActivity[] = [];
-  
+
   loading = false;
   generatingPlayers = false;
 
@@ -109,6 +114,67 @@ export class DashboardComponent implements OnInit {
     this.loadCareerStatus();
   }
 
+  /**
+   * Load squad data for condition warnings (V24D6G5A)
+   */
+  private loadSquadData(): void {
+    this.http.get<SessionPlayer[]>(`${environment.apiUrl}/career/players/squad`).pipe(
+      catchError(err => {
+        console.error('[DASHBOARD] Error loading squad data for condition warnings:', err);
+        return of([]);
+      })
+    ).subscribe(players => {
+      this.squadSubject.next(players);
+    });
+  }
+
+  // V24D6G5A — Squad condition warning helpers
+  private getSquadPlayers(): SessionPlayer[] {
+    return this.squadSubject.value;
+  }
+
+  injuredCount(): number {
+    return this.getSquadPlayers().filter(p => p.injured === true).length;
+  }
+
+  exhaustedCount(): number {
+    // Exclude injured players from exhausted count (injury takes priority)
+    return this.getSquadPlayers().filter(p =>
+      p.injured !== true && (p.energy ?? 100) <= 19
+    ).length;
+  }
+
+  veryTiredCount(): number {
+    // Exclude injured and exhausted from very tired count
+    return this.getSquadPlayers().filter(p => {
+      const e = p.energy ?? 100;
+      return p.injured !== true && e >= 20 && e <= 39;
+    }).length;
+  }
+
+  hasSquadConditionWarning(): boolean {
+    return this.injuredCount() > 0 || this.exhaustedCount() > 0 || this.veryTiredCount() > 0;
+  }
+
+  squadConditionWarningText(): string {
+    const parts: string[] = [];
+    const injured = this.injuredCount();
+    const exhausted = this.exhaustedCount();
+    const veryTired = this.veryTiredCount();
+
+    if (injured > 0) {
+      parts.push(`${injured} injured player${injured > 1 ? 's' : ''}`);
+    }
+    if (exhausted > 0) {
+      parts.push(`${exhausted} exhausted player${exhausted > 1 ? 's' : ''}`);
+    }
+    if (veryTired > 0) {
+      parts.push(`${veryTired} very tired player${veryTired > 1 ? 's' : ''}`);
+    }
+
+    return parts.join(' · ');
+  }
+
   loadDashboardData(): void {
     // Username como observable, para template async
     this.username$ = this.authService.getUserInfo().pipe(
@@ -122,6 +188,9 @@ export class DashboardComponent implements OnInit {
 
     // Cargar career status y emitir al BehaviorSubject
     this.loadCareerStatus();
+
+    // Load squad data for condition warnings
+    this.loadSquadData();
 
     this.userStats$ = this.http.get<UserStats>(`${environment.apiUrl}/dashboard/user-stats`).pipe(
       shareReplay(1),
