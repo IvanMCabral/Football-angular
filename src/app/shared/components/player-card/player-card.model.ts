@@ -10,4 +10,7 @@ export interface PlayerCardData {
   age: number;
   form?: number;
   energy: number;
+  injured?: boolean;
+  injuryType?: string | null;
+  injuryRemainingMatches?: number | null;
 }

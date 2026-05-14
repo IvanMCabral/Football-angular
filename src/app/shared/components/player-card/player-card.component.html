@@ -24,6 +24,12 @@
   <div class="player-meta">
     <span>Age: {{player.age}}</span>
     <span *ngIf="player.form !== undefined">Form: {{player.form}}%</span>
-    <span>Energy: {{player.energy}}%</span>
+    <span class="energy-status" [class]="'energy-' + energyStatus()" [title]="energyTooltip()">
+      Energy: {{energyPercent()}}% · {{energyLabel()}}
+    </span>
+  </div>
+  <div class="player-injury" *ngIf="isInjured()">
+    <span class="injury-badge" [title]="injuryTooltip()">🤕 {{injuryLabel()}}</span>
+    <span class="injury-detail">{{injuryDetail()}}</span>
   </div>
 </div>

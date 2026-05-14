@@ -12,4 +12,69 @@ import { PlayerCardData } from './player-card.model';
 export class PlayerCardComponent {
   @Input() player!: PlayerCardData;
   @Input() isSquad: boolean = false;
+
+  isInjured(): boolean {
+    return this.player.injured === true;
+  }
+
+  injuryLabel(): string {
+    if (this.player.injured !== true) { return ''; }
+    const remaining = this.player.injuryRemainingMatches;
+    if (remaining === null || remaining === undefined || remaining <= 0) {
+      return 'Injured';
+    }
+    return remaining === 1 ? 'Returning soon' : 'Injured';
+  }
+
+  injuryDetail(): string {
+    if (this.player.injured !== true) { return ''; }
+    const remaining = this.player.injuryRemainingMatches;
+    if (remaining === null || remaining === undefined || remaining <= 0) {
+      return 'Unavailable';
+    }
+    return remaining === 1 ? 'Out 1 match' : `Out ${remaining} matches`;
+  }
+
+  injuryTooltip(): string {
+    if (this.player.injured !== true) { return ''; }
+    const label = this.injuryLabel();
+    const detail = this.injuryDetail();
+    if (this.player.injuryType) {
+      return `${label}: ${this.player.injuryType} — ${detail}`;
+    }
+    return `${label} — ${detail}`;
+  }
+
+  energyStatus(): 'fresh' | 'good' | 'tired' | 'very-tired' | 'exhausted' {
+    const e = this.clampEnergy(this.player.energy ?? 100);
+    if (e >= 80) { return 'fresh'; }
+    if (e >= 60) { return 'good'; }
+    if (e >= 40) { return 'tired'; }
+    if (e >= 20) { return 'very-tired'; }
+    return 'exhausted';
+  }
+
+  energyLabel(): string {
+    const labels: Record<string, string> = {
+      'fresh': 'Fresh',
+      'good': 'Good',
+      'tired': 'Tired',
+      'very-tired': 'Very Tired',
+      'exhausted': 'Exhausted'
+    };
+    return labels[this.energyStatus()] ?? '';
+  }
+
+  energyTooltip(): string {
+    return `Energy level: ${this.energyPercent()}% — ${this.energyLabel()}`;
+  }
+
+  energyPercent(): number {
+    return this.clampEnergy(this.player.energy ?? 100);
+  }
+
+  private clampEnergy(value: number | undefined | null): number {
+    if (value === null || value === undefined) { return 100; }
+    return Math.max(0, Math.min(100, Math.round(value)));
+  }
 }
