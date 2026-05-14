@@ -72,3 +72,47 @@
   font-size: 0.75rem;
   color: #718096;
 }
+
+/* Condition warning badges */
+.condition-warning {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.35rem;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
+.condition-injured {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.condition-exhausted {
+  background: #fff7ed;
+  color: #9a3412;
+  border: 1px solid #fed7aa;
+}
+
+.condition-very-tired {
+  background: #fefce8;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+.condition-tired {
+  background: #f0fdf4;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+.condition-icon {
+  font-size: 0.75rem;
+}
+
+.condition-label {
+  line-height: 1;
+}
