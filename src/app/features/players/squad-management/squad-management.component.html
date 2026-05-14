@@ -143,8 +143,12 @@
           </div>
 
           <div class="lineup-actions">
-            <button 
-              (click)="onConfirmLineup()" 
+            <div *ngIf="confirmationWarning$ | async as warning" class="confirmation-warning" role="alert">
+              <span class="warning-icon">⚠️</span>
+              <span class="warning-text">{{warning}}</span>
+            </div>
+            <button
+              (click)="onConfirmLineup()"
               [disabled]="(lineupLoading$ | async) || lineup.players.length !== 11"
               class="btn-confirm-lineup">
               ✅ Confirmar y Jugar

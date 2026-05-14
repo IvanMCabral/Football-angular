@@ -122,6 +122,8 @@ export class SquadManagementComponent implements OnInit {
    lineupLoading$ = new BehaviorSubject<boolean>(false);
    lineupError$ = new BehaviorSubject<string | null>(null);
    lineupSubject$ = new BehaviorSubject<LineupDTO | null>(null);
+   confirmationWarning$ = new BehaviorSubject<string | null>(null);
+   pendingRiskyConfirm$ = new BehaviorSubject<boolean>(false);
 
    selectedFormation$ = new BehaviorSubject<string>('4-4-2');
    availableFormations = ['4-4-2', '4-3-3', '4-2-3-1', '3-5-2', '5-3-2'];
@@ -187,6 +189,35 @@ export class SquadManagementComponent implements OnInit {
      this.lineup$ = this.lineupSubject$.asObservable();
    }
 
+   private buildRiskyLineupMessage(players: PlayerLineupDTO[]): string | null {
+     if (!players || players.length === 0) { return null; }
+     const injured = players.filter(p => p.injured === true);
+     const exhausted = players.filter(p => (p.energy ?? 100) <= 19);
+     const veryTired = players.filter(p => { const e = p.energy ?? 100; return e >= 20 && e <= 39; });
+
+     if (injured.length === 0 && exhausted.length === 0 && veryTired.length === 0) {
+       return null;
+     }
+
+     const parts: string[] = [];
+     if (injured.length > 0) {
+       parts.push(`${injured.length} injured player${injured.length > 1 ? 's' : ''}`);
+     }
+     if (exhausted.length > 0) {
+       parts.push(`${exhausted.length} exhausted player${exhausted.length > 1 ? 's' : ''}`);
+     }
+     if (veryTired.length > 0) {
+       parts.push(`${veryTired.length} very tired player${veryTired.length > 1 ? 's' : ''}`);
+     }
+
+     return `Warning: ${parts.join(', ')} ${parts.length > 1 ? 'are' : 'is'} in the lineup. This may affect performance. Click "Confirmar y Jugar" again to continue.`;
+   }
+
+   private resetLineupWarning(): void {
+     this.confirmationWarning$.next(null);
+     this.pendingRiskyConfirm$.next(false);
+   }
+
    formatMoney(value: number): string {
      return new Intl.NumberFormat('es-ES', {
        style: 'currency',
@@ -205,6 +236,7 @@ export class SquadManagementComponent implements OnInit {
 
      this.lineupLoading$.next(true);
      this.lineupError$.next(null);
+     this.resetLineupWarning();
 
      this.http.post<LineupDTO>(
        `${environment.apiUrl}/career/lineup/auto-select`,
@@ -229,60 +261,75 @@ export class SquadManagementComponent implements OnInit {
    }
 
     onConfirmLineup(): void {
-      this.lineupLoading$.next(true);
-      this.lineupError$.next(null);
+     const currentLineup = this.lineupSubject$.value;
+     const riskyMsg = this.buildRiskyLineupMessage(currentLineup?.players ?? []);
 
-      firstValueFrom(this.careerStatus$).then(careerStatus => {
-        if (!careerStatus || !careerStatus.careerId) {
-          this.lineupLoading$.next(false);
-          this.lineupError$.next('No career found');
-          return;
-        }
+     if (riskyMsg && !this.pendingRiskyConfirm$.value) {
+       this.confirmationWarning$.next(riskyMsg);
+       this.pendingRiskyConfirm$.next(true);
+       this.lineupLoading$.next(false);
+       return;
+     }
 
-        this.http.post(`${environment.apiUrl}/career/lineup/confirm`, {}).subscribe({
-          next: () => {
-            if (careerStatus.careerPhase === 'WAITING_USER') {
-              this.http.post<any>(`${environment.apiUrl}/career/${careerStatus.careerId}/next-round`, {}).subscribe({
-                next: (response) => {
-                  this.lineupLoading$.next(false);
+     this.lineupLoading$.next(true);
+     this.lineupError$.next(null);
 
-                  if (response.success) {
-                    if (response.tournamentFinished) {
-                      alert('🏆 ¡Temporada completada!\n\nPosición final: ' + response.userPosition + '°');
-                      this.refreshCareerStatus();
-                    } else {
-                      this.router.navigate([`/games/${careerStatus.careerId}/round/${response.currentRound}/live`]);
-                    }
-                  } else {
-                    this.lineupError$.next(response.message || 'Error al avanzar');
-                  }
-                },
-                error: (err) => {
-                  console.error('[SQUAD] Error en next-round:', err);
-                  this.lineupLoading$.next(false);
-                  this.lineupError$.next(err.error?.message || 'Error al avanzar de fecha');
-                }
-              });
-            } else if (careerStatus.careerPhase === 'FINISHED') {
-              this.lineupLoading$.next(false);
-              this.lineupError$.next('El torneo ha finalizado. Usa "Continuar Carrera" para iniciar una nueva temporada.');
-            } else {
-              this.lineupLoading$.next(false);
-              this.router.navigate([`/games/${careerStatus.careerId}/round/${careerStatus.currentRound}/live`]);
-            }
-          },
-          error: (err) => {
-            console.error('[SQUAD] Error confirmando lineup:', err);
-            this.lineupLoading$.next(false);
-            this.lineupError$.next(err.error?.message || 'Error al confirmar lineup');
-          }
-        });
-      }).catch(err => {
-        console.error('[SQUAD] Error obteniendo career status:', err);
-        this.lineupLoading$.next(false);
-        this.lineupError$.next('Error al obtener estado de carrera');
-      });
-    }
+     firstValueFrom(this.careerStatus$).then(careerStatus => {
+       if (!careerStatus || !careerStatus.careerId) {
+         this.lineupLoading$.next(false);
+         this.lineupError$.next('No career found');
+         this.resetLineupWarning();
+         return;
+       }
+
+       this.http.post(`${environment.apiUrl}/career/lineup/confirm`, {}).subscribe({
+         next: () => {
+           this.resetLineupWarning();
+           if (careerStatus.careerPhase === 'WAITING_USER') {
+             this.http.post<any>(`${environment.apiUrl}/career/${careerStatus.careerId}/next-round`, {}).subscribe({
+               next: (response) => {
+                 this.lineupLoading$.next(false);
+
+                 if (response.success) {
+                   if (response.tournamentFinished) {
+                     alert('🏆 ¡Temporada completada!\n\nPosición final: ' + response.userPosition + '°');
+                     this.refreshCareerStatus();
+                   } else {
+                     this.router.navigate([`/games/${careerStatus.careerId}/round/${response.currentRound}/live`]);
+                   }
+                 } else {
+                   this.lineupError$.next(response.message || 'Error al avanzar');
+                 }
+               },
+               error: (err) => {
+                 console.error('[SQUAD] Error en next-round:', err);
+                 this.lineupLoading$.next(false);
+                 this.lineupError$.next(err.error?.message || 'Error al avanzar de fecha');
+                 this.resetLineupWarning();
+               }
+             });
+           } else if (careerStatus.careerPhase === 'FINISHED') {
+             this.lineupLoading$.next(false);
+             this.lineupError$.next('El torneo ha finalizado. Usa "Continuar Carrera" para iniciar una nueva temporada.');
+           } else {
+             this.lineupLoading$.next(false);
+             this.router.navigate([`/games/${careerStatus.careerId}/round/${careerStatus.currentRound}/live`]);
+           }
+         },
+         error: (err) => {
+           console.error('[SQUAD] Error confirmando lineup:', err);
+           this.lineupLoading$.next(false);
+           this.lineupError$.next(err.error?.message || 'Error al confirmar lineup');
+           this.resetLineupWarning();
+         }
+       });
+     }).catch(err => {
+       console.error('[SQUAD] Error obteniendo career status:', err);
+       this.lineupLoading$.next(false);
+       this.lineupError$.next('Error al obtener estado de carrera');
+       this.resetLineupWarning();
+     });
+   }
 
     viewFinalStandings(): void {
       firstValueFrom(this.careerStatus$).then(status => {
