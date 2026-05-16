@@ -31,6 +31,13 @@ interface SessionPlayer {
   energy: number;
   form: number;
   origin: string;
+  injured?: boolean;
+  injuryType?: string | null;
+  injuryRemainingMatches?: number;
+  yellowCards?: number;
+  redCards?: number;
+  suspended?: boolean;
+  suspensionRemainingMatches?: number;
 }
 
 interface Team {
@@ -54,6 +61,10 @@ interface PlayerLineupDTO {
   energy: number;
   injured: boolean;
   age: number;
+  yellowCards?: number;
+  redCards?: number;
+  suspended?: boolean;
+  suspensionRemainingMatches?: number;
 }
 
 interface LineupDTO {
@@ -189,17 +200,28 @@ export class SquadManagementComponent implements OnInit {
      this.lineup$ = this.lineupSubject$.asObservable();
    }
 
+   private isSuspendedPlayer(p: { suspended?: boolean; suspensionRemainingMatches?: number }): boolean {
+    return p.suspended === true || (p.suspensionRemainingMatches ?? 0) > 0;
+  }
+
    private buildRiskyLineupMessage(players: PlayerLineupDTO[]): string | null {
      if (!players || players.length === 0) { return null; }
-     const injured = players.filter(p => p.injured === true);
-     const exhausted = players.filter(p => (p.energy ?? 100) <= 19);
-     const veryTired = players.filter(p => { const e = p.energy ?? 100; return e >= 20 && e <= 39; });
+     const suspended = players.filter(p => this.isSuspendedPlayer(p));
+     const injured = players.filter(p => !this.isSuspendedPlayer(p) && p.injured === true);
+     const exhausted = players.filter(p => !this.isSuspendedPlayer(p) && (p.energy ?? 100) <= 19);
+     const veryTired = players.filter(p => {
+       const e = p.energy ?? 100;
+       return !this.isSuspendedPlayer(p) && p.injured !== true && e >= 20 && e <= 39;
+     });
 
-     if (injured.length === 0 && exhausted.length === 0 && veryTired.length === 0) {
+     if (suspended.length === 0 && injured.length === 0 && exhausted.length === 0 && veryTired.length === 0) {
        return null;
      }
 
      const parts: string[] = [];
+     if (suspended.length > 0) {
+       parts.push(`${suspended.length} suspended player${suspended.length > 1 ? 's' : ''}`);
+     }
      if (injured.length > 0) {
        parts.push(`${injured.length} injured player${injured.length > 1 ? 's' : ''}`);
      }

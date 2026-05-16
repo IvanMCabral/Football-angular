@@ -29,6 +29,10 @@ export interface SessionPlayer {
   injuryType: string | null;
   injuryRemainingMatches: number;
   origin: 'CLONED' | 'CUSTOM' | 'RANDOM';
+  yellowCards?: number;
+  redCards?: number;
+  suspended?: boolean;
+  suspensionRemainingMatches?: number;
 }
 
 export interface CreatePlayerRequest {

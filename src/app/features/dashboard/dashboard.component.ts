@@ -133,35 +133,48 @@ export class DashboardComponent implements OnInit {
     return this.squadSubject.value;
   }
 
+  private isSuspended(p: SessionPlayer): boolean {
+    return p.suspended === true || (p.suspensionRemainingMatches ?? 0) > 0;
+  }
+
+  suspendedCount(): number {
+    return this.getSquadPlayers().filter(p => this.isSuspended(p)).length;
+  }
+
   injuredCount(): number {
-    return this.getSquadPlayers().filter(p => p.injured === true).length;
+    // Exclude suspended players (suspended takes priority over injured)
+    return this.getSquadPlayers().filter(p => p.injured === true && !this.isSuspended(p)).length;
   }
 
   exhaustedCount(): number {
-    // Exclude injured players from exhausted count (injury takes priority)
+    // Exclude suspended and injured players (injury takes priority)
     return this.getSquadPlayers().filter(p =>
-      p.injured !== true && (p.energy ?? 100) <= 19
+      !this.isSuspended(p) && p.injured !== true && (p.energy ?? 100) <= 19
     ).length;
   }
 
   veryTiredCount(): number {
-    // Exclude injured and exhausted from very tired count
+    // Exclude suspended and injured from very tired count
     return this.getSquadPlayers().filter(p => {
       const e = p.energy ?? 100;
-      return p.injured !== true && e >= 20 && e <= 39;
+      return !this.isSuspended(p) && p.injured !== true && e >= 20 && e <= 39;
     }).length;
   }
 
   hasSquadConditionWarning(): boolean {
-    return this.injuredCount() > 0 || this.exhaustedCount() > 0 || this.veryTiredCount() > 0;
+    return this.suspendedCount() > 0 || this.injuredCount() > 0 || this.exhaustedCount() > 0 || this.veryTiredCount() > 0;
   }
 
   squadConditionWarningText(): string {
     const parts: string[] = [];
+    const suspended = this.suspendedCount();
     const injured = this.injuredCount();
     const exhausted = this.exhaustedCount();
     const veryTired = this.veryTiredCount();
 
+    if (suspended > 0) {
+      parts.push(`${suspended} suspended player${suspended > 1 ? 's' : ''}`);
+    }
     if (injured > 0) {
       parts.push(`${injured} injured player${injured > 1 ? 's' : ''}`);
     }
