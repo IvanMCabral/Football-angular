@@ -15,6 +15,7 @@ import { PromotionResult, CareerStatus, DivisionInfo } from 'app/core/services/c
 import { CareerStatusBarComponent } from 'app/shared/components/career-status-bar/career-status-bar.component';
 import { PlayerCardComponent } from 'app/shared/components/player-card/player-card.component';
 import { LineupPlayerCardComponent } from 'app/shared/components/lineup-player-card/lineup-player-card.component';
+import { SeasonStatsTabComponent } from '../../player-season-stats/components/season-stats-tab/season-stats-tab.component';
 
 interface SessionPlayer {
   sessionPlayerId: string;
@@ -80,7 +81,8 @@ interface LineupDTO {
     CommonModule, RouterLink, FormsModule, MatDialogModule,
     FixtureModalComponent, StandingsModalComponent,
     PalmaresDialogComponent, PromotionsDialogComponent,
-    CareerStatusBarComponent, PlayerCardComponent, LineupPlayerCardComponent
+    CareerStatusBarComponent, PlayerCardComponent, LineupPlayerCardComponent,
+    SeasonStatsTabComponent
   ],
   templateUrl: './squad-management.component.html',
   styleUrls: ['./squad-management.component.css']
@@ -138,6 +140,9 @@ export class SquadManagementComponent implements OnInit {
 
    selectedFormation$ = new BehaviorSubject<string>('4-4-2');
    availableFormations = ['4-4-2', '4-3-3', '4-2-3-1', '3-5-2', '5-3-2'];
+
+   /** Active tab: 'squad' | 'stats' */
+   activeTab$ = new BehaviorSubject<'squad' | 'stats'>('squad');
 
    ngOnInit() {
      const careerStatusSource$ = this.http.get<CareerStatus>(`${environment.apiUrl}/career/status`).pipe(
@@ -251,6 +256,10 @@ export class SquadManagementComponent implements OnInit {
 
    onFormationChange(formation: string): void {
      this.selectedFormation$.next(formation);
+   }
+
+   setActiveTab(tab: 'squad' | 'stats'): void {
+     this.activeTab$.next(tab);
    }
 
    onAutoSelect(): void {

@@ -74,21 +74,48 @@
     </div>
 
     <div class="section" *ngIf="careerStatus.careerPhase !== 'FINISHED'">
-      <div class="section-header">
-        <h3>👥 Tu Plantilla ({{(squad$ | async)?.length || 0}} / 25)</h3>
-        <a routerLink="/players/manage" class="btn-create">⚙️ Gestionar</a>
+      <!-- Squad / Stats tab bar -->
+      <div class="tab-bar">
+        <button
+          class="tab-btn"
+          [class.active]="(activeTab$ | async) === 'squad'"
+          (click)="setActiveTab('squad')">
+          👥 Plantilla
+        </button>
+        <button
+          class="tab-btn"
+          [class.active]="(activeTab$ | async) === 'stats'"
+          (click)="setActiveTab('stats')">
+          📊 Stats
+        </button>
       </div>
-      
-      <div *ngIf="(squad$ | async)?.length === 0" class="empty-state">
-        Tu plantilla está vacía. Ve a "Gestionar" para agregar jugadores.
+
+      <!-- Squad tab -->
+      <div *ngIf="(activeTab$ | async) === 'squad'">
+        <div class="section-header">
+          <h3>👥 Tu Plantilla ({{(squad$ | async)?.length || 0}} / 25)</h3>
+          <a routerLink="/players/manage" class="btn-create">⚙️ Gestionar</a>
+        </div>
+
+        <div *ngIf="(squad$ | async)?.length === 0" class="empty-state">
+          Tu plantilla está vacía. Ve a "Gestionar" para agregar jugadores.
+        </div>
+
+        <div class="players-grid">
+          <app-player-card
+            *ngFor="let player of (squad$ | async)"
+            [player]="player"
+            [isSquad]="true">
+          </app-player-card>
+        </div>
       </div>
-      
-      <div class="players-grid">
-        <app-player-card
-          *ngFor="let player of (squad$ | async)"
-          [player]="player"
-          [isSquad]="true">
-        </app-player-card>
+
+      <!-- Stats tab -->
+      <div *ngIf="(activeTab$ | async) === 'stats'">
+        <app-season-stats-tab
+          [careerId]="(careerStatus$ | async)?.careerId ?? ''"
+          [season]="(careerStatus$ | async)?.season ?? 1">
+        </app-season-stats-tab>
       </div>
     </div>
 

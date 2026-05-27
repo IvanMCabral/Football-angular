@@ -1,7 +1,7 @@
 import { Component, Input, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { PlayerSeasonStatsWarning } from '../../models/player-season-stats.model';
-import { translateWarnings, WarningDisplay } from '../../utils/player-season-stats-warnings';
+import { PlayerSeasonStatsWarning, WarningDisplay } from '../../models/player-season-stats.model';
+import { translateWarnings } from '../../utils/player-season-stats-warnings';
 
 @Component({
   selector: 'app-player-season-stats-warnings',
