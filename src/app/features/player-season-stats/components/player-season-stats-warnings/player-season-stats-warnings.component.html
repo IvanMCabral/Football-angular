@@ -1,0 +1,13 @@
+<div *ngIf="hasWarnings" class="warnings-container">
+  <!-- Warning severity (yellow) -->
+  <span *ngFor="let warning of getWarningsByType('warning')" class="warning-item warning-severity">
+    <span class="warning-icon">⚠</span>
+    <span class="warning-message">{{ warning.message }}</span>
+  </span>
+
+  <!-- Info severity (blue) -->
+  <span *ngFor="let warning of getWarningsByType('info')" class="warning-item info-severity">
+    <span class="warning-icon">ℹ</span>
+    <span class="warning-message">{{ warning.message }}</span>
+  </span>
+</div>

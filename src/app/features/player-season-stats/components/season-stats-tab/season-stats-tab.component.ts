@@ -5,6 +5,7 @@ import {
   PlayerSeasonStatsResponse,
   PlayerSeasonStatsDto,
   PlayerSeasonStatsMetadata,
+  PlayerSeasonStatsWarning,
   PlayerStatsParams,
   StatsApiError,
   SortField,
@@ -16,6 +17,8 @@ import { PlayerSeasonStatsTableComponent } from '../player-season-stats-table/pl
 import { PlayerSeasonStatsToolbarComponent } from '../player-season-stats-toolbar/player-season-stats-toolbar.component';
 import { PlayerSeasonStatsPaginationComponent } from '../player-season-stats-pagination/player-season-stats-pagination.component';
 import { PlayerSeasonStatsEmptyStateComponent, EmptyStateReason } from '../player-season-stats-empty-state/player-season-stats-empty-state.component';
+import { PlayerSeasonStatsInfoBarComponent } from '../player-season-stats-info-bar/player-season-stats-info-bar.component';
+import { PlayerSeasonStatsWarningsComponent } from '../player-season-stats-warnings/player-season-stats-warnings.component';
 
 type LoadingState = 'loading' | 'loaded' | 'error' | 'empty';
 
@@ -27,7 +30,9 @@ type LoadingState = 'loading' | 'loaded' | 'error' | 'empty';
     PlayerSeasonStatsTableComponent,
     PlayerSeasonStatsToolbarComponent,
     PlayerSeasonStatsPaginationComponent,
-    PlayerSeasonStatsEmptyStateComponent
+    PlayerSeasonStatsEmptyStateComponent,
+    PlayerSeasonStatsInfoBarComponent,
+    PlayerSeasonStatsWarningsComponent
   ],
   templateUrl: './season-stats-tab.component.html',
   styleUrls: ['./season-stats-tab.component.css'],
@@ -45,6 +50,7 @@ export class SeasonStatsTabComponent implements OnInit, OnChanges {
   // State
   players: PlayerSeasonStatsDto[] = [];
   metadata: PlayerSeasonStatsMetadata | null = null;
+  warnings: PlayerSeasonStatsWarning[] = [];
   loadingState: LoadingState = 'loading';
   errorMessage: string = '';
 
@@ -80,6 +86,7 @@ export class SeasonStatsTabComponent implements OnInit, OnChanges {
   private handleResponse(response: PlayerSeasonStatsResponse): void {
     this.players = response.playerStats || [];
     this.metadata = response.metadata || null;
+    this.warnings = response.warnings || [];
 
     if (this.players.length === 0) {
       this.loadingState = 'empty';

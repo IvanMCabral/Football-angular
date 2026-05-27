@@ -1,0 +1,9 @@
+<div class="info-bar-container" [title]="tooltipText">
+  <span class="info-bar-text">
+    <ng-container *ngIf="updatedRoundText">{{ updatedRoundText }} · </ng-container>
+    {{ showingText }}
+    <span *ngIf="hasCompletenessIndicator" class="completeness-indicator">
+      · {{ completenessText }}
+    </span>
+  </span>
+</div>

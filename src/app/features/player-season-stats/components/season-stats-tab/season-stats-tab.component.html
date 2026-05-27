@@ -26,6 +26,15 @@
       (limitChange)="onLimitChange($event)">
     </app-player-season-stats-toolbar>
 
+    <app-player-season-stats-info-bar
+      [metadata]="metadata"
+      [fallbackPlayerCount]="players.length">
+    </app-player-season-stats-info-bar>
+
+    <app-player-season-stats-warnings
+      [warnings]="warnings">
+    </app-player-season-stats-warnings>
+
     <app-player-season-stats-table
       [players]="players"
       [sortBy]="sortBy"

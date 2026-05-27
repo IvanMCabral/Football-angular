@@ -1,0 +1,18 @@
+.info-bar-container {
+  padding: 8px 16px;
+  background-color: #fafafa;
+  border-bottom: 1px solid #eee;
+}
+
+.info-bar-text {
+  font-size: 13px;
+  color: #666;
+}
+
+.completeness-indicator {
+  color: #f57c00;
+}
+
+.info-bar-container[title] {
+  cursor: help;
+}
