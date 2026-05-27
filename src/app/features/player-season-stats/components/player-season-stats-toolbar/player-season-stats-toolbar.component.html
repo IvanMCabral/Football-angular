@@ -1,0 +1,19 @@
+<div class="toolbar-container">
+  <div class="toolbar-title">
+    <h3>Season Stats</h3>
+  </div>
+  <div class="toolbar-controls">
+    <div class="limit-selector">
+      <label for="limit-select">Show:</label>
+      <select
+        id="limit-select"
+        [value]="limit"
+        (change)="onLimitChange($event)">
+        <option *ngFor="let option of limitOptions" [value]="option">
+          {{ option }}
+        </option>
+      </select>
+      <span class="limit-label">players per page</span>
+    </div>
+  </div>
+</div>

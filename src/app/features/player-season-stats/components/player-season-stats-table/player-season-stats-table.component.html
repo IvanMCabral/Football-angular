@@ -1,0 +1,31 @@
+<div class="table-container">
+  <table class="stats-table">
+    <thead>
+      <tr>
+        <th
+          *ngFor="let column of columns"
+          [class.sortable]="column.sortable"
+          [class.sort-active]="sortBy === column.key"
+          [class.sort-available]="column.sortable && sortBy !== column.key"
+          [class.align-left]="column.align === 'left'"
+          [class.align-center]="column.align === 'center'"
+          [class.align-right]="column.align === 'right'"
+          (click)="onHeaderClick(column)">
+          {{ column.label }}
+          <span class="sort-icon" *ngIf="getSortIcon(column)">{{ getSortIcon(column) }}</span>
+        </th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let player of players">
+        <td
+          *ngFor="let column of columns"
+          [class.align-left]="column.align === 'left'"
+          [class.align-center]="column.align === 'center'"
+          [class.align-right]="column.align === 'right'">
+          {{ getValue(player, column.key) }}
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>

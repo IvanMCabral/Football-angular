@@ -1,0 +1,46 @@
+<div class="season-stats-container">
+  <!-- Loading State -->
+  <div *ngIf="loadingState === 'loading'" class="loading-container">
+    <div class="loading-message">Loading season stats...</div>
+  </div>
+
+  <!-- Error State with Retry -->
+  <div *ngIf="loadingState === 'error'" class="error-container">
+    <app-player-season-stats-empty-state
+      [reason]="'api-error'"
+      (retry)="onRetry()">
+    </app-player-season-stats-empty-state>
+  </div>
+
+  <!-- Empty State -->
+  <div *ngIf="loadingState === 'empty'" class="empty-container">
+    <app-player-season-stats-empty-state [reason]="emptyReason"></app-player-season-stats-empty-state>
+  </div>
+
+  <!-- Loaded State - Show Table -->
+  <div *ngIf="loadingState === 'loaded'" class="loaded-container">
+    <app-player-season-stats-toolbar
+      [limit]="currentLimit"
+      [sortBy]="sortBy"
+      [order]="order"
+      (limitChange)="onLimitChange($event)">
+    </app-player-season-stats-toolbar>
+
+    <app-player-season-stats-table
+      [players]="players"
+      [sortBy]="sortBy"
+      [order]="order"
+      (sortChange)="onSortChange($event)">
+    </app-player-season-stats-table>
+
+    <app-player-season-stats-pagination
+      [offset]="offset"
+      [limit]="limit"
+      [hasMore]="hasMore"
+      [totalPlayers]="totalPlayers"
+      [returnedPlayers]="returnedPlayers"
+      (previous)="onPrevious()"
+      (next)="onNext()">
+    </app-player-season-stats-pagination>
+  </div>
+</div>

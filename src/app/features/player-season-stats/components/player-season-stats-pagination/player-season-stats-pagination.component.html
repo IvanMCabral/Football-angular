@@ -1,0 +1,24 @@
+<div class="pagination-container">
+  <div class="pagination-info">
+    {{ showingText }}
+  </div>
+  <div class="pagination-controls">
+    <button
+      class="pagination-btn"
+      [class.disabled]="!canGoPrevious"
+      [disabled]="!canGoPrevious"
+      (click)="onPrevious()">
+      ◄ Previous
+    </button>
+    <span class="pagination-page">
+      Page {{ currentPage }} of {{ totalPages }}
+    </span>
+    <button
+      class="pagination-btn"
+      [class.disabled]="!canGoNext"
+      [disabled]="!canGoNext"
+      (click)="onNext()">
+      Next ►
+    </button>
+  </div>
+</div>
