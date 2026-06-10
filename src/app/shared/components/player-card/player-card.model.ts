@@ -13,4 +13,8 @@ export interface PlayerCardData {
   injured?: boolean;
   injuryType?: string | null;
   injuryRemainingMatches?: number | null;
+  yellowCards?: number;
+  redCards?: number;
+  suspended?: boolean;
+  suspensionRemainingMatches?: number;
 }

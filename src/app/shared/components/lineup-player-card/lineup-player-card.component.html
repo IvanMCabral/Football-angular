@@ -20,7 +20,7 @@
   <div *ngIf="hasConditionWarning()" class="condition-warning"
        [class]="conditionClass()"
        [title]="conditionWarningTooltip()">
-    <span class="condition-icon">{{ isInjured() ? '⚠️' : '⚡' }}</span>
+    <span class="condition-icon">{{ isSuspended() ? '⛔' : isInjured() ? '⚠️' : '⚡' }}</span>
     <span class="condition-label">{{conditionWarningLabel()}}</span>
   </div>
 </div>

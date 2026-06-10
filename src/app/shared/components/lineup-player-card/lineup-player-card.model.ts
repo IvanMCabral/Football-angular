@@ -5,5 +5,9 @@ export interface LineupPlayerData {
   overall: number;
   energy: number;
   injured: boolean;
+  yellowCards?: number;
+  redCards?: number;
+  suspended?: boolean;
+  suspensionRemainingMatches?: number;
   age: number;
 }

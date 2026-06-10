@@ -28,6 +28,10 @@
       Energy: {{energyPercent()}}% · {{energyLabel()}}
     </span>
   </div>
+  <div class="player-suspended" *ngIf="isSuspended()">
+    <span class="suspended-badge" [title]="suspendedTooltip()">⛔ {{suspendedLabel()}}</span>
+    <span class="suspended-detail">{{suspendedDetail()}}</span>
+  </div>
   <div class="player-injury" *ngIf="isInjured()">
     <span class="injury-badge" [title]="injuryTooltip()">🤕 {{injuryLabel()}}</span>
     <span class="injury-detail">{{injuryDetail()}}</span>

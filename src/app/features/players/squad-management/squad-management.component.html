@@ -114,7 +114,9 @@
       <div *ngIf="(activeTab$ | async) === 'stats'">
         <app-season-stats-tab
           [careerId]="(careerStatus$ | async)?.careerId ?? ''"
-          [season]="(careerStatus$ | async)?.season ?? 1">
+          [season]="(careerStatus$ | async)?.season ?? 1"
+          [teamId]="(careerStatus$ | async)?.userSessionTeamId ?? ''"
+          [scope]="'team'">
         </app-season-stats-tab>
       </div>
     </div>

@@ -20,7 +20,20 @@ import { PlayerSeasonStatsEmptyStateComponent, EmptyStateReason } from '../playe
 import { PlayerSeasonStatsInfoBarComponent } from '../player-season-stats-info-bar/player-season-stats-info-bar.component';
 import { PlayerSeasonStatsWarningsComponent } from '../player-season-stats-warnings/player-season-stats-warnings.component';
 
-type LoadingState = 'loading' | 'loaded' | 'error' | 'empty';
+type LoadingState = 'loading' | 'loaded' | 'error' | 'empty' | 'waiting-team';
+
+/**
+ * Scope of the stats tab.
+ *
+ * - 'team'   : caller REQUIRES team-scoped data. The component will ONLY call
+ *              the team endpoint (/teams/{teamId}/player-stats). If `teamId`
+ *              is empty, the component stays in a 'waiting-team' state and
+ *              NEVER falls back to the all-player endpoint.
+ *
+ * - 'global' : default. The component may call either endpoint based on
+ *              whether `teamId` is provided (backwards compatible).
+ */
+export type StatsScope = 'team' | 'global';
 
 @Component({
   selector: 'app-season-stats-tab',
@@ -46,6 +59,13 @@ export class SeasonStatsTabComponent implements OnInit, OnChanges {
   @Input() careerId: string = '';
   /** Season number input */
   @Input() season: number = 1;
+  /** Team ID for team-filtered stats (optional - when provided, calls /teams/{teamId}/player-stats) */
+  @Input() teamId: string = '';
+  /**
+   * Stats scope. 'team' forces team-scoped endpoint and disables all-player
+   * fallback. 'global' preserves legacy behavior (default).
+   */
+  @Input() scope: StatsScope = 'global';
 
   // State
   players: PlayerSeasonStatsDto[] = [];
@@ -57,23 +77,65 @@ export class SeasonStatsTabComponent implements OnInit, OnChanges {
   // Toolbar/pagination params
   params: PlayerStatsParams = { ...DEFAULT_STATS_PARAMS };
 
+  // Track previous teamId to detect when it changes from empty to populated
+  private previousTeamId: string = '';
+
   ngOnInit(): void {
+    this.previousTeamId = this.teamId;
     if (this.careerId) {
       this.fetchStats();
     }
   }
 
-  ngOnChanges(): void {
-    if (this.careerId) {
+  ngOnChanges(changes: { careerId?: any; season?: any; teamId?: any; scope?: any }): void {
+    // Detect when teamId changes from empty to non-empty → trigger refetch
+    if (changes.teamId && this.teamId && !this.previousTeamId && this.careerId) {
+      this.previousTeamId = this.teamId;
       this.fetchStats();
+    } else if (this.careerId) {
+      this.fetchStats();
+    }
+    if (changes.teamId) {
+      this.previousTeamId = this.teamId;
+    }
+    // If scope flips to 'team' but teamId is still empty, settle into waiting-team
+    // without firing a fetch. (This can happen if the parent re-renders.)
+    if (changes.scope && this.scope === 'team' && !this.teamId) {
+      this.loadingState = 'waiting-team';
+      this.players = [];
+      this.metadata = null;
+      this.warnings = [];
+      this.cdr.markForCheck();
     }
   }
 
   fetchStats(): void {
+    // Guard 1: careerId is the only hard requirement for any fetch.
+    if (!this.careerId) {
+      return;
+    }
+
+    // Guard 2: team-scope contract — when scope='team', teamId is mandatory.
+    // We must NOT call the all-player endpoint, because that would show
+    // 132 players from every team instead of the 11 from the user's squad.
+    if (this.scope === 'team' && !this.teamId) {
+      this.loadingState = 'waiting-team';
+      this.errorMessage = '';
+      this.players = [];
+      this.metadata = null;
+      this.warnings = [];
+      this.cdr.markForCheck();
+      return;
+    }
+
     this.loadingState = 'loading';
     this.errorMessage = '';
 
-    this.statsService.getPlayerSeasonStats(this.careerId, this.season, this.params).subscribe({
+    // Team scope ALWAYS uses the team endpoint; global scope keeps the
+    // legacy precedence (teamId wins, all-player as fallback).
+    const stats$ = this.resolveEndpoint();
+
+    stats$.subscribe({
       next: (response: PlayerSeasonStatsResponse) => {
         this.handleResponse(response);
       },
@@ -81,6 +143,25 @@ export class SeasonStatsTabComponent implements OnInit, OnChanges {
         this.handleError(error);
       }
     });
+  }
+
+  /**
+   * Decide which service method to call based on `scope` and `teamId`.
+   *
+   * - scope='team'   + teamId       → team endpoint (only legal combo)
+   * - scope='team'   + no teamId    → unreachable (Guard 2 returns early)
+   * - scope='global' + teamId       → team endpoint (precedence)
+   * - scope='global' + no teamId    → all-player endpoint
+   */
+  private resolveEndpoint() {
+    if (this.teamId) {
+      return this.statsService.getTeamPlayerSeasonStats(
+        this.careerId, this.season, this.teamId, this.params
+      );
+    }
+    return this.statsService.getPlayerSeasonStats(
+      this.careerId, this.season, this.params
+    );
   }
 
   private handleResponse(response: PlayerSeasonStatsResponse): void {

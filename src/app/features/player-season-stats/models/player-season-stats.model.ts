@@ -223,7 +223,7 @@ export class StatsApiError extends Error {
  * Default query parameters for initial fetch.
  */
 export const DEFAULT_STATS_PARAMS: Required<PlayerStatsParams> = {
-  limit: 50,
+  limit: 25,
   offset: 0,
   sortBy: 'goals',
   order: 'desc',

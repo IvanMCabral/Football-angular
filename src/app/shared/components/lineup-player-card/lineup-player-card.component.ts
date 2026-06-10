@@ -12,8 +12,12 @@ import { LineupPlayerData } from './lineup-player-card.model';
 export class LineupPlayerCardComponent {
   @Input() player!: LineupPlayerData;
 
+  isSuspended(): boolean {
+    return this.player.suspended === true || (this.player.suspensionRemainingMatches ?? 0) > 0;
+  }
+
   isInjured(): boolean {
-    return this.player.injured === true;
+    return this.player.injured === true && !this.isSuspended();
   }
 
   energyPercent(): number {
@@ -35,6 +39,7 @@ export class LineupPlayerCardComponent {
   }
 
   conditionWarningLabel(): string {
+    if (this.isSuspended()) { return 'Suspended'; }
     if (this.isInjured()) { return 'Injured'; }
     if (this.isExhausted()) { return 'Exhausted'; }
     if (this.isVeryTired()) { return 'Very tired'; }
@@ -43,6 +48,13 @@ export class LineupPlayerCardComponent {
   }
 
   conditionWarningTooltip(): string {
+    if (this.isSuspended()) {
+      const remaining = this.player.suspensionRemainingMatches ?? 0;
+      if (remaining > 0) {
+        return `This player is suspended and unavailable for ${remaining} match(es).`;
+      }
+      return 'This player is suspended and cannot be selected.';
+    }
     if (this.isInjured()) {
       return 'This player is injured. Consider replacing them before confirming the lineup.';
     }
@@ -59,6 +71,7 @@ export class LineupPlayerCardComponent {
   }
 
   conditionClass(): string {
+    if (this.isSuspended()) { return 'condition-suspended'; }
     if (this.isInjured()) { return 'condition-injured'; }
     if (this.isExhausted()) { return 'condition-exhausted'; }
     if (this.isVeryTired()) { return 'condition-very-tired'; }
@@ -67,7 +80,7 @@ export class LineupPlayerCardComponent {
   }
 
   hasConditionWarning(): boolean {
-    return this.isInjured() || this.isExhausted() || this.isVeryTired() || this.isTired();
+    return this.isSuspended() || this.isInjured() || this.isExhausted() || this.isVeryTired() || this.isTired();
   }
 
   private clampEnergy(value: number | undefined | null): number {

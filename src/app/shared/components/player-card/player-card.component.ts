@@ -13,8 +13,32 @@ export class PlayerCardComponent {
   @Input() player!: PlayerCardData;
   @Input() isSquad: boolean = false;
 
+  isSuspended(): boolean {
+    return this.player.suspended === true || (this.player.suspensionRemainingMatches ?? 0) > 0;
+  }
+
+  suspendedLabel(): string {
+    return 'Suspended';
+  }
+
+  suspendedDetail(): string {
+    const remaining = this.player.suspensionRemainingMatches ?? 0;
+    if (remaining > 0) {
+      return remaining === 1 ? 'Unavailable for 1 match' : `Unavailable for ${remaining} matches`;
+    }
+    return 'Unavailable';
+  }
+
+  suspendedTooltip(): string {
+    const remaining = this.player.suspensionRemainingMatches ?? 0;
+    if (remaining > 0) {
+      return `Player is suspended for ${remaining} match(es) and cannot be selected`;
+    }
+    return 'Player is suspended and cannot be selected';
+  }
+
   isInjured(): boolean {
-    return this.player.injured === true;
+    return this.player.injured === true && !this.isSuspended();
   }
 
   injuryLabel(): string {

@@ -85,6 +85,12 @@
   font-weight: 600;
 }
 
+.condition-suspended {
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
 .condition-injured {
   background: #fef2f2;
   color: #b91c1c;
