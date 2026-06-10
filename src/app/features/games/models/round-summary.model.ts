@@ -27,10 +27,14 @@ export interface SummaryMatchVM {
 
 /**
  * ViewModel completo para la pantalla de resumen de jornada
+ *
+ * V24D6O: Added `careerId` so completed matches can link to the
+ * V24 match detail page at /careers/:careerId/matches/:matchId/detail.
  */
 export interface RoundSummaryViewModel {
   gameId: string;
   roundNumber: number;
+  careerId: string;
   matches: SummaryMatchVM[];
   standings: Standing[];
   teamNameMap: { [id: string]: string };

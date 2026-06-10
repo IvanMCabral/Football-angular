@@ -74,6 +74,21 @@
   font-weight: bold;
   padding: 0 1rem;
 }
+
+/* V24D6O: button to open V24 match detail for a completed match */
+.btn-detail {
+  background: #1e3c72;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.btn-detail:hover { background: #2a5298; }
 .table-responsive {
   overflow-x: auto;
 }

@@ -21,6 +21,14 @@
           <span class="team-score">{{ match.awayGoals }}</span>
           <span class="team-name">{{ getTeamName(match.awayTeamId) }}</span>
         </div>
+        <!-- V24D6O: link to V24 match detail page for completed matches -->
+        <button *ngIf="match.status === 'COMPLETED'"
+                type="button"
+                class="btn-detail"
+                (click)="goToMatchDetail(match.matchId)"
+                title="Ver detalle V24 del partido">
+          📊 Ver Detalle V24
+        </button>
       </div>
     </div>
   </div>

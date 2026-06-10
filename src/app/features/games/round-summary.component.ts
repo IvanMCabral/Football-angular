@@ -25,6 +25,7 @@ export class RoundSummaryComponent implements OnInit, OnDestroy {
   private vmSubject = new BehaviorSubject<RoundSummaryViewModel>({
     gameId: '',
     roundNumber: 1,
+    careerId: '',
     matches: [],
     standings: [],
     teamNameMap: {},
@@ -94,6 +95,7 @@ export class RoundSummaryComponent implements OnInit, OnDestroy {
             this.updateVm({
               gameId: params.gameId,
               roundNumber: params.roundNumber,
+              careerId: careerStatus.careerId || '',
               matches,
               standings: [],
               teamNameMap: teamMap,
@@ -286,6 +288,20 @@ export class RoundSummaryComponent implements OnInit, OnDestroy {
   getTeamName(teamId: string): string {
     const vm = this.vmSubject.value;
     return vm.teamNameMap[teamId] || teamId.substring(0, 8);
+  }
+
+  /**
+   * V24D6O: Navigate to the V24 match detail page for a completed match.
+   * The view consumes GET /api/v1/careers/{careerId}/matches/{matchId}/detail
+   * and shows score, xG, timeline, playerRatings and shot map.
+   */
+  goToMatchDetail(matchId: string) {
+    const vm = this.vmSubject.value;
+    if (!vm.careerId || !matchId) {
+      console.warn('[SUMMARY] Missing careerId or matchId for V24 detail navigation', vm.careerId, matchId);
+      return;
+    }
+    this.router.navigate(['/careers', vm.careerId, 'matches', matchId, 'detail']);
   }
 
   playNextRound() {

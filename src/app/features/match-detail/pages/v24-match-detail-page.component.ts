@@ -1,8 +1,10 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink, ActivatedRoute } from '@angular/router';
 import { MatchDetailApiService } from '../services/match-detail-api.service';
 import { MatchDetail } from '../models/match-detail.model';
+import { MatchShotMapComponent } from '../components/shot-map/match-shot-map.component';
+import { ShotInput } from '../components/shot-map/match-shot-map.model';
 
 /**
  * V24D5E4: Add Player Ratings UI
@@ -17,7 +19,7 @@ import { MatchDetail } from '../models/match-detail.model';
 @Component({
   selector: 'app-v24-match-detail-page',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, MatchShotMapComponent],
   template: `
     <div class="v24-match-detail-page">
 
@@ -244,33 +246,12 @@ import { MatchDetail } from '../models/match-detail.model';
           <div *ngIf="!hasShotMap()" class="empty-state">
             Shot map is not available for this match.
           </div>
-          <div *ngIf="hasShotMap()" class="shot-map-container">
-            <div class="shot-map-header">
-              <span>{{ shotMapEvents().length }} shots</span>
-              <span class="meta-dot">·</span>
-              <span>{{ shotGoalsCount() }} goals</span>
-              <span class="meta-dot" *ngIf="averageShotXg() !== null">·</span>
-              <span *ngIf="averageShotXg() !== null">Avg xG {{ averageShotXg()!.toFixed(2) }}</span>
-            </div>
-            <div class="pitch-wrap">
-              <div class="pitch" role="img" aria-label="Shot map">
-                <div class="pitch-line center-line"></div>
-                <div class="pitch-rect penalty-area"></div>
-                <div class="pitch-rect six-yard"></div>
-                <div *ngFor="let event of shotMapEvents()" class="shot-dot"
-                  [class.dot-goal]="isGoalEvent(event)"
-                  [style.left.%]="clamp(event.shotCoordinate!.x)"
-                  [style.top.%]="clamp(event.shotCoordinate!.y)"
-                  [title]="formatTooltip(event)"
-                  [attr.aria-label]="formatTooltip(event)">
-                </div>
-              </div>
-            </div>
-            <div class="shot-legend">
-              <span class="legend-item"><span class="legend-dot dot-goal"></span> Goal</span>
-              <span class="legend-item"><span class="legend-dot dot-other"></span> Shot / Block / Miss</span>
-            </div>
-          </div>
+          <app-match-shot-map
+            *ngIf="hasShotMap()"
+            [shotsInput]="shotInputs()"
+            [homeTeamId]="detail?.homeTeamId ?? null"
+            [awayTeamId]="detail?.awayTeamId ?? null">
+          </app-match-shot-map>
         </div>
 
       </div>
@@ -702,80 +683,7 @@ import { MatchDetail } from '../models/match-detail.model';
     .badge-card.red { background: #ffcdd2; color: #c62828; }
     .badge-inj { color: #0288d1; font-weight: 700; font-size: 12px; }
 
-    /* === Shot Map === */
-    .shot-map-container { display: flex; flex-direction: column; gap: 10px; }
-    .shot-map-header {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 13px;
-      color: #666;
-    }
-    .meta-dot { color: #ccc; }
-    .pitch-wrap {
-      width: 100%;
-      border-radius: 6px;
-      overflow: hidden;
-      border: 2px solid #e0e0e0;
-    }
-    .pitch {
-      position: relative;
-      width: 100%;
-      aspect-ratio: 50 / 33;
-      background: #2d8c3c;
-    }
-    .pitch-line {
-      position: absolute;
-      border: 1px solid rgba(255,255,255,0.25);
-    }
-    .center-line {
-      left: 50%;
-      top: 0; bottom: 0;
-      width: 0;
-      border-width: 0 1px 0 0;
-      border-color: rgba(255,255,255,0.3);
-    }
-    .pitch-rect {
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      transform: translate(-50%, -50%);
-      border: 1.5px solid rgba(255,255,255,0.35);
-    }
-    .penalty-area { width: 40%; height: 44%; border-radius: 2px; }
-    .six-yard { width: 18%; height: 22%; border-radius: 1px; }
-    .shot-dot {
-      position: absolute;
-      width: 10px; height: 10px;
-      border-radius: 50%;
-      transform: translate(-50%, -50%);
-      background: #ff9800;
-      border: 2px solid rgba(255,255,255,0.7);
-      cursor: pointer;
-      transition: transform 0.1s ease;
-      z-index: 1;
-    }
-    .shot-dot:hover { transform: translate(-50%, -50%) scale(1.4); z-index: 2; }
-    .shot-dot.dot-goal {
-      background: #4caf50;
-      width: 14px; height: 14px;
-      border-color: rgba(255,255,255,0.8);
-    }
-    .shot-dot.dot-goal:hover { transform: translate(-50%, -50%) scale(1.3); }
-    .shot-legend {
-      display: flex;
-      gap: 16px;
-      font-size: 12px;
-      color: #666;
-    }
-    .legend-item { display: flex; align-items: center; gap: 5px; }
-    .legend-dot {
-      display: inline-block;
-      width: 8px; height: 8px;
-      border-radius: 50%;
-    }
-    .legend-dot.dot-goal { background: #4caf50; }
-    .legend-dot.dot-other { background: #ff9800; }
+    /* === Shot Map moved to standalone MatchShotMapComponent === */
 
     /* === Responsive === */
     @media (max-width: 600px) {
@@ -783,13 +691,13 @@ import { MatchDetail } from '../models/match-detail.model';
       .score { font-size: 28px; }
       .team-name { font-size: 14px; }
       .scoreboard { gap: 10px; }
-      .pitch-wrap { border-radius: 4px; }
     }
   `]
 })
 export class V24MatchDetailPageComponent implements OnInit {
   private api = inject(MatchDetailApiService);
   private route = inject(ActivatedRoute);
+  private cdr = inject(ChangeDetectorRef);
 
   loading = false;
   error = '';
@@ -798,12 +706,35 @@ export class V24MatchDetailPageComponent implements OnInit {
   ngOnInit(): void {
     const careerId = this.route.snapshot.paramMap.get('careerId');
     const matchId = this.route.snapshot.paramMap.get('matchId');
-    if (!careerId || !matchId) { this.error = 'Missing career or match ID.'; return; }
+    if (!careerId || !matchId) {
+      this.error = 'Missing career or match ID.';
+      this.cdr.detectChanges();
+      return;
+    }
     this.loading = true;
     this.error = '';
+    this.cdr.detectChanges();
+
     this.api.getMatchDetail(careerId, matchId).subscribe({
-      next: (data) => { this.detail = data; this.loading = false; },
-      error: () => { this.error = 'Failed to load match detail.'; this.loading = false; }
+      next: (data) => {
+        try {
+          console.log('[V24-DETAIL] received match detail', { careerId, matchId, hasData: !!data, hasTimeline: !!(data && data.timeline), timelineSize: data?.timeline?.length });
+          this.detail = data ?? null;
+          this.loading = false;
+        } catch (err) {
+          console.error('[V24-DETAIL] error processing response', err);
+          this.error = 'Failed to process match detail response.';
+          this.loading = false;
+        } finally {
+          this.cdr.detectChanges();
+        }
+      },
+      error: (err) => {
+        console.error('[V24-DETAIL] HTTP error', { careerId, matchId, status: err?.status, url: err?.url, message: err?.message });
+        this.error = 'Failed to load match detail.';
+        this.loading = false;
+        this.cdr.detectChanges();
+      }
     });
   }
 
@@ -880,25 +811,24 @@ export class V24MatchDetailPageComponent implements OnInit {
     return 'No injury events recorded for this match.';
   }
 
-  // === Shot Map helpers ===
+  // === Shot Map (V24D6O) ===
   hasShotMap(): boolean { return !!(this.detail?.timeline?.some(e => e.shotCoordinate != null)); }
-  shotMapEvents(): import('../models/match-detail.model').MatchEvent[] { return (this.detail?.timeline ?? []).filter(e => e.shotCoordinate != null); }
-  shotGoalsCount(): number { return this.shotMapEvents().filter(e => e.type === 'GOAL').length; }
-  isGoalEvent(event: import('../models/match-detail.model').MatchEvent): boolean { return event.type === 'GOAL'; }
-  clamp(v: number | undefined | null): number { if (v == null) return 50; return Math.max(0, Math.min(100, v)); }
-  formatTooltip(event: import('../models/match-detail.model').MatchEvent): string {
-    const parts: string[] = [`${event.minute}'`];
-    if (event.playerName) parts.push(event.playerName);
-    parts.push(event.type);
-    if (event.xg != null) parts.push(`xG ${event.xg.toFixed(2)}`);
-    if (event.shotCoordinate?.location) parts.push(event.shotCoordinate.location.replace(/_/g, ' '));
-    return parts.join(' • ');
-  }
-  averageShotXg(): number | null {
-    const events = this.shotMapEvents();
-    if (!events.length) return null;
-    const withXg = events.filter(e => e.xg != null);
-    if (!withXg.length) return null;
-    return withXg.reduce((s, e) => s + (e.xg ?? 0), 0) / withXg.length;
+  /**
+   * Build a strongly-typed ShotInput[] for the standalone MatchShotMapComponent.
+   * The renderer owns projection, drawing, and tooltips.
+   */
+  shotInputs(): ShotInput[] {
+    const tl = this.detail?.timeline ?? [];
+    return tl
+      .filter(e => !!e.shotCoordinate)
+      .map(e => ({
+        teamId: e.teamId,
+        type: e.type,
+        minute: e.minute,
+        playerName: e.playerName,
+        xg: e.xg ?? null,
+        description: e.description,
+        shotCoordinate: e.shotCoordinate,
+      }));
   }
 }
