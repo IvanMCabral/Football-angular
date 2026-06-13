@@ -1200,8 +1200,8 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     }));
 
     this.http.post<{warnings?: LineupWarningDTO[]}>(
-      `${environment.apiUrl}/career/lineup/save`,
-      { lineup }
+      `${environment.apiUrl}/career/lineup/confirm`,
+      {}
     ).subscribe({
       next: (response) => {
         // V24D6U3: surface server warnings (LINEUP_SHORT_HANDED, etc.)
