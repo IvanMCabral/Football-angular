@@ -16,6 +16,8 @@ import { CareerStatusBarComponent } from 'app/shared/components/career-status-ba
 import { PlayerCardComponent } from 'app/shared/components/player-card/player-card.component';
 import { LineupPlayerCardComponent } from 'app/shared/components/lineup-player-card/lineup-player-card.component';
 import { SeasonStatsTabComponent } from '../../player-season-stats/components/season-stats-tab/season-stats-tab.component';
+import { LineupDTO, PlayerLineupDTO } from 'app/shared/models/lineup/lineup.dto';
+import { LineupWarningDTO } from 'app/shared/models/lineup/lineup-warning.dto';
 
 interface SessionPlayer {
   sessionPlayerId: string;
@@ -54,25 +56,7 @@ interface Team {
   origin: string;
 }
 
-interface PlayerLineupDTO {
-  playerId: string;
-  name: string;
-  position: string;
-  overall: number;
-  energy: number;
-  injured: boolean;
-  age: number;
-  yellowCards?: number;
-  redCards?: number;
-  suspended?: boolean;
-  suspensionRemainingMatches?: number;
-}
 
-interface LineupDTO {
-  formation: string;
-  players: PlayerLineupDTO[];
-  confirmed: boolean;
-}
 
 @Component({
   selector: 'app-squad-management',
@@ -134,6 +118,8 @@ export class SquadManagementComponent implements OnInit {
    lineup$!: Observable<LineupDTO | null>;
    lineupLoading$ = new BehaviorSubject<boolean>(false);
    lineupError$ = new BehaviorSubject<string | null>(null);
+   /** V24D6U3: server-issued warnings (LINEUP_SHORT_HANDED, LINEUP_NO_GOALKEEPER). */
+   lineupWarning$ = new BehaviorSubject<LineupWarningDTO | null>(null);
    lineupSubject$ = new BehaviorSubject<LineupDTO | null>(null);
    confirmationWarning$ = new BehaviorSubject<string | null>(null);
    pendingRiskyConfirm$ = new BehaviorSubject<boolean>(false);
@@ -194,9 +180,13 @@ export class SquadManagementComponent implements OnInit {
 
      this.http.get<LineupDTO>(`${environment.apiUrl}/career/lineup/current`)
        .pipe(
-         tap(lineup => this.lineupSubject$.next(lineup)),
+         tap(lineup => {
+           this.lineupSubject$.next(lineup);
+           this.lineupWarning$.next(this.pickLineupWarning(lineup.warnings));
+         }),
          catchError(err => {
            this.lineupSubject$.next(null);
+           this.lineupWarning$.next(null);
            return of(null);
          })
        )
@@ -245,6 +235,21 @@ export class SquadManagementComponent implements OnInit {
      this.pendingRiskyConfirm$.next(false);
    }
 
+   /**
+    * V24D6U3: Reduce a list of backend warnings to a single banner payload.
+    * Priority: ERROR > WARNING. Returns null when no banner should be shown.
+    */
+   private pickLineupWarning(warnings?: LineupWarningDTO[]): LineupWarningDTO | null {
+     if (!warnings || warnings.length === 0) {
+       return null;
+     }
+     const errors = warnings.filter(w => w.severity === 'ERROR');
+     if (errors.length > 0) {
+       return errors[0];
+     }
+     return warnings[0];
+   }
+
    formatMoney(value: number): string {
      return new Intl.NumberFormat('es-ES', {
        style: 'currency',
@@ -267,6 +272,7 @@ export class SquadManagementComponent implements OnInit {
 
      this.lineupLoading$.next(true);
      this.lineupError$.next(null);
+     this.lineupWarning$.next(null);
      this.resetLineupWarning();
 
      this.http.post<LineupDTO>(
@@ -276,6 +282,7 @@ export class SquadManagementComponent implements OnInit {
      .subscribe({
        next: (lineup) => {
          this.lineupSubject$.next(lineup);
+         this.lineupWarning$.next(this.pickLineupWarning(lineup.warnings));
          this.lineupLoading$.next(false);
        },
        error: (err) => {
@@ -286,6 +293,14 @@ export class SquadManagementComponent implements OnInit {
            userMsg = err.message;
          }
          this.lineupError$.next(userMsg);
+         // Also surface 422 warnings (e.g. LINEUP_MINIMUM_PLAYERS_NOT_MET) in the warning banner
+         if (err.error?.code) {
+           this.lineupWarning$.next({
+             code: err.error.code,
+             severity: 'ERROR',
+             message: userMsg
+           });
+         }
          this.lineupLoading$.next(false);
        }
      });
@@ -293,6 +308,19 @@ export class SquadManagementComponent implements OnInit {
 
     onConfirmLineup(): void {
      const currentLineup = this.lineupSubject$.value;
+     const playerCount = currentLineup?.players?.length ?? 0;
+
+     // V24D6U3: Guard against confirming with <7 or >11. Block client-side
+     // without sending the request — the backend would 422 anyway.
+     if (playerCount < 7 || playerCount > 11) {
+       this.lineupError$.next(
+         playerCount < 7
+           ? 'Mínimo 7 jugadores para confirmar'
+           : 'Máximo 11 jugadores'
+       );
+       return;
+     }
+
      const riskyMsg = this.buildRiskyLineupMessage(currentLineup?.players ?? []);
 
      if (riskyMsg && !this.pendingRiskyConfirm$.value) {
@@ -304,6 +332,7 @@ export class SquadManagementComponent implements OnInit {
 
      this.lineupLoading$.next(true);
      this.lineupError$.next(null);
+     this.lineupWarning$.next(null);
 
      firstValueFrom(this.careerStatus$).then(careerStatus => {
        if (!careerStatus || !careerStatus.careerId) {

@@ -161,7 +161,29 @@
         <div *ngIf="lineup.players && lineup.players.length > 0" class="lineup-container">
           <div class="lineup-info">
             <span class="lineup-formation">{{lineup.formation}}</span>
-            <span class="lineup-count">{{lineup.players.length}} / 11</span>
+            <span class="lineup-count"
+                  [class.count-short]="lineup.players.length < 7"
+                  [class.count-ok]="lineup.players.length >= 7 && lineup.players.length < 11"
+                  [class.count-full]="lineup.players.length === 11">
+              {{lineup.players.length}} / 11
+            </span>
+          </div>
+
+          <!-- V24D6U3: server-issued warning banner (LINEUP_SHORT_HANDED / LINEUP_NO_GOALKEEPER) -->
+          <div *ngIf="lineupWarning$ | async as w"
+               class="lineup-warning-banner"
+               [class.warning-error]="w.severity === 'ERROR'"
+               [class.warning-warning]="w.severity === 'WARNING'"
+               role="alert">
+            <span class="banner-icon">
+              <ng-container [ngSwitch]="w.code">
+                <span *ngSwitchCase="'LINEUP_NO_GOALKEEPER'">🧤</span>
+                <span *ngSwitchCase="'LINEUP_MINIMUM_PLAYERS_NOT_MET'">✕</span>
+                <span *ngSwitchDefault>⚠</span>
+              </ng-container>
+            </span>
+            <span class="banner-text">{{w.message}}</span>
+            <button class="banner-close" (click)="lineupWarning$.next(null)" title="Cerrar">×</button>
           </div>
 
           <div class="lineup-grid">
@@ -178,7 +200,12 @@
             </div>
             <button
               (click)="onConfirmLineup()"
-              [disabled]="(lineupLoading$ | async) || lineup.players.length !== 11"
+              [disabled]="(lineupLoading$ | async) || lineup.players.length < 7 || lineup.players.length > 11"
+              [title]="lineup.players.length < 7
+                       ? 'Mínimo 7 jugadores'
+                       : (lineup.players.length > 11
+                          ? 'Máximo 11 jugadores'
+                          : 'Confirmar')"
               class="btn-confirm-lineup">
               ✅ Confirmar y Jugar
             </button>
