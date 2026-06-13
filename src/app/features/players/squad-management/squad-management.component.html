@@ -93,8 +93,25 @@
       <!-- Squad tab -->
       <div *ngIf="(activeTab$ | async) === 'squad'">
         <div class="section-header">
-          <h3>👥 Tu Plantilla ({{(squad$ | async)?.length || 0}} / 25)</h3>
+          <h3>👥 Tu Plantilla ({{availableSquadCount(squad$ | async)}} / {{(squad$ | async)?.length || 0}} disponibles)</h3>
           <a routerLink="/players/manage" class="btn-create">⚙️ Gestionar</a>
+        </div>
+
+        <!-- V24D6T2 (bug #6): dedicated short-handed warning when available < 11 -->
+        <div *ngIf="(squad$ | async) as s"
+             [hidden]="availableSquadCount(s) >= 11"
+             class="squad-short-handed-banner"
+             role="alert">
+          <span class="banner-icon">⚠</span>
+          <span class="banner-text">
+            <ng-container *ngIf="availableSquadCount(s) < 7; else shortHanded">
+              Plantilla muy corta: {{ availableSquadCount(s) }} disponibles.
+              Mínimo 7 para jugar.
+            </ng-container>
+            <ng-template #shortHanded>
+              Jugando con {{ availableSquadCount(s) }} jugadores (short-handed).
+            </ng-template>
+          </span>
         </div>
 
         <div *ngIf="(squad$ | async)?.length === 0" class="empty-state">

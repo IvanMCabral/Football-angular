@@ -267,6 +267,18 @@ export class SquadManagementComponent implements OnInit {
      this.activeTab$.next(tab);
    }
 
+   /**
+    * V24D6T2 (bug #6): count of healthy + non-suspended players in the
+    * current squad. Used by the Plantilla header to show "available / total".
+    */
+   availableSquadCount(squad: SessionPlayer[] | null): number {
+     if (!squad) return 0;
+     return squad.filter(p =>
+       p.injured !== true &&
+       !(p.suspensionRemainingMatches != null && p.suspensionRemainingMatches > 0)
+     ).length;
+   }
+
    onAutoSelect(): void {
      const formation = this.selectedFormation$.value;
 
