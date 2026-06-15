@@ -74,7 +74,6 @@ export class DashboardComponent implements OnInit {
 
 
   ngOnInit(): void {
-    console.log('[DASHBOARD] ngOnInit called');
     this.loadDashboardData();
   }
 
@@ -98,11 +97,9 @@ export class DashboardComponent implements OnInit {
         return null;
       }),
       catchError(err => {
-        console.log('[DASHBOARD] No hay carrera activa');
         return of(null);
       })
     ).subscribe(status => {
-      console.log('[DASHBOARD] Career status cargado:', status);
       this.careerStatusSubject.next(status);
     });
   }
@@ -120,7 +117,6 @@ export class DashboardComponent implements OnInit {
   private loadSquadData(): void {
     this.http.get<SessionPlayer[]>(`${environment.apiUrl}/career/players/squad`).pipe(
       catchError(err => {
-        console.error('[DASHBOARD] Error loading squad data for condition warnings:', err);
         return of([]);
       })
     ).subscribe(players => {
@@ -193,7 +189,6 @@ export class DashboardComponent implements OnInit {
     this.username$ = this.authService.getUserInfo().pipe(
       map(info => info.username),
       catchError(err => {
-        console.error('[DASHBOARD] Error loading user info', err);
         return of('');
       }),
       shareReplay(1)
@@ -208,7 +203,6 @@ export class DashboardComponent implements OnInit {
     this.userStats$ = this.http.get<UserStats>(`${environment.apiUrl}/dashboard/user-stats`).pipe(
       shareReplay(1),
       catchError(err => {
-        console.error('[DASHBOARD] Error loading user stats', err);
         return of({ matchesPlayed: 0, matchesWon: 0, matchesLost: 0, winPercentage: 0 });
       })
     );
@@ -218,7 +212,6 @@ export class DashboardComponent implements OnInit {
     this.worldStatus$ = this.http.get<WorldStatus>('http://localhost:8080/api/v1/dashboard/world-status').pipe(
       shareReplay(1),
       catchError(err => {
-        console.error('[DASHBOARD] Error loading world status', err);
         return of({ clubs: 0, players: 0, matches: 0 });
       })
     );
@@ -226,7 +219,6 @@ export class DashboardComponent implements OnInit {
     this.userStats$ = this.http.get<UserStats>(`${environment.apiUrl}/dashboard/user-stats`).pipe(
       shareReplay(1),
       catchError(err => {
-        console.error('[DASHBOARD] Error loading user stats', err);
         return of({ matchesPlayed: 0, matchesWon: 0, matchesLost: 0, winPercentage: 0 });
       })
     );
@@ -242,12 +234,10 @@ export class DashboardComponent implements OnInit {
 
   onPlayNow(): void {
     // Este botón solo aparece cuando !careerStatus, así que siempre ir a setup
-    console.log('[DASHBOARD] Starting new career, going to setup');
     this.router.navigate(['/career/setup']);
   }
 
   onContinueCareer(): void {
-    console.log('[DASHBOARD] Continuing career...');
     this.router.navigate(['/squad']);
   }
 
@@ -260,29 +250,23 @@ export class DashboardComponent implements OnInit {
     if (!confirm('¿Comenzar la siguiente fecha? Podrás ajustar táctica y formación antes de que_startMatch los partidos.')) {
       return;
     }
-    
-    console.log('[DASHBOARD] 🎮 Solicitando avanzar a siguiente fecha...');
+
     this.loading = true;
-    
+
     firstValueFrom(this.careerStatus$).then(status => {
       if (!status?.careerId) {
         this.loading = false;
         this.toastService.error('No se encontró la carrera');
         return;
       }
-      
-      console.log('[DASHBOARD] 📋 careerId:', status.careerId);
-      console.log('[DASHBOARD] 📋 currentRound:', status.currentRound);
-      console.log('[DASHBOARD] 📋 careerPhase:', status.careerPhase);
-      
+
       this.http.post<any>(`${environment.apiUrl}/career/${status.careerId}/next-round`, {}).subscribe({
         next: (response) => {
-          console.log('[DASHBOARD] ✅ Respuesta de next-round:', response);
           this.loading = false;
-          
+
           if (response.success) {
             this.toastService.success('📅 ' + response.message);
-            
+
             if (response.currentRound && response.careerPhase === 'PRE_MATCH') {
               this.router.navigate([`/games/${response.careerId}/round/${response.currentRound}/live`]);
             } else if (response.tournamentFinished) {
@@ -290,7 +274,7 @@ export class DashboardComponent implements OnInit {
             } else {
               this.router.navigate(['/squad']);
             }
-            
+
             this.refreshCareerStatus();
           } else {
             this.toastService.error('Error: ' + response.message);
@@ -298,14 +282,12 @@ export class DashboardComponent implements OnInit {
         },
         error: (err) => {
           this.loading = false;
-          console.error('[DASHBOARD] ❌ Error en next-round:', err);
           const errorMsg = err.error?.message || err.message || 'Error desconocido';
           this.toastService.error('No se pudo avanzar: ' + errorMsg);
         }
       });
     }).catch(err => {
       this.loading = false;
-      console.error('[DASHBOARD] ❌ Error obteniendo career status:', err);
       this.toastService.error('Error al obtener estado de carrera');
     });
   }
@@ -323,15 +305,12 @@ export class DashboardComponent implements OnInit {
     if (!confirm('Are you sure you want to delete your career? This action cannot be undone.')) {
       return;
     }
-    console.log('[DASHBOARD] Deleting career...');
     this.http.delete(`${environment.apiUrl}/career/reset`).subscribe({
       next: () => {
-        console.log('[DASHBOARD] Career deleted successfully');
         // Refrescar el observable para que el UI reaccione inmediatamente
         this.refreshCareerStatus();
       },
       error: (err) => {
-        console.error('[DASHBOARD] Error deleting career:', err);
         alert('Error deleting career. Please try again.');
       }
     });

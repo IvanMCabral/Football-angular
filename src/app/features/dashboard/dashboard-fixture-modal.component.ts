@@ -24,7 +24,6 @@ export class DashboardFixtureModalComponent {
   
   @Input() set matches(val: Match[]) {
     this._matches = val;
-    console.log('[MODAL] matches recibidos:', this._matches);
   }
   get matches(): Match[] {
     return this._matches;
@@ -43,7 +42,6 @@ export class DashboardFixtureModalComponent {
 
   playLive(match: Match) {
     if (!this.gameId) {
-      console.error('[MODAL] No se especificó gameId');
       return;
     }
     const matchId = this.getValue(match.id);
@@ -53,13 +51,11 @@ export class DashboardFixtureModalComponent {
 
   getRounds(matches: any[]): number[] {
     const rounds = Array.from(new Set(matches.map(m => m.round))).sort((a, b) => a - b);
-    console.log('[MODAL] Rounds calculados:', rounds);
     return rounds;
   }
 
   getMatchesForRound(round: number): any[] {
     const filtered = this.matches.filter((m: any) => m.round === round);
-    console.log(`[MODAL] Matches para round ${round}:`, filtered);
     return filtered;
   }
 
@@ -76,7 +72,6 @@ export class DashboardFixtureModalComponent {
 
   goToMatchDetail(match: Match): void {
     if (!this._careerId) {
-      console.error('[MODAL] careerId not available');
       return;
     }
     const matchId = this.getValue(match.id);
