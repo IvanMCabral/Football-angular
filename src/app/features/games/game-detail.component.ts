@@ -68,6 +68,14 @@ export class GameDetailComponent implements OnInit {
       this.gameService.getGameById(id).subscribe({
         next: (game) => {
           console.log('[GAME DETAIL] Loaded game:', game);
+          if (!game) {
+            // Defensive: back should now return 404 for missing games, but if
+            // a regression sends 200+null we still surface the error state
+            // instead of falling into the infinite 'Loading game details...' template.
+            this.errorMsg = 'No se encontro el juego. Puede que no exista o no tengas acceso.';
+            this.cdr.detectChanges();
+            return;
+          }
           this.game = game;
           this.cdr.detectChanges();
           // Fetch user info
