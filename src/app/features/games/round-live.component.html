@@ -11,16 +11,32 @@
 
   <div *ngIf="vm.errorMsg" class="error">{{ vm.errorMsg }}</div>
 
-  <div class="matches-grid">
+  <!-- V24D11 UX-5: tu partido destacado primero, los demas debajo con divider -->
+  <div *ngIf="userMatch" class="user-match-section">
+    <h3 class="section-title">⭐ Tu partido</h3>
     <app-match-card
-      *ngFor="let rm of vm.matches"
-      [match]="rm.match"
-      [state]="rm.state"
-      [isUserMatch]="rm.isUserMatch"
-      [homeTeamName]="getTeamName(rm.match.homeTeamId, vm.teamNameMap)"
-      [awayTeamName]="getTeamName(rm.match.awayTeamId, vm.teamNameMap)"
-      (tacticChange)="onTacticChange(rm.match, $event)">
+      [match]="userMatch.match"
+      [state]="userMatch.state"
+      [isUserMatch]="true"
+      [homeTeamName]="getTeamName(userMatch.match.homeTeamId, vm.teamNameMap)"
+      [awayTeamName]="getTeamName(userMatch.match.awayTeamId, vm.teamNameMap)"
+      (tacticChange)="onTacticChange(userMatch.match, $event)">
     </app-match-card>
+  </div>
+
+  <div *ngIf="otherMatches.length" class="other-matches-section">
+    <h3 class="section-title">Otros partidos</h3>
+    <div class="matches-grid">
+      <app-match-card
+        *ngFor="let rm of otherMatches"
+        [match]="rm.match"
+        [state]="rm.state"
+        [isUserMatch]="false"
+        [homeTeamName]="getTeamName(rm.match.homeTeamId, vm.teamNameMap)"
+        [awayTeamName]="getTeamName(rm.match.awayTeamId, vm.teamNameMap)"
+        (tacticChange)="onTacticChange(rm.match, $event)">
+      </app-match-card>
+    </div>
   </div>
 
   <div class="footer" *ngIf="vm.allFinished">

@@ -266,6 +266,15 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
     return events.slice(-count).reverse();
   }
 
+  // V24D11 UX-5: separar el partido del user del resto en la grilla
+  get userMatch(): RoundMatchVM | null {
+    return this.vmSubject.value.matches.find(m => m.isUserMatch) || null;
+  }
+
+  get otherMatches(): RoundMatchVM[] {
+    return this.vmSubject.value.matches.filter(m => !m.isUserMatch);
+  }
+
   private mapFixtureStatus(fixtureStatus: string): 'SCHEDULED' | 'SIMULATED' | 'CANCELLED' {
     switch (fixtureStatus) {
       case 'PENDING': case 'SIMULATING': return 'SCHEDULED';

@@ -97,6 +97,13 @@
           <a routerLink="/players/manage" class="btn-create">⚙️ Gestionar</a>
         </div>
 
+        <!-- V24D11 UX-3: mini-CTA en el header del squad con conteo de lineup armado -->
+        <div *ngIf="(lineup$ | async)?.players?.length as lineupCount"
+             [hidden]="!lineupCount"
+             class="lineup-mini-cta">
+          ⚽ Lineup armado: <strong>{{ lineupCount }} / 11</strong> — <a href="#lineup-actions">Ir a confirmar</a>
+        </div>
+
         <!-- V24D6T2 (bug #6): dedicated short-handed warning when available < 11 -->
         <div *ngIf="(squad$ | async) as s"
              [hidden]="availableSquadCount(s) >= 11"
@@ -107,9 +114,13 @@
             <ng-container *ngIf="availableSquadCount(s) < 7; else shortHanded">
               Plantilla muy corta: {{ availableSquadCount(s) }} disponibles.
               Mínimo 7 para jugar.
+              <a routerLink="/players/manage" class="banner-link">Gestionar plantilla</a>
             </ng-container>
             <ng-template #shortHanded>
-              Jugando con {{ availableSquadCount(s) }} jugadores (short-handed).
+              <span [title]="'Estás jugando con ' + availableSquadCount(s) + ' jugadores. El mínimo recomendado es 11 (idealmente 25). Andá a Gestionar para agregar más jugadores a tu plantilla.'">
+                Jugando con {{ availableSquadCount(s) }} jugadores (short-handed).
+                <a routerLink="/players/manage" class="banner-link">Gestionar plantilla</a>
+              </span>
             </ng-template>
           </span>
         </div>
@@ -237,4 +248,24 @@
   </div>
 
   <div *ngIf="error$ | async as error" class="error">{{error}}</div>
+
+  <!-- V24D11 UX-3: sticky CTA bar visible cuando hay lineup armado -->
+  <div *ngIf="(lineup$ | async) as lineup"
+       [hidden]="!lineup?.players?.length"
+       class="sticky-confirm-bar">
+    <span class="sticky-confirm-info">
+      ⚽ {{ lineup.players.length }} / 11 jugadores
+    </span>
+    <button
+      (click)="onConfirmLineup()"
+      [disabled]="(lineupLoading$ | async) || lineup.players.length < 7 || lineup.players.length > 11"
+      [title]="lineup.players.length < 7
+               ? 'Mínimo 7 jugadores'
+               : (lineup.players.length > 11
+                  ? 'Máximo 11 jugadores'
+                  : 'Confirmar y Jugar')"
+      class="btn-confirm-lineup">
+      ✅ Confirmar y Jugar
+    </button>
+  </div>
 </div>

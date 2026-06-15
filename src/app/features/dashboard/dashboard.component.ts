@@ -230,13 +230,6 @@ export class DashboardComponent implements OnInit {
         return of({ matchesPlayed: 0, matchesWon: 0, matchesLost: 0, winPercentage: 0 });
       })
     );
-
-    // Load recent activities (mock for now)
-    this.recentActivities = [
-      { message: 'Created player: John Doe (GK, 28y)', timestamp: new Date(), type: 'player' },
-      { message: 'Assigned 5 players to Manchester Red', timestamp: new Date(), type: 'squad' },
-      { message: 'Custom Match: Team A 2-1 Team B', timestamp: new Date(), type: 'match' }
-    ];
   }
 
 

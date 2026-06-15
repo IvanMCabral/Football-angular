@@ -90,16 +90,6 @@
 
   <!-- Botones de acción -->
   <div class="actions">
-    <div *ngIf="!vm.tournamentStatus" class="debug-info">
-      Cargando estado del torneo...
-    </div>
-    <div *ngIf="vm.tournamentStatus" class="debug-info">
-      Debug: currentRound={{ vm.tournamentStatus.currentRound }}, 
-      totalRounds={{ vm.tournamentStatus.totalRounds }}, 
-      careerPhase={{ vm.careerPhase }},
-      isFinished={{ vm.tournamentStatus.isFinished }}
-    </div>
-    
     <!-- FIN DE TORNEO: Opciones de cierre -->
     <ng-container *ngIf="vm.careerPhase === 'FINISHED'">
       <div class="tournament-ended-message">

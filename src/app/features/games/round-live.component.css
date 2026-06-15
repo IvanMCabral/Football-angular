@@ -70,6 +70,30 @@
   margin-bottom: 2rem;
 }
 
+/* V24D11 UX-5: seccion destacada del partido del user + divider para los demas */
+.user-match-section {
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.user-match-section .section-title {
+  color: #b7791f;
+  font-size: 1.15rem;
+  margin: 0 0 0.75rem 0;
+}
+
+.other-matches-section {
+  margin-bottom: 1rem;
+}
+
+.other-matches-section .section-title {
+  color: #4a5568;
+  font-size: 1rem;
+  margin: 0 0 0.75rem 0;
+  font-weight: 500;
+}
+
 .footer {
   text-align: center;
   padding: 2rem;

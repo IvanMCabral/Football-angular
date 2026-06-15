@@ -510,3 +510,54 @@
   border-bottom-color: #1976d2;
   background: #fff;
 }
+
+/* V24D11 UX-3: sticky CTA bar al fondo de la viewport */
+.sticky-confirm-bar {
+  position: sticky;
+  bottom: 0;
+  background: #fff;
+  border-top: 1px solid #e2e8f0;
+  padding: 0.75rem 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+  z-index: 10;
+  margin-top: 1rem;
+}
+
+.sticky-confirm-info {
+  font-size: 0.95rem;
+  color: #2d3748;
+  font-weight: 500;
+}
+
+/* V24D11 UX-3: mini-CTA en el header del squad */
+.lineup-mini-cta {
+  background: #ebf8ff;
+  border: 1px solid #bee3f8;
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  margin: 0.5rem 0 1rem 0;
+  font-size: 0.9rem;
+  color: #2c5282;
+}
+
+.lineup-mini-cta a {
+  color: #2b6cb0;
+  text-decoration: underline;
+  font-weight: 500;
+  margin-left: 0.25rem;
+}
+
+/* V24D11 UX-4: link inline en el banner short-handed */
+.banner-link {
+  color: #2b6cb0;
+  text-decoration: underline;
+  font-weight: 500;
+  margin-left: 0.4rem;
+}
+
+.banner-link:hover {
+  color: #1a365d;
+}
