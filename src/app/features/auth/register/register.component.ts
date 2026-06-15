@@ -41,18 +41,18 @@ export class RegisterComponent {
     this.errorMessage = '';
     this.successMessage = '';
     const { email, username, password } = this.registerForm.value;
-    (this.authService.register(email, username, password) as any).subscribe({
+    this.authService.register(email, username, password).subscribe({
       next: () => {
-        this.successMessage = 'Registro exitoso. Ahora puedes iniciar sesión.';
+        // AuthService.register ya guardo tokens + emitio authStatus via handleAuthResponse.
+        // Navegamos directo a /dashboard: el authGuard pasa porque isAuthenticated() retorna true.
         this.loading = false;
-        this.registerForm.reset();
-        setTimeout(() => this.router.navigate(['/login']), 1500);
+        this.router.navigate(['/dashboard']);
       },
       error: (err: any) => {
         if (err?.status === 409) {
           this.errorMessage = 'El usuario ya existe. Usa otro email o inicia sesión.';
         } else {
-          this.errorMessage = err?.error?.message || 'Error al registrar usuario';
+          this.errorMessage = 'Error al registrar usuario';
         }
         this.loading = false;
       }

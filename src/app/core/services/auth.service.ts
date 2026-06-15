@@ -56,9 +56,11 @@ export class AuthService {
     );
   }
 
-  register(email: string, username: string, password: string): Observable<void> {
+  register(email: string, username: string, password: string): Observable<AuthResponse> {
     const request: RegisterRequest = { email, username, password };
-    return this.http.post<void>(`${environment.apiUrl}/auth/register`, request);
+    return this.http.post<AuthResponse>(`${environment.apiUrl}/auth/register`, request).pipe(
+      tap(response => this.handleAuthResponse(response))
+    );
   }
 
   logout(): void {
