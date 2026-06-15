@@ -94,7 +94,7 @@
       <div *ngIf="(activeTab$ | async) === 'squad'">
         <div class="section-header">
           <h3>👥 Tu Plantilla ({{availableSquadCount(squad$ | async)}} / {{(squad$ | async)?.length || 0}} disponibles)</h3>
-          <a routerLink="/players/manage" class="btn-create">⚙️ Gestionar</a>
+          <a routerLink="/players/manage" class="btn-create" title="Ir a gestion de jugadores">⚙️ Gestionar</a>
         </div>
 
         <!-- V24D11 UX-3: mini-CTA en el header del squad con conteo de lineup armado -->
@@ -166,10 +166,11 @@
             {{formation}}
           </option>
         </select>
-        <button 
-          (click)="onAutoSelect()" 
+        <button
+          (click)="onAutoSelect()"
           [disabled]="lineupLoading$ | async"
-          class="btn-auto-select">
+          class="btn-auto-select"
+          title="Auto-seleccionar alineacion segun formacion">
           🤖 Auto Seleccionar
         </button>
       </div>
