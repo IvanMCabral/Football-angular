@@ -1,10 +1,12 @@
 import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
+import { of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 import { MatchService } from '../services/match.service';
-import { TeamService } from '../../teams/services/team.service';
+import { CareerService } from '../../../core/services/career.service';
+import { CareerStatus } from '../../../core/services/career.model';
 import { Match } from '../../../shared/models/match.model';
-import { Team } from '../../../shared/models/team.model';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
 import { ErrorMessageComponent } from '../../../shared/components/error-message/error-message.component';
 
@@ -17,15 +19,24 @@ import { ErrorMessageComponent } from '../../../shared/components/error-message/
 })
 export class MatchListComponent implements OnInit {
   private matchService = inject(MatchService);
-  private teamService = inject(TeamService);
+  private careerService = inject(CareerService);
 
   matches: Match[] = [];
-  teams: Map<string, string> = new Map();
+  careerStatus: CareerStatus | null = null;
   loading = false;
   errorMessage = '';
 
   ngOnInit(): void {
+    this.loadCareerStatus();
     this.loadMatches();
+  }
+
+  loadCareerStatus(): void {
+    this.careerService.getCareerStatus().pipe(
+      catchError(() => of(null))
+    ).subscribe(status => {
+      this.careerStatus = status;
+    });
   }
 
   loadMatches(): void {
@@ -35,7 +46,6 @@ export class MatchListComponent implements OnInit {
     this.matchService.getMatches().subscribe({
       next: (matches) => {
         this.matches = matches;
-        this.loadTeamNames();
         this.loading = false;
       },
       error: (error) => {
@@ -45,19 +55,8 @@ export class MatchListComponent implements OnInit {
     });
   }
 
-  loadTeamNames(): void {
-    this.teamService.getAllTeams().subscribe({
-      next: (teams: Team[]) => {
-        teams.forEach((team: Team) => {
-          this.teams.set(team.id, team.name);
-        });
-      },
-      error: () => {}
-    });
-  }
-
-  getTeamName(teamId: string): string {
-    return this.teams.get(teamId) || 'Team';
+  hasCareer(): boolean {
+    return !!(this.careerStatus && this.careerStatus.careerId);
   }
 
   formatStatus(status: string): string {

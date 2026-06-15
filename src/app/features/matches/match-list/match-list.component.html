@@ -1,7 +1,6 @@
 <div class="matches-container">
   <div class="matches-header">
     <h1>Matches</h1>
-    <a routerLink="/matches/create" class="create-button">+ Schedule Match</a>
   </div>
 
   @if (loading) {
@@ -13,12 +12,21 @@
       (retry)="loadMatches()"
     ></app-error-message>
   } @else if (matches.length === 0) {
-    <div class="empty-state">
-      <div class="empty-icon">🏆</div>
-      <h2>No matches scheduled</h2>
-      <p>Schedule your first match to get started</p>
-      <a routerLink="/matches/create" class="create-button">Schedule Match</a>
-    </div>
+    @if (!hasCareer()) {
+      <div class="empty-state">
+        <div class="empty-icon">🏆</div>
+        <h2>No tenés carrera activa</h2>
+        <p>Iniciá una carrera para jugar tu primera temporada</p>
+        <a routerLink="/career/setup" class="create-button">Iniciar Carrera</a>
+      </div>
+    } @else {
+      <div class="empty-state">
+        <div class="empty-icon">⚽</div>
+        <h2>Los partidos se juegan desde el Dashboard</h2>
+        <p>Los partidos de tu career se gestionan desde el resumen de fechas</p>
+        <a routerLink="/dashboard" class="create-button">Ir al Dashboard</a>
+      </div>
+    }
   } @else {
     <div class="matches-list">
       @for (match of matches; track match.id) {
@@ -30,9 +38,9 @@
           </div>
           <div class="match-content">
             <div class="teams">
-              <span class="team home">{{ getTeamName(match.homeTeamId) }}</span>
+              <span class="team home">Team</span>
               <span class="vs">vs</span>
-              <span class="team away">{{ getTeamName(match.awayTeamId) }}</span>
+              <span class="team away">Team</span>
             </div>
             @if (match.result) {
               <div class="result">
