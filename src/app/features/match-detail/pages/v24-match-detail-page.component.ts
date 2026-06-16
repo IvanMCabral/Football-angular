@@ -59,6 +59,16 @@ import { ShotInput } from '../components/shot-map/match-shot-map.model';
         <!-- Header -->
         <div class="match-header">
           <a routerLink="/matches" class="link link-back">&#8592; Back to matches</a>
+          <!-- P1a: Breadcrumb navigation (Career/Route use placeholders — MatchDetail DTO does not include gameId or career name) -->
+          <nav class="breadcrumb" aria-label="Breadcrumb">
+            <a routerLink="/dashboard" class="breadcrumb-link" title="Go to dashboard">Home</a>
+            <span class="breadcrumb-sep">›</span>
+            <a routerLink="/dashboard" class="breadcrumb-link" title="Career overview (linked to dashboard until dedicated career route exists)">Career</a>
+            <span class="breadcrumb-sep">›</span>
+            <span class="breadcrumb-current" title="Round summary route requires gameId (not in MatchDetail DTO)">Round {{ detail.round }}</span>
+            <span class="breadcrumb-sep">›</span>
+            <span class="breadcrumb-current">Match</span>
+          </nav>
           <div class="scoreboard">
             <div class="team home-team">
               <span class="team-name">{{ detail.homeTeamName }}</span>
@@ -78,6 +88,11 @@ import { ShotInput } from '../components/shot-map/match-shot-map.model';
             <span class="meta-item">Season {{ detail.seasonNumber }}</span>
             <span class="meta-dot">·</span>
             <span class="badge badge-v24">V24 Engine</span>
+          </div>
+          <!-- P1a: Prev/Next match navigation (placeholders, disabled until P1a.1 wires to backend) -->
+          <div class="match-nav">
+            <button type="button" class="btn-nav btn-nav-prev" disabled title="Coming soon (P1a.1)">← Previous match</button>
+            <button type="button" class="btn-nav btn-nav-next" disabled title="Coming soon (P1a.1)">Next match →</button>
           </div>
         </div>
 
@@ -152,7 +167,7 @@ import { ShotInput } from '../components/shot-map/match-shot-map.model';
         <div class="section">
           <h3 class="section-title">Timeline</h3>
           <div *ngIf="detail.timeline.length === 0" class="empty-state">
-            No timeline events available.
+            No key moments were recorded for this match — the action happened, we just don't have the play-by-play.
           </div>
           <ul class="timeline-list" *ngIf="detail.timeline.length > 0">
             <li *ngFor="let event of detail.timeline" class="timeline-item">
@@ -186,7 +201,7 @@ import { ShotInput } from '../components/shot-map/match-shot-map.model';
         <div class="section">
           <h3 class="section-title">Players</h3>
           <div *ngIf="!hasPlayerRatings()" class="empty-state">
-            Player ratings are not available for this match.
+            Per-player ratings are not available for this match yet. They'll show up here as the engine collects more data.
           </div>
           <div *ngIf="hasPlayerRatings()" class="players-container">
             <div class="team-players" *ngFor="let team of playerRatingsByTeam()">
@@ -244,7 +259,7 @@ import { ShotInput } from '../components/shot-map/match-shot-map.model';
         <div class="section">
           <h3 class="section-title">Shot Map</h3>
           <div *ngIf="!hasShotMap()" class="empty-state">
-            Shot map is not available for this match.
+            We don't have shot locations for this match. The shot map will appear once the match is played with full V24 detail tracking.
           </div>
           <app-match-shot-map
             *ngIf="hasShotMap()"
@@ -402,6 +417,51 @@ import { ShotInput } from '../components/shot-map/match-shot-map.model';
       font-weight: 600;
     }
     .badge-v24 { background: #e3f2fd; color: #1976d2; }
+
+    /* === P1a: Breadcrumb === */
+    .breadcrumb {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 4px;
+      font-size: 12px;
+      color: #888;
+      margin-bottom: 4px;
+    }
+    .breadcrumb-link {
+      color: #1976d2;
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+    .breadcrumb-link:hover { text-decoration: underline; color: #1565c0; }
+    .breadcrumb-sep { color: #ccc; margin: 0 2px; }
+    .breadcrumb-current { color: #555; font-weight: 500; }
+
+    /* === P1a: Prev/Next match navigation === */
+    .match-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      padding-top: 4px;
+      border-top: 1px solid #f0f0f0;
+      margin-top: 4px;
+    }
+    .btn-nav {
+      flex: 1;
+      max-width: 200px;
+      padding: 6px 12px;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      background: #fafafa;
+      color: #999;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: not-allowed;
+      transition: background 0.15s;
+    }
+    .btn-nav:disabled { cursor: not-allowed; }
+    .btn-nav:hover:disabled { background: #fafafa; }
 
     /* === Summary Cards === */
     .summary-cards {
@@ -704,6 +764,9 @@ export class V24MatchDetailPageComponent implements OnInit {
   detail: MatchDetail | null = null;
 
   ngOnInit(): void {
+    // P1a: scroll to top on entry to this view (avoid stale scroll position when navigating between matches)
+    window.scrollTo(0, 0);
+
     const careerId = this.route.snapshot.paramMap.get('careerId');
     const matchId = this.route.snapshot.paramMap.get('matchId');
     if (!careerId || !matchId) {
@@ -717,20 +780,11 @@ export class V24MatchDetailPageComponent implements OnInit {
 
     this.api.getMatchDetail(careerId, matchId).subscribe({
       next: (data) => {
-        try {
-          console.log('[V24-DETAIL] received match detail', { careerId, matchId, hasData: !!data, hasTimeline: !!(data && data.timeline), timelineSize: data?.timeline?.length });
-          this.detail = data ?? null;
-          this.loading = false;
-        } catch (err) {
-          console.error('[V24-DETAIL] error processing response', err);
-          this.error = 'Failed to process match detail response.';
-          this.loading = false;
-        } finally {
-          this.cdr.detectChanges();
-        }
+        this.detail = data ?? null;
+        this.loading = false;
+        this.cdr.detectChanges();
       },
       error: (err) => {
-        console.error('[V24-DETAIL] HTTP error', { careerId, matchId, status: err?.status, url: err?.url, message: err?.message });
         this.error = 'Failed to load match detail.';
         this.loading = false;
         this.cdr.detectChanges();
