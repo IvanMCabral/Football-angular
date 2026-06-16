@@ -1,8 +1,19 @@
-import { Component, Input, ChangeDetectionStrategy, inject } from '@angular/core';
+import { Component, Input, ChangeDetectionStrategy, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { Match } from '../../shared/models/match.model';
 import { CareerService } from '../../core/services/career.service';
+import { Fixture } from '../../core/services/career.model';
+
+interface RoundFixturesWithBye {
+  round: number;
+  matches: Fixture[];
+  byeTeam: string | null;
+}
+
+interface AllRoundsWithBye {
+  rounds: RoundFixturesWithBye[];
+}
 
 @Component({
   selector: 'app-dashboard-fixture-modal',
@@ -12,11 +23,13 @@ import { CareerService } from '../../core/services/career.service';
   templateUrl: './dashboard-fixture-modal.component.html',
   styleUrls: ['./dashboard-fixture-modal.component.css']
 })
-export class DashboardFixtureModalComponent {
+export class DashboardFixtureModalComponent implements OnInit {
   private router = inject(Router);
   private careerService = inject(CareerService);
   private _matches: Match[] = [];
   private _careerId: string | null = null;
+  rounds: RoundFixturesWithBye[] = [];
+  loading = true;
 
   get careerId(): string | null {
     return this._careerId;
@@ -40,11 +53,39 @@ export class DashboardFixtureModalComponent {
     return val ?? '';
   }
 
-  playLive(match: Match) {
+  ngOnInit(): void {
+    this.loadFixturesWithBye();
+  }
+
+  loadFixturesWithBye(): void {
+    this.loading = true;
+    this.careerService.getAllFixturesWithBye().subscribe({
+      next: (data: AllRoundsWithBye) => {
+        this.rounds = data.rounds || [];
+        this.loading = false;
+      },
+      error: () => {
+        this.rounds = [];
+        this.loading = false;
+      }
+    });
+
+    this.careerService.getCareerStatus().subscribe({
+      next: (status) => {
+        this._careerId = status.careerId;
+      },
+      error: () => {
+        this._careerId = null;
+      }
+    });
+  }
+
+  playLive(match: any) {
     if (!this.gameId) {
       return;
     }
-    const matchId = this.getValue(match.id);
+    // UX-6: handle both Fixture (matchId) and legacy Match (id)
+    const matchId = this.getValue(match.matchId || match.id);
     this.router.navigate([`/games/${this.gameId}/match/${matchId}/live`]);
     this.close();
   }
@@ -59,27 +100,17 @@ export class DashboardFixtureModalComponent {
     return filtered;
   }
 
-  ngOnInit(): void {
-    this.careerService.getCareerStatus().subscribe({
-      next: (status) => {
-        this._careerId = status.careerId;
-      },
-      error: () => {
-        this._careerId = null;
-      }
-    });
-  }
-
-  goToMatchDetail(match: Match): void {
+  goToMatchDetail(match: any): void {
     if (!this._careerId) {
       return;
     }
-    const matchId = this.getValue(match.id);
+    // UX-6: handle both Fixture (matchId) and legacy Match (id)
+    const matchId = this.getValue(match.matchId || match.id);
     this.router.navigate(['/careers', this._careerId, 'matches', matchId, 'detail']);
     this.close();
   }
 
-  canShowDetail(match: Match): boolean {
-    return (match.status as string) === 'COMPLETED' && !!this._careerId;
+  canShowDetail(match: any): boolean {
+    return match.status === 'COMPLETED' && !!this._careerId;
   }
 }

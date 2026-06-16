@@ -34,7 +34,8 @@ export class RoundSummaryComponent implements OnInit, OnDestroy {
     userPosition: 0,
     careerPhase: 'WAITING_USER',
     tournamentStatus: null,
-    errorMsg: ''
+    errorMsg: '',
+    byeTeam: null // UX-6: BYE indicator
   });
 
   vm$: Observable<RoundSummaryViewModel>;
@@ -73,8 +74,10 @@ export class RoundSummaryComponent implements OnInit, OnDestroy {
         const userSessionTeamId = careerStatus.userSessionTeamId || '';
         const userTeamName = teamMap[userSessionTeamId] || '';
 
-        this.careerService.getFixturesByRound(params.roundNumber).subscribe({
-          next: (fixtures) => {
+        this.careerService.getFixturesByRoundWithBye(params.roundNumber).subscribe({
+          next: (fixturesData) => {
+            const fixtures = fixturesData.matches;
+            const byeTeam: string | null = fixturesData.byeTeam ?? null;
             const matches: SummaryMatchVM[] = fixtures.map(fixture => ({
               matchId: fixture.matchId,
               homeTeamId: fixture.homeTeamId,
@@ -111,7 +114,8 @@ export class RoundSummaryComponent implements OnInit, OnDestroy {
                 canPlayCurrentRound: canPlayNextRound,
                 season: careerStatus.season
               },
-              errorMsg: ''
+              errorMsg: '',
+              byeTeam
             });
 
             this.loadStandings();

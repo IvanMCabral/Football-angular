@@ -44,4 +44,5 @@ export interface RoundSummaryViewModel {
   careerPhase: string; // PRE_MATCH, IN_MATCH, POST_MATCH, WAITING_USER, FINISHED
   tournamentStatus: TournamentStatus | null;
   errorMsg: string;
+  byeTeam: string | null; // UX-6: BYE indicator
 }

@@ -21,4 +21,5 @@ export interface RoundLiveViewModel {
   allFinished: boolean;
   errorMsg: string;
   isRoundPaused: boolean;
+  byeTeam: string | null; // UX-6: BYE indicator
 }

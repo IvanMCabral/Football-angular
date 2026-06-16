@@ -119,6 +119,15 @@ export class CareerService {
     return this.http.get<Fixture[]>(`${this.apiUrl}/fixtures?round=${round}`);
   }
 
+  // UX-6: BYE indicator
+  getFixturesByRoundWithBye(round: number): Observable<{ round: number; matches: Fixture[]; byeTeam: string | null }> {
+    return this.http.get<{ round: number; matches: Fixture[]; byeTeam: string | null }>(`${this.apiUrl}/fixtures/round/${round}`);
+  }
+
+  getAllFixturesWithBye(): Observable<{ rounds: { round: number; matches: Fixture[]; byeTeam: string | null }[] }> {
+    return this.http.get<{ rounds: { round: number; matches: Fixture[]; byeTeam: string | null }[] }>(`${this.apiUrl}/fixtures/round-with-bye`);
+  }
+
   /**
    * Get the complete standings table from CareerSave (Redis)
    * 

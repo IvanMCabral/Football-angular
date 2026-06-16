@@ -2,6 +2,7 @@
 
   <div class="header">
     <h2>Fecha {{ vm.roundNumber }} - En Vivo</h2>
+    <span *ngIf="vm.byeTeam" class="bye-badge">BYE: {{ vm.byeTeam }}</span>
     <div class="controls">
       <button *ngIf="!vm.allFinished && !vm.isRoundPaused" (click)="pauseAll()" class="btn btn-pause">⏸️ Pausar Todos</button>
       <button *ngIf="!vm.allFinished && vm.isRoundPaused" (click)="resumeAll()" class="btn btn-resume">▶️ Reanudar Todos</button>

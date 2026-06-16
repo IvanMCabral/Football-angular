@@ -32,7 +32,8 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
     teamNameMap: {},
     allFinished: false,
     errorMsg: '',
-    isRoundPaused: false
+    isRoundPaused: false,
+    byeTeam: null // UX-6: BYE indicator
   });
 
   vm$: Observable<RoundLiveViewModel>;
@@ -66,12 +67,12 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
     );
 
     const fixtures$ = routeParams$.pipe(
-      switchMap(params => this.careerService.getFixturesByRound(params.roundNumber))
+      switchMap(params => this.careerService.getFixturesByRoundWithBye(params.roundNumber))
     );
 
     combineLatest([routeParams$, teams$, careerStatus$, fixtures$]).pipe(
       takeUntil(this.destroy$),
-      tap(([params, teamMap, careerStatus, fixtures]) => {
+      tap(([params, teamMap, careerStatus, fixturesData]) => {
         if (careerStatus.careerPhase === 'FINISHED') {
           this.router.navigate([`/games/${params.gameId}/champion`]);
           return;
@@ -83,6 +84,8 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
         }
 
         const userSessionTeamId = careerStatus.userSessionTeamId || '';
+        const fixtures = fixturesData.matches;
+        const byeTeam: string | null = fixturesData.byeTeam ?? null;
 
         if (fixtures.length === 0) {
           this.updateVm({
@@ -92,7 +95,8 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
             teamNameMap: teamMap,
             allFinished: false,
             errorMsg: `No hay partidos para la fecha ${params.roundNumber}`,
-            isRoundPaused: false
+            isRoundPaused: false,
+            byeTeam
           });
           return;
         }
@@ -126,7 +130,8 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
           teamNameMap: teamMap,
           allFinished: false,
           errorMsg: '',
-          isRoundPaused: false
+          isRoundPaused: false,
+          byeTeam
         });
 
         this.startRoundEngine(params.gameId, matches);
