@@ -63,8 +63,6 @@ interface Team {
   standalone: true,
   imports: [
     CommonModule, RouterLink, FormsModule, MatDialogModule,
-    FixtureModalComponent, StandingsModalComponent,
-    PalmaresDialogComponent, PromotionsDialogComponent,
     CareerStatusBarComponent, PlayerCardComponent, LineupPlayerCardComponent,
     SeasonStatsTabComponent
   ],
