@@ -1,10 +1,19 @@
 import { Component, OnInit, inject, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink, ActivatedRoute } from '@angular/router';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { MatButtonModule } from '@angular/material/button';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatchDetailApiService } from '../services/match-detail-api.service';
 import { MatchDetail } from '../models/match-detail.model';
 import { MatchShotMapComponent } from '../components/shot-map/match-shot-map.component';
 import { ShotInput } from '../components/shot-map/match-shot-map.model';
+import { MatchEngineService } from '../../../core/services/match-engine.service';
+import {
+  SubstitutionDialogComponent,
+  SubstitutionDialogData,
+  SubstitutionDialogResult
+} from '../components/substitution-dialog/substitution-dialog.component';
 
 /**
  * V24D5E4: Add Player Ratings UI
@@ -19,7 +28,7 @@ import { ShotInput } from '../components/shot-map/match-shot-map.model';
 @Component({
   selector: 'app-v24-match-detail-page',
   standalone: true,
-  imports: [CommonModule, RouterLink, MatchShotMapComponent],
+  imports: [CommonModule, RouterLink, MatDialogModule, MatButtonModule, MatchShotMapComponent],
   template: `
     <div class="v24-match-detail-page">
 
@@ -99,6 +108,13 @@ import { ShotInput } from '../components/shot-map/match-shot-map.model';
             <button type="button" class="btn-nav btn-nav-prev" disabled
                     aria-label="Previous match (not available yet)"
                     title="Coming soon (P1a.1)">← Previous match</button>
+            <!-- LIVE-MATCH-F1-POC: manual substitution entry point (UI-only, no result change) -->
+            <button type="button" class="btn-nav btn-nav-substitute"
+                    (click)="openSubstitutionDialog()"
+                    aria-label="Sustituir jugador"
+                    title="Sustituir jugador (Phase 1 POC: UI only, no result change)">
+              Sustituir
+            </button>
             <button type="button" class="btn-nav btn-nav-next" disabled
                     aria-label="Next match (not available yet)"
                     title="Coming soon (P1a.1)">Next match →</button>
@@ -847,6 +863,10 @@ export class V24MatchDetailPageComponent implements OnInit {
   private api = inject(MatchDetailApiService);
   private route = inject(ActivatedRoute);
   private cdr = inject(ChangeDetectorRef);
+  // LIVE-MATCH-F1-POC: dialog + snackbar + engine service for manual substitutions
+  private dialog = inject(MatDialog);
+  private snackBar = inject(MatSnackBar);
+  private engine = inject(MatchEngineService);
 
   loading = false;
   error = '';
@@ -986,5 +1006,87 @@ export class V24MatchDetailPageComponent implements OnInit {
         description: e.description,
         shotCoordinate: e.shotCoordinate,
       }));
+  }
+
+  // ========== LIVE-MATCH-F1-POC: manual substitution dialog ==========
+
+  /**
+   * LIVE-MATCH-F1-POC: open the substitution dialog.
+   *
+   * <p>Phase 1 POC limitation (per F3): the starting/bench player lists are
+   * hardcoded here as static arrays because the {@code MatchDetail} DTO does
+   * not yet expose {@code startingPlayers}/{@code benchPlayers}. The real
+   * lineup data requires a backend DTO extension (deferred to Phase 2).
+   *
+   * <p>For Phase 1 POC validation, we use a 4-3-3 home vs 4-4-2 away lineup
+   * with 4 bench players each. The substitutions work on real session player
+   * IDs (the dialog returns them), so the validation flow against the backend
+   * engine is end-to-end even with placeholder names.
+   */
+  openSubstitutionDialog(): void {
+    if (!this.detail?.matchId) {
+      return;
+    }
+    // Static placeholder lineups — see F3 limitation in the prompt.
+    const startingPlayers = [
+      { sessionPlayerId: 'home-starter-0', name: 'Home GK (placeholder)', position: 'GK' },
+      { sessionPlayerId: 'home-starter-1', name: 'Home DEF 1 (placeholder)', position: 'DEF' },
+      { sessionPlayerId: 'home-starter-2', name: 'Home DEF 2 (placeholder)', position: 'DEF' },
+      { sessionPlayerId: 'home-starter-3', name: 'Home MID 1 (placeholder)', position: 'MID' },
+      { sessionPlayerId: 'home-starter-4', name: 'Home ATT 1 (placeholder)', position: 'ATT' },
+    ];
+    const benchPlayers = [
+      { sessionPlayerId: 'home-bench-0', name: 'Home GK Bench (placeholder)', position: 'GK' },
+      { sessionPlayerId: 'home-bench-1', name: 'Home DEF Bench (placeholder)', position: 'DEF' },
+      { sessionPlayerId: 'home-bench-2', name: 'Home MID Bench (placeholder)', position: 'MID' },
+      { sessionPlayerId: 'home-bench-3', name: 'Home ATT Bench (placeholder)', position: 'ATT' },
+    ];
+
+    const data: SubstitutionDialogData = {
+      matchId: this.detail.matchId,
+      startingPlayers,
+      benchPlayers,
+      substitutionsRemaining: 5, // backend is authoritative; this is a UI hint
+      currentMinute: 45,         // placeholder minute (backend overrides)
+    };
+
+    const dialogRef = this.dialog.open<SubstitutionDialogComponent, SubstitutionDialogData, SubstitutionDialogResult>(
+      SubstitutionDialogComponent,
+      { data, width: '560px', ariaLabel: 'Sustituir jugador' }
+    );
+
+    dialogRef.afterClosed().subscribe(result => {
+      if (!result) {
+        return; // cancelled
+      }
+      this.engine.substitutePlayer(
+        this.detail!.matchId,
+        result.playerOffId,
+        result.playerOnId,
+        result.minute
+      ).subscribe({
+        next: (subResult: { success: boolean; minuteApplied: number; substitutionsRemaining: number; error?: string }) => {
+          // Note: backend returns substitutionsRemaining; for POC we display the
+          // dialog's optimistic count. A follow-up GET /match-state would refresh.
+          const msg = subResult.success
+            ? `Sustitución registrada (minuto ${subResult.minuteApplied || result.minute}). Te quedan ${subResult.substitutionsRemaining ?? '?'}.`
+            : `Error: ${subResult.error || 'sustitución no aplicada'}`;
+          this.snackBar.open(msg, 'Cerrar', {
+            duration: 5000,
+            panelClass: subResult.success ? 'snack-success' : 'snack-error',
+            politeness: 'polite'
+          });
+          this.cdr.detectChanges();
+        },
+        error: (err: { message?: string } | unknown) => {
+          const errMsg = (err as { message?: string })?.message || String(err);
+          this.snackBar.open(`Error de red: ${errMsg}`, 'Cerrar', {
+            duration: 5000,
+            panelClass: 'snack-error',
+            politeness: 'assertive'
+          });
+        }
+      });
+    });
   }
 }

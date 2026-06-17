@@ -6,7 +6,8 @@ import {
   MatchState,
   MatchCommand,
   EngineStatus,
-  RoundState
+  RoundState,
+  SubstitutionResult
 } from './match-engine.model';
 
 /**
@@ -70,6 +71,33 @@ export class MatchEngineService {
    */
   stopEngine(matchId: string): Observable<MatchState> {
     return this.http.post<MatchState>(`${this.apiUrl}/${matchId}/stop`, {});
+  }
+
+  /**
+   * LIVE-MATCH-F1-POC: Send a manual substitution to the backend.
+   *
+   * <p>Returns the substitution result with substitutions remaining.
+   * The backend appends the SUBSTITUTION event to the live session's
+   * timeline and mutates player state, but does NOT alter the match result
+   * (D1=B). The proper engine refactor that lets user actions affect goals
+   * is deferred to Phase 2.
+   *
+   * @param matchId the match UUID
+   * @param playerOffId sessionPlayerId of the player being substituted off
+   * @param playerOnId sessionPlayerId of the bench player coming on
+   * @param minute optional override; the backend always uses the live session
+   *              clock as the authoritative minute, so this is mostly cosmetic
+   */
+  substitutePlayer(
+    matchId: string,
+    playerOffId: string,
+    playerOnId: string,
+    minute?: number
+  ): Observable<SubstitutionResult> {
+    return this.http.post<SubstitutionResult>(
+      `${this.apiUrl}/matches/${matchId}/substitutions`,
+      { playerOffId, playerOnId, minute: minute ?? null }
+    );
   }
 
   /**
