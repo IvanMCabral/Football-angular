@@ -1,112 +1,162 @@
-<div class="match-live-container">
+<div class="match-live-container" *ngIf="matchState$ | async as state">
   <h2>Partido en Vivo</h2>
-  
-  <div *ngIf="errorMsg" class="error">{{ errorMsg }}</div>
-  
-  <div *ngIf="matchState" class="match-info">
-    <!-- Equipos y resultado -->
-    <div class="teams-section">
-      <div class="team home-team">
-        <h3>{{ teamNameMap[matchState.homeTeamId] || 'Equipo Local' }}</h3>
-        <div class="score">{{ matchState.score.home }}</div>
-      </div>
-      <div class="vs">VS</div>
-      <div class="team away-team">
-        <h3>{{ teamNameMap[matchState.awayTeamId] || 'Equipo Visitante' }}</h3>
-        <div class="score">{{ matchState.score.away }}</div>
-      </div>
-    </div>
 
-    <!-- Minuto actual y estado -->
-    <div class="match-status">
-      <div class="minute">Minuto {{ matchState.currentMinute }}'</div>
-      <div class="status" [class.running]="matchState.status === 'RUNNING'" 
-                          [class.paused]="matchState.status === 'PAUSED'"
-                          [class.finished]="matchState.status === 'FINISHED'">
-        {{ getStatusText(matchState.status) }}
-      </div>
-    </div>
+  <div *ngIf="errorMsg$ | async as errorMsg" class="error">{{ errorMsg }}</div>
 
-    <!-- Controles -->
-    <div class="controls" *ngIf="matchState.status !== 'FINISHED'">
-      <button *ngIf="matchState.status === 'RUNNING'" 
-              (click)="pauseMatch()" 
-              class="btn btn-pause">
-        ⏸️ Pausar
-      </button>
-      <button *ngIf="matchState.status === 'PAUSED'" 
-              (click)="resumeMatch()" 
-              class="btn btn-resume">
-        ▶️ Reanudar
-      </button>
-      <button (click)="stopMatch()" class="btn btn-stop">
-        ⏹️ Cancelar Partido
-      </button>
-    </div>
+  <ng-container *ngIf="teamNameMap$ | async as teamNameMap">
+    <div class="match-info" *ngIf="state as s">
 
-    <!-- Tácticas -->
-    <div class="tactics" *ngIf="matchState.status !== 'FINISHED'">
-      <div class="tactic-control">
-        <h4>{{ teamNameMap[matchState.homeTeamId] || 'Local' }}</h4>
-        <div class="tactic-buttons">
-          <button (click)="changeTactic('HOME', 'DEFEND')" 
-                  [class.active]="matchState.homeTactic === 'DEFEND'"
-                  class="btn-tactic">
-            🛡️ Defensiva
-          </button>
-          <button (click)="changeTactic('HOME', 'BALANCED')" 
-                  [class.active]="matchState.homeTactic === 'BALANCED'"
-                  class="btn-tactic">
-            ⚖️ Normal
-          </button>
-          <button (click)="changeTactic('HOME', 'ATTACK')" 
-                  [class.active]="matchState.homeTactic === 'ATTACK'"
-                  class="btn-tactic">
-            ⚔️ Ofensiva
-          </button>
+      <!-- Header: teams + score + minute/status/health -->
+      <div class="teams-section">
+        <div class="team home-team">
+          <h3>{{ teamNameMap[s.homeTeamId] || 'Equipo Local' }}</h3>
+          <div class="score"
+               [class.flash]="s.score.home !== undefined">
+            {{ s.score.home }}
+          </div>
+          <div class="team-style"
+               *ngIf="s.homeStyle || s.homeFormation">
+            <span class="badge">{{ s.homeStyle || 'BALANCED' }}</span>
+            <span class="badge badge-muted">{{ s.homeFormation || '4-4-2' }}</span>
+          </div>
+        </div>
+        <div class="vs">
+          <div class="vs-text">VS</div>
+          <div class="health-indicator"
+               *ngIf="useSse && (streamHealth$ | async) as health"
+               [class.healthy]="health === 'HEALTHY'"
+               [class.reconnecting]="health === 'RECONNECTING'"
+               [class.degraded]="health === 'DEGRADED'"
+               [class.closed]="health === 'CLOSED'"
+               [title]="healthTooltip(health)"
+               aria-label="Estado de la conexión en vivo">
+            <span class="health-dot"></span>
+            <span class="health-text">{{ health }}</span>
+          </div>
+        </div>
+        <div class="team away-team">
+          <h3>{{ teamNameMap[s.awayTeamId] || 'Equipo Visitante' }}</h3>
+          <div class="score"
+               [class.flash]="s.score.away !== undefined">
+            {{ s.score.away }}
+          </div>
+          <div class="team-style"
+               *ngIf="s.awayStyle || s.awayFormation">
+            <span class="badge">{{ s.awayStyle || 'BALANCED' }}</span>
+            <span class="badge badge-muted">{{ s.awayFormation || '4-4-2' }}</span>
+          </div>
         </div>
       </div>
-      <div class="tactic-control">
-        <h4>{{ teamNameMap[matchState.awayTeamId] || 'Visitante' }}</h4>
-        <div class="tactic-buttons">
-          <button (click)="changeTactic('AWAY', 'DEFEND')" 
-                  [class.active]="matchState.awayTactic === 'DEFEND'"
-                  class="btn-tactic">
-            🛡️ Defensiva
-          </button>
-          <button (click)="changeTactic('AWAY', 'BALANCED')" 
-                  [class.active]="matchState.awayTactic === 'BALANCED'"
-                  class="btn-tactic">
-            ⚖️ Normal
-          </button>
-          <button (click)="changeTactic('AWAY', 'ATTACK')" 
-                  [class.active]="matchState.awayTactic === 'ATTACK'"
-                  class="btn-tactic">
-            ⚔️ Ofensiva
-          </button>
+
+      <!-- Minuto + status text -->
+      <div class="match-status">
+        <div class="minute">Minuto {{ s.currentMinute }}'</div>
+        <div class="status"
+             [class.running]="s.status === 'RUNNING'"
+             [class.paused]="s.status === 'PAUSED'"
+             [class.half-time]="s.status === 'HALF_TIME'"
+             [class.finished]="s.status === 'FINISHED'">
+          {{ getStatusText(s.status) }}
         </div>
       </div>
-    </div>
 
-    <!-- Eventos recientes -->
-    <div class="events" *ngIf="matchState.events && matchState.events.length > 0">
-      <h4>Eventos Recientes</h4>
-      <div class="event-list">
-        <div *ngFor="let event of matchState.events" class="event">
-          <span class="event-minute">{{ event.minute }}'</span>
-          <span class="event-icon">{{ getEventIcon(event.eventType) }}</span>
-          <span class="event-desc">{{ event.description }}</span>
+      <!-- Possession bar (F3.0/F3.2) -->
+      <div class="possession-block" aria-label="Posesión del partido">
+        <div class="possession-label">
+          Posesión
+        </div>
+        <div class="possession-bar">
+          <div class="possession-home"
+               [style.flex]="homePossessionPct(s)">
+            {{ homePossessionPct(s) }}%
+          </div>
+          <div class="possession-away"
+               [style.flex]="awayPossessionPct(s)">
+            {{ awayPossessionPct(s) }}%
+          </div>
+        </div>
+        <div class="possession-legend">
+          <span>{{ teamNameMap[s.homeTeamId] || 'Local' }}</span>
+          <span>{{ teamNameMap[s.awayTeamId] || 'Visitante' }}</span>
         </div>
       </div>
-    </div>
 
-    <!-- Botón volver -->
-    <div class="back-section" *ngIf="matchState.status === 'FINISHED'">
-      <a [routerLink]="['/games', gameId]" class="back-btn">Volver al Juego</a>
-    </div>
-  </div>
+      <!-- Controles: pause / resume / stop / sustitucion / formacion (F3.3) -->
+      <div class="controls" *ngIf="s.status !== 'FINISHED'">
+        <button *ngIf="s.status === 'RUNNING'"
+                (click)="pauseMatch()"
+                class="btn btn-pause">
+          ⏸️ Pausar
+        </button>
+        <button *ngIf="s.status === 'PAUSED'"
+                (click)="resumeMatch()"
+                class="btn btn-resume">
+          ▶️ Reanudar
+        </button>
+        <button (click)="stopMatch()" class="btn btn-stop">
+          ⏹️ Cancelar Partido
+        </button>
+        <!-- F3.3 buttons: open substitution/formation modals. -->
+        <button class="btn btn-action" disabled
+                title="Disponible en F3.3">
+          🔄 Sustituir
+        </button>
+        <button class="btn btn-action" disabled
+                title="Disponible en F3.3">
+          📐 Formación
+        </button>
+      </div>
 
-  <div *ngIf="!matchState && !errorMsg" class="loading">
-    Cargando partido...
-  </div>
+      <!-- Tácticas: BALANCED / DEFEND / ATTACK (legacy UI) -->
+      <div class="tactics" *ngIf="s.status !== 'FINISHED'">
+        <div class="tactic-control">
+          <h4>{{ teamNameMap[s.homeTeamId] || 'Local' }}</h4>
+          <div class="tactic-buttons">
+            <button (click)="changeTactic('HOME', 'DEFEND')"
+                    [class.active]="s.homeTactic === 'DEFEND'"
+                    class="btn-tactic">🛡️ Defensiva</button>
+            <button (click)="changeTactic('HOME', 'BALANCED')"
+                    [class.active]="s.homeTactic === 'BALANCED'"
+                    class="btn-tactic">⚖️ Normal</button>
+            <button (click)="changeTactic('HOME', 'ATTACK')"
+                    [class.active]="s.homeTactic === 'ATTACK'"
+                    class="btn-tactic">⚔️ Ofensiva</button>
+          </div>
+        </div>
+        <div class="tactic-control">
+          <h4>{{ teamNameMap[s.awayTeamId] || 'Visitante' }}</h4>
+          <div class="tactic-buttons">
+            <button (click)="changeTactic('AWAY', 'DEFEND')"
+                    [class.active]="s.awayTactic === 'DEFEND'"
+                    class="btn-tactic">🛡️ Defensiva</button>
+            <button (click)="changeTactic('AWAY', 'BALANCED')"
+                    [class.active]="s.awayTactic === 'BALANCED'"
+                    class="btn-tactic">⚖️ Normal</button>
+            <button (click)="changeTactic('AWAY', 'ATTACK')"
+                    [class.active]="s.awayTactic === 'ATTACK'"
+                    class="btn-tactic">⚔️ Ofensiva</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Timeline (F3.0/F3.2 — replaced the old event-list) -->
+      <app-live-timeline
+        [events]="s.events || []"
+        [currentMinute]="s.currentMinute || 0"
+        [homeTeamId]="s.homeTeamId"
+        [awayTeamId]="s.awayTeamId"
+        [teamNameMap]="teamNameMap">
+      </app-live-timeline>
+
+      <!-- Volver (solo al final) -->
+      <div class="back-section" *ngIf="s.status === 'FINISHED'">
+        <a [routerLink]="['/games', gameId]" class="back-btn">Volver al Juego</a>
+      </div>
+    </div>
+  </ng-container>
+</div>
+
+<div *ngIf="(matchState$ | async) === null && (errorMsg$ | async) === ''"
+     class="loading">
+  Cargando partido...
 </div>

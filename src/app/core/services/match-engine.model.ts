@@ -6,13 +6,35 @@ export interface MatchState {
   homeTeamId: string;
   awayTeamId: string;
   currentMinute: number;
-  status: 'NOT_STARTED' | 'RUNNING' | 'PAUSED' | 'FINISHED' | 'CANCELLED';
+  status: 'NOT_STARTED' | 'RUNNING' | 'PAUSED' | 'HALF_TIME' | 'FINISHED' | 'CANCELLED';
   score: {
     home: number;
     away: number;
   };
-  homeTactic: string;
-  awayTactic: string;
+  /**
+   * LIVE-MATCH-F3-UI-LIVE BE1: live possession percentages (0-100) per team.
+   * Source: V24LiveSnapshot.homePossession/awayPossession, propagated through
+   * MatchStateSnapshot. Defaults to 50 when the V24 path is not active.
+   */
+  homePossession?: number;
+  awayPossession?: number;
+  /**
+   * LIVE-MATCH-F3-UI-LIVE BE1: live style (BALANCED/ATTACKING/DEFENSIVE/COUNTER/POSSESSION)
+   * per team. Source: V24LiveSnapshot.homeStyle/awayStyle, propagated through
+   * MatchStateSnapshot. Defaults to "BALANCED" when missing.
+   */
+  homeStyle?: string;
+  awayStyle?: string;
+  /**
+   * LIVE-MATCH-F3-UI-LIVE BE1: live formation (e.g. "4-4-2") per team.
+   * Source: V24LiveSnapshot.homeFormation/awayFormation, propagated through
+   * MatchStateSnapshot. Defaults to "4-4-2" when missing.
+   */
+  homeFormation?: string;
+  awayFormation?: string;
+  /** Legacy tactics field (ATTACK/DEFEND/BALANCED) — pre-F3 UI used it for buttons. */
+  homeTactic?: string;
+  awayTactic?: string;
   events: MatchEvent[];
   cards: any[];
   substitutions: any[];
@@ -23,10 +45,25 @@ export interface MatchState {
  * MatchEvent - Evento ocurrido durante el partido
  */
 export interface MatchEvent {
-  eventType: 'GOAL' | 'CARD' | 'INJURY' | 'SUBSTITUTION';
+  eventType: 'GOAL' | 'SHOT' | 'SHOT_ON_TARGET' | 'SAVE' | 'MISS' | 'BLOCK'
+           | 'CHANCE_CREATED' | 'FOUL' | 'YELLOW_CARD' | 'RED_CARD'
+           | 'INJURY' | 'CORNER' | 'OFFSIDE' | 'SUBSTITUTION' | 'CARD'
+           | 'TACTICAL_CHANGE';
   minute: number;
+  /** Primary player (e.g. the goal scorer, the player who got a card). */
   playerName: string;
   description: string;
+  /**
+   * Team sessionTeamId (e.g. for the home team of a goal event). The F3
+   * timeline uses this to push the chip to the home or away rail.
+   * Optional — undefined for events without a team attribution.
+   */
+  teamId?: string;
+  /**
+   * LIVE-MATCH-F3-UI-LIVE BE2: ON player name for SUBSTITUTION events.
+   * Undefined for non-SUBSTITUTION events.
+   */
+  playerOnName?: string;
 }
 
 /**
@@ -73,4 +110,49 @@ export interface SubstitutionResult {
   minuteApplied: number;
   substitutionsRemaining: number;
   error?: string;
+}
+
+/**
+ * LIVE-MATCH-F3-UI-LIVE FE1: SSE connection health.
+ *
+ * <p>The match engine service emits the current health through a per-stream
+ * {@code BehaviorSubject<StreamHealth>} that components can subscribe to. The
+ * UI renders a small dot (green/yellow/red) and a tooltip so the manager
+ * knows whether the scoreboard is real-time or stale.
+ *
+ * <ul>
+ *   <li>{@code HEALTHY} — the SSE connection is OPEN and emitting events.</li>
+ *   <li>{@code RECONNECTING} — the connection dropped; a backoff timer is
+ *       armed and a manual reconnect attempt is in flight.</li>
+ *   <li>{@code DEGRADED} — the connection is open but the gap between two
+ *       consecutive events exceeded the degraded threshold (5s). The UI
+ *       still shows the latest state but warns the user.</li>
+ *   <li>{@code CLOSED} — the connection is permanently closed (5+ failed
+ *       reconnect attempts) and the user must retry manually.</li>
+ * </ul>
+ */
+export type StreamHealth = 'HEALTHY' | 'RECONNECTING' | 'DEGRADED' | 'CLOSED';
+
+/**
+ * LIVE-MATCH-F3-UI-LIVE FE5: response shape for POST /api/v1/match-engine/matches/{id}/formation.
+ *
+ * <p>Mirrors the F5 {@code FormationChangeResultDTO} on the backend.
+ */
+export interface FormationChangeResult {
+  success: boolean;
+  minuteApplied?: number;
+  error?: string;
+}
+
+/**
+ * LIVE-MATCH-F3-UI-LIVE FE4: shape of a player entry sent to the substitution
+ * modal. Resolved from the match squad at modal open time.
+ */
+export interface SubModalPlayer {
+  /** Backend sessionPlayerId (UUID as string). */
+  sessionPlayerId: string;
+  displayName: string;
+  position: string;        // GK / DEF / MID / WINGER / ATT
+  rating?: number;         // 0-100
+  isStarter: boolean;      // true if part of the starting XI
 }

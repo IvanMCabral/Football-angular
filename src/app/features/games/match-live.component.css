@@ -1,16 +1,18 @@
 .match-live-container {
-  max-width: 800px;
+  max-width: 920px;
   margin: 2rem auto;
   padding: 2rem;
   background: #fff;
   border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(30,60,114,0.08);
+  box-shadow: 0 2px 12px rgba(30, 60, 114, 0.08);
 }
+
 h2 {
   text-align: center;
   color: #1e3c72;
   margin-bottom: 2rem;
 }
+
 .error {
   background: #fee;
   border: 1px solid #fcc;
@@ -19,173 +21,268 @@ h2 {
   border-radius: 8px;
   margin-bottom: 1rem;
 }
+
+/* ============ Teams section ============ */
 .teams-section {
   display: flex;
   justify-content: space-around;
   align-items: center;
   margin-bottom: 2rem;
-  padding: 2rem;
+  padding: 1.5rem;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   border-radius: 12px;
   color: white;
 }
+
 .team {
   text-align: center;
+  flex: 1;
 }
+
 .team h3 {
   margin: 0 0 0.5rem 0;
   font-size: 1.2rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
 }
+
 .score {
-  font-size: 3rem;
+  font-size: 3.5rem;
   font-weight: bold;
+  line-height: 1.1;
+  transition: transform 0.4s ease;
 }
+
+.score.flash {
+  animation: scoreFlash 0.7s ease-out;
+}
+
+@keyframes scoreFlash {
+  0%   { transform: scale(1); color: inherit; }
+  35%  { transform: scale(1.4); color: #ffeb3b; text-shadow: 0 0 12px rgba(255, 235, 59, 0.6); }
+  100% { transform: scale(1); color: inherit; }
+}
+
+.team-style {
+  display: flex;
+  justify-content: center;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.badge.badge-muted {
+  background: rgba(255, 255, 255, 0.10);
+}
+
 .vs {
+  text-align: center;
   font-size: 1.5rem;
   font-weight: bold;
-  opacity: 0.8;
+  opacity: 0.9;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
 }
+
+.vs-text { opacity: 0.8; }
+
+/* ============ Health indicator ============ */
+.health-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.health-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.health-indicator.healthy .health-dot      { background: #4caf50; box-shadow: 0 0 4px #4caf50; }
+.health-indicator.reconnecting .health-dot { background: #ffc107; animation: health-pulse 1s ease-in-out infinite; }
+.health-indicator.degraded .health-dot     { background: #ff9800; }
+.health-indicator.closed .health-dot       { background: #f44336; }
+
+@keyframes health-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.4; }
+}
+
+/* ============ Match status ============ */
 .match-status {
   text-align: center;
-  margin-bottom: 2rem;
+  margin-bottom: 1.5rem;
 }
+
 .minute {
   font-size: 2rem;
   font-weight: bold;
   color: #1e3c72;
   margin-bottom: 0.5rem;
 }
+
 .status {
   display: inline-block;
-  padding: 0.5rem 1rem;
+  padding: 0.4rem 1rem;
   border-radius: 20px;
   font-weight: 600;
-  font-size: 1rem;
+  font-size: 0.9rem;
 }
-.status.running {
-  background: #4caf50;
-  color: white;
+
+.status.running    { background: #4caf50; color: white; }
+.status.paused     { background: #ff9800; color: white; }
+.status.half-time  { background: #ffc107; color: #1e3c72; }
+.status.finished   { background: #2196f3; color: white; }
+
+/* ============ Possession bar ============ */
+.possession-block {
+  margin: 0 0 1.5rem 0;
+  padding: 0.75rem 1rem;
+  background: #f5f7fa;
+  border-radius: 10px;
 }
-.status.paused {
-  background: #ff9800;
-  color: white;
+
+.possession-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #1e3c72;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.4rem;
+  text-align: center;
 }
-.status.finished {
-  background: #2196f3;
-  color: white;
+
+.possession-bar {
+  display: flex;
+  width: 100%;
+  height: 32px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #e2e6ee;
+  border: 1px solid #d0d6e0;
 }
+
+.possession-home,
+.possession-away {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #fff;
+  transition: flex 500ms ease;
+  white-space: nowrap;
+  min-width: 36px;
+}
+
+.possession-home { background: linear-gradient(90deg, #1e88e5 0%, #42a5f5 100%); }
+.possession-away { background: linear-gradient(90deg, #ef5350 0%, #ff7043 100%); }
+
+.possession-legend {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  color: #5a6473;
+  margin-top: 0.4rem;
+  padding: 0 4px;
+}
+
+/* ============ Controls ============ */
 .controls {
   display: flex;
   justify-content: center;
-  gap: 1rem;
-  margin-bottom: 2rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
 }
+
 .btn {
-  padding: 0.8rem 1.5rem;
+  padding: 0.6rem 1.2rem;
   border: none;
   border-radius: 8px;
-  font-size: 1rem;
+  font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
 }
-.btn-pause {
-  background: #ff9800;
-  color: white;
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
-.btn-pause:hover {
-  background: #f57c00;
-}
-.btn-resume {
-  background: #4caf50;
-  color: white;
-}
-.btn-resume:hover {
-  background: #388e3c;
-}
-.btn-stop {
-  background: #f44336;
-  color: white;
-}
-.btn-stop:hover {
-  background: #d32f2f;
-}
+
+.btn-pause   { background: #ff9800; color: white; }
+.btn-pause:hover   { background: #f57c00; }
+.btn-resume  { background: #4caf50; color: white; }
+.btn-resume:hover  { background: #388e3c; }
+.btn-stop    { background: #f44336; color: white; }
+.btn-stop:hover    { background: #d32f2f; }
+.btn-action  { background: #667eea; color: white; }
+.btn-action:hover  { background: #5a6fd1; }
+
+/* ============ Tactics ============ */
 .tactics {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 2rem;
-  margin-bottom: 2rem;
-  padding: 1.5rem;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+  padding: 1rem;
   background: #f5f7fa;
   border-radius: 12px;
 }
+
 .tactic-control h4 {
-  margin: 0 0 1rem 0;
+  margin: 0 0 0.75rem 0;
   color: #1e3c72;
   text-align: center;
 }
+
 .tactic-buttons {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.4rem;
 }
+
 .btn-tactic {
-  padding: 0.6rem;
+  padding: 0.5rem;
   border: 2px solid #ddd;
   background: white;
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
 }
-.btn-tactic:hover {
-  border-color: #667eea;
-  background: #f0f4ff;
-}
-.btn-tactic.active {
-  border-color: #667eea;
-  background: #667eea;
-  color: white;
-  font-weight: 600;
-}
-.events {
-  margin-bottom: 2rem;
-}
-.events h4 {
-  color: #1e3c72;
-  margin-bottom: 1rem;
-}
-.event-list {
-  max-height: 200px;
-  overflow-y: auto;
-}
-.event {
-  display: flex;
-  gap: 1rem;
-  padding: 0.8rem;
-  background: #f5f7fa;
-  border-radius: 6px;
-  margin-bottom: 0.5rem;
-  align-items: center;
-}
-.event-minute {
-  font-weight: bold;
-  color: #667eea;
-  min-width: 40px;
-}
-.event-icon {
-  font-size: 1.2rem;
-}
-.event-desc {
-  flex: 1;
-}
-.back-section {
-  text-align: center;
-  margin-top: 2rem;
-}
+
+.btn-tactic:hover { border-color: #667eea; background: #f0f4ff; }
+.btn-tactic.active { border-color: #667eea; background: #667eea; color: white; font-weight: 600; }
+
+/* ============ Back link ============ */
+.back-section { text-align: center; margin-top: 1.5rem; }
+
 .back-btn {
   display: inline-block;
-  padding: 0.8rem 2rem;
+  padding: 0.7rem 1.5rem;
   background: #1e3c72;
   color: white;
   text-decoration: none;
@@ -193,12 +290,22 @@ h2 {
   font-weight: 600;
   transition: all 0.2s;
 }
-.back-btn:hover {
-  background: #16305a;
-}
+
+.back-btn:hover { background: #16305a; }
+
+/* ============ Loading ============ */
 .loading {
   text-align: center;
   color: #666;
   padding: 2rem;
   font-size: 1.1rem;
+}
+
+/* ============ Goal toast styling ============ */
+:host ::ng-deep .goal-toast {
+  --mdc-snackbar-container-color: #1b5e20;
+  --mdc-snackbar-supporting-text-color: #ffffff;
+  --mat-snack-bar-button-color: #ffeb3b;
+  font-weight: 600;
+  font-size: 1rem;
 }

@@ -1,0 +1,33 @@
+<div class="live-timeline" aria-live="polite">
+  <h4 class="timeline-title">Línea de Tiempo</h4>
+  <div class="timeline-buckets">
+    <section
+      *ngFor="let bucket of buckets(); trackBy: trackByBucket"
+      class="timeline-bucket"
+      [class.is-current]="bucket.isCurrent"
+      [attr.data-bucket-start]="bucket.bucketStart">
+      <header class="bucket-header">
+        <span class="bucket-label">{{ bucketLabel(bucket) }}</span>
+        <span *ngIf="bucket.isCurrent" class="now-pulse" aria-label="Minuto actual">AHORA</span>
+      </header>
+      <div class="bucket-rail">
+        <div class="rail-line"></div>
+        <ng-container *ngFor="let e of bucket.events; trackBy: trackByEventMinute">
+          <div
+            class="event-row"
+            [class.side-home]="eventSide(e) === 'home'"
+            [class.side-away]="eventSide(e) === 'away'"
+            [class.side-center]="eventSide(e) === 'center'"
+            [title]="eventTooltip(e)">
+            <span class="event-minute">{{ e.minute }}'</span>
+            <span [class]="eventChipClass(e)">
+              <span class="chip-icon">{{ eventIcon(e.eventType) }}</span>
+              <span class="chip-text">{{ e.playerName || e.description }}</span>
+            </span>
+          </div>
+        </ng-container>
+        <p *ngIf="bucket.events.length === 0" class="bucket-empty">— sin eventos —</p>
+      </div>
+    </section>
+  </div>
+</div>

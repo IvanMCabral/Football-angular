@@ -1,0 +1,146 @@
+.live-timeline {
+  background: #fff;
+  border: 1px solid #e2e6ee;
+  border-radius: 12px;
+  padding: 1rem 1rem 0.5rem;
+  margin: 0.5rem 0;
+  max-height: 480px;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+}
+
+.timeline-title {
+  margin: 0 0 0.75rem 0;
+  color: #1e3c72;
+  font-size: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.timeline-buckets {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.timeline-bucket {
+  border-left: 3px solid transparent;
+  padding-left: 0.5rem;
+  transition: border-color 0.2s ease;
+  scroll-snap-align: start;
+}
+
+.timeline-bucket.is-current {
+  border-left-color: #667eea;
+  background: linear-gradient(90deg, rgba(102, 126, 234, 0.06) 0%, rgba(255, 255, 255, 0) 80%);
+  border-radius: 6px;
+}
+
+.bucket-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.bucket-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #1e3c72;
+  min-width: 80px;
+}
+
+.now-pulse {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #fff;
+  background: #f44336;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  animation: now-pulse-anim 1.2s ease-in-out infinite;
+}
+
+@keyframes now-pulse-anim {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%      { transform: scale(1.05); opacity: 0.7; }
+}
+
+.bucket-rail {
+  position: relative;
+  padding-left: 1rem;
+}
+
+.rail-line {
+  position: absolute;
+  left: 0.45rem;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #d0d6e0;
+}
+
+.event-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.25rem 0;
+  font-size: 0.85rem;
+}
+
+.event-row.side-home {
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.event-row.side-away {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.event-row.side-center {
+  justify-content: center;
+  text-align: center;
+}
+
+.event-minute {
+  font-weight: 600;
+  color: #667eea;
+  min-width: 36px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #1e3c72;
+  background: #f0f4ff;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chip-icon {
+  font-size: 0.9rem;
+}
+
+.chip-goal        { background: #c8e6c9; color: #1b5e20; }
+.chip-card-yellow { background: #fff9c4; color: #795548; }
+.chip-card-red    { background: #ffcdd2; color: #b71c1c; }
+.chip-injury      { background: #ffe0b2; color: #e65100; }
+.chip-substitution{ background: #bbdefb; color: #0d47a1; }
+.chip-tactical    { background: #e1bee7; color: #4a148c; }
+.chip-default     { background: #eceff1; color: #37474f; }
+
+.bucket-empty {
+  margin: 0.25rem 0;
+  font-size: 0.75rem;
+  color: #9aa3b1;
+  font-style: italic;
+}
