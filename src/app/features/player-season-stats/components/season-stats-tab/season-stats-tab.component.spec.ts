@@ -38,16 +38,6 @@ describe('SeasonStatsTabComponent — scope contract', () => {
     totals: { totalGoals: 0, totalAssists: 0, totalAppearances: 0, averageRating: 0 },
     incomplete: false,
     message: 'ok',
-    metadata: {
-      limit: 25,
-      offset: 0,
-      hasMore: false,
-      totalPlayers: 0,
-      returnedPlayers: 0,
-      dataSource: 'V24_DETAIL',
-      dataCompleteness: 'COMPLETE',
-      filters: { season: 1 }
-    },
     warnings: []
   };
 

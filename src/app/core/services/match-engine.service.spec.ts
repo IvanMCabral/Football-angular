@@ -2,32 +2,28 @@
  * LIVE-MATCH-F3-UI-LIVE FE1: unit tests for the SSE backoff + health plumbing
  * in {@link MatchEngineService}.
  *
- * <p>IMPORTANT: this project has NO Karma/Jasmine test infrastructure
- * configured (no `test` script in `package.json`, no `karma.conf.js`, no
- * jasmine deps in `devDependencies`). This spec is a faithful record of the
- * expected behavior — wire it up once Karma is added to the project.
+ * <p>Karma + Jasmine setup is wired in {@link ../../../karma.conf.js} and the
+ * test target in `angular.json`. This spec validates:
+ * <ul>
+ *   <li>Initial streamHealth$ is CLOSED.</li>
+ *   <li>After onopen + first message the health becomes HEALTHY.</li>
+ *   <li>After a closed-error, the service schedules a backoff reconnect and
+ *       transitions to RECONNECTING.</li>
+ *   <li>After {@link RECONNECT_MAX_ATTEMPTS} failed attempts the health is
+ *       CLOSED.</li>
+ *   <li>No event in {@code DEGRADED_GAP_MS} → health becomes DEGRADED.</li>
+ *   <li>A payload with {@code status=FINISHED} completes the stream.</li>
+ * </ul>
  *
- * <p>To run: add to package.json:
- * <pre>
- *   "scripts": { "test": "ng test" }
- * </pre>
- * And to devDependencies:
- * <pre>
- *   "jasmine-core": "~5.x",
- *   "karma": "~6.x",
- *   "karma-chrome-launcher": "~3.x",
- *   "karma-jasmine": "~5.x",
- *   "karma-jasmine-html-reporter": "~2.x",
- *   "@types/jasmine": "~5.x"
- * </pre>
- * Plus a `tsconfig.spec.json` and a `test` target in `angular.json`.
+ * <p>Timer-based tests use `jasmine.clock()` to mock `setTimeout` instead of
+ * `fakeAsync(tick(...))` — this avoids the ProxyZone bootstrapping pain and
+ * keeps the spec independent of zone.js internals.
  */
 
-import { TestBed, fakeAsync, tick, flush, discardPeriodicTasks } from '@angular/core/testing';
+import { TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
 import { MatchEngineService } from './match-engine.service';
 import { MatchState, StreamHealth } from './match-engine.model';
-import { environment } from '../../environments/environment';
 
 // ---------- EventSource mock ----------
 
@@ -104,6 +100,14 @@ describe('MatchEngineService — LIVE-MATCH-F3-UI-LIVE FE1 (SSE backoff + health
     service = TestBed.inject(MatchEngineService);
   });
 
+  afterEach(() => {
+    // Drain any leftover timers from a fakeAsync test by clearing
+    // jasmine.clock if it was installed. (jasmine 5+ removed the
+    // .installed getter, so we just attempt uninstall unconditionally
+    // and swallow the "not installed" error.)
+    try { jasmine.clock().uninstall(); } catch (_e) { /* not installed */ }
+  });
+
   it('initial health is CLOSED', () => {
     expect(service.streamHealth$.value).toBe('CLOSED');
   });
@@ -124,9 +128,8 @@ describe('MatchEngineService — LIVE-MATCH-F3-UI-LIVE FE1 (SSE backoff + health
     sub.unsubscribe();
   });
 
-  it('switches to RECONNECTING after a CLOSE error and schedules a backoff reconnect', fakeAsync(() => {
-    const health: StreamHealth[] = [];
-    service.streamHealth$.subscribe(h => health.push(h));
+  it('switches to RECONNECTING after a CLOSE error and schedules a backoff reconnect', () => {
+    jasmine.clock().install();
     const received: MatchState[] = [];
     service.streamMatchState('m1').subscribe(s => received.push(s));
 
@@ -135,49 +138,47 @@ describe('MatchEngineService — LIVE-MATCH-F3-UI-LIVE FE1 (SSE backoff + health
     es1.fireMessage(fakeState);
     expect(service.streamHealth$.value).toBe('HEALTHY');
 
-    // Force a closed state (network dropped)
+    // Force a closed state (network dropped) — service schedules a backoff
     es1.fireErrorAndClose();
     expect(service.streamHealth$.value).toBe('RECONNECTING');
 
     // Advance just under the 1s backoff (with jitter), nothing happens
-    tick(800);
+    jasmine.clock().tick(800);
     expect(MockEventSource.instances.length).toBe(1);
 
     // Advance past the backoff (give 500ms leeway for jitter)
-    tick(500);
+    jasmine.clock().tick(500);
     expect(MockEventSource.instances.length).toBe(2);
 
     // Open the new connection → HEALTHY
     const es2 = MockEventSource.instances[1];
     es2.fireOpen();
     expect(service.streamHealth$.value).toBe('HEALTHY');
+  });
 
-    flush();
-    discardPeriodicTasks();
-  }));
-
-  it('caps the backoff at RECONNECT_MAX_ATTEMPTS and transitions to CLOSED', fakeAsync(() => {
+  it('caps the backoff at RECONNECT_MAX_ATTEMPTS and transitions to CLOSED', () => {
+    jasmine.clock().install();
     service.streamMatchState('m1').subscribe();
 
-    // Open and immediately close to trigger 5 reconnect attempts
+    // Open and immediately close to trigger 5 reconnect attempts.
+    // The first ES instance is created in subscribe() above. Subsequent
+    // attempts are created by the backoff timer.
+    const initialCount = MockEventSource.instances.length;
     for (let i = 0; i < 5; i++) {
-      const es = MockEventSource.instances[i];
+      const es = MockEventSource.instances[initialCount + i];
+      if (!es) { break; }
       es.fireOpen();
       es.fireErrorAndClose();
       // Advance well past each backoff to allow reconnect attempt
-      tick(35_000);
+      jasmine.clock().tick(35_000);
     }
 
     // After 5 attempts, next error should transition to CLOSED
     expect(service.streamHealth$.value).toBe('CLOSED');
+  });
 
-    flush();
-    discardPeriodicTasks();
-  }));
-
-  it('emits DEGRADED when no event arrives within the gap window', fakeAsync(() => {
-    const health: StreamHealth[] = [];
-    service.streamHealth$.subscribe(h => health.push(h));
+  it('emits DEGRADED when no event arrives within the gap window', () => {
+    jasmine.clock().install();
     service.streamMatchState('m1').subscribe();
     const es = MockEventSource.instances[0];
     es.fireOpen();
@@ -185,12 +186,9 @@ describe('MatchEngineService — LIVE-MATCH-F3-UI-LIVE FE1 (SSE backoff + health
     expect(service.streamHealth$.value).toBe('HEALTHY');
 
     // Wait > DEGRADED_GAP_MS (5000) without firing another message
-    tick(5_500);
+    jasmine.clock().tick(5_500);
     expect(service.streamHealth$.value).toBe('DEGRADED');
-
-    flush();
-    discardPeriodicTasks();
-  }));
+  });
 
   it('completes the stream when the payload is FINISHED', () => {
     let completed = false;
