@@ -24,17 +24,21 @@ import { ShotInput } from '../components/shot-map/match-shot-map.model';
     <div class="v24-match-detail-page">
 
       <!-- Loading state -->
-      <div *ngIf="loading" class="state-container">
-        <div class="state-spinner"></div>
+      <!-- P1a: role="status" + aria-live="polite" so screen readers announce "Loading..." -->
+      <div *ngIf="loading" class="state-container" role="status" aria-live="polite">
+        <div class="state-spinner" aria-hidden="true"></div>
         <p class="loading-text">Loading match detail...</p>
       </div>
 
       <!-- Error state -->
-      <div *ngIf="!loading && error" class="state-container">
-        <div class="state-icon error-icon">!</div>
+      <!-- P1a: role="alert" so screen readers announce errors immediately -->
+      <div *ngIf="!loading && error" class="state-container" role="alert">
+        <div class="state-icon error-icon" aria-hidden="true">!</div>
         <p class="error-text">Failed to load match detail.</p>
-        <button (click)="retry()" class="btn btn-primary">Retry</button>
-        <a routerLink="/matches" class="link">Back to matches</a>
+        <button (click)="retry()" class="btn btn-primary"
+                aria-label="Retry loading match detail">Retry</button>
+        <a routerLink="/matches" class="link"
+           aria-label="Back to matches list">Back to matches</a>
       </div>
 
       <!-- Detail unavailable state (404 / null) -->
@@ -58,7 +62,8 @@ import { ShotInput } from '../components/shot-map/match-shot-map.model';
 
         <!-- Header -->
         <div class="match-header">
-          <a routerLink="/matches" class="link link-back">&#8592; Back to matches</a>
+          <a routerLink="/matches" class="link link-back"
+             aria-label="Back to matches list">&#8592; Back to matches</a>
           <!-- P1a: Breadcrumb navigation (Career/Route use placeholders — MatchDetail DTO does not include gameId or career name) -->
           <nav class="breadcrumb" aria-label="Breadcrumb">
             <a routerLink="/dashboard" class="breadcrumb-link" title="Go to dashboard">Home</a>
@@ -91,14 +96,20 @@ import { ShotInput } from '../components/shot-map/match-shot-map.model';
           </div>
           <!-- P1a: Prev/Next match navigation (placeholders, disabled until P1a.1 wires to backend) -->
           <div class="match-nav">
-            <button type="button" class="btn-nav btn-nav-prev" disabled title="Coming soon (P1a.1)">← Previous match</button>
-            <button type="button" class="btn-nav btn-nav-next" disabled title="Coming soon (P1a.1)">Next match →</button>
+            <button type="button" class="btn-nav btn-nav-prev" disabled
+                    aria-label="Previous match (not available yet)"
+                    title="Coming soon (P1a.1)">← Previous match</button>
+            <button type="button" class="btn-nav btn-nav-next" disabled
+                    aria-label="Next match (not available yet)"
+                    title="Coming soon (P1a.1)">Next match →</button>
           </div>
         </div>
 
         <!-- Summary Cards -->
+        <!-- P1a: each stat card has role="group" with a descriptive aria-label -->
         <div class="summary-cards">
-          <div class="stat-card">
+          <div class="stat-card" role="group"
+               [attr.aria-label]="'Expected goals: ' + detail.homeXg.toFixed(2) + ' home, ' + detail.awayXg.toFixed(2) + ' away'">
             <span class="stat-card-label">xG</span>
             <div class="stat-card-values">
               <span class="stat-home">{{ detail.homeXg.toFixed(2) }}</span>
@@ -106,7 +117,8 @@ import { ShotInput } from '../components/shot-map/match-shot-map.model';
               <span class="stat-away">{{ detail.awayXg.toFixed(2) }}</span>
             </div>
           </div>
-          <div class="stat-card">
+          <div class="stat-card" role="group"
+               [attr.aria-label]="'Shots: ' + detail.homeShots + ' home, ' + detail.awayShots + ' away'">
             <span class="stat-card-label">Shots</span>
             <div class="stat-card-values">
               <span class="stat-home">{{ detail.homeShots }}</span>
@@ -114,7 +126,8 @@ import { ShotInput } from '../components/shot-map/match-shot-map.model';
               <span class="stat-away">{{ detail.awayShots }}</span>
             </div>
           </div>
-          <div class="stat-card">
+          <div class="stat-card" role="group"
+               [attr.aria-label]="'Possession: ' + detail.homePossession + ' percent home, ' + detail.awayPossession + ' percent away'">
             <span class="stat-card-label">Possession</span>
             <div class="stat-card-values">
               <span class="stat-home">{{ detail.homePossession }}%</span>
@@ -122,7 +135,8 @@ import { ShotInput } from '../components/shot-map/match-shot-map.model';
               <span class="stat-away">{{ detail.awayPossession }}%</span>
             </div>
           </div>
-          <div class="stat-card">
+          <div class="stat-card" role="group"
+               [attr.aria-label]="'Goals: ' + detail.homeGoals + ' home, ' + detail.awayGoals + ' away'">
             <span class="stat-card-label">Goals</span>
             <div class="stat-card-values">
               <span class="stat-home">{{ detail.homeGoals }}</span>
@@ -192,6 +206,11 @@ import { ShotInput } from '../components/shot-map/match-shot-map.model';
             <div class="stats-row" *ngFor="let row of statsComparison()">
               <span class="stat-label">{{ row.label }}</span>
               <span class="stat-home">{{ row.home }}</span>
+              <span class="stat-delta" [class.delta-home]="row.delta.winner === 'home'"
+                                     [class.delta-away]="row.delta.winner === 'away'"
+                                     [class.delta-even]="row.delta.winner === 'even'">
+                {{ row.delta.formatted }}
+              </span>
               <span class="stat-away">{{ row.away }}</span>
             </div>
           </div>
@@ -250,6 +269,31 @@ import { ShotInput } from '../components/shot-map/match-shot-map.model';
                     </tr>
                   </tbody>
                 </table>
+              </div>
+              <!-- P1a: mobile cards layout (visible only on screens <= 600px) -->
+              <div class="players-cards-mobile">
+                <div *ngFor="let p of team.players; let i = index"
+                     class="player-card-mobile"
+                     [class.row-top]="i === 0">
+                  <div class="player-card-header">
+                    <span class="player-card-name">{{ p.playerName }}</span>
+                    <span class="player-card-rating"
+                          [class.rat-high]="p.rating >= 7.0"
+                          [class.rat-low]="p.rating < 6.0">
+                      {{ p.rating.toFixed(1) }}
+                    </span>
+                  </div>
+                  <div class="player-card-pos">{{ p.position }}</div>
+                  <div class="player-card-stats">
+                    <span class="card-stat">G {{ p.goals }}</span>
+                    <span class="card-stat">A {{ p.assists }}</span>
+                    <span class="card-stat">KP {{ p.keyPasses }}</span>
+                    <span class="card-stat">Sh {{ p.shots }}</span>
+                    <span class="card-stat" *ngIf="p.cards > 0">Cards {{ p.cards }}</span>
+                    <span class="card-stat" *ngIf="p.injuries > 0">Inj {{ p.injuries }}</span>
+                    <span class="card-stat" *ngIf="p.substitutions > 0">Subs {{ p.substitutions }}</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -667,7 +711,7 @@ import { ShotInput } from '../components/shot-map/match-shot-map.model';
     }
     .stats-row {
       display: grid;
-      grid-template-columns: 80px 1fr 1fr;
+      grid-template-columns: 80px 1fr auto 1fr;
       align-items: center;
       padding: 10px 0;
       border-bottom: 1px solid #f5f5f5;
@@ -676,6 +720,17 @@ import { ShotInput } from '../components/shot-map/match-shot-map.model';
     .stat-label { font-size: 13px; color: #666; text-transform: uppercase; font-size: 11px; letter-spacing: 0.3px; }
     .stats-row .stat-home { text-align: right; font-weight: 700; font-size: 15px; color: #1a1a2e; }
     .stats-row .stat-away { text-align: left; font-weight: 700; font-size: 15px; color: #1a1a2e; }
+    /* P1a: stats delta visual indicator (home - away, color-coded) */
+    .stat-delta {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 0 6px;
+      text-align: center;
+      min-width: 48px;
+    }
+    .delta-home { color: #2e7d32; }
+    .delta-away { color: #c62828; }
+    .delta-even { color: #999; }
 
     /* === Players === */
     .players-container { display: flex; flex-direction: column; gap: 20px; }
@@ -746,11 +801,45 @@ import { ShotInput } from '../components/shot-map/match-shot-map.model';
     /* === Shot Map moved to standalone MatchShotMapComponent === */
 
     /* === Responsive === */
+    /* P1a: mobile players cards layout (default hidden, visible <= 600px) */
+    .players-cards-mobile { display: none; }
+    .player-card-mobile {
+      background: #fafafa;
+      border: 1px solid #f0f0f0;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
+    .player-card-mobile.row-top { background: #f8fff8; border-color: #d0e8d0; }
+    .player-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+    .player-card-name { font-weight: 600; color: #1a1a2e; }
+    .player-card-rating { font-weight: 700; font-size: 15px; }
+    .player-card-rating.rat-high { color: #1565c0; }
+    .player-card-rating.rat-low { color: #c62828; }
+    .player-card-pos { color: #888; font-size: 12px; margin-bottom: 6px; }
+    .player-card-stats {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 10px;
+      font-size: 12px;
+      color: #555;
+    }
+    .card-stat { font-weight: 500; }
+
     @media (max-width: 600px) {
       .summary-cards { grid-template-columns: repeat(2, 1fr); }
       .score { font-size: 28px; }
       .team-name { font-size: 14px; }
       .scoreboard { gap: 10px; }
+      /* P1a: on mobile, swap table for cards */
+      .table-responsive { display: none; }
+      .players-cards-mobile { display: block; }
     }
   `]
 })
@@ -804,13 +893,26 @@ export class V24MatchDetailPageComponent implements OnInit {
   };
   eventClass(type: string): string { return this.typeMap[type] ?? 'event-shot'; }
 
-  statsComparison(): { label: string; home: string; away: string }[] {
+  // P1a: stats comparison now includes a delta field for visual indication
+  // of home - away (color-coded green/red/grey in the template).
+  statsComparison(): { label: string; home: string; away: string; delta: { value: number; formatted: string; winner: 'home' | 'away' | 'even' } }[] {
     if (!this.detail) return [];
+    const row = (
+      label: string,
+      homeVal: number,
+      awayVal: number,
+      formatFn: (n: number) => string
+    ) => {
+      const value = homeVal - awayVal;
+      const winner: 'home' | 'away' | 'even' = value > 0 ? 'home' : value < 0 ? 'away' : 'even';
+      const formatted = value > 0 ? `+${formatFn(value)}` : value < 0 ? formatFn(value) : 'even';
+      return { label, home: formatFn(homeVal), away: formatFn(awayVal), delta: { value, formatted, winner } };
+    };
     return [
-      { label: 'Goals', home: String(this.detail.homeGoals), away: String(this.detail.awayGoals) },
-      { label: 'xG', home: this.detail.homeXg.toFixed(2), away: this.detail.awayXg.toFixed(2) },
-      { label: 'Shots', home: String(this.detail.homeShots), away: String(this.detail.awayShots) },
-      { label: 'Possession', home: `${this.detail.homePossession}%`, away: `${this.detail.awayPossession}%` }
+      row('Goals', this.detail.homeGoals, this.detail.awayGoals, n => String(Math.round(n))),
+      row('xG', this.detail.homeXg, this.detail.awayXg, n => n.toFixed(2)),
+      row('Shots', this.detail.homeShots, this.detail.awayShots, n => String(Math.round(n))),
+      row('Possession', this.detail.homePossession, this.detail.awayPossession, n => `${Math.round(n)}%`)
     ];
   }
 
