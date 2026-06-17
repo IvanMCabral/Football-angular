@@ -30,6 +30,34 @@
     {{ state?.currentMinute || 0 }}'
   </div>
 
+  <!-- LIVE-MATCH-F3-UI-LIVE FE6: barra de posesión + style/formation badges -->
+  <div *ngIf="isUserMatch && state && state.status !== 'FINISHED'" class="possession-block">
+    <div class="possession-bar">
+      <div class="possession-home" [style.flex]="homePossessionPct()">
+        {{ homePossessionPct() }}%
+      </div>
+      <div class="possession-away" [style.flex]="awayPossessionPct()">
+        {{ awayPossessionPct() }}%
+      </div>
+    </div>
+    <div class="formation-badges">
+      <span class="badge">{{ state.homeStyle || 'BALANCED' }} · {{ state.homeFormation || '4-4-2' }}</span>
+      <span class="badge badge-muted">{{ state.awayStyle || 'BALANCED' }} · {{ state.awayFormation || '4-4-2' }}</span>
+    </div>
+  </div>
+
+  <!-- LIVE-MATCH-F3-UI-LIVE FE6: shortcuts de sustitución / formación (solo user match) -->
+  <div *ngIf="isUserMatch && state && state.status !== 'FINISHED'" class="quick-actions">
+    <button (click)="onSubstitutionOpen()" class="btn btn-action"
+            aria-label="Sustituir jugadores">
+      🔄 Sustituir
+    </button>
+    <button (click)="onFormationOpen()" class="btn btn-action"
+            aria-label="Cambiar formación">
+      📐 Formación
+    </button>
+  </div>
+
   <!-- Tácticas (solo para el partido del usuario) -->
   <div *ngIf="isUserMatch && state && state.status !== 'FINISHED'" class="tactics-section">
     <h4>Tácticas</h4>

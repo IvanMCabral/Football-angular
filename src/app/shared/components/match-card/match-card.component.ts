@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter } from '@angular/core';
+import { ChangeDetectionStrategy, Component, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Match } from '../../../shared/models/match.model';
 
@@ -8,6 +8,15 @@ export interface MatchCardState {
   score: { home: number; away: number };
   homeTactic?: string;
   awayTactic?: string;
+  /** LIVE-MATCH-F3-UI-LIVE FE6: possession percentages (0-100) per team. */
+  homePossession?: number;
+  awayPossession?: number;
+  /** LIVE-MATCH-F3-UI-LIVE FE6: current style per team. */
+  homeStyle?: string;
+  awayStyle?: string;
+  /** LIVE-MATCH-F3-UI-LIVE FE6: current formation per team. */
+  homeFormation?: string;
+  awayFormation?: string;
   events?: any[];
 }
 
@@ -16,7 +25,9 @@ export interface MatchCardState {
   standalone: true,
   imports: [CommonModule],
   templateUrl: './match-card.component.html',
-  styleUrl: './match-card.component.css'
+  styleUrl: './match-card.component.css',
+  // LIVE-MATCH-F3-UI-LIVE FE6: OnPush to align with the F3 strategy.
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class MatchCardComponent {
   @Input() match!: Match;
@@ -26,9 +37,22 @@ export class MatchCardComponent {
   @Input() awayTeamName: string = '';
 
   @Output() tacticChange = new EventEmitter<{ team: 'HOME' | 'AWAY'; tactic: 'ATTACK' | 'DEFEND' | 'BALANCED' }>();
+  // LIVE-MATCH-F3-UI-LIVE FE6: emit when the user clicks Sustituir / Formacion
+  // on the user-match card. The parent (round-live or match-live) opens the
+  // corresponding modal in response.
+  @Output() substitutionOpen = new EventEmitter<void>();
+  @Output() formationOpen = new EventEmitter<void>();
 
   onTacticChange(team: 'HOME' | 'AWAY', tactic: 'ATTACK' | 'DEFEND' | 'BALANCED') {
     this.tacticChange.emit({ team, tactic });
+  }
+
+  onSubstitutionOpen(): void {
+    this.substitutionOpen.emit();
+  }
+
+  onFormationOpen(): void {
+    this.formationOpen.emit();
   }
 
   getStatusText(status: string): string {
@@ -36,6 +60,7 @@ export class MatchCardComponent {
       'NOT_STARTED': 'Por Iniciar',
       'RUNNING': 'En Juego',
       'PAUSED': 'Pausado',
+      'HALF_TIME': 'Descanso',
       'FINISHED': 'Finalizado',
       'CANCELLED': 'Cancelado'
     };
@@ -51,5 +76,14 @@ export class MatchCardComponent {
 
   getLastEvents(events: any[] | undefined, count: number): any[] {
     return (events || []).slice(-count).reverse();
+  }
+
+  /** LIVE-MATCH-F3-UI-LIVE FE6: possession % clamped 0-100. */
+  homePossessionPct(): number {
+    return Math.max(0, Math.min(100, this.state?.homePossession ?? 50));
+  }
+
+  awayPossessionPct(): number {
+    return Math.max(0, Math.min(100, this.state?.awayPossession ?? 50));
   }
 }

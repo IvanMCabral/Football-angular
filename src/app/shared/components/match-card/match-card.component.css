@@ -166,3 +166,79 @@
   font-weight: 600;
   color: #667eea;
 }
+
+/* ============================================================
+ * LIVE-MATCH-F3-UI-LIVE FE6: possession bar + sub/formation
+ * quick actions for the user-match card.
+ * ============================================================ */
+.possession-block {
+  margin: 0.5rem 0;
+}
+
+.possession-bar {
+  display: flex;
+  width: 100%;
+  height: 18px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #e2e8f0;
+  border: 1px solid #cbd5e0;
+}
+
+.possession-home,
+.possession-away {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #fff;
+  transition: flex 500ms ease;
+  white-space: nowrap;
+  min-width: 24px;
+}
+
+.possession-home { background: linear-gradient(90deg, #1e88e5 0%, #42a5f5 100%); }
+.possession-away { background: linear-gradient(90deg, #ef5350 0%, #ff7043 100%); }
+
+.formation-badges {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.3rem;
+  gap: 0.4rem;
+  font-size: 0.7rem;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  background: #e8eaf6;
+  color: #1e3c72;
+  font-weight: 600;
+}
+
+.badge.badge-muted {
+  background: #eceff1;
+  color: #5a6473;
+}
+
+.quick-actions {
+  display: flex;
+  justify-content: center;
+  gap: 0.4rem;
+  margin: 0.5rem 0;
+}
+
+.quick-actions .btn {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.8rem;
+  background: #667eea;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.quick-actions .btn:hover { background: #5a6fd1; }

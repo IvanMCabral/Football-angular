@@ -3,12 +3,14 @@ import { CommonModule } from '@angular/common';
 import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 import { MatchEngineService } from '../../core/services/match-engine.service';
 import { CareerService } from '../../core/services/career.service';
+import { LiveMatchModalsService } from '../../core/services/live-match-modals.service';
 import { Match } from '../../shared/models/match.model';
 import { BehaviorSubject, Observable, combineLatest, of } from 'rxjs';
 import { map, switchMap, tap, takeUntil, catchError, shareReplay } from 'rxjs/operators';
 import { Subject } from 'rxjs';
 import { MatchCardComponent } from '../../shared/components/match-card/match-card.component';
 import { RoundLiveViewModel, RoundMatchVM } from './models/round-live.model';
+import { MatchState } from '../../core/services/match-engine.model';
 
 @Component({
   selector: 'app-round-live',
@@ -20,6 +22,7 @@ import { RoundLiveViewModel, RoundMatchVM } from './models/round-live.model';
 export class RoundLiveComponent implements OnInit, OnDestroy {
   private engineService = inject(MatchEngineService);
   private careerService = inject(CareerService);
+  private modals = inject(LiveMatchModalsService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
 
@@ -242,6 +245,39 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
 
   onTacticChange(match: Match, event: { team: 'HOME' | 'AWAY'; tactic: 'ATTACK' | 'DEFEND' | 'BALANCED' }) {
     this.changeTactic(match, event.team, event.tactic);
+  }
+
+  // ========== LIVE-MATCH-F3-UI-LIVE FE6: sub/formation shortcuts on user match card ==========
+
+  /**
+   * FE6: open the substitution modal for the user match. Called from the
+   * match-card's (substitutionOpen) output. The actual lineup/squad fetch
+   * + dialog opening is delegated to {@link LiveMatchModalsService}.
+   */
+  onSubstitutionOpen(match: Match, state: MatchState | undefined): void {
+    if (!state) {
+      return;
+    }
+    this.modals.openSubstitutionModal(String(match.id), state)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        error: (err) => console.error('[ROUND-LIVE] openSubstitutionModal error', err)
+      });
+  }
+
+  /**
+   * FE6: open the formation modal for the user match. Called from the
+   * match-card's (formationOpen) output.
+   */
+  onFormationOpen(match: Match, state: MatchState | undefined): void {
+    if (!state) {
+      return;
+    }
+    this.modals.openFormationModal(String(match.id), state)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        error: (err) => console.error('[ROUND-LIVE] openFormationModal error', err)
+      });
   }
 
   getTeamName(teamId: any, teamNameMap: { [id: string]: string } | null): string {
