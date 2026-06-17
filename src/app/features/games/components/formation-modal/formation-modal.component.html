@@ -1,0 +1,62 @@
+<div class="formation-modal-root">
+  <h2 mat-dialog-title>
+    <span class="title-icon">📐</span>
+    Cambiar Formación
+    <span class="current-tag">Actual: <b>{{ data.currentFormation || '4-4-2' }}</b></span>
+  </h2>
+
+  <mat-dialog-content class="formation-modal-content">
+    <div *ngIf="errorMsg" class="banner banner-error" role="alert">
+      <mat-icon>error</mat-icon>
+      <span>{{ errorMsg }}</span>
+    </div>
+
+    <div class="formation-row">
+      <mat-form-field appearance="outline" class="formation-select">
+        <mat-label>Formación</mat-label>
+        <mat-select [value]="selectedFormation()"
+                    (selectionChange)="onFormationChange($event.value)">
+          <mat-option *ngFor="let f of formations" [value]="f">
+            {{ f }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+
+    <!-- Visual pitch: 1 GK at the bottom, then DEF / MID / ATT lines. -->
+    <div class="pitch" role="img" [attr.aria-label]="'Vista previa de la formación ' + selectedFormation()">
+      <div class="pitch-line" *ngFor="let count of formationLines; let i = index; let last = last">
+        <div class="player-dot"
+             *ngFor="let _ of [].constructor(count); let n = index"
+             [class.is-gk]="last && i === 0"
+             [class.is-def]="i === 1"
+             [class.is-mid]="i === 2 && formationLines.length === 4"
+             [class.is-mid2]="i === 2 && formationLines.length === 5"
+             [class.is-att]="i === formationLines.length - 1 && !last">
+          <span class="dot-label">{{ getDotLabel(i, n, count, last) }}</span>
+        </div>
+      </div>
+    </div>
+
+    <p class="hint">
+      <mat-icon>info</mat-icon>
+      La formación se aplica al XI actual. Los jugadores se reordenan automáticamente
+      según la nueva formación (sin arrastrar y soltar en este sprint).
+    </p>
+
+    <div *ngIf="isSubmitting" class="submit-overlay">
+      <mat-spinner diameter="36"></mat-spinner>
+      <span>Enviando cambio…</span>
+    </div>
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end" class="formation-modal-actions">
+    <button mat-button (click)="cancel()" [disabled]="isSubmitting">Cancelar</button>
+    <button mat-flat-button
+            color="primary"
+            (click)="confirm()"
+            [disabled]="isSubmitting || selectedFormation() === data.currentFormation">
+      Confirmar
+    </button>
+  </mat-dialog-actions>
+</div>

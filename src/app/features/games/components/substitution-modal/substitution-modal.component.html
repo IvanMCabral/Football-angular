@@ -1,0 +1,87 @@
+<div class="sub-modal-root">
+  <h2 mat-dialog-title>
+    <span class="title-icon">🔄</span>
+    Sustitución
+    <span class="minute-tag">Minuto {{ data.currentMinute }}'</span>
+  </h2>
+
+  <mat-dialog-content class="sub-modal-content">
+    <div *ngIf="isOutOfSubs" class="banner banner-warning" role="alert">
+      <mat-icon>warning</mat-icon>
+      <span>Sin sustituciones restantes (0/{{ data.substitutionsRemaining }})</span>
+    </div>
+
+    <div *ngIf="errorMsg" class="banner banner-error" role="alert">
+      <mat-icon>error</mat-icon>
+      <span>{{ errorMsg }}</span>
+    </div>
+
+    <div class="sub-grid">
+      <!-- Starting XI -->
+      <section class="col col-starter">
+        <h3>Sale</h3>
+        <ul class="player-list" role="listbox" aria-label="Starting XI">
+          <li *ngFor="let p of data.startingXi; trackBy: trackByPlayer"
+              role="option"
+              [class.selected]="playerOffId === p.sessionPlayerId"
+              [attr.aria-selected]="playerOffId === p.sessionPlayerId"
+              (click)="selectOff(p)"
+              (keydown.enter)="selectOff(p)"
+              tabindex="0">
+            <span class="pos-badge">{{ p.position }}</span>
+            <span class="player-name">{{ p.displayName }}</span>
+            <span class="player-ovr" *ngIf="p.rating != null">{{ p.rating }}</span>
+            <span *ngIf="playerOffId === p.sessionPlayerId" class="x-mark" (click)="clearOff($event)">×</span>
+          </li>
+        </ul>
+      </section>
+
+      <!-- Arrow -->
+      <div class="arrow-col" aria-hidden="true">
+        <span class="arrow">→</span>
+      </div>
+
+      <!-- Bench -->
+      <section class="col col-bench">
+        <h3>Entra</h3>
+        <ul class="player-list" role="listbox" aria-label="Bench">
+          <li *ngFor="let p of data.bench; trackBy: trackByPlayer"
+              role="option"
+              [class.selected]="playerOnId === p.sessionPlayerId"
+              [attr.aria-selected]="playerOnId === p.sessionPlayerId"
+              (click)="selectOn(p)"
+              (keydown.enter)="selectOn(p)"
+              tabindex="0">
+            <span class="pos-badge">{{ p.position }}</span>
+            <span class="player-name">{{ p.displayName }}</span>
+            <span class="player-ovr" *ngIf="p.rating != null">{{ p.rating }}</span>
+            <span *ngIf="playerOnId === p.sessionPlayerId" class="x-mark" (click)="clearOn($event)">×</span>
+          </li>
+        </ul>
+      </section>
+    </div>
+
+    <div class="summary" *ngIf="playerOff || playerOn">
+      <span *ngIf="playerOff"><b>Sale:</b> {{ playerOff.displayName }} ({{ playerOff.position }})</span>
+      <span *ngIf="playerOn"><b>Entra:</b> {{ playerOn.displayName }} ({{ playerOn.position }})</span>
+    </div>
+
+    <div *ngIf="isSubmitting" class="submit-overlay">
+      <mat-spinner diameter="36"></mat-spinner>
+      <span>Enviando sustitución…</span>
+    </div>
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end" class="sub-modal-actions">
+    <span class="remaining-tag">
+      Sustituciones restantes: <b>{{ data.substitutionsRemaining }}</b>
+    </span>
+    <button mat-button (click)="cancel()" [disabled]="isSubmitting">Cancelar</button>
+    <button mat-flat-button
+            color="primary"
+            (click)="confirm()"
+            [disabled]="!canConfirm">
+      Confirmar
+    </button>
+  </mat-dialog-actions>
+</div>

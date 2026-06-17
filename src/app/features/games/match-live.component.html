@@ -96,13 +96,16 @@
         <button (click)="stopMatch()" class="btn btn-stop">
           ⏹️ Cancelar Partido
         </button>
-        <!-- F3.3 buttons: open substitution/formation modals. -->
-        <button class="btn btn-action" disabled
-                title="Disponible en F3.3">
+        <!-- F3.3: substitution modal (FE4) -->
+        <button (click)="openSubstitutionModal(s)"
+                class="btn btn-action"
+                [attr.aria-label]="'Sustituir jugadores en el minuto ' + (s.currentMinute || 0)">
           🔄 Sustituir
         </button>
-        <button class="btn btn-action" disabled
-                title="Disponible en F3.3">
+        <!-- F3.3: formation modal (FE5) -->
+        <button (click)="openFormationModal(s)"
+                class="btn btn-action"
+                [attr.aria-label]="'Cambiar la formación del equipo'">
           📐 Formación
         </button>
       </div>

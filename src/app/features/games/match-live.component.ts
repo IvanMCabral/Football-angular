@@ -8,15 +8,22 @@ import {
 import { CommonModule, AsyncPipe } from '@angular/common';
 import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { BehaviorSubject, Subject, interval } from 'rxjs';
+import { MatDialog } from '@angular/material/dialog';
+import { BehaviorSubject, Subject, forkJoin, interval } from 'rxjs';
 import { map, pairwise, startWith, switchMap, takeUntil } from 'rxjs/operators';
 import { MatchEngineService } from '../../core/services/match-engine.service';
-import { MatchState, MatchEvent, StreamHealth } from '../../core/services/match-engine.model';
+import { MatchState, MatchEvent, StreamHealth, SubModalPlayer } from '../../core/services/match-engine.model';
 import { CareerService } from '../../core/services/career.service';
+import { TeamService } from '../teams/services/team.service';
+import { LineupDTO, PlayerLineupDTO } from '../../shared/models/lineup/lineup.dto';
+import { SessionPlayer } from '../../shared/models/player.model';
 import { MatchService } from '../matches/services/match.service';
 import { Match } from '../../shared/models/match.model';
+import { HttpClient } from '@angular/common/http';
 import { environment } from '../../environments/environment';
 import { LiveTimelineComponent } from './components/live-timeline/live-timeline.component';
+import { SubstitutionModalComponent, SubstitutionDialogData } from './components/substitution-modal/substitution-modal.component';
+import { FormationModalComponent, FormationDialogData } from './components/formation-modal/formation-modal.component';
 
 /**
  * LIVE-MATCH-F3-UI-LIVE FE2 (partial): live match view.
@@ -54,10 +61,13 @@ export class MatchLiveComponent implements OnInit, OnDestroy {
 
   private engineService = inject(MatchEngineService);
   private careerService = inject(CareerService);
+  private teamService = inject(TeamService);
   private matchService = inject(MatchService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private snackBar = inject(MatSnackBar);
+  private dialog = inject(MatDialog);
+  private http = inject(HttpClient);
 
   matchId: string = '';
   gameId: string = '';
@@ -267,6 +277,148 @@ export class MatchLiveComponent implements OnInit, OnDestroy {
       targetTeam: team,
       tactic
     }).pipe(takeUntil(this.destroy$)).subscribe();
+  }
+
+  // ========== F3.3 — substitution + formation modals ==========
+
+  /**
+   * FE4: open the substitution modal. Fetches the saved lineup (starting XI)
+   * and the full squad in parallel, derives the bench as the complement,
+   * and hands the lists to the modal.
+   */
+  openSubstitutionModal(state: MatchState): void {
+    if (state.status === 'FINISHED' || state.status === 'CANCELLED') {
+      this.snackBar.open('El partido ya terminó, no se puede sustituir', 'OK', { duration: 3000 });
+      return;
+    }
+    this.careerService.getCareerStatus()
+      .pipe(
+        takeUntil(this.destroy$),
+        switchMap(status => {
+          const userTeamId = status.userSessionTeamId;
+          if (!userTeamId) {
+            this.snackBar.open('No se encontró el equipo del manager', 'OK', { duration: 3000 });
+            return [];
+          }
+          return forkJoin({
+            lineup: this.http.get<LineupDTO>(`${environment.apiUrl}/career/lineup/current`),
+            squad: this.teamService.getSessionTeamSquad(userTeamId)
+          });
+        })
+      )
+      .subscribe({
+        next: ({ lineup, squad }) => {
+          if (!lineup || !squad) {
+            this.snackBar.open('No se pudo cargar el lineup', 'OK', { duration: 3000 });
+            return;
+          }
+          const startingIds = new Set(lineup.players.map(p => p.playerId));
+          const startingXi: SubModalPlayer[] = lineup.players.map(p => this.toSubModalPlayer(p, true));
+          const bench: SubModalPlayer[] = squad
+            .filter(sp => !startingIds.has(sp.sessionPlayerId))
+            .map(sp => this.toSubModalPlayerFromSession(sp, false));
+
+          const data: SubstitutionDialogData = {
+            matchId: this.matchId,
+            currentMinute: state.currentMinute ?? 0,
+            startingXi,
+            bench,
+            // The live snapshot doesn't carry substitutionsRemaining yet; we
+            // pass 5 as the engine's per-team cap (F2 spec). The backend
+            // returns the real number in the response and an error if 0.
+            substitutionsRemaining: 5
+          };
+          this.dialog.open(SubstitutionModalComponent, {
+            data,
+            width: '720px',
+            maxWidth: '95vw',
+            disableClose: false,
+            autoFocus: 'first-tabbable'
+          });
+        },
+        error: (err) => {
+          console.error('[MATCH-LIVE] openSubstitutionModal error', err);
+          this.snackBar.open('No se pudo abrir la sustitución', 'OK', { duration: 3000 });
+        }
+      });
+  }
+
+  /** FE4 helper: convert a PlayerLineupDTO to SubModalPlayer. */
+  private toSubModalPlayer(p: PlayerLineupDTO, isStarter: boolean): SubModalPlayer {
+    return {
+      sessionPlayerId: p.playerId,
+      displayName: p.name,
+      position: p.position,
+      rating: p.overall,
+      isStarter
+    };
+  }
+
+  /** FE4 helper: convert a SessionPlayer to SubModalPlayer. */
+  private toSubModalPlayerFromSession(sp: SessionPlayer, isStarter: boolean): SubModalPlayer {
+    // SessionPlayer has no `overall` field — derive a quick rating from
+    // (attack + defense + technique + speed + stamina + mentality) / 6
+    // as a 0-100 approximation. For F3 this is purely UI hint; the engine
+    // uses the raw attributes.
+    const overall = Math.round(
+      ((sp.attack ?? 50) +
+       (sp.defense ?? 50) +
+       (sp.technique ?? 50) +
+       (sp.speed ?? 50) +
+       (sp.stamina ?? 50) +
+       (sp.mentality ?? 50)) / 6
+    );
+    return {
+      sessionPlayerId: sp.sessionPlayerId,
+      displayName: sp.name || 'Unknown',
+      position: sp.position || 'MID',
+      rating: overall,
+      isStarter
+    };
+  }
+
+  /**
+   * FE5: open the formation-change modal. The modal renders a dropdown with
+   * 4 formations and a visual pitch preview. The current formation is taken
+   * from the snapshot (BE1) — defaults to 4-4-2 if the snapshot predates F3.
+   */
+  openFormationModal(state: MatchState): void {
+    if (state.status === 'FINISHED' || state.status === 'CANCELLED') {
+      this.snackBar.open('El partido ya terminó, no se puede cambiar la formación', 'OK', { duration: 3000 });
+      return;
+    }
+    const homeTeamId = state.homeTeamId;
+    const currentFormation = state.homeFormation || '4-4-2';
+    // Build the current slot list from the saved lineup. The endpoint
+    // returns the order; we mirror that into FormationSlotDTO shape.
+    this.http.get<LineupDTO>(`${environment.apiUrl}/career/lineup/current`)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (lineup) => {
+          const currentSlots = (lineup?.players ?? []).map((p, i) => ({
+            sessionPlayerId: p.playerId,
+            position: p.position,
+            slotIndex: i
+          }));
+          const data: FormationDialogData = {
+            matchId: this.matchId,
+            currentFormation,
+            homeTeamId,
+            currentSlots
+          };
+          this.dialog.open(FormationModalComponent, {
+            data,
+            width: '520px',
+            maxWidth: '95vw',
+            disableClose: false,
+            autoFocus: 'first-tabbable'
+          });
+        },
+        error: (err) => {
+          console.error('[MATCH-LIVE] openFormationModal error', err);
+          this.snackBar.open('No se pudo abrir el cambio de formación', 'OK', { duration: 3000 });
+        }
+      });
   }
 
   // ===== Template helpers (pure functions) =====
