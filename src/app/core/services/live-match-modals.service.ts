@@ -84,6 +84,26 @@ export class LiveMatchModalsService {
               // real count after each substitution.
               substitutionsRemaining: 5
             };
+
+            // LIVE-MATCH-F5.3.3 BUG-015: pause the round BEFORE the dialog
+            // opens so the `currentMinute` the manager saw when they clicked
+            // "Sustituir" is still current when they confirm. This prevents
+            // the `MINUTE_IN_PAST (X) must be >= currentMinute (Y)` error
+            // Iván hit on minute 81 → 73. We fire-and-forget the pause call:
+            // waiting for the response before opening the dialog would add
+            // ~50-100ms of perceived lag, and the backend is idempotent so
+            // a transient pause failure is recoverable (the next tick will
+            // re-pause if the modal is still open). We only pause if we
+            // could resolve a careerId from the URL — otherwise we log a
+            // warning and open the modal anyway.
+            if (careerId) {
+              this.engineService.pauseRoundForMatch(careerId, matchId).subscribe({
+                error: (err) => console.warn('[LIVE-MATCH] pause round on sub modal open failed:', err)
+              });
+            } else {
+              console.warn('[LIVE-MATCH] could not resolve careerId from URL; round will NOT be paused on modal open');
+            }
+
             const dialogRef = this.dialog.open(SubstitutionModalComponent, {
               data,
               width: '720px',
@@ -92,23 +112,14 @@ export class LiveMatchModalsService {
               autoFocus: 'first-tabbable'
             });
 
-            // LIVE-MATCH-F5.3.3 BUG-015: pause the round while the modal is
-            // open so the `currentMinute` the manager saw when they clicked
-            // "Sustituir" is still current when they confirm. This prevents
-            // the `MINUTE_IN_PAST (X) must be >= currentMinute (Y)` error
-            // Iván hit on minute 81 → 73. We only pause if we could resolve
-            // a careerId from the URL — otherwise we just log a warning.
+            // LIVE-MATCH-F5.3.3 BUG-015: resume the round when the modal
+            // closes (whether the manager confirmed OR cancelled).
             if (careerId) {
-              this.engineService.pauseRoundForMatch(careerId, matchId).subscribe({
-                error: (err) => console.warn('[LIVE-MATCH] pause round on sub modal open failed:', err)
-              });
               dialogRef.afterClosed().subscribe(() => {
                 this.engineService.resumeRoundForMatch(careerId, matchId).subscribe({
                   error: (err) => console.warn('[LIVE-MATCH] resume round on sub modal close failed:', err)
                 });
               });
-            } else {
-              console.warn('[LIVE-MATCH] could not resolve careerId from URL; round will NOT be paused on modal open');
             }
 
             return data;
@@ -140,6 +151,19 @@ export class LiveMatchModalsService {
           homeTeamId,
           currentSlots
         };
+
+        // LIVE-MATCH-F5.3.3 BUG-015: pause the round BEFORE the dialog
+        // opens. Same wire as openSubstitutionModal — see that method
+        // for the full rationale (the `currentMinute` the manager saw at
+        // click time must still be current when they confirm).
+        if (careerId) {
+          this.engineService.pauseRoundForMatch(careerId, matchId).subscribe({
+            error: (err) => console.warn('[LIVE-MATCH] pause round on formation modal open failed:', err)
+          });
+        } else {
+          console.warn('[LIVE-MATCH] could not resolve careerId from URL; round will NOT be paused on modal open');
+        }
+
         const dialogRef = this.dialog.open(FormationModalComponent, {
           data,
           width: '520px',
@@ -148,21 +172,13 @@ export class LiveMatchModalsService {
           autoFocus: 'first-tabbable'
         });
 
-        // LIVE-MATCH-F5.3.3 BUG-015: same pause/resume wiring as the
-        // substitution modal — see openSubstitutionModal for the full
-        // rationale (the `currentMinute` the manager saw at click time
-        // must still be current when they confirm the formation).
+        // LIVE-MATCH-F5.3.3 BUG-015: resume on afterClosed (confirm or cancel).
         if (careerId) {
-          this.engineService.pauseRoundForMatch(careerId, matchId).subscribe({
-            error: (err) => console.warn('[LIVE-MATCH] pause round on formation modal open failed:', err)
-          });
           dialogRef.afterClosed().subscribe(() => {
             this.engineService.resumeRoundForMatch(careerId, matchId).subscribe({
               error: (err) => console.warn('[LIVE-MATCH] resume round on formation modal close failed:', err)
             });
           });
-        } else {
-          console.warn('[LIVE-MATCH] could not resolve careerId from URL; round will NOT be paused on modal open');
         }
 
         return data;
