@@ -56,7 +56,10 @@ export class LiveMatchModalsService {
         }
         return forkJoin({
           lineup: this.http.get<LineupDTO>(`${environment.apiUrl}/career/lineup/current`),
-          squad: this.teamService.getSessionTeamSquad(userTeamId)
+          // LIVE-MATCH-F3-UI-LIVE F5.1 BUG-001: use /teams/me/squad so the
+          // server resolves the manager's own team from the JWT instead of
+          // hitting the non-existent /session-teams/{id}/squad endpoint.
+          squad: this.teamService.getMyTeamSquad()
         }).pipe(
           map(({ lineup, squad }) => {
             const startingIds = new Set(lineup.players.map(p => p.playerId));

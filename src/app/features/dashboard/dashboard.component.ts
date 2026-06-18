@@ -267,10 +267,16 @@ export class DashboardComponent implements OnInit {
           if (response.success) {
             this.toastService.success('📅 ' + response.message);
 
+            // LIVE-MATCH-F3-UI-LIVE F5.1 BUG-002: AdvanceRoundResponse
+            // does not include `careerId`, so reading `response.careerId`
+            // produced the literal string "undefined" in the round-live URL.
+            // Use the `careerId` we just posted (already validated above).
+            const careerId = status.careerId!;
+
             if (response.currentRound && response.careerPhase === 'PRE_MATCH') {
-              this.router.navigate([`/games/${response.careerId}/round/${response.currentRound}/live`]);
+              this.router.navigate([`/games/${careerId}/round/${response.currentRound}/live`]);
             } else if (response.tournamentFinished) {
-              this.router.navigate([`/games/${response.careerId}/champion`]);
+              this.router.navigate([`/games/${careerId}/champion`]);
             } else {
               this.router.navigate(['/squad']);
             }

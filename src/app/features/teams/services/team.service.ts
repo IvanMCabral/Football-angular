@@ -92,7 +92,15 @@ export class TeamService {
     });
   }
 
-  getSessionTeamSquad(sessionTeamId: string): Observable<SessionPlayer[]> {
-    return this.http.get<SessionPlayer[]>(`${this.careerApiUrl}/session-teams/${sessionTeamId}/squad`);
+  /**
+   * LIVE-MATCH-F3-UI-LIVE F5.1 BUG-001: the legacy URL
+   * `/api/v1/career/session-teams/{id}/squad` returns 404 because the
+   * controller exposes the squad under `/api/v1/career/teams/{id}/squad`
+   * and `/api/v1/career/teams/me/squad`. The modal only needs the manager's
+   * own squad, so we use the `me/squad` shortcut and drop the unused
+   * sessionTeamId parameter (server resolves it from the JWT).
+   */
+  getMyTeamSquad(): Observable<SessionPlayer[]> {
+    return this.http.get<SessionPlayer[]>(`${this.careerApiUrl}/teams/me/squad`);
   }
 }
