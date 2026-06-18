@@ -95,7 +95,6 @@ export class TournamentChampionComponent implements OnInit {
   private loadChampionFromCareer() {
     this.careerService.getChampion().subscribe({
       next: (champion) => {
-        console.log('[TournamentChampion] Champion received from Career:', champion);
         this.champion = champion;
         this.cdr.markForCheck();
       },
@@ -110,7 +109,6 @@ export class TournamentChampionComponent implements OnInit {
   private loadStandingsFromCareer() {
     this.careerService.getStandings().subscribe({
       next: (standings) => {
-        console.log('[TournamentChampion] Final standings received from Career:', standings);
         this.standings = standings;
         this.cdr.markForCheck();
       },
@@ -124,7 +122,6 @@ export class TournamentChampionComponent implements OnInit {
   loadChampion() {
     this.gameService.getChampion(this.gameId).subscribe({
       next: (champion) => {
-        console.log('[TournamentChampion] Champion received:', champion);
         this.champion = champion;
         this.cdr.markForCheck();
       },
@@ -139,7 +136,6 @@ export class TournamentChampionComponent implements OnInit {
   loadStandings() {
     this.gameService.getStandings(this.gameId).subscribe({
       next: (standings) => {
-        console.log('[TournamentChampion] Final standings received:', standings);
         this.standings = standings;
         this.cdr.markForCheck();
       },
@@ -163,14 +159,9 @@ export class TournamentChampionComponent implements OnInit {
       return;
     }
 
-    console.log('[TournamentChampion] 🏆 Solicitando nueva temporada...');
-
     this.careerService.continueToNewSeason().subscribe({
       next: (response) => {
-        console.log('[TournamentChampion] ✅ Nueva temporada:', response);
-
         if (response.success) {
-          console.log('[TournamentChampion] 🏆 Navegando a /squad con reload completo...');
           // Usar Location.reload() para forzar recarga completa de la página
           window.location.href = '/squad';
         } else {
@@ -178,7 +169,7 @@ export class TournamentChampionComponent implements OnInit {
         }
       },
       error: (err) => {
-        console.error('[TournamentChampion] ❌ Error iniciando nueva temporada:', err);
+        console.error('[TournamentChampion] Error iniciando nueva temporada:', err);
         alert(err.error?.message || 'Error al iniciar nueva temporada');
       }
     });

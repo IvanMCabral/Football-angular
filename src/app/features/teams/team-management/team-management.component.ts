@@ -51,7 +51,6 @@ export class TeamManagementComponent {
   leagues$: Observable<League[]> = this.authService.getUserInfo().pipe(
     switchMap((userInfo: any) =>
       this.http.get<League[]>(`http://localhost:8080/api/v1/world/leagues?userId=${userInfo.id}`).pipe(
-        tap(leagues => console.log('Leagues loaded:', leagues)),
         catchError(err => {
           console.error('Failed to load leagues:', err);
           this.toastService.error('Failed to load leagues');
@@ -90,7 +89,6 @@ export class TeamManagementComponent {
               city: wt.city || 'N/A',
               leagueId: wt.realLeagueId?.toString() // El campo correcto es realLeagueId
             }))),
-            tap(teams => console.log('Teams loaded:', teams)),
             catchError(err => {
               console.error('Failed to load teams:', err);
               return of([]);
@@ -153,13 +151,11 @@ export class TeamManagementComponent {
     const leagueId = this.selectedLeagueId$.value;
     if (!leagueId) return;
 
-    console.log('Adding team', team.id, 'to league', leagueId);
-
     this.authService.getUserInfo().pipe(
-      switchMap((userInfo: any) => 
-        this.http.post(`http://localhost:8080/api/v1/world/leagues/${leagueId}/add-team`, { 
+      switchMap((userInfo: any) =>
+        this.http.post(`http://localhost:8080/api/v1/world/leagues/${leagueId}/add-team`, {
           userId: userInfo.id,
-          teamId: team.id 
+          teamId: team.id
         })
       )
     ).subscribe({
@@ -177,8 +173,6 @@ export class TeamManagementComponent {
   removeTeam(team: Team): void {
     const leagueId = this.selectedLeagueId$.value;
     if (!leagueId) return;
-
-    console.log('Removing team', team.id, 'from league', leagueId);
 
     this.authService.getUserInfo().pipe(
       switchMap((userInfo: any) => 

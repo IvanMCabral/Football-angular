@@ -855,7 +855,6 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
         // Si no hay jugadores, hacer auto-select automáticamente
         const playersList = response?.players || [];
         if (playersList.length === 0) {
-          console.log('[SQUAD-EDITOR] No lineup found, auto-selecting...');
           this.executeAutoSelect(formationName);
           // Noreturn aquí - necesitamos terminar la inicialización después del auto-select
         }
@@ -1151,12 +1150,9 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
         formation: newFormation
       }).subscribe({
         next: (response) => {
-          const elapsed = (performance.now() - startTime).toFixed(0);
-          console.log(`[SQUAD-EDITOR] Auto-select completed in ${elapsed}ms:`, response);
           this.loadingFormation$.next(false);
           this.applyLineupToSlots(newFormation, response?.players || []);
           // EMITIR EVENTO AL PADRE con los players directamente (sin esperar backend)
-          console.log('[SQUAD-EDITOR] EMITTING formationChanged event to parent!');
           this.formationChanged.emit({
             formation: newFormation,
             players: response?.players || []
