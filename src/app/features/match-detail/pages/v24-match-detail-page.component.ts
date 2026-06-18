@@ -115,6 +115,13 @@ import {
                     title="Sustituir jugador (Phase 1 POC: UI only, no result change)">
               Sustituir
             </button>
+            <!-- F6 Sprint 2 (LIVE-MATCH-F6-MATCH-COMPARE): link to baseline-vs-live comparison -->
+            <a [routerLink]="['/careers', careerId, 'matches', matchId, 'compare']"
+               class="btn-nav btn-nav-compare"
+               aria-label="Ver comparación baseline vs live"
+               title="Ver comparación baseline vs live (F6 Match Compare)">
+              🔄 Comparar
+            </a>
             <button type="button" class="btn-nav btn-nav-next" disabled
                     aria-label="Next match (not available yet)"
                     title="Coming soon (P1a.1)">Next match →</button>
@@ -871,6 +878,10 @@ export class V24MatchDetailPageComponent implements OnInit {
   loading = false;
   error = '';
   detail: MatchDetail | null = null;
+  // F6 Sprint 2 (LIVE-MATCH-F6-MATCH-COMPARE): exposed for the compare
+  // link in the match-header.
+  careerId: string | null = null;
+  matchId: string | null = null;
 
   ngOnInit(): void {
     // P1a: scroll to top on entry to this view (avoid stale scroll position when navigating between matches)
@@ -883,6 +894,8 @@ export class V24MatchDetailPageComponent implements OnInit {
       this.cdr.detectChanges();
       return;
     }
+    this.careerId = careerId;
+    this.matchId = matchId;
     this.loading = true;
     this.error = '';
     this.cdr.detectChanges();
