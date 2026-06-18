@@ -4,7 +4,8 @@
 
 import { HttpClient, HttpResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable, map } from 'rxjs';
+import { Observable, of } from 'rxjs';
+import { catchError, map } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 import { MatchComparison } from '../models/match-compare.model';
 
@@ -23,6 +24,12 @@ export class MatchCompareApiService {
    *   - `null` on 404 (no baseline, no live detail, or feature disabled)
    *   - errors propagate for any other status (handled by the global
    *     error interceptor)
+   *
+   * <p>V24D15-CLEANUP (BUG_COMPARE_UX): the 404 → null contract was
+   * documented but never enforced — the {@code http.get} threw on 404
+   * and the caller's {@code error} branch fired ("Error al cargar la
+   * comparación") instead of the user-friendly "Comparación no
+   * disponible" message. Adding the {@code catchError} closes the loop.
    */
   getMatchCompare(careerId: string, matchId: string): Observable<MatchComparison | null> {
     const url = `${this.apiUrl}/${encodeURIComponent(careerId)}/matches/${encodeURIComponent(matchId)}/compare`;
@@ -32,6 +39,12 @@ export class MatchCompareApiService {
           return response.body;
         }
         return null;
+      }),
+      catchError((err) => {
+        if (err && err.status === 404) {
+          return of(null);
+        }
+        throw err;
       })
     );
   }
