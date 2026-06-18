@@ -1,6 +1,9 @@
+/* LIVE-MATCH-F5.2 BUG-014: CSS grid 3-col layout (Starting XI | Bench | Acciones).
+   Responsive: en mobile (< 768px) las 3 columnas colapsan a 1 vertical. */
+
 .sub-modal-root {
-  min-width: 560px;
-  max-width: 720px;
+  min-width: 720px;
+  max-width: 960px;
   font-family: 'Segoe UI', system-ui, sans-serif;
 }
 
@@ -52,12 +55,18 @@
   border: 1px solid #ffcdd2;
 }
 
-.sub-grid {
+/* ========== 3-column grid (desktop) ========== */
+.substitution-modal-grid {
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  gap: 0.5rem;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-areas: "starting bench actions";
+  gap: 16px;
   align-items: start;
 }
+
+.col-starting { grid-area: starting; }
+.col-bench    { grid-area: bench; }
+.col-actions  { grid-area: actions; }
 
 .col h3 {
   margin: 0 0 0.4rem 0;
@@ -70,6 +79,7 @@
 
 .col-starter h3 { color: #c62828; }
 .col-bench h3   { color: #2e7d32; }
+.col-actions h3 { color: #5a6473; }
 
 .player-list {
   list-style: none;
@@ -97,7 +107,6 @@
 
 .player-list li:hover  { background: #f0f4ff; }
 .player-list li.selected { background: #c8e6c9; }
-.player-list li.selected.col-bench li.selected { background: #c8e6c9; }
 .col-bench .player-list li.selected { background: #bbdefb; }
 
 .pos-badge {
@@ -122,29 +131,80 @@
   padding: 0 0.3rem;
 }
 
-.arrow-col {
+/* ========== Acciones (right column) ========== */
+.actions-summary {
+  border: 1px solid #e2e6ee;
+  border-radius: 6px;
+  background: #f5f7fa;
+  padding: 0.6rem;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
+  gap: 0.4rem;
 }
 
-.arrow {
-  font-size: 1.6rem;
+.action-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+.action-row-off {
+  background: #ffebee;
+  border-left: 3px solid #c62828;
+}
+
+.action-row-on {
+  background: #e8f5e9;
+  border-left: 3px solid #2e7d32;
+}
+
+.action-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #5a6473;
+  font-weight: 700;
+}
+
+.action-name {
+  font-weight: 600;
+  color: #1e3c72;
+}
+
+.action-pos {
+  font-size: 0.75rem;
+  color: #5a6473;
+}
+
+.arrow-inline {
+  text-align: center;
+  font-size: 1.4rem;
   font-weight: 700;
   color: #667eea;
 }
 
-.summary {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 0.75rem;
-  padding: 0.5rem 0.6rem;
-  background: #f5f7fa;
+.actions-hint {
+  font-size: 0.8rem;
+  color: #5a6473;
+  font-style: italic;
+  text-align: center;
+  padding: 0.6rem;
+  border: 1px dashed #c8d0dc;
   border-radius: 6px;
-  font-size: 0.85rem;
+  background: #fafbfc;
 }
 
-.summary span { white-space: nowrap; }
+.actions-footer {
+  margin-top: 0.6rem;
+  text-align: center;
+  font-size: 0.8rem;
+  color: #5a6473;
+}
+
+.remaining-tag b { color: #1e3c72; }
 
 .submit-overlay {
   position: absolute;
@@ -168,17 +228,29 @@
   padding: 0.5rem 1rem;
 }
 
-.remaining-tag {
-  flex: 1;
-  font-size: 0.8rem;
-  color: #5a6473;
-}
-
-.remaining-tag b { color: #1e3c72; }
-
 :host ::ng-deep .success-toast {
   --mdc-snackbar-container-color: #2e7d32;
   --mdc-snackbar-supporting-text-color: #ffffff;
   --mat-snack-bar-button-color: #c8e6c9;
   font-weight: 600;
+}
+
+/* ========== Responsive: mobile < 768px ========== */
+@media (max-width: 768px) {
+  .sub-modal-root {
+    min-width: unset;
+    max-width: 100vw;
+  }
+
+  .substitution-modal-grid {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "starting"
+      "bench"
+      "actions";
+  }
+
+  .player-list {
+    max-height: 200px;
+  }
 }
