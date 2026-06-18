@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router';
 import { Observable, forkJoin, switchMap } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
@@ -37,6 +38,11 @@ export class LiveMatchModalsService {
   private careerService = inject(CareerService);
   private teamService = inject(TeamService);
   private engineService = inject(MatchEngineService);
+  // LIVE-MATCH-F5.3.3 BUG-015: we need the careerId to call the
+  // round-level pause/resume endpoints (`/api/v1/career/{careerId}/round/...`).
+  // The careerId lives in the URL (`/games/{careerId}/...`), so we read it
+  // from the Router rather than threading it through every modal caller.
+  private router = inject(Router);
 
   /**
    * Opens the substitution modal for the given match/state. Returns the
@@ -47,6 +53,7 @@ export class LiveMatchModalsService {
       this.snackBar.open('El partido ya terminó, no se puede sustituir', 'OK', { duration: 3000 });
       return new Observable(sub => sub.complete());
     }
+    const careerId = this.getCurrentCareerId();
     return this.careerService.getCareerStatus().pipe(
       switchMap(status => {
         const userTeamId = status.userSessionTeamId;
@@ -77,13 +84,33 @@ export class LiveMatchModalsService {
               // real count after each substitution.
               substitutionsRemaining: 5
             };
-            this.dialog.open(SubstitutionModalComponent, {
+            const dialogRef = this.dialog.open(SubstitutionModalComponent, {
               data,
               width: '720px',
               maxWidth: '95vw',
               disableClose: false,
               autoFocus: 'first-tabbable'
             });
+
+            // LIVE-MATCH-F5.3.3 BUG-015: pause the round while the modal is
+            // open so the `currentMinute` the manager saw when they clicked
+            // "Sustituir" is still current when they confirm. This prevents
+            // the `MINUTE_IN_PAST (X) must be >= currentMinute (Y)` error
+            // Iván hit on minute 81 → 73. We only pause if we could resolve
+            // a careerId from the URL — otherwise we just log a warning.
+            if (careerId) {
+              this.engineService.pauseRoundForMatch(careerId, matchId).subscribe({
+                error: (err) => console.warn('[LIVE-MATCH] pause round on sub modal open failed:', err)
+              });
+              dialogRef.afterClosed().subscribe(() => {
+                this.engineService.resumeRoundForMatch(careerId, matchId).subscribe({
+                  error: (err) => console.warn('[LIVE-MATCH] resume round on sub modal close failed:', err)
+                });
+              });
+            } else {
+              console.warn('[LIVE-MATCH] could not resolve careerId from URL; round will NOT be paused on modal open');
+            }
+
             return data;
           })
         );
@@ -99,6 +126,7 @@ export class LiveMatchModalsService {
     }
     const homeTeamId = state.homeTeamId;
     const currentFormation = state.homeFormation || '4-4-2';
+    const careerId = this.getCurrentCareerId();
     return this.http.get<LineupDTO>(`${environment.apiUrl}/career/lineup/current`).pipe(
       map((lineup) => {
         const currentSlots = (lineup?.players ?? []).map((p, i) => ({
@@ -112,16 +140,47 @@ export class LiveMatchModalsService {
           homeTeamId,
           currentSlots
         };
-        this.dialog.open(FormationModalComponent, {
+        const dialogRef = this.dialog.open(FormationModalComponent, {
           data,
           width: '520px',
           maxWidth: '95vw',
           disableClose: false,
           autoFocus: 'first-tabbable'
         });
+
+        // LIVE-MATCH-F5.3.3 BUG-015: same pause/resume wiring as the
+        // substitution modal — see openSubstitutionModal for the full
+        // rationale (the `currentMinute` the manager saw at click time
+        // must still be current when they confirm the formation).
+        if (careerId) {
+          this.engineService.pauseRoundForMatch(careerId, matchId).subscribe({
+            error: (err) => console.warn('[LIVE-MATCH] pause round on formation modal open failed:', err)
+          });
+          dialogRef.afterClosed().subscribe(() => {
+            this.engineService.resumeRoundForMatch(careerId, matchId).subscribe({
+              error: (err) => console.warn('[LIVE-MATCH] resume round on formation modal close failed:', err)
+            });
+          });
+        } else {
+          console.warn('[LIVE-MATCH] could not resolve careerId from URL; round will NOT be paused on modal open');
+        }
+
         return data;
       })
     );
+  }
+
+  /**
+   * LIVE-MATCH-F5.3.3 BUG-015: extracts the careerId from the current
+   * router URL. We expect URLs of the form
+   * {@code /games/{careerId}/round/{round}/live} (or
+   * {@code /games/{careerId}/...}); any other route returns null and the
+   * caller logs a warning instead of pausing.
+   */
+  private getCurrentCareerId(): string | null {
+    const url = this.router.url || '';
+    const match = url.match(/\/games\/([^/]+)/);
+    return match ? match[1] : null;
   }
 
   private toSubModalPlayer(p: PlayerLineupDTO, isStarter: boolean): SubModalPlayer {

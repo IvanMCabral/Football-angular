@@ -1,6 +1,7 @@
 import { Injectable, inject, NgZone } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, Observable, Subject } from 'rxjs';
+import { map, switchMap } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 import {
   MatchState,
@@ -383,4 +384,83 @@ export class MatchEngineService {
    * show the health of multiple round streams.
    */
   readonly streamHealthByUrl = new Map<string, StreamHealth>();
+
+  // ========== LIVE-MATCH-F5.3.3 BUG-015: pause/resume round via matchId ==========
+
+  /**
+   * LIVE-MATCH-F5.3.3 BUG-015: in-memory cache for the
+   * {@code matchId -> roundId} lookup so the modal doesn't hit the helper
+   * endpoint on every open. TTL of 5 minutes — the round is much shorter
+   * than that, but a stale cache would also surface as a 404 on the next
+   * pause/resume call which is self-healing.
+   */
+  private static readonly ROUND_ID_CACHE_TTL_MS = 5 * 60 * 1_000;
+  private readonly roundIdCache = new Map<string, { roundId: string; cachedAt: number }>();
+
+  /**
+   * Resolves the roundId for a given matchId via
+   * {@code GET /api/v1/match-engine/matches/{matchId}/roundId}. The result
+   * is cached in-memory for {@link ROUND_ID_CACHE_TTL_MS} to avoid hammering
+   * the helper endpoint when the manager opens a sub/formation modal repeatedly.
+   *
+   * <p>If the cached entry is stale, the cache is refreshed on the next call.
+   * On error (e.g. the round was unregistered, 404), the cache entry is
+   * evicted so the next attempt goes back to the server.
+   */
+  getRoundIdForMatch(matchId: string): Observable<string> {
+    const cached = this.roundIdCache.get(matchId);
+    if (cached && Date.now() - cached.cachedAt < MatchEngineService.ROUND_ID_CACHE_TTL_MS) {
+      // Return cached as observable (cold -> emit -> complete).
+      return new Observable<string>(sub => {
+        sub.next(cached.roundId);
+        sub.complete();
+      });
+    }
+    return this.http.get<{ matchId: string; roundId: string }>(
+      `${this.apiUrl}/matches/${matchId}/roundId`
+    ).pipe(
+      map(resp => {
+        this.roundIdCache.set(matchId, { roundId: resp.roundId, cachedAt: Date.now() });
+        return resp.roundId;
+      })
+    );
+  }
+
+  /**
+   * LIVE-MATCH-F5.3.3 BUG-015: pauses ALL matches of the round that the
+   * given {@code matchId} belongs to. Resolves roundId via
+   * {@link getRoundIdForMatch} (cached) and then POSTs to the round-level
+   * pause endpoint.
+   *
+   * <p>The round-level pause propagates to every {@code MatchEngine} in
+   * the round via {@code RoundEngine.pauseAll()} — including the manager's
+   * own match and the other 5 matches running concurrently. That prevents
+   * the {@code MINUTE_IN_PAST} error Iván hit when the server kept ticking
+   * the {@code currentMinute} while he prepared the substitution.
+   *
+   * <p>The endpoint is idempotent on the backend ({@code RoundEngine.pauseAll}
+   * early-returns if already paused), so calling this twice in a row is
+   * safe (e.g. user double-clicks "Sustituir").
+   */
+  pauseRoundForMatch(careerId: string, matchId: string): Observable<unknown> {
+    return this.getRoundIdForMatch(matchId).pipe(
+      switchMap(roundId =>
+        this.http.post(`${environment.apiUrl}/career/${careerId}/round/${roundId}/pause`, {})
+      )
+    );
+  }
+
+  /**
+   * LIVE-MATCH-F5.3.3 BUG-015: mirror of {@link pauseRoundForMatch} for
+   * the resume side. Called from the modal's {@code afterClosed()} so the
+   * round re-runs whether the manager confirmed OR cancelled the
+   * substitution/formation. Idempotent on the backend.
+   */
+  resumeRoundForMatch(careerId: string, matchId: string): Observable<unknown> {
+    return this.getRoundIdForMatch(matchId).pipe(
+      switchMap(roundId =>
+        this.http.post(`${environment.apiUrl}/career/${careerId}/round/${roundId}/resume`, {})
+      )
+    );
+  }
 }
