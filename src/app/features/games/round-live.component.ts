@@ -1,12 +1,12 @@
-import { Component, inject, OnInit, OnDestroy, effect } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 import { MatchEngineService } from '../../core/services/match-engine.service';
 import { CareerService } from '../../core/services/career.service';
 import { LiveMatchModalsService } from '../../core/services/live-match-modals.service';
 import { Match } from '../../shared/models/match.model';
-import { BehaviorSubject, Observable, combineLatest, of, interval } from 'rxjs';
-import { map, switchMap, tap, takeUntil, catchError, shareReplay, filter } from 'rxjs/operators';
+import { BehaviorSubject, Observable, combineLatest, of } from 'rxjs';
+import { map, switchMap, tap, takeUntil, catchError, shareReplay } from 'rxjs/operators';
 import { Subject } from 'rxjs';
 import { MatchCardComponent } from '../../shared/components/match-card/match-card.component';
 import { RoundLiveViewModel, RoundMatchVM } from './models/round-live.model';
@@ -150,7 +150,6 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
-    this.stopAutoAdvancePolling();
     this.destroy$.next();
     this.destroy$.complete();
   }
@@ -195,14 +194,6 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
         };
 
         this.updateVm(newVm);
-
-        // LIVE-MATCH-F5.2 BUG-012: when allFinished transitions from false
-        // to true, start the auto-advance polling. The previous value is
-        // checked explicitly so we don't restart the interval on every
-        // SSE tick (which would be wasteful).
-        if (newVm.allFinished && !currentVm.allFinished) {
-          this.startAutoAdvancePolling();
-        }
       },
       error: (err) => {
         console.error('[ROUND] Error in SSE stream:', err);
@@ -337,84 +328,5 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
   goToRoundSummary() {
     const vm = this.vmSubject.value;
     this.router.navigate([`/games/${vm.gameId}/round/${vm.roundNumber}/summary`]);
-  }
-
-  // ========== LIVE-MATCH-F5.2 BUG-012: auto-advance to next round ==========
-
-  /**
-   * F5.2 BUG-012: when ALL matches of the current round reach FINISHED,
-   * the front-end polls every 5 seconds and calls the existing
-   * {@code POST /api/v1/career/{careerId}/next-round} endpoint to advance
-   * to the next round. This avoids an implicit auto-advance in the
-   * orchestrator (which would race with the user looking at the last
-   * match's timeline).
-   *
-   * <p>Backed by a {@code setInterval} (5s) — the cheapest polling source
-   * for a 5-second cadence. The interval is started/stopped from
-   * {@link ngOnInit}/{@link ngOnDestroy} so no leak on component teardown.
-   *
-   * <p>Guards:
-   * <ul>
-   *   <li>No-op if {@code allFinished} is false (still matches in progress).</li>
-   *   <li>No-op if the user has not opted-in to auto-advance (the
-   *       `autoAdvanceEnabled` flag can be toggled via UI; default true
-   *       for now per the F5.2 spec).</li>
-   *   <li>Single-flight: once the advance call is in flight, the next
-   *       tick skips the call to avoid double POSTs.</li>
-   *   <li>No-op while a modal is open (UX: don't navigate away from a
-   *       substitution/formation dialog).</li>
-   * </ul>
-   */
-  private autoAdvanceIntervalId: ReturnType<typeof setInterval> | null = null;
-  private autoAdvanceInFlight = false;
-  /** LIVE-MATCH-F5.2 BUG-012: in-memory flag. Could be wired to a UI toggle later. */
-  readonly autoAdvanceEnabled = true;
-
-  private startAutoAdvancePolling() {
-    this.stopAutoAdvancePolling();
-    this.autoAdvanceIntervalId = setInterval(() => {
-      this.maybeAutoAdvance();
-    }, 5_000);
-  }
-
-  private stopAutoAdvancePolling() {
-    if (this.autoAdvanceIntervalId != null) {
-      clearInterval(this.autoAdvanceIntervalId);
-      this.autoAdvanceIntervalId = null;
-    }
-  }
-
-  private maybeAutoAdvance() {
-    if (!this.autoAdvanceEnabled || this.autoAdvanceInFlight) {
-      return;
-    }
-    const vm = this.vmSubject.value;
-    if (!vm.allFinished) {
-      return;
-    }
-    // Don't advance if the user is in a match detail view.
-    const url = this.router.url;
-    if (url && url.includes('/matches/')) {
-      return;
-    }
-    this.autoAdvanceInFlight = true;
-    this.careerService.advanceToNextRound(vm.gameId)
-      .pipe(takeUntil(this.destroy$))
-      .subscribe({
-        next: () => {
-          this.autoAdvanceInFlight = false;
-          // The backend returns the new round context. We navigate to the
-          // next round's live page; the server decides the round number.
-          const nextRound = vm.roundNumber + 1;
-          this.router.navigate([`/games/${vm.gameId}/round/${nextRound}/live`]);
-        },
-        error: (err) => {
-          this.autoAdvanceInFlight = false;
-          // The endpoint may legitimately fail if the tournament is over
-          // (totalRounds reached). Surface a console warning — the user
-          // already sees the round-summary button as a fallback.
-          console.warn('[ROUND-LIVE] auto-advance next-round failed:', err);
-        }
-      });
   }
 }
