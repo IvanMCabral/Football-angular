@@ -1,10 +1,17 @@
 // F6 Sprint 2 (LIVE-MATCH-F6-MATCH-COMPARE): Tests for
-// MatchComparePageComponent. Pattern: provide the real service, then
-// spy on it after the component is created.
+// MatchComparePageComponent.
+//
+// V24D15-CLEANUP (BUG_COMPARE_UX Zone.js fix): switched from
+// `waitForAsync(() => ...)` to `async/await + fixture.whenStable()`
+// because Angular 21's Zone.js setup rejects `waitForAsync` outside an
+// active ProxyZone. The `async` form does not depend on the test runner's
+// zone-detection helpers, so it works under the default ChromeHeadlessCI
+// environment.
 
-import { ComponentFixture, TestBed, waitForAsync } from '@angular/core/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { of, throwError } from 'rxjs';
@@ -29,6 +36,7 @@ describe('MatchComparePageComponent', () => {
       providers: [
         provideRouter([]),
         provideHttpClient(),
+        provideHttpClientTesting(),
         MatchCompareApiService,   // provide the real service (will be spied)
         { provide: MatSnackBar, useValue: snackBarSpy },
         { provide: ActivatedRoute, useValue: routeStub },
@@ -40,40 +48,43 @@ describe('MatchComparePageComponent', () => {
     api = TestBed.inject(MatchCompareApiService);
   });
 
-  it('renders the comparison on 200', waitForAsync(() => {
+  it('renders the comparison on 200', async () => {
     spyOn(api, 'getMatchCompare').and.returnValue(of(sampleComparison()));
     fixture.detectChanges();
-    fixture.whenStable().then(() => {
-      expect(component.comparison).toBeTruthy();
-      expect(component.loading).toBeFalse();
-      expect(component.error).toBe('');
+    await fixture.whenStable();
+    fixture.detectChanges();
 
-      const html = fixture.nativeElement.textContent;
-      expect(html).toContain('Baseline');
-      expect(html).toContain('Live');
-      expect(html).toContain('Match Compare');
-    });
-  }));
+    expect(component.comparison).toBeTruthy();
+    expect(component.loading).toBeFalse();
+    expect(component.error).toBe('');
 
-  it('shows error when comparison is null (no baseline or no detail)', waitForAsync(() => {
+    const html = fixture.nativeElement.textContent;
+    expect(html).toContain('Baseline');
+    expect(html).toContain('Live');
+    expect(html).toContain('Match Compare');
+  });
+
+  it('shows error when comparison is null (no baseline or no detail)', async () => {
     spyOn(api, 'getMatchCompare').and.returnValue(of(null));
     fixture.detectChanges();
-    fixture.whenStable().then(() => {
-      expect(component.comparison).toBeNull();
-      expect(component.error).toContain('Comparación no disponible');
-      expect(snackBarSpy.open).toHaveBeenCalled();
-    });
-  }));
+    await fixture.whenStable();
+    fixture.detectChanges();
 
-  it('shows error on HTTP failure', waitForAsync(() => {
+    expect(component.comparison).toBeNull();
+    expect(component.error).toContain('Comparación no disponible');
+    expect(snackBarSpy.open).toHaveBeenCalled();
+  });
+
+  it('shows error on HTTP failure', async () => {
     spyOn(api, 'getMatchCompare').and.returnValue(throwError(() => new Error('boom')));
     fixture.detectChanges();
-    fixture.whenStable().then(() => {
-      expect(component.comparison).toBeNull();
-      expect(component.error).toContain('Error al cargar');
-      expect(snackBarSpy.open).toHaveBeenCalled();
-    });
-  }));
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(component.comparison).toBeNull();
+    expect(component.error).toContain('Error al cargar');
+    expect(snackBarSpy.open).toHaveBeenCalled();
+  });
 });
 
 function sampleComparison(): MatchComparison {
