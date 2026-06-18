@@ -18,10 +18,14 @@
  * <p>Timer-based tests use `jasmine.clock()` to mock `setTimeout` instead of
  * `fakeAsync(tick(...))` — this avoids the ProxyZone bootstrapping pain and
  * keeps the spec independent of zone.js internals.
+ *
+ * <p>LIVE-MATCH-F5.3.4: extends the spec with BUG-015 pause/resume plumbing
+ * (helper roundId lookup + per-round pause/resume with 5-minute cache).
  */
 
 import { TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
+import { of } from 'rxjs';
 import { MatchEngineService } from './match-engine.service';
 import { MatchState, StreamHealth } from './match-engine.model';
 
@@ -197,5 +201,106 @@ describe('MatchEngineService — LIVE-MATCH-F3-UI-LIVE FE1 (SSE backoff + health
     es.fireOpen();
     es.fireMessage({ ...fakeState, status: 'FINISHED' });
     expect(completed).toBe(true);
+  });
+});
+
+// ========== LIVE-MATCH-F5.3.4 BUG-015: pause/resume plumbing ==========
+
+describe('MatchEngineService — LIVE-MATCH-F5.3 BUG-015 (pause/resume per round)', () => {
+  let service: MatchEngineService;
+  let httpSpy: jasmine.SpyObj<HttpClient>;
+
+  beforeEach(() => {
+    httpSpy = jasmine.createSpyObj('HttpClient', ['post', 'get']);
+    TestBed.configureTestingModule({
+      providers: [
+        MatchEngineService,
+        { provide: HttpClient, useValue: httpSpy }
+      ]
+    });
+    service = TestBed.inject(MatchEngineService);
+  });
+
+  it('getRoundIdForMatch — calls GET /matches/{matchId}/roundId and caches the result', (done) => {
+    const matchId = 'match-1';
+    const roundId = 'round-1';
+    httpSpy.get.and.returnValue(of({ matchId, roundId }));
+
+    service.getRoundIdForMatch(matchId).subscribe(emitted => {
+      expect(emitted).toBe(roundId);
+      expect(httpSpy.get).toHaveBeenCalledTimes(1);
+      expect(httpSpy.get).toHaveBeenCalledWith(
+        jasmine.stringMatching(/\/api\/v1\/match-engine\/matches\/match-1\/roundId$/)
+      );
+      done();
+    });
+  });
+
+  it('getRoundIdForMatch — second call within TTL hits the cache (no second HTTP)', (done) => {
+    const matchId = 'match-2';
+    const roundId = 'round-2';
+    httpSpy.get.and.returnValue(of({ matchId, roundId }));
+
+    service.getRoundIdForMatch(matchId).subscribe();
+    service.getRoundIdForMatch(matchId).subscribe(emitted => {
+      expect(emitted).toBe(roundId);
+      // Only ONE HTTP call — second call was served from cache
+      expect(httpSpy.get).toHaveBeenCalledTimes(1);
+      done();
+    });
+  });
+
+  it('pauseRoundForMatch — resolves roundId via helper then POSTs to the round pause endpoint', (done) => {
+    const careerId = 'career-1';
+    const matchId = 'match-3';
+    const roundId = 'round-3';
+    httpSpy.get.and.returnValue(of({ matchId, roundId }));
+    httpSpy.post.and.returnValue(of({ success: true }));
+
+    service.pauseRoundForMatch(careerId, matchId).subscribe(result => {
+      expect(result).toEqual({ success: true } as any);
+      // GET helper + POST pause
+      expect(httpSpy.get).toHaveBeenCalledTimes(1);
+      expect(httpSpy.post).toHaveBeenCalledTimes(1);
+      expect(httpSpy.post).toHaveBeenCalledWith(
+        `/api/v1/career/${careerId}/round/${roundId}/pause`,
+        {}
+      );
+      done();
+    });
+  });
+
+  it('resumeRoundForMatch — resolves roundId via helper then POSTs to the round resume endpoint', (done) => {
+    const careerId = 'career-2';
+    const matchId = 'match-4';
+    const roundId = 'round-4';
+    httpSpy.get.and.returnValue(of({ matchId, roundId }));
+    httpSpy.post.and.returnValue(of({ success: true, wasPaused: true }));
+
+    service.resumeRoundForMatch(careerId, matchId).subscribe(result => {
+      expect(result).toEqual({ success: true, wasPaused: true } as any);
+      expect(httpSpy.post).toHaveBeenCalledWith(
+        `/api/v1/career/${careerId}/round/${roundId}/resume`,
+        {}
+      );
+      done();
+    });
+  });
+
+  it('pauseRoundForMatch — second call within TTL reuses the cached roundId (only 1 GET across 2 pauses)', (done) => {
+    const careerId = 'career-3';
+    const matchId = 'match-5';
+    const roundId = 'round-5';
+    httpSpy.get.and.returnValue(of({ matchId, roundId }));
+    httpSpy.post.and.returnValue(of({ success: true }));
+
+    service.pauseRoundForMatch(careerId, matchId).subscribe(() => {
+      service.pauseRoundForMatch(careerId, matchId).subscribe(() => {
+        // Only ONE GET (cache hit on second call), TWO POSTs (idempotent pause)
+        expect(httpSpy.get).toHaveBeenCalledTimes(1);
+        expect(httpSpy.post).toHaveBeenCalledTimes(2);
+        done();
+      });
+    });
   });
 });
