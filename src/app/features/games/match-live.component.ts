@@ -8,13 +8,11 @@ import {
 import { CommonModule, AsyncPipe } from '@angular/common';
 import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { BehaviorSubject, Subject, interval } from 'rxjs';
+import { BehaviorSubject, Subject } from 'rxjs';
 import { map, pairwise, startWith, switchMap, takeUntil } from 'rxjs/operators';
 import { MatchEngineService } from '../../core/services/match-engine.service';
 import { MatchState, MatchEvent, StreamHealth, TeamStyle } from '../../core/services/match-engine.model';
 import { CareerService } from '../../core/services/career.service';
-import { MatchService } from '../matches/services/match.service';
-import { Match } from '../../shared/models/match.model';
 import { environment } from '../../environments/environment';
 import { LiveTimelineComponent } from './components/live-timeline/live-timeline.component';
 import { LiveMatchModalsService } from '../../core/services/live-match-modals.service';
@@ -55,7 +53,6 @@ export class MatchLiveComponent implements OnInit, OnDestroy {
 
   private engineService = inject(MatchEngineService);
   private careerService = inject(CareerService);
-  private matchService = inject(MatchService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private snackBar = inject(MatSnackBar);
@@ -87,6 +84,13 @@ export class MatchLiveComponent implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
 
   ngOnInit() {
+    // BUG_F5.4_MATCH_LIVE_BLANK fix: route param resolution + per-match state
+    // stream are decoupled. MatchLiveComponent now connects to the RoundEngine
+    // V24 SSE (already running in back since V24D6M11) instead of three legacy
+    // per-match endpoints (`GET /matches/{matchId}`, `POST /matches/{matchId}/start`,
+    // `GET /matches/{matchId}/stream`) which no longer exist on the backend.
+    // Reference: round-level endpoints are documented in
+    // `MatchEngineController.java:42` (stream) and `:156` (roundId lookup).
     this.route.paramMap
       .pipe(takeUntil(this.destroy$))
       .subscribe(params => {
@@ -98,6 +102,8 @@ export class MatchLiveComponent implements OnInit, OnDestroy {
           return;
         }
 
+        // (1) Team-name lookup — unchanged from prior F5.4 wire. Pure HTTP GET,
+        // feeds the `teamNameMap` consumed by the template header + goal toasts.
         this.careerService.getCareerTeams(this.gameId)
           .pipe(takeUntil(this.destroy$))
           .subscribe({
@@ -115,14 +121,62 @@ export class MatchLiveComponent implements OnInit, OnDestroy {
             error: (err) => console.error('[MATCH-LIVE] teams error', err)
           });
 
-        this.matchService.getMatch(this.matchId)
-          .pipe(takeUntil(this.destroy$))
+        // (2) State stream — resolve the round this match belongs to (cached
+        // helper, TTL 5min via `getRoundIdForMatch`) and subscribe to the
+        // round-level SSE. Each emission carries the full `RoundState` with
+        // `matches: MatchState[]`; we filter for OUR matchId and push the
+        // resulting `MatchState` into `matchStateSubject`. The template's
+        // `*ngIf="matchState$ | async as state"` then renders the scoreboard,
+        // possession bar, timeline and 5 F5.4 buttons.
+        //
+        // Decision B5: the engine only exposes round-level SSE, so the legacy
+        // `useSse` polling branch is no longer reachable. We force SSE round
+        // here and log a one-shot warning if the env flag is off, but never
+        // route to a non-existent per-match polling path.
+        if (!environment.useSse) {
+          console.warn('[MATCH-LIVE] environment.useSse is false; forcing round-level SSE — per-match polling endpoint was removed in V24D6M11.');
+        }
+
+        this.engineService.getRoundIdForMatch(this.matchId)
+          .pipe(
+            switchMap(roundId => this.engineService.streamRoundState(roundId)),
+            takeUntil(this.destroy$)
+          )
           .subscribe({
-            next: (match: Match) => this.startEngine(match),
+            next: (roundState) => {
+              const myMatch = roundState.matches.find(m => m.matchId === this.matchId);
+              if (myMatch) {
+                this.matchStateSubject.next(myMatch);
+              }
+              // If the round is still warming up and our match hasn't emitted
+              // yet, `*ngIf` stays in its "Cargando..." state until the next
+              // tick carries our matchId — this is the desired UX.
+            },
             error: (err) => {
-              this.errorMsgSubject.next('No se pudo cargar el partido');
-              console.error('[MATCH-LIVE] Error loading match:', err);
+              // Decision B4: clear, non-breaking error message. We do NOT
+              // redirect or tear down the layout — the template renders the
+              // banner next to the scoreboard area instead of replacing it.
+              this.errorMsgSubject.next(
+                'No se puede cargar el partido. Es posible que ya haya finalizado o que aún no haya comenzado.'
+              );
+              console.error('[MATCH-LIVE] Error loading match state:', err);
             }
+          });
+
+        // (3) Goal-detection pipe — preserved verbatim from the deleted
+        // `startSseStream` private method so the goal snackbar still fires
+        // when a GOAL event appears in the round SSE for our match. Runs on
+        // `matchState$` so it sees exactly the post-filter MatchState we
+        // pushed above.
+        this.matchState$
+          .pipe(
+            map(s => s?.events ?? []),
+            startWith<MatchEvent[]>([]),
+            pairwise(),
+            takeUntil(this.destroy$)
+          )
+          .subscribe(([prev, next]) => {
+            this.detectNewGoals(prev, next);
           });
       });
   }
@@ -130,65 +184,6 @@ export class MatchLiveComponent implements OnInit, OnDestroy {
   ngOnDestroy() {
     this.destroy$.next();
     this.destroy$.complete();
-  }
-
-  private startEngine(match: Match) {
-    const homeTeamId = typeof match.homeTeamId === 'object' && 'value' in match.homeTeamId
-      ? (match.homeTeamId as any).value
-      : String(match.homeTeamId);
-    const awayTeamId = typeof match.awayTeamId === 'object' && 'value' in match.awayTeamId
-      ? (match.awayTeamId as any).value
-      : String(match.awayTeamId);
-
-    this.engineService.startEngine(this.matchId, homeTeamId, awayTeamId)
-      .pipe(takeUntil(this.destroy$))
-      .subscribe({
-        next: () => this.startPolling(),
-        error: (err) => {
-          this.errorMsgSubject.next('No se pudo iniciar el motor del partido');
-          console.error('[MATCH-LIVE] Error starting engine:', err);
-        }
-      });
-  }
-
-  private startPolling() {
-    if (environment.useSse) {
-      this.startSseStream();
-    } else {
-      this.startPollingInterval();
-    }
-  }
-
-  private startSseStream() {
-    this.engineService.streamMatchState(this.matchId)
-      .pipe(takeUntil(this.destroy$))
-      .subscribe({
-        next: (state: MatchState) => {
-          this.matchStateSubject.next(state);
-          if (state.status === 'FINISHED' || state.status === 'CANCELLED') {
-            // Cleanup happens via destroy$ when the component leaves.
-          }
-        },
-        error: (err) => {
-          console.error('[MATCH-LIVE] SSE stream error (will be retried by service):', err);
-          // FE1: do NOT set errorMsg here. The service handles reconnect
-          // via streamHealth$; the UI shows the red dot, not an error
-          // banner that nukes the whole view.
-        }
-      });
-
-    // FE2: subscribe to events + pairwise to detect new goals and trigger
-    // a snackbar.
-    this.matchState$
-      .pipe(
-        map(s => s?.events ?? []),
-        startWith<MatchEvent[]>([]),
-        pairwise(),
-        takeUntil(this.destroy$)
-      )
-      .subscribe(([prev, next]) => {
-        this.detectNewGoals(prev, next);
-      });
   }
 
   /**
@@ -216,31 +211,6 @@ export class MatchLiveComponent implements OnInit, OnDestroy {
         { duration: 5000, panelClass: 'goal-toast' }
       );
     }
-  }
-
-  private startPollingInterval() {
-    interval(1000)
-      .pipe(
-        switchMap(() => {
-          const state = this.matchStateSubject.value;
-          if (state?.status === 'RUNNING') {
-            return this.engineService.getMatchState(this.matchId);
-          }
-          return [];
-        }),
-        takeUntil(this.destroy$)
-      )
-      .subscribe({
-        next: (state: MatchState) => {
-          if (state) {
-            this.matchStateSubject.next(state);
-            if (state.status === 'FINISHED' || state.status === 'CANCELLED') {
-              // stop handled by state checks in switchMap
-            }
-          }
-        },
-        error: (err) => console.error('[MATCH-LIVE] Error polling state:', err)
-      });
   }
 
   pauseMatch() {
