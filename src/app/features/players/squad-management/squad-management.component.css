@@ -199,6 +199,22 @@
   cursor: not-allowed;
 }
 
+/* MVP1-lineup-cancha-1: botón para abrir el modal con cancha visual. */
+.btn-visual-editor {
+  padding: 0.5rem 1rem;
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-left: 0.5rem;
+}
+
+.btn-visual-editor:hover {
+  opacity: 0.92;
+}
+
 /* Lineup Error */
 .lineup-error {
   display: flex;

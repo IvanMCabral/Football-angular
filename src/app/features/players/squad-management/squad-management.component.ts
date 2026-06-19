@@ -18,6 +18,7 @@ import { LineupPlayerCardComponent } from 'app/shared/components/lineup-player-c
 import { SeasonStatsTabComponent } from '../../player-season-stats/components/season-stats-tab/season-stats-tab.component';
 import { LineupDTO, PlayerLineupDTO } from 'app/shared/models/lineup/lineup.dto';
 import { LineupWarningDTO } from 'app/shared/models/lineup/lineup-warning.dto';
+import { SquadEditorModalComponent } from 'app/components/squad-editor-modal/squad-editor-modal.component';
 
 interface SessionPlayer {
   sessionPlayerId: string;
@@ -265,17 +266,57 @@ export class SquadManagementComponent implements OnInit {
      this.activeTab$.next(tab);
    }
 
-   /**
-    * V24D6T2 (bug #6): count of healthy + non-suspended players in the
-    * current squad. Used by the Plantilla header to show "available / total".
-    */
-   availableSquadCount(squad: SessionPlayer[] | null): number {
-     if (!squad) return 0;
-     return squad.filter(p =>
-       p.injured !== true &&
-       !(p.suspensionRemainingMatches != null && p.suspensionRemainingMatches > 0)
-     ).length;
-   }
+/**
+ * V24D6T2 (bug #6): count of healthy + non-suspended players in the
+ * current squad. Used by the Plantilla header to show "available / total".
+ */
+availableSquadCount(squad: SessionPlayer[] | null): number {
+  if (!squad) return 0;
+  return squad.filter(p =>
+    p.injured !== true &&
+    !(p.suspensionRemainingMatches != null && p.suspensionRemainingMatches > 0)
+  ).length;
+}
+
+/**
+ * MVP1-lineup-cancha-1: abre el {@link SquadEditorModalComponent} con
+ * cancha visual y 82 slots. El modal persiste las asignaciones vía
+ * {@code /career/lineup/manual-select} y al cerrar refresca el lineup
+ * actual para que el squad-management muestre los cambios.
+ */
+openVisualEditor(): void {
+  this.careerStatus$.subscribe(status => {
+    if (!status || !status.careerId) {
+      return;
+    }
+    const ref = this.dialog.open(SquadEditorModalComponent, {
+      data: {
+        careerId: status.careerId,
+        matchId: null
+      },
+      width: '95vw',
+      height: '90vh',
+      disableClose: false,
+      panelClass: 'squad-editor-panel'
+    });
+    ref.afterClosed().subscribe(() => {
+      // Refresca el lineup para que la grid del squad-management muestre los cambios.
+      this.http.get<LineupDTO>(`${environment.apiUrl}/career/lineup/current`)
+        .pipe(
+          tap(lineup => {
+            this.lineupSubject$.next(lineup);
+            this.lineupWarning$.next(this.pickLineupWarning(lineup.warnings));
+          }),
+          catchError(() => {
+            this.lineupSubject$.next(null);
+            this.lineupWarning$.next(null);
+            return of(null);
+          })
+        )
+        .subscribe();
+    });
+  });
+}
 
    onAutoSelect(): void {
      const formation = this.selectedFormation$.value;

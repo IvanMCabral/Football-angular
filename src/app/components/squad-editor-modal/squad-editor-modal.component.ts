@@ -9,6 +9,10 @@ import { HttpClient } from '@angular/common/http';
 import { environment } from '../../environments/environment';
 import { Subject, BehaviorSubject, takeUntil } from 'rxjs';
 import { LineupWarningDTO } from '../../shared/models/lineup/lineup-warning.dto';
+import { FieldSubdivisionDTO } from '../../shared/models/lineup/field-subdivision.dto';
+import { FormationDTO, FormationPositionDTO } from '../../shared/models/lineup/formation.dto';
+import { PlayerOnFieldDto } from '../../shared/models/lineup/player-on-field.dto';
+import { LineupSlotDTO } from '../../shared/models/lineup/lineup-slot.dto';
 
 /**
  * Modal del Editor de Formación - MODO PRE-PARTIDO
@@ -841,7 +845,14 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     });
   }
 
-  /** Carga la alineación desde el backend */
+  /**
+ * Carga la alineación desde el backend.
+ *
+ * <p>MVP1-lineup-cancha-1: si el response trae {@code slots[]} persistidos,
+ * se usan para restaurar las asignaciones exactas (playerId → subdivisionId).
+ * Si {@code slots} viene vacío o ausente, se aplica el fallback de role-match
+ * (backward compat con lineups previos al sprint).
+   */
   private loadSquadFromBackend(): void {
     this.http.get<any>(`${environment.apiUrl}/career/lineup/current`).subscribe({
       next: (response) => {
@@ -873,17 +884,45 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
           injured: p.injured || false
         }));
 
-        // Asignar slots según posición EXACTA del jugador
-        // Solo asignamos si la posición del jugador coincide exactamente con el rol de la posición
-        const assignedPositions = new Set<number>();
+        // Indexar jugadores por playerId para lookup O(1) al restaurar slots.
+        const playerById = new Map<string, PlayerOnFieldDto>();
+        for (const p of allPlayers) {
+          playerById.set(p.playerId, p);
+        }
 
-        allPlayers.forEach((player) => {
-          // Buscar una posición libre que coincida EXACTAMENTE con la posición del jugador
+        // MVP1-lineup-cancha-1: si el back trae slots persistidos, restaurar asignaciones exactas.
+        const persistedSlots: Array<{ playerId: string; subdivisionId: string }> = response?.slots ?? [];
+        const usedSubdivisionIds = new Set<string>();
+        if (persistedSlots.length > 0) {
+          for (const slot of persistedSlots) {
+            const player = playerById.get(slot.playerId);
+            if (!player) continue;
+            if (!slot.subdivisionId) continue;
+            // Si dos slots apuntan al mismo subdivisionId, conservar solo el primero.
+            if (usedSubdivisionIds.has(slot.subdivisionId)) continue;
+            player.slotId = slot.subdivisionId;
+            this.slotPlayerMap[slot.subdivisionId] = player;
+            usedSubdivisionIds.add(slot.subdivisionId);
+          }
+        }
+
+        // Para jugadores sin slot asignado (o si el back no devolvió slots),
+        // aplicar el fallback de role-match contra la formación activa.
+        const assignedPositions = new Set<number>();
+        for (const player of allPlayers) {
+          if (player.slotId) {
+            // Ya tiene slot del path MVP1 — marcar la posición de formación como usada.
+            for (let i = 0; i < positions.length; i++) {
+              if (positions[i].subdivisionId === player.slotId) {
+                assignedPositions.add(i);
+                break;
+              }
+            }
+            continue;
+          }
           for (let i = 0; i < positions.length; i++) {
             if (assignedPositions.has(i)) continue;
-
             const posRole = positions[i].role;
-            // Solo asignar si la posición es exacta (GK->GK, CB->CB, etc.)
             if (player.position === posRole) {
               const slotId = positions[i].subdivisionId;
               player.slotId = slotId;
@@ -892,7 +931,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
               break;
             }
           }
-        });
+        }
 
         this.homePlayers$.next(allPlayers.filter(p => p.slotId));
         this.benchPlayers$.next(allPlayers.filter(p => !p.slotId));
@@ -1171,11 +1210,18 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     });
   }
 
-  /** Guarda la alineación en el backend */
+  /** Guarda la alineación en el backend.
+   *
+   * <p>MVP1-lineup-cancha-1: envía primero los slots a
+   * {@code /career/lineup/manual-select} (para persistir la subdivisionId por
+   * jugador), luego {@code /career/lineup/confirm} para confirmar la alineación.
+   *
+   * <p>Si el back rechaza con 422 (LINEUP_VALIDATION_ERROR, etc.), se surface
+   * el mensaje inline sin llamar a /confirm.
+   */
   private saveLineup(): void {
     // V24D6U3: client-side guard before sending the save. The backend
-    // (currently the unbacked /career/lineup/save) would 422 anyway;
-    // we surface the error inline without sending a doomed request.
+    // would 422 anyway; we surface the error inline without sending a doomed request.
     const playerCount = this.homePlayers.length;
     if (playerCount < 7) {
       this.errorMessage$.next('Mínimo 7 jugadores para guardar');
@@ -1189,23 +1235,42 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     }
     this.errorMessage$.next('');
 
-    const lineup = this.homePlayers.map(p => ({
-      playerId: p.playerId,
-      slotId: p.slotId,
-      position: p.position
-    }));
+    // Construir body para /manual-select con los slots actuales (playerId + subdivisionId).
+    const playerIds: string[] = this.homePlayers.map(p => p.playerId);
+    const slots: LineupSlotDTO[] = this.homePlayers
+      .filter(p => !!p.slotId)
+      .map(p => ({ playerId: p.playerId, subdivisionId: p.slotId }));
 
+    // Paso 1: persistir la subdivision map vía /manual-select.
     this.http.post<{warnings?: LineupWarningDTO[]}>(
-      `${environment.apiUrl}/career/lineup/confirm`,
-      {}
+      `${environment.apiUrl}/career/lineup/manual-select`,
+      {
+        formation: this.selectedFormation,
+        playerIds,
+        slots
+      }
     ).subscribe({
-      next: (response) => {
-        // V24D6U3: surface server warnings (LINEUP_SHORT_HANDED, etc.)
-        const warnings = response?.warnings ?? [];
-        this.lineupWarning$.next(warnings.length > 0 ? warnings[0] : null);
+      next: () => {
+        // Paso 2: confirmar la alineación (genera lineup "armed" para el match).
+        this.http.post<{warnings?: LineupWarningDTO[]}>(
+          `${environment.apiUrl}/career/lineup/confirm`,
+          {}
+        ).subscribe({
+          next: (response) => {
+            // V24D6U3: surface server warnings (LINEUP_SHORT_HANDED, etc.)
+            const warnings = response?.warnings ?? [];
+            this.lineupWarning$.next(warnings.length > 0 ? warnings[0] : null);
+          },
+          error: (err) => {
+            console.error('[SQUAD-EDITOR] Error confirming lineup:', err);
+            if (err.error?.code) {
+              this.errorMessage$.next(err.error.message || 'Error al guardar');
+            }
+          }
+        });
       },
       error: (err) => {
-        console.error('[SQUAD-EDITOR] Error saving lineup:', err);
+        console.error('[SQUAD-EDITOR] Error saving manual-select:', err);
         // 422 with code (e.g. LINEUP_MINIMUM_PLAYERS_NOT_MET) — surface inline
         if (err.error?.code) {
           this.errorMessage$.next(err.error.message || 'Error al guardar');
@@ -1238,52 +1303,4 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   clearConditionWarning(): void {
     this.conditionWarning$.next('');
   }
-}
-
-/** DTO de subdivisión desde el backend */
-interface FieldSubdivisionDTO {
-  sector: number;
-  subIndex: number;
-  isGoalkeeper: boolean;
-  left: number;
-  top: number;
-  width: number;
-  height: number;
-  subdivisionId: string;
-  zone: string;
-}
-
-/** DTO de posición de formación */
-interface FormationPositionDTO {
-  index: number;
-  role: string;
-  xPercent: number;
-  yPercent: number;
-  actionRangePercent: number;
-  subdivisionId: string;
-}
-
-/** DTO de formación */
-interface FormationDTO {
-  name: string;
-  description: string;
-  defenders: number;
-  midfielders: number;
-  attackers: number;
-  outfieldPlayers: number;
-  positions: FormationPositionDTO[];
-}
-
-/** Jugador en el campo */
-interface PlayerOnFieldDto {
-  playerId: string;
-  name: string;
-  position: string;
-  role: string;
-  overall: number;
-  slotId: string;
-  stamina: number;
-  active: boolean;
-  isEmpty: boolean;
-  injured?: boolean;
 }

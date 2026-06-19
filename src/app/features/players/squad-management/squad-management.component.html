@@ -157,9 +157,9 @@
 
       <div class="formation-selector">
         <label for="formation">Formación:</label>
-        <select 
-          id="formation" 
-          [value]="selectedFormation$ | async" 
+        <select
+          id="formation"
+          [value]="selectedFormation$ | async"
           (change)="onFormationChange($any($event.target).value)"
           class="formation-select">
           <option *ngFor="let formation of availableFormations" [value]="formation">
@@ -172,6 +172,15 @@
           class="btn-auto-select"
           title="Auto-seleccionar alineacion segun formacion">
           🤖 Auto Seleccionar
+        </button>
+        <!-- MVP1-lineup-cancha-1: abre modal con cancha visual y 82 slots. -->
+        <button
+          (click)="openVisualEditor()"
+          class="btn-visual-editor"
+          color="accent"
+          mat-raised-button
+          title="Abrir editor visual con cancha y slots cliqueables">
+          🎯 Editar Formación Visual
         </button>
       </div>
 
