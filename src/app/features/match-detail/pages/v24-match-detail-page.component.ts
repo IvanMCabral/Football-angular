@@ -73,13 +73,24 @@ import {
         <div class="match-header">
           <a routerLink="/matches" class="link link-back"
              aria-label="Back to matches list">&#8592; Back to matches</a>
-          <!-- P1a: Breadcrumb navigation (Career/Route use placeholders — MatchDetail DTO does not include gameId or career name) -->
+          <!-- V24D15-CLEANUP BUG_BREADCRUMB_PLACEHOLDER: the previous template
+               rendered the Round span with a literal placeholder in the title
+               attribute ('Round summary route requires gameId (not in MatchDetail
+               DTO)'). The Phase 2 invariant Game.id == Career.careerId means
+               we can use careerId as gameId here and link to the real
+               /games/:gameId/round/:round/summary route (defined in app.routes.ts).
+               Removed the placeholder text — the link now navigates to the
+               round summary page where the manager can see the full round recap. -->
           <nav class="breadcrumb" aria-label="Breadcrumb">
             <a routerLink="/dashboard" class="breadcrumb-link" title="Go to dashboard">Home</a>
             <span class="breadcrumb-sep">›</span>
             <a routerLink="/dashboard" class="breadcrumb-link" title="Career overview (linked to dashboard until dedicated career route exists)">Career</a>
             <span class="breadcrumb-sep">›</span>
-            <span class="breadcrumb-current" title="Round summary route requires gameId (not in MatchDetail DTO)">Round {{ detail.round }}</span>
+            <a [routerLink]="['/games', careerId, 'round', detail.round, 'summary']"
+               class="breadcrumb-link"
+               [attr.title]="'Round ' + detail.round + ' summary'">
+              Round {{ detail.round }}
+            </a>
             <span class="breadcrumb-sep">›</span>
             <span class="breadcrumb-current">Match</span>
           </nav>
