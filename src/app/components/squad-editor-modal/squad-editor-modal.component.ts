@@ -860,6 +860,14 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
         const formationName = response?.formation || this.selectedFormation || '4-4-2';
         const positions = this.formationPositions[formationName] || [];
 
+        // MVP1-lineup-cancha-1.5 FIX (F3): setear selectedFormation ANTES del
+        // role-match fallback para que isRecommendedSlot/getRecommendedRole
+        // (que usan this.selectedFormation) vean la formación correcta, no la
+        // vieja. Antes este seteo estaba al final del callback y los métodos
+        // que dependen de selectedFormation usaban el valor previo.
+        this.homeFormation$.next(formationName);
+        this.selectedFormation = formationName;
+
         // Limpiar mapeos anteriores
         this.slotPlayerMap = {};
 
@@ -935,9 +943,6 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
 
         this.homePlayers$.next(allPlayers.filter(p => p.slotId));
         this.benchPlayers$.next(allPlayers.filter(p => !p.slotId));
-
-        this.homeFormation$.next(formationName);
-        this.selectedFormation = this.homeFormation;
 
         // Finalizar inicialización
         this.isInitializing = false;
@@ -1191,6 +1196,12 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
         next: (response) => {
           this.loadingFormation$.next(false);
           this.applyLineupToSlots(newFormation, response?.players || []);
+          // MVP1-lineup-cancha-1.5 FIX (F4, defensivo): persistir los slots
+          // después del auto-select. Si F1 (back) está bien implementado,
+          // el back ya persistió el subdivision map; este saveLineup es
+          // redundante pero defensivo. Si F1 tiene un bug, este saveLineup
+          // asegura persistencia. El guard interno bloquea si lineup < 7.
+          this.saveLineup();
           // EMITIR EVENTO AL PADRE con los players directamente (sin esperar backend)
           this.formationChanged.emit({
             formation: newFormation,
