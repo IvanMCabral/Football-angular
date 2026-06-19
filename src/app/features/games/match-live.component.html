@@ -110,34 +110,36 @@
         </button>
       </div>
 
-      <!-- Tácticas: BALANCED / DEFEND / ATTACK (legacy UI) -->
+      <!-- LIVE-MATCH-F5.4: tactical style buttons (5 estilos, manager's team only) -->
       <div class="tactics" *ngIf="s.status !== 'FINISHED'">
-        <div class="tactic-control">
-          <h4>{{ teamNameMap[s.homeTeamId] || 'Local' }}</h4>
+        <div class="tactic-control tactic-control-single">
+          <h4>{{ teamNameMap[s.homeTeamId] || 'Local' }} — Táctica</h4>
           <div class="tactic-buttons">
-            <button (click)="changeTactic('HOME', 'DEFEND')"
-                    [class.active]="s.homeTactic === 'DEFEND'"
-                    class="btn-tactic">🛡️ Defensiva</button>
-            <button (click)="changeTactic('HOME', 'BALANCED')"
-                    [class.active]="s.homeTactic === 'BALANCED'"
-                    class="btn-tactic">⚖️ Normal</button>
-            <button (click)="changeTactic('HOME', 'ATTACK')"
-                    [class.active]="s.homeTactic === 'ATTACK'"
-                    class="btn-tactic">⚔️ Ofensiva</button>
-          </div>
-        </div>
-        <div class="tactic-control">
-          <h4>{{ teamNameMap[s.awayTeamId] || 'Visitante' }}</h4>
-          <div class="tactic-buttons">
-            <button (click)="changeTactic('AWAY', 'DEFEND')"
-                    [class.active]="s.awayTactic === 'DEFEND'"
-                    class="btn-tactic">🛡️ Defensiva</button>
-            <button (click)="changeTactic('AWAY', 'BALANCED')"
-                    [class.active]="s.awayTactic === 'BALANCED'"
-                    class="btn-tactic">⚖️ Normal</button>
-            <button (click)="changeTactic('AWAY', 'ATTACK')"
-                    [class.active]="s.awayTactic === 'ATTACK'"
-                    class="btn-tactic">⚔️ Ofensiva</button>
+            <button (click)="changeStyle('BALANCED')"
+                    [class.active]="s.homeStyle === 'BALANCED'"
+                    [disabled]="s.homeStyle === 'BALANCED'"
+                    class="btn-tactic"
+                    aria-label="Táctica equilibrada">⚖️ Equilibrado</button>
+            <button (click)="changeStyle('ATTACKING')"
+                    [class.active]="s.homeStyle === 'ATTACKING'"
+                    [disabled]="s.homeStyle === 'ATTACKING'"
+                    class="btn-tactic"
+                    aria-label="Táctica ofensiva">⚔️ Ofensiva</button>
+            <button (click)="changeStyle('DEFENSIVE')"
+                    [class.active]="s.homeStyle === 'DEFENSIVE'"
+                    [disabled]="s.homeStyle === 'DEFENSIVE'"
+                    class="btn-tactic"
+                    aria-label="Táctica defensiva">🛡️ Defensiva</button>
+            <button (click)="changeStyle('COUNTER')"
+                    [class.active]="s.homeStyle === 'COUNTER'"
+                    [disabled]="s.homeStyle === 'COUNTER'"
+                    class="btn-tactic"
+                    aria-label="Táctica contraataque">⚡ Contraataque</button>
+            <button (click)="changeStyle('POSSESSION')"
+                    [class.active]="s.homeStyle === 'POSSESSION'"
+                    [disabled]="s.homeStyle === 'POSSESSION'"
+                    class="btn-tactic"
+                    aria-label="Táctica posesión">🎯 Posesión</button>
           </div>
         </div>
       </div>

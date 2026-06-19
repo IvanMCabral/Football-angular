@@ -145,6 +145,39 @@ export interface FormationChangeResult {
 }
 
 /**
+ * LIVE-MATCH-F5.4: tactical style for the manager's team. Mirrors the
+ * {@code TeamStyle} enum on the backend (5 values). Used to populate the
+ * body of {@code POST /api/v1/match-engine/matches/{matchId}/style}.
+ *
+ * <p>Mapping with the legacy front enum ({@code 'ATTACK' | 'DEFEND' | 'BALANCED'}):
+ * <ul>
+ *   <li>BALANCED   — no modifier (default)</li>
+ *   <li>ATTACKING  — slightly higher totalLambda, slight share boost</li>
+ *   <li>DEFENSIVE  — slightly lower totalLambda, slight defensive share effect</li>
+ *   <li>COUNTER    — lower totalLambda, better chance share when weaker than opponent</li>
+ *   <li>POSSESSION — slightly lower totalLambda, slight possession share boost</li>
+ * </ul>
+ */
+export type TeamStyle = 'BALANCED' | 'ATTACKING' | 'DEFENSIVE' | 'COUNTER' | 'POSSESSION';
+
+/**
+ * LIVE-MATCH-F5.4: response shape for POST /api/v1/match-engine/matches/{matchId}/style.
+ *
+ * <p>Mirrors the F5 {@code StyleChangeResultDTO} on the backend. The current
+ * style is echoed back as a {@link TeamStyle} string (the enum is serialized
+ * as {@code .name()} by Jackson).
+ */
+export interface StyleChangeResult {
+  success: boolean;
+  /** Always present on success; reflects the style the engine is now using. */
+  currentStyle: TeamStyle;
+  /** Live minute at which the style was applied (drives the replay window). */
+  minuteApplied: number;
+  /** Human-readable error message — present only when {@code success=false}. */
+  error?: string;
+}
+
+/**
  * LIVE-MATCH-F3-UI-LIVE FE4: shape of a player entry sent to the substitution
  * modal. Resolved from the match squad at modal open time.
  */

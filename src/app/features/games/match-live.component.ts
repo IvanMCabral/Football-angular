@@ -11,7 +11,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { BehaviorSubject, Subject, interval } from 'rxjs';
 import { map, pairwise, startWith, switchMap, takeUntil } from 'rxjs/operators';
 import { MatchEngineService } from '../../core/services/match-engine.service';
-import { MatchState, MatchEvent, StreamHealth } from '../../core/services/match-engine.model';
+import { MatchState, MatchEvent, StreamHealth, TeamStyle } from '../../core/services/match-engine.model';
 import { CareerService } from '../../core/services/career.service';
 import { MatchService } from '../matches/services/match.service';
 import { Match } from '../../shared/models/match.model';
@@ -263,12 +263,37 @@ export class MatchLiveComponent implements OnInit, OnDestroy {
     }
   }
 
-  changeTactic(team: 'HOME' | 'AWAY', tactic: 'ATTACK' | 'DEFEND' | 'BALANCED') {
-    this.engineService.sendCommand(this.matchId, {
-      type: 'CHANGE_TACTIC',
-      targetTeam: team,
-      tactic
-    }).pipe(takeUntil(this.destroy$)).subscribe();
+  /**
+   * LIVE-MATCH-F5.4: change the manager's home team tactical style mid-match.
+   * Wires to {@code POST /api/v1/match-engine/matches/{matchId}/style} via
+   * {@link MatchEngineService.changeStyle}.
+   *
+   * <p>Only the home team is editable. The rival (away) block was removed
+   * from the template because the back does not support rival changes in F5.
+   * The new style is reflected on the next SSE tick via {@code s.homeStyle}.
+   *
+   * <p>Replaces the legacy {@code changeTactic('HOME'|'AWAY', 'ATTACK'|'DEFEND'|'BALANCED')}
+   * method which called the pre-V24 {@code sendCommand('CHANGE_TACTIC', ...)}
+   * path and did NOT trigger the new {@code TeamStyle}-aware engine effects.
+   */
+  changeStyle(style: TeamStyle): void {
+    this.engineService.changeStyle(this.matchId, style)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (result) => {
+          if (result.success) {
+            // The SSE tick will update s.homeStyle on the next emission;
+            // we don't need to manually push to matchStateSubject.
+            console.log(`[MATCH-LIVE] [F5.4] Style changed to ${result.currentStyle} at minute ${result.minuteApplied}`);
+          } else {
+            this.snackBar.open(result.error || 'No se pudo cambiar la táctica', 'OK', { duration: 3000 });
+          }
+        },
+        error: (err) => {
+          console.error('[MATCH-LIVE] [F5.4] changeStyle error', err);
+          this.snackBar.open('Error al cambiar la táctica', 'OK', { duration: 3000 });
+        }
+      });
   }
 
   // ========== F3.3 — substitution + formation modals (delegated to LiveMatchModalsService) ==========

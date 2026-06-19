@@ -10,7 +10,9 @@ import {
   RoundState,
   SubstitutionResult,
   StreamHealth,
-  FormationChangeResult
+  FormationChangeResult,
+  StyleChangeResult,
+  TeamStyle
 } from './match-engine.model';
 
 /**
@@ -137,6 +139,33 @@ export class MatchEngineService {
     return this.http.post<FormationChangeResult>(
       `${this.apiUrl}/matches/${matchId}/formation`,
       { players }
+    );
+  }
+
+  /**
+   * LIVE-MATCH-F5.4: Send a tactical style change to the backend.
+   *
+   * <p>Endpoint: {@code POST /api/v1/match-engine/matches/{matchId}/style}.
+   * <p>Body: {@code { newStyle: TeamStyle }}.
+   * <p>Response: {@link StyleChangeResult} with {@code success}, {@code currentStyle},
+   * {@code minuteApplied}, and an optional {@code error}.
+   *
+   * <p>Triggers {@code V24LiveSession.mutateContext → withNewStyle(homeTeamId, newStyle)
+   * → replayFromMinute(currentMinute)} on the backend. The style change is
+   * destructive for the prefix from {@code currentMinute} onward (deterministic
+   * replay, same contract as formation change).
+   *
+   * <p>Only the manager's home team can be changed. The rival (away) is out of
+   * scope for F5.4 — the back rejects away changes. The component is
+   * responsible for filtering the UI to show only the home team's buttons.
+   *
+   * @param matchId  the match UUID
+   * @param style    one of the 5 {@link TeamStyle} values
+   */
+  changeStyle(matchId: string, style: TeamStyle): Observable<StyleChangeResult> {
+    return this.http.post<StyleChangeResult>(
+      `${this.apiUrl}/matches/${matchId}/style`,
+      { newStyle: style }
     );
   }
 
