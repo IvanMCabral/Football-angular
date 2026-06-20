@@ -316,7 +316,13 @@ export class RoundSummaryComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const nextRound = vm.roundNumber + 1;
+    // V24D14-LIVE-FIX-1.7 Bug #1: prefer the server-side currentRound from
+    // tournamentStatus (canonical source of truth), fall back to URL roundNumber + 1
+    // when tournamentStatus is unavailable (e.g. summary loaded before careerStatus).
+    // This prevents the "play next round" button from navigating to a stale round
+    // when the user opened a summary for round N but the career has already advanced
+    // to round M > N.
+    const nextRound = (vm.tournamentStatus?.currentRound ?? vm.roundNumber) + 1;
 
     if (vm.tournamentStatus && nextRound > vm.tournamentStatus.totalRounds) {
       this.router.navigate([`/games/${vm.gameId}/champion`]);
