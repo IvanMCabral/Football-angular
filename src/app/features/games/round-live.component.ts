@@ -176,8 +176,17 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
           const matchState = roundState.matches.find(ms =>
             String(ms.matchId) === String(rm.match.id)
           );
+          // V24D14-LIVE-FIX-1.7 Bug #2: propagate the live state status into the
+          // embedded Match.status so post-FINISHED snapshots don't show stale
+          // "En Juego" — mapFixtureStatus now handles both fixture statuses
+          // (PENDING/SIMULATING/COMPLETED/CANCELLED) and live state statuses
+          // (NOT_STARTED/RUNNING/PAUSED/FINISHED/CANCELLED).
+          const match = matchState
+            ? { ...rm.match, status: this.mapFixtureStatus(matchState.status) }
+            : rm.match;
           return {
             ...rm,
+            match,
             state: matchState
           };
         });
@@ -317,10 +326,17 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
   }
 
   private mapFixtureStatus(fixtureStatus: string): 'SCHEDULED' | 'SIMULATED' | 'CANCELLED' {
+    // V24D14-LIVE-FIX-1.7 Bug #2: also accept live state statuses (NOT_STARTED /
+    // RUNNING / PAUSED / FINISHED) so SSE-driven updates of rm.match.status
+    // correctly flip SCHEDULED → SIMULATED when the match ends.
     switch (fixtureStatus) {
-      case 'PENDING': case 'SIMULATING': return 'SCHEDULED';
-      case 'COMPLETED': return 'SIMULATED';
-      case 'CANCELLED': return 'CANCELLED';
+      case 'PENDING': case 'SIMULATING':
+      case 'NOT_STARTED': case 'RUNNING': case 'PAUSED':
+        return 'SCHEDULED';
+      case 'COMPLETED': case 'FINISHED':
+        return 'SIMULATED';
+      case 'CANCELLED':
+        return 'CANCELLED';
       default: return 'SCHEDULED';
     }
   }
