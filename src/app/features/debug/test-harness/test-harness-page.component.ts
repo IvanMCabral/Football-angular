@@ -1,0 +1,525 @@
+import { CommonModule } from '@angular/common';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  OnInit,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
+import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatSelectModule } from '@angular/material/select';
+import { MatSnackBar } from '@angular/material/snack-bar';
+
+import { CareerService } from '../../../core/services/career.service';
+import { Fixture } from '../../../core/services/career.model';
+import { V24MatchDetailPageComponent } from '../../match-detail/pages/v24-match-detail-page.component';
+import {
+  FORMATION_CODES,
+  FormationCode,
+  TestHarnessMatchRow,
+} from '../models/test-harness.model';
+import { TestHarnessService } from '../services/test-harness.service';
+
+interface RoundGroup {
+  round: number;
+  byeTeam: string | null;
+  matches: TestHarnessMatchRow[];
+}
+
+/**
+ * V24D24: Test-Harness UI page (3-panel layout).
+ *
+ * <p>Route: {@code /debug/test-harness}.
+ *
+ * <p>Layout (desktop, ≥768px):
+ * <pre>
+ * +-----------------+-----------------+
+ * |  Panel A        |  Panel B        |
+ * |  V24 match      |  Formation      |
+ * |  detail (reused)|  select + btns  |
+ * +-----------------+-----------------+
+ * |  Panel C                          |
+ * |  Match list (grouped by round)    |
+ * +-----------------------------------+
+ * </pre>
+ *
+ * <p>Panel D (timeline scrubber with metrics) is F3 and lands in a
+ * separate commit.
+ *
+ * <p>Backend gating: this UI is a debug surface — the backend is
+ * profile-gated ({@code dev | local | test}). The /detail and /timeline
+ * endpoints that Panel A will hit return 404 in prod. REVISOR runs the
+ * smoke against the dev profile.
+ *
+ * <p>No mutations on Panel A read — only Panel B buttons mutate the
+ * career. After a successful mutation, the page reloads the match
+ * detail (Panel A re-fetches) and the match list (Panel C re-fetches)
+ * via the standard {@code @Input} + signal pipeline.
+ */
+@Component({
+  selector: 'app-test-harness-page',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [
+    CommonModule,
+    FormsModule,
+    RouterLink,
+    MatButtonModule,
+    MatFormFieldModule,
+    MatSelectModule,
+    V24MatchDetailPageComponent,
+  ],
+  template: `
+    <div class="test-harness-page">
+      <header class="page-header">
+        <h1 class="page-title">Test Harness</h1>
+        <p class="page-subtitle">
+          Debug surface — change formation, replay, and inspect match detail.
+        </p>
+        <a routerLink="/dashboard" class="link link-back" aria-label="Back to dashboard">
+          &larr; Back to dashboard
+        </a>
+      </header>
+
+      <!-- Empty state: no career active -->
+      <div *ngIf="!loading && !loadError && !hasCareer()" class="state-container" role="status">
+        <div class="state-icon info-icon" aria-hidden="true">i</div>
+        <h2 class="state-title">No active career</h2>
+        <p class="state-text">You need an active career to use the test harness.</p>
+        <a routerLink="/career/setup" class="btn btn-primary">Set up a career</a>
+      </div>
+
+      <!-- Load error -->
+      <div *ngIf="!loading && loadError" class="state-container" role="alert">
+        <div class="state-icon error-icon" aria-hidden="true">!</div>
+        <p class="error-text">{{ loadError() }}</p>
+        <button (click)="reload()" class="btn btn-primary" aria-label="Retry loading">Retry</button>
+      </div>
+
+      <!-- Loading state -->
+      <div *ngIf="loading" class="state-container" role="status" aria-live="polite">
+        <div class="state-spinner" aria-hidden="true"></div>
+        <p class="loading-text">Loading test harness…</p>
+      </div>
+
+      <!-- Main grid -->
+      <div *ngIf="!loading && !loadError && hasCareer()" class="test-harness-grid">
+        <!-- Panel A: Reused V24 match detail (F2) -->
+        <section class="panel panel-a" aria-labelledby="panel-a-heading">
+          <h2 id="panel-a-heading" class="panel-title">Panel A · Match Detail</h2>
+          <p class="panel-hint" *ngIf="!selectedMatchId()">
+            Select a match in Panel C to view its V24 detail.
+          </p>
+          <app-v24-match-detail-page
+            *ngIf="selectedMatchId()"
+            [inputCareerId]="careerId()"
+            [inputMatchId]="selectedMatchId()"
+          ></app-v24-match-detail-page>
+        </section>
+
+        <!-- Panel B: Mutation controls -->
+        <section class="panel panel-b" aria-labelledby="panel-b-heading">
+          <h2 id="panel-b-heading" class="panel-title">Panel B · Mutations</h2>
+
+          <div class="control-group">
+            <mat-form-field appearance="outline" class="formation-field">
+              <mat-label>Formation</mat-label>
+              <mat-select
+                [(ngModel)]="selectedFormationModel"
+                (selectionChange)="onFormationChange($event.value)"
+                aria-label="Select formation"
+              >
+                <mat-option *ngFor="let code of formationCodes" [value]="code">
+                  {{ code }}
+                </mat-option>
+              </mat-select>
+            </mat-form-field>
+
+            <div class="button-stack">
+              <button
+                mat-raised-button
+                color="primary"
+                (click)="applyFormation()"
+                [disabled]="mutationInFlight() || !selectedFormationModel"
+                aria-label="Apply selected formation"
+              >
+                Set Formation
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onResetInjuries()"
+                [disabled]="mutationInFlight()"
+                aria-label="Reset all injuries"
+              >
+                Reset Injuries
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onReplaceFixtures()"
+                [disabled]="mutationInFlight()"
+                aria-label="Replace fixtures with a Barcelona rival"
+              >
+                Replace Fixtures
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Panel C: Match list (full width) -->
+        <section class="panel panel-c" aria-labelledby="panel-c-heading">
+          <h2 id="panel-c-heading" class="panel-title">Panel C · Matches</h2>
+          <p class="panel-hint">Click a match to load its detail in Panel A.</p>
+
+          <div *ngIf="rounds().length === 0" class="empty-rounds">
+            <p>No matches in the active career.</p>
+          </div>
+
+          <ul class="rounds-list" *ngIf="rounds().length > 0">
+            <li *ngFor="let r of rounds(); trackBy: trackByRound" class="round-block">
+              <div class="round-header">
+                <span class="round-label">Round {{ r.round }}</span>
+                <span *ngIf="r.byeTeam" class="round-bye">BYE: {{ r.byeTeam }}</span>
+              </div>
+              <ul class="match-list">
+                <li
+                  *ngFor="let m of r.matches; trackBy: trackByMatchId"
+                  class="match-row"
+                  [class.match-row-selected]="m.matchId === selectedMatchId()"
+                  (click)="selectMatch(m)"
+                  (keyup.enter)="selectMatch(m)"
+                  tabindex="0"
+                  [attr.aria-pressed]="m.matchId === selectedMatchId()"
+                  [attr.aria-label]="'Match ' + m.homeTeamName + ' vs ' + m.awayTeamName + ', status ' + m.status"
+                >
+                  <span class="match-teams">
+                    <span class="team-home">{{ m.homeTeamName }}</span>
+                    <span class="team-sep">vs</span>
+                    <span class="team-away">{{ m.awayTeamName }}</span>
+                  </span>
+                  <span class="match-score">
+                    <ng-container *ngIf="m.homeGoals !== null && m.awayGoals !== null; else pendingScore">
+                      {{ m.homeGoals }} - {{ m.awayGoals }}
+                    </ng-container>
+                    <ng-template #pendingScore>—</ng-template>
+                  </span>
+                  <span class="match-status" [attr.data-status]="m.status">{{ m.status }}</span>
+                </li>
+              </ul>
+            </li>
+          </ul>
+        </section>
+      </div>
+    </div>
+  `,
+  styles: [`
+    :host { display: block; padding: 1rem; max-width: 1400px; margin: 0 auto; }
+    .test-harness-page { color: var(--text-color, #222); }
+    .page-header { margin-bottom: 1.5rem; }
+    .page-title { margin: 0; font-size: 1.5rem; }
+    .page-subtitle { margin: 0.25rem 0 0; color: var(--text-muted, #666); font-size: 0.9rem; }
+    .link-back { display: inline-block; margin-top: 0.5rem; font-size: 0.85rem; }
+    .state-container { padding: 2rem; text-align: center; }
+    .state-spinner {
+      width: 32px; height: 32px; border: 3px solid #ccc; border-top-color: #1976d2;
+      border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 1rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .test-harness-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-areas:
+        "a b"
+        "c c";
+      gap: 1rem;
+    }
+    @media (max-width: 767px) {
+      .test-harness-grid {
+        grid-template-columns: 1fr;
+        grid-template-areas: "a" "b" "c";
+      }
+    }
+    .panel { border: 1px solid var(--border-color, #e0e0e0); border-radius: 6px; padding: 1rem; background: var(--panel-bg, #fff); }
+    .panel-a { grid-area: a; min-height: 320px; }
+    .panel-b { grid-area: b; }
+    .panel-c { grid-area: c; }
+    .panel-title { margin: 0 0 0.5rem; font-size: 1rem; }
+    .panel-hint { margin: 0 0 1rem; color: var(--text-muted, #666); font-size: 0.85rem; }
+    .formation-field { width: 100%; }
+    .button-stack { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 1rem; }
+    .rounds-list { list-style: none; margin: 0; padding: 0; }
+    .round-block { margin-bottom: 1rem; }
+    .round-header { display: flex; gap: 0.5rem; align-items: baseline; margin-bottom: 0.5rem; }
+    .round-label { font-weight: 600; }
+    .round-bye { font-size: 0.8rem; color: var(--text-muted, #888); }
+    .match-list { list-style: none; margin: 0; padding: 0; border: 1px solid #eee; border-radius: 4px; }
+    .match-row {
+      display: grid;
+      grid-template-columns: 2fr 80px 100px;
+      gap: 0.5rem;
+      padding: 0.5rem 0.75rem;
+      cursor: pointer;
+      border-bottom: 1px solid #f0f0f0;
+      transition: background 0.1s;
+    }
+    .match-row:last-child { border-bottom: none; }
+    .match-row:hover { background: #f8f8f8; }
+    .match-row:focus { outline: 2px solid #1976d2; outline-offset: -2px; }
+    .match-row-selected { background: #e3f2fd !important; }
+    .match-teams { display: flex; gap: 0.5rem; }
+    .team-sep { color: var(--text-muted, #888); }
+    .match-score { text-align: center; font-variant-numeric: tabular-nums; }
+    .match-status { text-align: right; font-size: 0.8rem; color: var(--text-muted, #666); }
+    .empty-rounds { color: var(--text-muted, #666); font-size: 0.9rem; }
+    .state-icon { font-weight: 700; font-size: 1.5rem; margin-bottom: 0.5rem; }
+    .info-icon { color: #1976d2; }
+    .error-icon { color: #d32f2f; }
+    .error-text { color: #d32f2f; }
+  `],
+})
+export class TestHarnessPageComponent implements OnInit {
+  private careerService = inject(CareerService);
+  private harness = inject(TestHarnessService);
+  private snackBar = inject(MatSnackBar);
+
+  /** Allowed formation codes (UI select options). */
+  readonly formationCodes: readonly FormationCode[] = FORMATION_CODES;
+
+  /** Selected formation (two-way bound to mat-select via ngModel). */
+  selectedFormationModel: FormationCode | null = '4-3-3';
+
+  // ============== State signals ==============
+
+  /** The active careerId (resolved from CareerStatus; null if no career). */
+  readonly careerId = signal<string | null>(null);
+
+  /** Currently selected match (Panel C click → Panel A renders). */
+  readonly selectedMatchId = signal<string | null>(null);
+
+  /** All matches of the active career, grouped by round. */
+  readonly rounds = signal<RoundGroup[]>([]);
+
+  /** True while we are loading the initial data (career + matches). */
+  readonly loading = signal<boolean>(true);
+
+  /** True while a mutation (set-formation, reset-injuries, replace-fixtures) is in flight. */
+  readonly mutationInFlight = signal<boolean>(false);
+
+  /** Error message from the initial load (null when OK). */
+  readonly loadError = signal<string | null>(null);
+
+  /** True if there is an active career. */
+  readonly hasCareer = computed(() => this.careerId() !== null);
+
+  // ============== Lifecycle ==============
+
+  ngOnInit(): void {
+    this.reload();
+  }
+
+  /** Re-load the career status and the match list. */
+  reload(): void {
+    this.loading.set(true);
+    this.loadError.set(null);
+
+    this.careerService.getCareerStatus().subscribe({
+      next: (status) => {
+        if (!status.careerId) {
+          this.careerId.set(null);
+          this.rounds.set([]);
+          this.loading.set(false);
+          return;
+        }
+        this.careerId.set(status.careerId);
+        this.loadMatches();
+      },
+      error: (err) => {
+        this.loadError.set(
+          err?.error?.message ?? err?.message ?? 'Failed to load career status.'
+        );
+        this.loading.set(false);
+      },
+    });
+  }
+
+  /** Set the selected match (Panel C → Panel A re-render via @Input). */
+  selectMatch(m: TestHarnessMatchRow): void {
+    this.selectedMatchId.set(m.matchId);
+  }
+
+  // ============== Panel B handlers ==============
+
+  /** Two-way binding shim for mat-select. */
+  onFormationChange(value: string): void {
+    this.selectedFormationModel = (value as FormationCode) ?? null;
+  }
+
+  applyFormation(): void {
+    const formation = this.selectedFormationModel;
+    if (!formation) {
+      this.snackBar.open('Pick a formation first.', 'OK', { duration: 3000 });
+      return;
+    }
+    this.mutationInFlight.set(true);
+    this.harness.setFormation(formation).subscribe({
+      next: (resp) => {
+        this.mutationInFlight.set(false);
+        this.snackBar.open(
+          resp?.message ?? `Formation ${formation} applied.`,
+          'OK',
+          { duration: 3000 }
+        );
+        this.refreshDetailAfterMutation();
+      },
+      error: (err) => {
+        this.mutationInFlight.set(false);
+        this.snackBar.open(
+          this.fmtError(err, 'Failed to set formation'),
+          'OK',
+          { duration: 5000 }
+        );
+      },
+    });
+  }
+
+  onResetInjuries(): void {
+    this.mutationInFlight.set(true);
+    this.harness.resetInjuries().subscribe({
+      next: (resp) => {
+        this.mutationInFlight.set(false);
+        this.snackBar.open(
+          resp?.message ?? 'Injuries reset.',
+          'OK',
+          { duration: 3000 }
+        );
+      },
+      error: (err) => {
+        this.mutationInFlight.set(false);
+        this.snackBar.open(
+          this.fmtError(err, 'Failed to reset injuries'),
+          'OK',
+          { duration: 5000 }
+        );
+      },
+    });
+  }
+
+  onReplaceFixtures(): void {
+    // V24D24 F2: For now the UI only triggers a no-op POST (the backend
+    // expects a real CustomFixture[]). The full "Barcelona rival" preset
+    // builder is out of F2 scope (see prompt-senior-v24d24.md F3 section
+    // for the interactive builder). Until then, we send a tiny preset.
+    const preset = this.buildSingleMatchPreset();
+    this.mutationInFlight.set(true);
+    this.harness.replaceFixtures(preset).subscribe({
+      next: (resp) => {
+        this.mutationInFlight.set(false);
+        this.snackBar.open(
+          resp?.message ?? 'Fixtures replaced.',
+          'OK',
+          { duration: 3000 }
+        );
+        // Match list will change — reload.
+        this.loadMatches();
+      },
+      error: (err) => {
+        this.mutationInFlight.set(false);
+        this.snackBar.open(
+          this.fmtError(err, 'Failed to replace fixtures'),
+          'OK',
+          { duration: 5000 }
+        );
+      },
+    });
+  }
+
+  // ============== Track-by ==============
+
+  trackByRound(_index: number, r: RoundGroup): number {
+    return r.round;
+  }
+
+  trackByMatchId(_index: number, m: TestHarnessMatchRow): string {
+    return m.matchId;
+  }
+
+  // ============== Internal helpers ==============
+
+  private loadMatches(): void {
+    this.careerService.getAllFixturesWithBye().subscribe({
+      next: (resp) => {
+        const rounds: RoundGroup[] = (resp?.rounds ?? []).map((rd) => ({
+          round: rd.round,
+          byeTeam: rd.byeTeam ?? null,
+          matches: (rd.matches ?? []).map((f: Fixture) =>
+            this.fixtureToMatchRow(f)
+          ),
+        }));
+        this.rounds.set(rounds);
+        this.loading.set(false);
+      },
+      error: (err) => {
+        this.loadError.set(
+          this.fmtError(err, 'Failed to load match list')
+        );
+        this.loading.set(false);
+      },
+    });
+  }
+
+  /**
+   * Build a TestHarnessMatchRow from a CareerService Fixture.
+   * Team names are not in the Fixture; the UI shows the teamId as a
+   * fallback. A future iteration can resolve names from CareerService.
+   */
+  private fixtureToMatchRow(f: Fixture): TestHarnessMatchRow {
+    return {
+      matchId: f.matchId,
+      round: f.round,
+      homeTeamId: f.homeTeamId,
+      homeTeamName: f.homeTeamId, // placeholder; real name resolved by Panel A
+      awayTeamId: f.awayTeamId,
+      awayTeamName: f.awayTeamId,
+      status: f.status,
+      homeGoals: f.homeGoals ?? null,
+      awayGoals: f.awayGoals ?? null,
+      homeFormation: null,
+      awayFormation: null,
+    };
+  }
+
+  /**
+   * V24D24 F2: tiny preset (single Barcelona-friendly match) so the
+   * "Replace Fixtures" button has something to send. Real preset
+   * builder lands in F3 (out of F2 scope).
+   */
+  private buildSingleMatchPreset() {
+    // Use the user team if we have it, otherwise a harmless empty list.
+    // Backend accepts an empty array; we use it so the button is harmless.
+    return [];
+  }
+
+  /**
+   * Force Panel A to re-fetch by re-setting the signal. The V24 detail
+   * page reads inputs and refetches when they change.
+   */
+  private refreshDetailAfterMutation(): void {
+    // No-op for now: the V24 detail page watches @Input changes and
+    // refetches automatically when the same id is re-assigned, but only
+    // if the value actually changes. To force a re-fetch, we briefly
+    // null the selection and re-assign it.
+    const current = this.selectedMatchId();
+    if (current) {
+      this.selectedMatchId.set(null);
+      // Use a microtask to let OnPush see the change, then re-set.
+      Promise.resolve().then(() => this.selectedMatchId.set(current));
+    }
+  }
+
+  private fmtError(err: any, fallback: string): string {
+    return err?.error?.message ?? err?.message ?? fallback;
+  }
+}

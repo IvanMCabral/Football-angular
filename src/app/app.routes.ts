@@ -26,6 +26,9 @@ import { RoundLiveComponent } from './features/games/round-live.component';
 import { RoundSummaryComponent } from './features/games/round-summary.component';
 import { TournamentChampionComponent } from './features/games/tournament-champion.component';
 
+// V24D24: Test-Harness UI page (debug surface).
+import { TestHarnessPageComponent } from './features/debug/test-harness/test-harness-page.component';
+
 export const routes: Routes = [
   { path: '', redirectTo: '/dashboard', pathMatch: 'full' },
   { path: 'login', component: LoginComponent },
@@ -46,6 +49,10 @@ export const routes: Routes = [
   { path: 'careers/:careerId/matches/:matchId/detail', component: V24MatchDetailPageComponent, canActivate: [authGuard] },
   // F6 Sprint 2 (LIVE-MATCH-F6-MATCH-COMPARE): baseline vs live comparison page
   { path: 'careers/:careerId/matches/:matchId/compare', component: MatchComparePageComponent, canActivate: [authGuard] },
+  // V24D24: Test-Harness UI page (debug surface — profile-gated on backend).
+  // No profile-guard here; the backend returns 404 in prod for the harness
+  // endpoints, and the authGuard ensures the user is logged in.
+  { path: 'debug/test-harness', component: TestHarnessPageComponent, canActivate: [authGuard] },
   { path: 'games/:id', component: GameDetailComponent, canActivate: [authGuard] },
   { path: 'games/:gameId/round/:round/live', component: RoundLiveComponent, canActivate: [authGuard] },
   { path: 'games/:gameId/round/:round/summary', component: RoundSummaryComponent, canActivate: [authGuard] },
