@@ -17,12 +17,15 @@ import { of, throwError } from 'rxjs';
 import { TestHarnessPageComponent } from './test-harness-page.component';
 import { CareerService } from '../../../core/services/career.service';
 import { TestHarnessService } from '../services/test-harness.service';
+import { MatchDetailApiService } from '../../match-detail/services/match-detail-api.service';
+import { TimelineSnapshot } from '../../match-detail/models/match-detail.model';
 
 describe('TestHarnessPageComponent', () => {
   let component: TestHarnessPageComponent;
   let fixture: ComponentFixture<TestHarnessPageComponent>;
   let careerService: jasmine.SpyObj<CareerService>;
   let harness: jasmine.SpyObj<TestHarnessService>;
+  let matchDetailApi: jasmine.SpyObj<MatchDetailApiService>;
   let snackBarSpy: jasmine.SpyObj<MatSnackBar>;
 
   beforeEach(async () => {
@@ -34,6 +37,10 @@ describe('TestHarnessPageComponent', () => {
       'setFormation',
       'resetInjuries',
       'replaceFixtures',
+    ]);
+    matchDetailApi = jasmine.createSpyObj('MatchDetailApiService', [
+      'getMatchTimeline',
+      'getMatchDetail',
     ]);
     snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
 
@@ -77,6 +84,12 @@ describe('TestHarnessPageComponent', () => {
         ],
       })
     );
+    // Default: timeline returns a stable snapshot for any minute.
+    matchDetailApi.getMatchTimeline.and.returnValue(
+      of(sampleSnapshot(0))
+    );
+    // Default: detail is unavailable (404 → null).
+    matchDetailApi.getMatchDetail.and.returnValue(of(null));
 
     await TestBed.configureTestingModule({
       imports: [TestHarnessPageComponent, NoopAnimationsModule],
@@ -86,6 +99,7 @@ describe('TestHarnessPageComponent', () => {
         provideHttpClientTesting(),
         { provide: CareerService, useValue: careerService },
         { provide: TestHarnessService, useValue: harness },
+        { provide: MatchDetailApiService, useValue: matchDetailApi },
         { provide: MatSnackBar, useValue: snackBarSpy },
       ],
     }).compileComponents();
@@ -230,4 +244,219 @@ describe('TestHarnessPageComponent', () => {
     expect(component.loadError()).toBe('network down');
     expect(component.loading()).toBeFalse();
   });
+
+  // ============== V24D24 F3: Panel D timeline scrubber ==============
+
+  it('starts with selectedMinute at 0 and no snapshot loaded', () => {
+    expect(component.selectedMinute()).toBe(0);
+    expect(component.timelineSnapshot()).toBeNull();
+    expect(component.timelineError()).toBeNull();
+  });
+
+  it('selectMatch resets the selected minute to 0', () => {
+    // First select a match (effect runs, snapshot loads).
+    component.selectMatch({
+      matchId: 'match-1',
+      round: 1,
+      homeTeamId: 'team-1',
+      homeTeamName: 'Team 1',
+      awayTeamId: 'team-2',
+      awayTeamName: 'Team 2',
+      status: 'PENDING',
+      homeGoals: null,
+      awayGoals: null,
+      homeFormation: null,
+      awayFormation: null,
+    });
+    component.onSliderInput({ target: { value: '45' } } as unknown as Event);
+    expect(component.selectedMinute()).toBe(45);
+
+    // Re-select the same match → minute resets to 0.
+    component.selectMatch({
+      matchId: 'match-1',
+      round: 1,
+      homeTeamId: 'team-1',
+      homeTeamName: 'Team 1',
+      awayTeamId: 'team-2',
+      awayTeamName: 'Team 2',
+      status: 'PENDING',
+      homeGoals: null,
+      awayGoals: null,
+      homeFormation: null,
+      awayFormation: null,
+    });
+    expect(component.selectedMinute()).toBe(0);
+  });
+
+  it('onSliderInput updates selectedMinute when value is in range', () => {
+    component.onSliderInput({ target: { value: '45' } } as unknown as Event);
+    expect(component.selectedMinute()).toBe(45);
+
+    component.onSliderInput({ target: { value: '0' } } as unknown as Event);
+    expect(component.selectedMinute()).toBe(0);
+
+    component.onSliderInput({ target: { value: '90' } } as unknown as Event);
+    expect(component.selectedMinute()).toBe(90);
+  });
+
+  it('onSliderInput rejects out-of-range and non-finite values', () => {
+    component.selectedMinute.set(50);
+    component.onSliderInput({ target: { value: '120' } } as unknown as Event);
+    expect(component.selectedMinute()).toBe(50); // unchanged
+
+    component.onSliderInput({ target: { value: '-1' } } as unknown as Event);
+    expect(component.selectedMinute()).toBe(50);
+
+    component.onSliderInput({ target: { value: 'abc' } } as unknown as Event);
+    expect(component.selectedMinute()).toBe(50);
+  });
+
+  it('effect fetches the timeline when a match is selected', async () => {
+    matchDetailApi.getMatchTimeline.calls.reset();
+    matchDetailApi.getMatchTimeline.and.returnValue(of(sampleSnapshot(0)));
+
+    component.selectMatch(makeMatchRow('match-1'));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    // Wait for the debounce (150ms) to elapse and the HTTP call to land.
+    await new Promise((r) => setTimeout(r, 200));
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(matchDetailApi.getMatchTimeline).toHaveBeenCalledWith(
+      'career-1',
+      'match-1',
+      0
+    );
+    expect(component.timelineSnapshot()?.minute).toBe(0);
+    expect(component.timelineLoading()).toBeFalse();
+  });
+
+  it('effect refetches the timeline when the slider moves', async () => {
+    matchDetailApi.getMatchTimeline.calls.reset();
+    matchDetailApi.getMatchTimeline.and.returnValue(of(sampleSnapshot(0)));
+
+    component.selectMatch(makeMatchRow('match-1'));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await new Promise((r) => setTimeout(r, 200));
+    expect(matchDetailApi.getMatchTimeline).toHaveBeenCalledTimes(1);
+
+    component.onSliderInput({ target: { value: '45' } } as unknown as Event);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await new Promise((r) => setTimeout(r, 200));
+    expect(matchDetailApi.getMatchTimeline).toHaveBeenCalledTimes(2);
+    expect(matchDetailApi.getMatchTimeline.calls.mostRecent().args[2]).toBe(45);
+  });
+
+  it('effect clears the snapshot when no match is selected', async () => {
+    matchDetailApi.getMatchTimeline.and.returnValue(of(sampleSnapshot(0)));
+
+    component.selectMatch(makeMatchRow('match-1'));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await new Promise((r) => setTimeout(r, 200));
+    expect(component.timelineSnapshot()).not.toBeNull();
+
+    // Set selectedMatchId back to null by selecting nothing (via the
+    // internal signal — public API only updates via selectMatch with a row).
+    // Workaround: assign via the signal directly.
+    (component as unknown as { selectedMatchId: { set: (v: string | null) => void } })
+      .selectedMatchId.set(null);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await new Promise((r) => setTimeout(r, 200));
+
+    expect(component.timelineSnapshot()).toBeNull();
+    expect(component.timelineLoading()).toBeFalse();
+  });
+
+  it('effect surfaces HTTP errors on the timeline signal', async () => {
+    matchDetailApi.getMatchTimeline.and.returnValue(
+      throwError(() => ({ message: 'upstream down' }))
+    );
+
+    component.selectMatch(makeMatchRow('match-1'));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await new Promise((r) => setTimeout(r, 200));
+
+    expect(component.timelineError()).toBe('upstream down');
+    expect(component.timelineSnapshot()).toBeNull();
+    expect(component.timelineLoading()).toBeFalse();
+  });
+
+  it('effect debounces rapid slider changes (final value is 45)', async () => {
+    matchDetailApi.getMatchTimeline.and.returnValue(of(sampleSnapshot(0)));
+    matchDetailApi.getMatchTimeline.calls.reset();
+
+    component.selectMatch(makeMatchRow('match-1'));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await new Promise((r) => setTimeout(r, 200));
+    // The initial fetch ran — reset the spy.
+    matchDetailApi.getMatchTimeline.calls.reset();
+
+    // Fire 5 rapid slider changes. The implementation debounces 150ms
+    // via setTimeout inside the effect, so the spy is called at most
+    // once with the LAST value (45). The exact count of intermediate
+    // calls depends on the test environment's zone scheduling.
+    for (const m of [10, 20, 30, 40, 45]) {
+      component.onSliderInput({ target: { value: String(m) } } as unknown as Event);
+      fixture.detectChanges();
+    }
+    await fixture.whenStable();
+    // After debounce settles, the last value wins.
+    await new Promise((r) => setTimeout(r, 250));
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    // At least one call happened after the rapid changes.
+    expect(matchDetailApi.getMatchTimeline).toHaveBeenCalled();
+    // The LAST call (which is what the debounce should leave standing)
+    // has the final value 45.
+    expect(matchDetailApi.getMatchTimeline.calls.mostRecent().args[2]).toBe(45);
+  });
+
+  it('exposes TIMELINE_MAX_MINUTE and TIMELINE_STEP for the template', () => {
+    expect(component.TIMELINE_MAX_MINUTE).toBe(90);
+    expect(component.TIMELINE_STEP).toBe(5);
+  });
+
+  it('renders the minute tick list (0,5,...,90)', () => {
+    expect(component.minuteTicks.length).toBe(19); // 0,5,...,90 = 19 ticks
+    expect(component.minuteTicks[0]).toBe(0);
+    expect(component.minuteTicks[component.minuteTicks.length - 1]).toBe(90);
+    expect(component.minuteTicks.every((m, i) => i === 0 || m - component.minuteTicks[i - 1] === 5)).toBeTrue();
+  });
 });
+
+function makeMatchRow(matchId: string) {
+  return {
+    matchId,
+    round: 1,
+    homeTeamId: 'team-1',
+    homeTeamName: 'Team 1',
+    awayTeamId: 'team-2',
+    awayTeamName: 'Team 2',
+    status: 'PENDING' as const,
+    homeGoals: null,
+    awayGoals: null,
+    homeFormation: null,
+    awayFormation: null,
+  };
+}
+
+function sampleSnapshot(minute: number): TimelineSnapshot {
+  return {
+    minute,
+    homeGoals: 1,
+    awayGoals: 0,
+    homeXg: 0.55,
+    awayXg: 0.10,
+    homeShots: 4,
+    awayShots: 1,
+    events: [],
+  };
+}

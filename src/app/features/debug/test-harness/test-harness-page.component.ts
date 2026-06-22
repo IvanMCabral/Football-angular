@@ -2,8 +2,10 @@ import { CommonModule } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
+  OnDestroy,
   OnInit,
   computed,
+  effect,
   inject,
   signal,
 } from '@angular/core';
@@ -16,6 +18,8 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { CareerService } from '../../../core/services/career.service';
 import { Fixture } from '../../../core/services/career.model';
+import { MatchDetailApiService } from '../../match-detail/services/match-detail-api.service';
+import { TimelineSnapshot } from '../../match-detail/models/match-detail.model';
 import { V24MatchDetailPageComponent } from '../../match-detail/pages/v24-match-detail-page.component';
 import {
   FORMATION_CODES,
@@ -30,8 +34,12 @@ interface RoundGroup {
   matches: TestHarnessMatchRow[];
 }
 
+const TIMELINE_DEBOUNCE_MS = 150;
+const TIMELINE_MAX_MINUTE = 90;
+const TIMELINE_STEP = 5;
+
 /**
- * V24D24: Test-Harness UI page (3-panel layout).
+ * V24D24: Test-Harness UI page (4-panel layout).
  *
  * <p>Route: {@code /debug/test-harness}.
  *
@@ -42,23 +50,16 @@ interface RoundGroup {
  * |  V24 match      |  Formation      |
  * |  detail (reused)|  select + btns  |
  * +-----------------+-----------------+
- * |  Panel C                          |
- * |  Match list (grouped by round)    |
+ * |  Panel C (match list, full width)  |
+ * +-----------------------------------+
+ * |  Panel D (timeline scrubber, full) |
  * +-----------------------------------+
  * </pre>
  *
- * <p>Panel D (timeline scrubber with metrics) is F3 and lands in a
- * separate commit.
- *
  * <p>Backend gating: this UI is a debug surface — the backend is
  * profile-gated ({@code dev | local | test}). The /detail and /timeline
- * endpoints that Panel A will hit return 404 in prod. REVISOR runs the
- * smoke against the dev profile.
- *
- * <p>No mutations on Panel A read — only Panel B buttons mutate the
- * career. After a successful mutation, the page reloads the match
- * detail (Panel A re-fetches) and the match list (Panel C re-fetches)
- * via the standard {@code @Input} + signal pipeline.
+ * endpoints return 404 in prod. REVISOR runs the smoke against the
+ * dev profile.
  */
 @Component({
   selector: 'app-test-harness-page',
@@ -86,7 +87,7 @@ interface RoundGroup {
       </header>
 
       <!-- Empty state: no career active -->
-      <div *ngIf="!loading && !loadError && !hasCareer()" class="state-container" role="status">
+      <div *ngIf="!loading() && !loadError() && !hasCareer()" class="state-container" role="status">
         <div class="state-icon info-icon" aria-hidden="true">i</div>
         <h2 class="state-title">No active career</h2>
         <p class="state-text">You need an active career to use the test harness.</p>
@@ -94,20 +95,20 @@ interface RoundGroup {
       </div>
 
       <!-- Load error -->
-      <div *ngIf="!loading && loadError" class="state-container" role="alert">
+      <div *ngIf="!loading() && loadError()" class="state-container" role="alert">
         <div class="state-icon error-icon" aria-hidden="true">!</div>
         <p class="error-text">{{ loadError() }}</p>
         <button (click)="reload()" class="btn btn-primary" aria-label="Retry loading">Retry</button>
       </div>
 
       <!-- Loading state -->
-      <div *ngIf="loading" class="state-container" role="status" aria-live="polite">
+      <div *ngIf="loading()" class="state-container" role="status" aria-live="polite">
         <div class="state-spinner" aria-hidden="true"></div>
         <p class="loading-text">Loading test harness…</p>
       </div>
 
       <!-- Main grid -->
-      <div *ngIf="!loading && !loadError && hasCareer()" class="test-harness-grid">
+      <div *ngIf="!loading() && !loadError() && hasCareer()" class="test-harness-grid">
         <!-- Panel A: Reused V24 match detail (F2) -->
         <section class="panel panel-a" aria-labelledby="panel-a-heading">
           <h2 id="panel-a-heading" class="panel-title">Panel A · Match Detail</h2>
@@ -172,7 +173,7 @@ interface RoundGroup {
         <!-- Panel C: Match list (full width) -->
         <section class="panel panel-c" aria-labelledby="panel-c-heading">
           <h2 id="panel-c-heading" class="panel-title">Panel C · Matches</h2>
-          <p class="panel-hint">Click a match to load its detail in Panel A.</p>
+          <p class="panel-hint">Click a match to load its detail in Panel A and the scrubber in Panel D.</p>
 
           <div *ngIf="rounds().length === 0" class="empty-rounds">
             <p>No matches in the active career.</p>
@@ -212,6 +213,91 @@ interface RoundGroup {
             </li>
           </ul>
         </section>
+
+        <!-- Panel D: Timeline scrubber (F3) -->
+        <section class="panel panel-d" aria-labelledby="panel-d-heading">
+          <h2 id="panel-d-heading" class="panel-title">Panel D · Timeline Scrubber</h2>
+          <p class="panel-hint" *ngIf="!selectedMatchId()">
+            Select a match in Panel C to use the timeline scrubber.
+          </p>
+
+          <div *ngIf="selectedMatchId()" class="scrubber-content">
+            <div class="scrubber-header">
+              <span class="minute-label">Minute {{ selectedMinute() }}</span>
+              <span *ngIf="timelineSnapshot() as snap" class="match-context">
+                of {{ snap.events.length }} events
+              </span>
+            </div>
+
+            <input
+              type="range"
+              class="minute-slider"
+              min="0"
+              [max]="TIMELINE_MAX_MINUTE"
+              [step]="TIMELINE_STEP"
+              [value]="selectedMinute()"
+              (input)="onSliderInput($event)"
+              [attr.aria-label]="'Match minute, currently ' + selectedMinute()"
+              [attr.aria-valuemin]="0"
+              [attr.aria-valuemax]="TIMELINE_MAX_MINUTE"
+              [attr.aria-valuenow]="selectedMinute()"
+              [disabled]="timelineLoading()"
+            />
+
+            <div class="minute-ticks" aria-hidden="true">
+              <span *ngFor="let m of minuteTicks" class="tick" [class.tick-active]="m === selectedMinute()">
+                {{ m }}
+              </span>
+            </div>
+
+            <!-- Loading skeleton -->
+            <div *ngIf="timelineLoading()" class="scrubber-skeleton" aria-live="polite">
+              <div class="skeleton-row skeleton-score"></div>
+              <div class="skeleton-grid">
+                <div class="skeleton-card"></div>
+                <div class="skeleton-card"></div>
+                <div class="skeleton-card"></div>
+                <div class="skeleton-card"></div>
+              </div>
+            </div>
+
+            <!-- Snapshot content -->
+            <ng-container *ngIf="!timelineLoading() && timelineSnapshot() as snap">
+              <div class="scrubber-score" role="status" aria-live="polite">
+                <span class="score-home">{{ snap.homeGoals }}</span>
+                <span class="score-sep">-</span>
+                <span class="score-away">{{ snap.awayGoals }}</span>
+              </div>
+
+              <div class="metric-grid">
+                <div class="metric-card">
+                  <span class="metric-label">Home xG</span>
+                  <span class="metric-value">{{ snap.homeXg | number:'1.2-2' }}</span>
+                </div>
+                <div class="metric-card">
+                  <span class="metric-label">Away xG</span>
+                  <span class="metric-value">{{ snap.awayXg | number:'1.2-2' }}</span>
+                </div>
+                <div class="metric-card">
+                  <span class="metric-label">Home Shots</span>
+                  <span class="metric-value">{{ snap.homeShots }}</span>
+                </div>
+                <div class="metric-card">
+                  <span class="metric-label">Away Shots</span>
+                  <span class="metric-value">{{ snap.awayShots }}</span>
+                </div>
+              </div>
+            </ng-container>
+
+            <!-- Empty / error state -->
+            <div *ngIf="!timelineLoading() && !timelineSnapshot() && !timelineError()" class="empty-snapshot">
+              <p>Timeline not available for this match (feature off, or no V24 detail persisted).</p>
+            </div>
+            <div *ngIf="!timelineLoading() && timelineError()" class="error-snapshot" role="alert">
+              <p>{{ timelineError() }}</p>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   `,
@@ -233,19 +319,21 @@ interface RoundGroup {
       grid-template-columns: 1fr 1fr;
       grid-template-areas:
         "a b"
-        "c c";
+        "c c"
+        "d d";
       gap: 1rem;
     }
     @media (max-width: 767px) {
       .test-harness-grid {
         grid-template-columns: 1fr;
-        grid-template-areas: "a" "b" "c";
+        grid-template-areas: "a" "b" "c" "d";
       }
     }
     .panel { border: 1px solid var(--border-color, #e0e0e0); border-radius: 6px; padding: 1rem; background: var(--panel-bg, #fff); }
     .panel-a { grid-area: a; min-height: 320px; }
     .panel-b { grid-area: b; }
     .panel-c { grid-area: c; }
+    .panel-d { grid-area: d; }
     .panel-title { margin: 0 0 0.5rem; font-size: 1rem; }
     .panel-hint { margin: 0 0 1rem; color: var(--text-muted, #666); font-size: 0.85rem; }
     .formation-field { width: 100%; }
@@ -278,15 +366,72 @@ interface RoundGroup {
     .info-icon { color: #1976d2; }
     .error-icon { color: #d32f2f; }
     .error-text { color: #d32f2f; }
+
+    /* === Panel D: timeline scrubber === */
+    .scrubber-content { display: flex; flex-direction: column; gap: 0.75rem; }
+    .scrubber-header { display: flex; align-items: baseline; gap: 0.5rem; }
+    .minute-label { font-size: 1.1rem; font-weight: 600; }
+    .match-context { font-size: 0.8rem; color: var(--text-muted, #888); }
+    .minute-slider { width: 100%; cursor: pointer; }
+    .minute-slider:disabled { cursor: not-allowed; opacity: 0.6; }
+    .minute-ticks {
+      display: flex; justify-content: space-between;
+      font-size: 0.7rem; color: var(--text-muted, #888);
+      font-variant-numeric: tabular-nums;
+    }
+    .tick { padding: 0 0.25rem; }
+    .tick-active { color: #1976d2; font-weight: 600; }
+    .scrubber-score {
+      font-size: 2rem; font-weight: 700;
+      display: flex; justify-content: center; gap: 0.5rem;
+      font-variant-numeric: tabular-nums;
+      margin: 0.5rem 0;
+    }
+    .score-home { color: #1565c0; }
+    .score-away { color: #c62828; }
+    .score-sep { color: var(--text-muted, #888); }
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 0.5rem;
+    }
+    .metric-card {
+      display: flex; flex-direction: column; align-items: center;
+      padding: 0.5rem; border: 1px solid #eee; border-radius: 4px;
+      background: #fafafa;
+    }
+    .metric-label { font-size: 0.75rem; color: var(--text-muted, #666); }
+    .metric-value { font-size: 1.25rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .empty-snapshot { color: var(--text-muted, #666); font-size: 0.85rem; padding: 0.5rem 0; }
+    .error-snapshot { color: #d32f2f; font-size: 0.85rem; padding: 0.5rem 0; }
+    .scrubber-skeleton { display: flex; flex-direction: column; gap: 0.5rem; }
+    .skeleton-row { background: #eee; height: 32px; border-radius: 4px; animation: pulse 1.4s ease-in-out infinite; }
+    .skeleton-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0.5rem; }
+    .skeleton-card { background: #eee; height: 56px; border-radius: 4px; animation: pulse 1.4s ease-in-out infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
   `],
 })
-export class TestHarnessPageComponent implements OnInit {
+export class TestHarnessPageComponent implements OnInit, OnDestroy {
   private careerService = inject(CareerService);
+  private matchDetailApi = inject(MatchDetailApiService);
   private harness = inject(TestHarnessService);
   private snackBar = inject(MatSnackBar);
 
   /** Allowed formation codes (UI select options). */
   readonly formationCodes: readonly FormationCode[] = FORMATION_CODES;
+
+  /** Constants exposed to the template. */
+  readonly TIMELINE_MAX_MINUTE = TIMELINE_MAX_MINUTE;
+  readonly TIMELINE_STEP = TIMELINE_STEP;
+
+  /** Tick marks shown below the slider. */
+  readonly minuteTicks: readonly number[] = (() => {
+    const ticks: number[] = [];
+    for (let m = 0; m <= TIMELINE_MAX_MINUTE; m += TIMELINE_STEP) {
+      ticks.push(m);
+    }
+    return ticks;
+  })();
 
   /** Selected formation (two-way bound to mat-select via ngModel). */
   selectedFormationModel: FormationCode | null = '4-3-3';
@@ -314,10 +459,88 @@ export class TestHarnessPageComponent implements OnInit {
   /** True if there is an active career. */
   readonly hasCareer = computed(() => this.careerId() !== null);
 
+  // ============== Panel D state ==============
+
+  /** Selected minute on the timeline scrubber (0-90 step 5). */
+  readonly selectedMinute = signal<number>(0);
+
+  /** Latest timeline snapshot (null when feature off or no detail). */
+  readonly timelineSnapshot = signal<TimelineSnapshot | null>(null);
+
+  /** True while fetching the timeline. */
+  readonly timelineLoading = signal<boolean>(false);
+
+  /** Error from the latest timeline fetch. */
+  readonly timelineError = signal<string | null>(null);
+
+  /** Active debounce timer for the timeline fetch. */
+  private timelineFetchTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** Monotonic counter for stale-response rejection. */
+  private timelineFetchSeq = 0;
+
+  // ============== Constructor / effects ==============
+
+  constructor() {
+    // V24D24 F3: re-fetch the timeline snapshot whenever the selected
+    // match or the selected minute changes. Debounced 150ms so a fast
+    // slider drag doesn't fire 18 requests.
+    effect(() => {
+      const matchId = this.selectedMatchId();
+      const minute = this.selectedMinute();
+      const careerId = this.careerId();
+
+      if (this.timelineFetchTimer) {
+        clearTimeout(this.timelineFetchTimer);
+        this.timelineFetchTimer = null;
+      }
+
+      if (!matchId || !careerId) {
+        this.timelineSnapshot.set(null);
+        this.timelineError.set(null);
+        this.timelineLoading.set(false);
+        return;
+      }
+
+      this.timelineLoading.set(true);
+      this.timelineError.set(null);
+      const fetchId = ++this.timelineFetchSeq;
+
+      this.timelineFetchTimer = setTimeout(() => {
+        this.matchDetailApi.getMatchTimeline(careerId, matchId, minute).subscribe({
+          next: (snap) => {
+            if (fetchId !== this.timelineFetchSeq) {
+              return; // stale response
+            }
+            this.timelineSnapshot.set(snap);
+            this.timelineLoading.set(false);
+          },
+          error: (err) => {
+            if (fetchId !== this.timelineFetchSeq) {
+              return;
+            }
+            this.timelineError.set(
+              this.fmtError(err, 'Failed to load timeline snapshot')
+            );
+            this.timelineSnapshot.set(null);
+            this.timelineLoading.set(false);
+          },
+        });
+      }, TIMELINE_DEBOUNCE_MS);
+    });
+  }
+
   // ============== Lifecycle ==============
 
   ngOnInit(): void {
     this.reload();
+  }
+
+  ngOnDestroy(): void {
+    if (this.timelineFetchTimer) {
+      clearTimeout(this.timelineFetchTimer);
+      this.timelineFetchTimer = null;
+    }
   }
 
   /** Re-load the career status and the match list. */
@@ -348,6 +571,21 @@ export class TestHarnessPageComponent implements OnInit {
   /** Set the selected match (Panel C → Panel A re-render via @Input). */
   selectMatch(m: TestHarnessMatchRow): void {
     this.selectedMatchId.set(m.matchId);
+    // Reset the scrubber to the start of the match when switching matches.
+    this.selectedMinute.set(0);
+  }
+
+  /**
+   * Panel D slider handler. Called on every `input` event from the
+   * <input type="range">. The effect in the constructor debounces the
+   * actual HTTP call.
+   */
+  onSliderInput(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const value = Number(input.value);
+    if (Number.isFinite(value) && value >= 0 && value <= TIMELINE_MAX_MINUTE) {
+      this.selectedMinute.set(value);
+    }
   }
 
   // ============== Panel B handlers ==============
@@ -410,8 +648,7 @@ export class TestHarnessPageComponent implements OnInit {
   onReplaceFixtures(): void {
     // V24D24 F2: For now the UI only triggers a no-op POST (the backend
     // expects a real CustomFixture[]). The full "Barcelona rival" preset
-    // builder is out of F2 scope (see prompt-senior-v24d24.md F3 section
-    // for the interactive builder). Until then, we send a tiny preset.
+    // builder is out of F2 scope. Until then, we send an empty array.
     const preset = this.buildSingleMatchPreset();
     this.mutationInFlight.set(true);
     this.harness.replaceFixtures(preset).subscribe({
@@ -480,7 +717,7 @@ export class TestHarnessPageComponent implements OnInit {
       matchId: f.matchId,
       round: f.round,
       homeTeamId: f.homeTeamId,
-      homeTeamName: f.homeTeamId, // placeholder; real name resolved by Panel A
+      homeTeamName: f.homeTeamId,
       awayTeamId: f.awayTeamId,
       awayTeamName: f.awayTeamId,
       status: f.status,
@@ -492,13 +729,10 @@ export class TestHarnessPageComponent implements OnInit {
   }
 
   /**
-   * V24D24 F2: tiny preset (single Barcelona-friendly match) so the
-   * "Replace Fixtures" button has something to send. Real preset
-   * builder lands in F3 (out of F2 scope).
+   * V24D24 F2: tiny preset (empty array) so the "Replace Fixtures"
+   * button has something to send without requiring a UI builder.
    */
   private buildSingleMatchPreset() {
-    // Use the user team if we have it, otherwise a harmless empty list.
-    // Backend accepts an empty array; we use it so the button is harmless.
     return [];
   }
 
@@ -507,14 +741,9 @@ export class TestHarnessPageComponent implements OnInit {
    * page reads inputs and refetches when they change.
    */
   private refreshDetailAfterMutation(): void {
-    // No-op for now: the V24 detail page watches @Input changes and
-    // refetches automatically when the same id is re-assigned, but only
-    // if the value actually changes. To force a re-fetch, we briefly
-    // null the selection and re-assign it.
     const current = this.selectedMatchId();
     if (current) {
       this.selectedMatchId.set(null);
-      // Use a microtask to let OnPush see the change, then re-set.
       Promise.resolve().then(() => this.selectedMatchId.set(current));
     }
   }
