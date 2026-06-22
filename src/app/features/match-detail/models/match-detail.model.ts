@@ -113,3 +113,27 @@ export interface MatchDetail {
   engineVersion: string;
   createdAt: string;
 }
+
+/**
+ * V24D24: Snapshot of V24 detailed match data filtered up to and including
+ * a specific minute. Returned by
+ * GET /api/v1/careers/{careerId}/matches/{matchId}/timeline?minute=N
+ * for the test-harness UI timeline scrubber (Panel D, F3).
+ *
+ * Aggregation rules (see backend V24TimelineSnapshot):
+ * - homeGoals / awayGoals: count of GOAL events per team
+ * - homeShots / awayShots: count of SHOT events per team (SHOT_ON_TARGET
+ *   is NOT a separate shot — it's the same attempt, just with on-target flag)
+ * - homeXg / awayXg: sum of xG for SHOT/SHOT_ON_TARGET/GOAL events per team
+ * - events: filtered to event.minute <= minute
+ */
+export interface TimelineSnapshot {
+  minute: number;
+  homeGoals: number;
+  awayGoals: number;
+  homeXg: number;
+  awayXg: number;
+  homeShots: number;
+  awayShots: number;
+  events: MatchEvent[];
+}

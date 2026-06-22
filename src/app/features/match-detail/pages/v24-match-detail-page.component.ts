@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, OnChanges, SimpleChanges, Input, inject, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink, ActivatedRoute } from '@angular/router';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
@@ -877,7 +877,7 @@ import {
     }
   `]
 })
-export class V24MatchDetailPageComponent implements OnInit {
+export class V24MatchDetailPageComponent implements OnInit, OnChanges {
   private api = inject(MatchDetailApiService);
   private route = inject(ActivatedRoute);
   private cdr = inject(ChangeDetectorRef);
@@ -894,21 +894,73 @@ export class V24MatchDetailPageComponent implements OnInit {
   careerId: string | null = null;
   matchId: string | null = null;
 
+  // V24D24: optional @Input bindings. When provided, the page reads
+  // careerId/matchId from inputs (used by the test-harness debug UI at
+  // /debug/test-harness). When NOT provided, the page falls back to the
+  // ActivatedRoute params (existing route-based behavior at
+  // /careers/:careerId/matches/:matchId/detail).
+  private _inputCareerId: string | null | undefined = undefined;
+  private _inputMatchId: string | null | undefined = undefined;
+  private _initialised = false;
+
+  @Input()
+  set inputCareerId(value: string | null | undefined) {
+    this._inputCareerId = value;
+    this.careerId = value ?? null;
+  }
+  get inputCareerId(): string | null | undefined { return this._inputCareerId; }
+
+  @Input()
+  set inputMatchId(value: string | null | undefined) {
+    this._inputMatchId = value;
+    this.matchId = value ?? null;
+  }
+  get inputMatchId(): string | null | undefined { return this._inputMatchId; }
+
   ngOnInit(): void {
     // P1a: scroll to top on entry to this view (avoid stale scroll position when navigating between matches)
     window.scrollTo(0, 0);
 
-    const careerId = this.route.snapshot.paramMap.get('careerId');
-    const matchId = this.route.snapshot.paramMap.get('matchId');
+    // V24D24: prefer @Input bindings when provided; otherwise read from route.
+    const careerId = this._inputCareerId || this.route.snapshot.paramMap.get('careerId');
+    const matchId = this._inputMatchId || this.route.snapshot.paramMap.get('matchId');
     if (!careerId || !matchId) {
       this.error = 'Missing career or match ID.';
       this.cdr.detectChanges();
+      this._initialised = true;
       return;
     }
     this.careerId = careerId;
     this.matchId = matchId;
     this.loading = true;
     this.error = '';
+    this.cdr.detectChanges();
+    this._initialised = true;
+
+    this.fetchDetail(careerId, matchId);
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    // V24D24: when the input bindings change after init (parent component
+    // picks a new match in Panel C of the test-harness page), refetch.
+    if (!this._initialised) {
+      return;
+    }
+    const careerId = this._inputCareerId;
+    const matchId = this._inputMatchId;
+    if (changes['inputMatchId'] && careerId && matchId) {
+      this.fetchDetail(careerId, matchId);
+    } else if (changes['inputCareerId'] && careerId && matchId) {
+      this.fetchDetail(careerId, matchId);
+    }
+  }
+
+  retry(): void { this.ngOnInit(); }
+
+  private fetchDetail(careerId: string, matchId: string): void {
+    this.loading = true;
+    this.error = '';
+    this.detail = null;
     this.cdr.detectChanges();
 
     this.api.getMatchDetail(careerId, matchId).subscribe({
@@ -924,8 +976,6 @@ export class V24MatchDetailPageComponent implements OnInit {
       }
     });
   }
-
-  retry(): void { this.ngOnInit(); }
 
   // === Helpers ===
   private typeMap: Record<string, string> = {
