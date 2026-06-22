@@ -430,6 +430,106 @@ describe('TestHarnessPageComponent', () => {
     expect(component.minuteTicks[component.minuteTicks.length - 1]).toBe(90);
     expect(component.minuteTicks.every((m, i) => i === 0 || m - component.minuteTicks[i - 1] === 5)).toBeTrue();
   });
+
+  it('effect handles null snapshot (404 from getMatchTimeline)', async () => {
+    matchDetailApi.getMatchTimeline.and.returnValue(of(null));
+
+    component.selectMatch(makeMatchRow('match-1'));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await new Promise((r) => setTimeout(r, 200));
+
+    expect(component.timelineSnapshot()).toBeNull();
+    expect(component.timelineError()).toBeNull();
+    expect(component.timelineLoading()).toBeFalse();
+  });
+
+  it('effect handles a snapshot with zero events (empty match)', async () => {
+    matchDetailApi.getMatchTimeline.and.returnValue(
+      of({ ...sampleSnapshot(0), events: [] })
+    );
+
+    component.selectMatch(makeMatchRow('match-1'));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await new Promise((r) => setTimeout(r, 200));
+
+    expect(component.timelineSnapshot()?.events.length).toBe(0);
+    expect(component.timelineLoading()).toBeFalse();
+  });
+
+  it('effect resets the snapshot when careerId becomes null', async () => {
+    // First: select match and let the effect fetch a snapshot.
+    matchDetailApi.getMatchTimeline.and.returnValue(of(sampleSnapshot(0)));
+    component.selectMatch(makeMatchRow('match-1'));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await new Promise((r) => setTimeout(r, 200));
+    expect(component.timelineSnapshot()).not.toBeNull();
+
+    // Then: careerId becomes null (e.g., the user lost their session).
+    (component as unknown as { careerId: { set: (v: string | null) => void } })
+      .careerId.set(null);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await new Promise((r) => setTimeout(r, 200));
+
+    expect(component.timelineSnapshot()).toBeNull();
+    expect(component.timelineError()).toBeNull();
+    expect(component.timelineLoading()).toBeFalse();
+  });
+
+  it('refreshDetailAfterMutation triggers a refetch via the null-and-reset pattern', async () => {
+    const detail1 = sampleSnapshot(0);
+    const detail2 = { ...sampleSnapshot(45), homeGoals: 5 };
+    matchDetailApi.getMatchTimeline.and.returnValues(of(detail1), of(detail2));
+    matchDetailApi.getMatchDetail.and.returnValue(of(null));
+
+    component.selectMatch(makeMatchRow('match-1'));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await new Promise((r) => setTimeout(r, 200));
+    expect(component.timelineSnapshot()?.homeGoals).toBe(1);
+
+    // Stub a successful formation mutation to trigger refreshDetailAfterMutation
+    harness.setFormation.and.returnValue(
+      of({ success: true, message: 'ok' } as any)
+    );
+    component.applyFormation();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    // Allow the null/reset microtask + the next debounce to settle
+    await new Promise((r) => setTimeout(r, 250));
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    // After refresh, the timeline was fetched at least twice (initial +
+    // after the null-reset, the selectedMatchId was set back to match-1
+    // and the effect re-fetched).
+    expect(matchDetailApi.getMatchTimeline).toHaveBeenCalled();
+    const calls = matchDetailApi.getMatchTimeline.calls.allArgs();
+    expect(calls.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('ngOnDestroy clears the pending debounce timer', async () => {
+    matchDetailApi.getMatchTimeline.and.returnValue(of(sampleSnapshot(0)));
+    matchDetailApi.getMatchTimeline.calls.reset();
+
+    component.selectMatch(makeMatchRow('match-1'));
+    // Schedule a slider change that would normally trigger a debounced fetch
+    component.onSliderInput({ target: { value: '30' } } as unknown as Event);
+    // IMMEDIATELY destroy the component (before the 150ms debounce fires)
+    fixture.destroy();
+
+    // Wait past the original debounce window
+    await new Promise((r) => setTimeout(r, 250));
+
+    // The service was NOT called for the destroyed component (or at most
+    // once for the very first fetch that fired before destroy).
+    // ngOnDestroy cancels the timer, so the slider-change fetch is dropped.
+    const calls = matchDetailApi.getMatchTimeline.calls.allArgs();
+    expect(calls.length).toBeLessThanOrEqual(1);
+  });
 });
 
 function makeMatchRow(matchId: string) {

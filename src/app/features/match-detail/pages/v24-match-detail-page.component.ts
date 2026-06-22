@@ -905,15 +905,26 @@ export class V24MatchDetailPageComponent implements OnInit, OnChanges {
 
   @Input()
   set inputCareerId(value: string | null | undefined) {
+    const isNew = value !== this._inputCareerId;
     this._inputCareerId = value;
     this.careerId = value ?? null;
+    // V24D24: trigger refetch if the component is already initialized and
+    // both inputs are present. Covers programmatic changes (tests) and
+    // template-bound changes (the test-harness page binds the inputs).
+    if (this._initialised && isNew && this._inputCareerId && this._inputMatchId) {
+      this.fetchDetail(this._inputCareerId, this._inputMatchId);
+    }
   }
   get inputCareerId(): string | null | undefined { return this._inputCareerId; }
 
   @Input()
   set inputMatchId(value: string | null | undefined) {
+    const isNew = value !== this._inputMatchId;
     this._inputMatchId = value;
     this.matchId = value ?? null;
+    if (this._initialised && isNew && this._inputCareerId && this._inputMatchId) {
+      this.fetchDetail(this._inputCareerId, this._inputMatchId);
+    }
   }
   get inputMatchId(): string | null | undefined { return this._inputMatchId; }
 
