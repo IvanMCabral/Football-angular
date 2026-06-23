@@ -6,6 +6,7 @@ import {
   CustomFixture,
   MatchFixture,
   ReplayMatchRequest,
+  ResetRoundRequest,
   RoundStateResponse,
   SetFormationRequest,
   SimulateRoundRequest,
@@ -148,6 +149,38 @@ export class TestHarnessService {
     const body: SimulateRoundRequest = { roundId, matches };
     return this.http.post<RoundStateResponse>(
       `${this.matchEngineUrl}/rounds/start`,
+      body
+    );
+  }
+
+  /**
+   * V24D24.3-HOTFIX: POST /api/v1/test-harness/career/reset-round
+   *
+   * <p>Resets every fixture of the given round back to PENDING, evicts
+   * the cached MatchSession for each match from MatchEngineRegistry, and
+   * clears the V24 detail entries from Redis. After this call, the next
+   * {@code /match-engine/rounds/start} POST with the same {@code roundId}
+   * will run a fresh V24 simulation (instead of returning the cached
+   * completed result from the previous run).
+   *
+   * <p>The component calls this RIGHT BEFORE
+   * {@link #simulateRound} so the "Simulate round" button is idempotent.
+   *
+   * <p>Failure mode: if the backend can't find the round, it returns
+   * 422 with a clear message ("roundId X does not match any round of
+   * career Y") — the component surfaces that via the standard
+   * {@code fmtError} path.
+   *
+   * @param roundId deterministic round UUID hydrated from
+   *   {@code /career/fixtures/round-with-bye} (carried in
+   *   {@code TestHarnessMatchRow.roundId}).
+   * @returns Observable<TestHarnessMutationResponse> with success flag
+   *   and a human-readable message.
+   */
+  resetRound(roundId: string): Observable<TestHarnessMutationResponse> {
+    const body: ResetRoundRequest = { roundId };
+    return this.http.post<TestHarnessMutationResponse>(
+      `${this.apiUrl}/reset-round`,
       body
     );
   }

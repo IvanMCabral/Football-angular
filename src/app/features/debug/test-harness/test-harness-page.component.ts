@@ -859,6 +859,17 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
    * <p>The backend runs the simulation async — we get back the initial
    * RoundStateResponse and let Iván watch the scores land by reloading
    * Panel C (the round will eventually mark matches COMPLETED).
+   *
+   * <p><b>V24D24.3-HOTFIX:</b> before calling {@code simulateRound}, we
+   * call {@code resetRound} so the round is re-simulation-friendly. The
+   * previous flow returned the same result on every re-simulate because
+   * the backend's {@code MatchEngineRegistry.startEngine} returns the
+   * cached {@code MatchSession} (line 25-30 of MatchEngineRegistry.java)
+   * and {@code MatchFixture.startSimulation} throws
+   * "Match can only start from PENDING state" if the fixture is still
+   * COMPLETED. {@code resetRound} clears fixtures back to PENDING,
+   * evicts the cached sessions, and clears V24 detail from Redis so the
+   * next simulate is a fresh run.
    */
   onSimulateRound(): void {
     const roundNumber = this.selectedRoundModel;
@@ -895,24 +906,44 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     }));
 
     this.mutationInFlight.set(true);
-    this.harness.simulateRound(roundId, matchesPayload).subscribe({
+    // V24D24.3-HOTFIX: reset the round first so the simulation is
+    // idempotent. Without this step, the second "Simulate round" call
+    // returns the cached result (BUG_SIMULATE_ROUND_NOT_RE_RUNNING).
+    this.harness.resetRound(roundId).subscribe({
       next: () => {
         this.snackBar.open(
-          `Round ${roundNumber} simulation started (${matchesPayload.length} matches).`,
+          `Round ${roundNumber} reset. Starting simulation (${matchesPayload.length} matches)…`,
           'OK',
-          { duration: 3000 }
+          { duration: 2000 }
         );
-        // V24D24.3-FIX (BUG_FIXTURES_CACHE_STALE): the POST returns
-        // IN_PROGRESS synchronously while the simulation runs async in the
-        // backend. A single loadMatches() here would land while matches are
-        // still PENDING. Poll every 2s until all matches of this round are
-        // COMPLETED (or 14s timeout). Panel C re-renders on every update.
-        this.pollRoundCompletion(roundNumber);
+        this.harness.simulateRound(roundId, matchesPayload).subscribe({
+          next: () => {
+            this.snackBar.open(
+              `Round ${roundNumber} simulation started.`,
+              'OK',
+              { duration: 3000 }
+            );
+            // V24D24.3-FIX (BUG_FIXTURES_CACHE_STALE): the POST returns
+            // IN_PROGRESS synchronously while the simulation runs async in the
+            // backend. A single loadMatches() here would land while matches are
+            // still PENDING. Poll every 2s until all matches of this round are
+            // COMPLETED (or 70s timeout — F2.6). Panel C re-renders on every update.
+            this.pollRoundCompletion(roundNumber);
+          },
+          error: (err) => {
+            this.mutationInFlight.set(false);
+            this.snackBar.open(
+              this.fmtError(err, `Failed to simulate round ${roundNumber}`),
+              'OK',
+              { duration: 5000 }
+            );
+          },
+        });
       },
       error: (err) => {
         this.mutationInFlight.set(false);
         this.snackBar.open(
-          this.fmtError(err, `Failed to simulate round ${roundNumber}`),
+          this.fmtError(err, `Failed to reset round ${roundNumber} (simulation aborted)`),
           'OK',
           { duration: 5000 }
         );

@@ -112,6 +112,26 @@ export interface SimulateRoundRequest {
 }
 
 /**
+ * V24D24.3-HOTFIX — wire type for the body of
+ * {@code POST /api/v1/test-harness/career/reset-round}.
+ *
+ * <p>Reset every fixture of a round back to PENDING, evict the cached
+ * MatchSession for each match from MatchEngineRegistry, and clear the
+ * V24 detail entries from Redis. After this call, the next
+ * {@code /match-engine/rounds/start} POST with the same {@code roundId}
+ * will run a fresh V24 simulation (instead of returning the cached
+ * completed result from the previous run).
+ *
+ * <p>The frontend calls this RIGHT BEFORE
+ * {@code /match-engine/rounds/start} so the {@code "Simulate round"}
+ * button is idempotent — re-running the same round with the same
+ * input always produces a fresh simulation.
+ */
+export interface ResetRoundRequest {
+  roundId: string;
+}
+
+/**
  * V24D24.2 — match fixture as returned by
  * {@code POST /api/v1/test-harness/career/match/{matchId}/replay}.
  *
