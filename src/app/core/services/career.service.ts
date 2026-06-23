@@ -124,8 +124,8 @@ export class CareerService {
     return this.http.get<{ round: number; matches: Fixture[]; byeTeam: string | null }>(`${this.apiUrl}/fixtures/round/${round}`);
   }
 
-  getAllFixturesWithBye(): Observable<{ rounds: { round: number; matches: Fixture[]; byeTeam: string | null }[] }> {
-    return this.http.get<{ rounds: { round: number; matches: Fixture[]; byeTeam: string | null }[] }>(`${this.apiUrl}/fixtures/round-with-bye`);
+  getAllFixturesWithBye(): Observable<{ rounds: { round: number; matches: Fixture[]; byeTeam: string | null }[]; userSessionTeamId?: string | null }> {
+    return this.http.get<{ rounds: { round: number; matches: Fixture[]; byeTeam: string | null }[]; userSessionTeamId?: string | null }>(`${this.apiUrl}/fixtures/round-with-bye`);
   }
 
   /**

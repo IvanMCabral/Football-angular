@@ -13,6 +13,11 @@ interface RoundFixturesWithBye {
 
 interface AllRoundsWithBye {
   rounds: RoundFixturesWithBye[];
+  // V24D24.6: hydrated from the backend AllRoundsWithBye record. Nullable
+  // for legacy callers; this modal does not use it directly but mirrors
+  // the wire shape so CareerService.getAllFixturesWithBye() typing stays
+  // consistent.
+  userSessionTeamId?: string | null;
 }
 
 @Component({

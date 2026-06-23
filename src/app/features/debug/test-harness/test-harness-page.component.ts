@@ -238,6 +238,35 @@ const DEFAULT_REPLAY_SEED = 12345;
                 Reset + Simulate round {{ selectedRoundModel ?? '—' }}
               </button>
             </div>
+
+            <!-- V24D24.6: team formation snapshot for the selected round.
+                 Shows which team is user-controllable (highlighted) and the
+                 current formation of every rival. Helps Iván understand
+                 what "Set formation" actually changes — only the user team's
+                 formation; rivals stay at their career-stored formation. -->
+            <div class="round-teams" *ngIf="selectedRoundModel !== null" aria-label="Teams in selected round">
+              <h3 class="round-teams-title">Round {{ selectedRoundModel }} teams</h3>
+              <ul class="team-formation-list">
+                <li *ngFor="let m of roundsForSelectedRound()"
+                    class="team-formation-row"
+                    [class.is-user-team]="m.homeTeamId === userSessionTeamId() || m.awayTeamId === userSessionTeamId()">
+                  <span class="team-name">{{ m.homeTeamName }}</span>
+                  <span class="formation-pill" [class.unknown]="!m.homeFormation">
+                    {{ m.homeFormation || '—' }}
+                  </span>
+                  <span class="vs-sep">vs</span>
+                  <span class="formation-pill" [class.unknown]="!m.awayFormation">
+                    {{ m.awayFormation || '—' }}
+                  </span>
+                  <span class="team-name">{{ m.awayTeamName }}</span>
+                </li>
+              </ul>
+              <p class="round-teams-hint">
+                The highlighted row is your team — only its formation changes
+                when you click "Set formation". Rivals keep their stored
+                formation for the whole career.
+              </p>
+            </div>
           </div>
         </section>
 
@@ -415,6 +444,52 @@ const DEFAULT_REPLAY_SEED = 12345;
       margin: 1rem 0;
     }
     .button-stack { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 1rem; }
+    /* V24D24.6: formations snapshot for the selected round. */
+    .round-teams {
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px dashed var(--border-color, #e0e0e0);
+    }
+    .round-teams-title {
+      margin: 0 0 0.5rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text-muted, #555);
+    }
+    .team-formation-list { list-style: none; margin: 0; padding: 0; }
+    .team-formation-row {
+      display: grid;
+      grid-template-columns: 1fr auto auto auto auto 1fr;
+      gap: 0.4rem;
+      align-items: center;
+      padding: 0.35rem 0.5rem;
+      font-size: 0.85rem;
+      border-radius: 4px;
+      background: var(--row-bg, #f8f8f8);
+      margin-bottom: 0.25rem;
+    }
+    .team-formation-row.is-user-team {
+      background: #e3f2fd;
+      border: 1px solid #1976d2;
+    }
+    .team-name { font-weight: 500; }
+    .formation-pill {
+      display: inline-block;
+      padding: 0.1rem 0.5rem;
+      border-radius: 10px;
+      background: #fff;
+      border: 1px solid #ccc;
+      font-size: 0.75rem;
+      font-family: monospace;
+    }
+    .formation-pill.unknown { color: var(--text-muted, #888); border-style: dashed; }
+    .vs-sep { color: var(--text-muted, #888); font-size: 0.75rem; }
+    .round-teams-hint {
+      margin: 0.5rem 0 0;
+      font-size: 0.75rem;
+      color: var(--text-muted, #777);
+      line-height: 1.4;
+    }
     .rounds-list { list-style: none; margin: 0; padding: 0; }
     .round-block { margin-bottom: 1rem; }
     .round-header { display: flex; gap: 0.5rem; align-items: baseline; margin-bottom: 0.5rem; }
@@ -523,6 +598,11 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
 
   /** The active careerId (resolved from CareerStatus; null if no career). */
   readonly careerId = signal<string | null>(null);
+  // V24D24.6: the user's team id, hydrated from
+  // /api/v1/career/fixtures/round-with-bye (AllRoundsWithBye.userSessionTeamId).
+  // Used to highlight the user-controllable team in the Panel B
+  // formations snapshot.
+  readonly userSessionTeamId = signal<string | null>(null);
 
   /** Currently selected match (Panel C click → Panel A renders). */
   readonly selectedMatchId = signal<string | null>(null);
@@ -549,6 +629,15 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
 
   /** True if there is an active career. */
   readonly hasCareer = computed(() => this.careerId() !== null);
+  // V24D24.6: list of matches for the currently-selected round. Returns
+  // empty array if no round is selected or the round is unknown. Used by
+  // the Panel B "Round N teams" sub-panel to render the formations list.
+  readonly roundsForSelectedRound = computed(() => {
+    const r = this.selectedRoundModel;
+    if (r === null) return [] as TestHarnessMatchRow[];
+    const group = this.rounds().find((rg) => rg.round === r);
+    return group?.matches ?? [];
+  });
 
   // ============== Panel D state ==============
 
@@ -1150,6 +1239,11 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   private loadMatches(): void {
     this.careerService.getAllFixturesWithBye().subscribe({
       next: (resp) => {
+        // V24D24.6: hydrate userSessionTeamId for the formations
+        // snapshot. The backend returns this in AllRoundsWithBye so
+        // the frontend can highlight which team the "Set formation"
+        // button actually controls.
+        this.userSessionTeamId.set(resp?.userSessionTeamId ?? null);
         const rounds: RoundGroup[] = (resp?.rounds ?? []).map((rd) => ({
           round: rd.round,
           byeTeam: rd.byeTeam ?? null,

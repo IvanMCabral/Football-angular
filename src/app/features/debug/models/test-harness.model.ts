@@ -12,7 +12,7 @@
 import { MatchDetail } from '../../match-detail/models/match-detail.model';
 
 /** Formation codes accepted by the V24 engine. */
-export type FormationCode = '4-3-3' | '4-4-2' | '3-5-2' | '4-2-3-1';
+export type FormationCode = '4-3-3' | '4-4-2' | '3-5-2' | '4-2-3-1' | '5-3-2' | string;
 
 /** Allowed formation codes for the UI select. */
 export const FORMATION_CODES: readonly FormationCode[] = [
@@ -68,7 +68,23 @@ export interface TestHarnessMatchRow {
   status: 'PENDING' | 'SIMULATING' | 'COMPLETED' | string;
   homeGoals: number | null;
   awayGoals: number | null;
+  /**
+   * V24D24.6: home formation read from the backend
+   * `/career/fixtures/round-with-bye` endpoint (V24D24.6 added this field
+   * to MatchInfo, sourced from `career.getTeamStarting11Formation()`).
+   * The test-harness Panel B uses this to display the formation of every
+   * team in the selected round, so Iván knows which teams are user-
+   * controllable (his team only — the rest are fixed by the career) and
+   * which formation each rival is using.
+   *
+   * Nullable: a team may not have a formation recorded yet (e.g. brand
+   * new career before any `set-formation` call, or a BYE team). The UI
+   * renders "—" for null.
+   */
   homeFormation: string | null;
+  /**
+   * V24D24.6: away formation, sourced same as homeFormation.
+   */
   awayFormation: string | null;
   /**
    * V24D24.2 — deterministic UUID for this (careerId, round) pair, hydrated
