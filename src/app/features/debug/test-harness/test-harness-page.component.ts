@@ -200,8 +200,8 @@ const DEFAULT_REPLAY_SEED = 12345;
             <mat-form-field appearance="outline" class="round-field">
               <mat-label>Round</mat-label>
               <mat-select
-                [(ngModel)]="selectedRoundModel"
-                (selectionChange)="onRoundSelect($event.value)"
+                [ngModel]="selectedRoundModel()"
+                (ngModelChange)="onRoundSelect($event)"
                 aria-label="Select round to simulate"
               >
                 <mat-option *ngFor="let r of rounds()" [value]="r.round">
@@ -224,18 +224,18 @@ const DEFAULT_REPLAY_SEED = 12345;
                 mat-stroked-button
                 color="warn"
                 (click)="onResetRound()"
-                [disabled]="mutationInFlight() || selectedRoundModel === null"
+                [disabled]="mutationInFlight() || selectedRoundModel() === null"
                 aria-label="Reset selected round back to PENDING"
               >
-                Reset round {{ selectedRoundModel ?? '—' }}
+                Reset round {{ selectedRoundModel() ?? '—' }}
               </button>
               <button
                 mat-stroked-button
                 (click)="onSimulateRound()"
-                [disabled]="mutationInFlight() || selectedRoundModel === null"
+                [disabled]="mutationInFlight() || selectedRoundModel() === null"
                 aria-label="Reset and re-simulate selected round"
               >
-                Reset + Simulate round {{ selectedRoundModel ?? '—' }}
+                Reset + Simulate round {{ selectedRoundModel() ?? '—' }}
               </button>
             </div>
 
@@ -244,8 +244,8 @@ const DEFAULT_REPLAY_SEED = 12345;
                  current formation of every rival. Helps Iván understand
                  what "Set formation" actually changes — only the user team's
                  formation; rivals stay at their career-stored formation. -->
-            <div class="round-teams" *ngIf="selectedRoundModel !== null" aria-label="Teams in selected round">
-              <h3 class="round-teams-title">Round {{ selectedRoundModel }} teams</h3>
+            <div class="round-teams" *ngIf="selectedRoundModel() !== null" aria-label="Teams in selected round">
+              <h3 class="round-teams-title">Round {{ selectedRoundModel() }} teams</h3>
               <ul class="team-formation-list">
                 <li *ngFor="let m of roundsForSelectedRound()"
                     class="team-formation-row"
@@ -592,7 +592,21 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   seedInputModel: number | null = DEFAULT_REPLAY_SEED;
 
   /** V24D24.2: round selected in the "Simulate round N" dropdown. */
-  selectedRoundModel: number | null = null;
+  /**
+   * V24D24.6 — converted from a plain field to a signal so the
+   * {@code roundsForSelectedRound} computed signal can re-evaluate
+   * when the user picks a different round. The previous plain-field
+   * form (line 595 in commit 3fb302b) caused the sub-panel to be
+   * permanently bound to whatever round was first selected — the
+   * computed cached the result and Angular's change detection did
+   * not invalidate it on subsequent mat-select changes. See
+   * BUG_V24D246_SUBPANEL_NOT_REACTIVE (REVISOR smoke 2026-06-23).
+   *
+   * <p>The template binding changes from {@code [(ngModel)]} to
+   * {@code [ngModel] + (ngModelChange)} because Angular Material's
+   * mat-select does not natively two-way-bind to a signal.
+   */
+  readonly selectedRoundModel = signal<number | null>(null);
 
   // ============== State signals ==============
 
@@ -633,7 +647,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   // empty array if no round is selected or the round is unknown. Used by
   // the Panel B "Round N teams" sub-panel to render the formations list.
   readonly roundsForSelectedRound = computed(() => {
-    const r = this.selectedRoundModel;
+    const r = this.selectedRoundModel();
     if (r === null) return [] as TestHarnessMatchRow[];
     const group = this.rounds().find((rg) => rg.round === r);
     return group?.matches ?? [];
@@ -896,7 +910,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
 
   /** Two-way binding shim for the round mat-select. */
   onRoundSelect(value: unknown): void {
-    this.selectedRoundModel = typeof value === 'number' ? value : null;
+    this.selectedRoundModel.set(typeof value === 'number' ? value : null);
   }
 
   /**
@@ -972,7 +986,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
    * label shows the number; the snackbar shows the wire UUID).
    */
   onResetRound(): void {
-    const roundNumber = this.selectedRoundModel;
+    const roundNumber = this.selectedRoundModel();
     if (roundNumber === null) {
       this.snackBar.open('Pick a round in the dropdown first.', 'OK', {
         duration: 3000,
@@ -1053,7 +1067,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
    * only the reset half.
    */
   onSimulateRound(): void {
-    const roundNumber = this.selectedRoundModel;
+    const roundNumber = this.selectedRoundModel();
     if (roundNumber === null) {
       this.snackBar.open('Pick a round in the dropdown first.', 'OK', {
         duration: 3000,
@@ -1293,8 +1307,14 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       status: f.status,
       homeGoals: f.homeGoals ?? null,
       awayGoals: f.awayGoals ?? null,
-      homeFormation: null,
-      awayFormation: null,
+      // V24D24.6: surface the formations from the backend so the Panel
+      // B "Round N teams" sub-panel can display them. Before this fix
+      // (commit 3fb302b regression), these were hardcoded to null
+      // regardless of the API response — the sub-panel rendered "—" for
+      // every team. See BUG_V24D246_FORMATIONS_PLACEHOLDER from smoke
+      // V24D24.6 (REVISOR mvs_3f12de1e769d4bc19d96266e17b49348).
+      homeFormation: f.homeFormation ?? null,
+      awayFormation: f.awayFormation ?? null,
       roundId: f.roundId ?? null,
     };
   }

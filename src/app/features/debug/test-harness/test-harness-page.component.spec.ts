@@ -541,7 +541,7 @@ describe('TestHarnessPageComponent', () => {
   });
 
   it('starts with no round selected in the simulate-round dropdown', () => {
-    expect(component.selectedRoundModel).toBeNull();
+    expect(component.selectedRoundModel()).toBeNull();
   });
 
   it('onSeedChange coerces numeric input and rejects non-finite', () => {
@@ -563,14 +563,14 @@ describe('TestHarnessPageComponent', () => {
 
   it('onRoundSelect updates the selected round', () => {
     component.onRoundSelect(3);
-    expect(component.selectedRoundModel).toBe(3);
+    expect(component.selectedRoundModel()).toBe(3);
 
     component.onRoundSelect(null);
-    expect(component.selectedRoundModel).toBeNull();
+    expect(component.selectedRoundModel()).toBeNull();
 
     component.onRoundSelect('7' as unknown as number);
     // Non-number input is rejected (the dropdown only emits numbers).
-    expect(component.selectedRoundModel).toBeNull();
+    expect(component.selectedRoundModel()).toBeNull();
   });
 
   it('onReplayWithSeed calls the service with the typed seed', () => {
@@ -844,7 +844,7 @@ describe('TestHarnessPageComponent', () => {
   });
 
   it('onSimulateRound calls the service with the roundId + matches of the selected round', () => {
-    component.selectedRoundModel = 1;
+    component.selectedRoundModel.set(1);
     harness.simulateRound.and.returnValue(
       of({ roundId: 'round-uuid-1', status: 'IN_PROGRESS' } as any)
     );
@@ -869,7 +869,7 @@ describe('TestHarnessPageComponent', () => {
   });
 
   it('onSimulateRound refuses to fire when no round is selected', () => {
-    component.selectedRoundModel = null;
+    component.selectedRoundModel.set(null);
     component.onSimulateRound();
 
     expect(harness.simulateRound).not.toHaveBeenCalled();
@@ -877,7 +877,7 @@ describe('TestHarnessPageComponent', () => {
   });
 
   it('onSimulateRound surfaces errors via the snackbar', () => {
-    component.selectedRoundModel = 1;
+    component.selectedRoundModel.set(1);
     harness.simulateRound.and.returnValue(throwError(() => new Error('boom')));
     component.onSimulateRound();
 
@@ -910,7 +910,7 @@ describe('TestHarnessPageComponent', () => {
       })
     );
     component.reload();
-    component.selectedRoundModel = 1;
+    component.selectedRoundModel.set(1);
 
     component.onSimulateRound();
 
@@ -925,7 +925,7 @@ describe('TestHarnessPageComponent', () => {
   it('V24D24.3: onSimulateRound starts polling after POST and resolves when all matches are COMPLETED', () => {
     jasmine.clock().install();
     try {
-      component.selectedRoundModel = 1;
+      component.selectedRoundModel.set(1);
       harness.simulateRound.and.returnValue(
         of({ roundId: 'round-uuid-1', status: 'IN_PROGRESS' } as any)
       );
@@ -974,7 +974,7 @@ describe('TestHarnessPageComponent', () => {
   it('V24D24.3: polling stops after max attempts (timeout) and releases mutationInFlight', () => {
     jasmine.clock().install();
     try {
-      component.selectedRoundModel = 1;
+      component.selectedRoundModel.set(1);
       harness.simulateRound.and.returnValue(
         of({ roundId: 'round-uuid-1', status: 'IN_PROGRESS' } as any)
       );
@@ -1012,7 +1012,7 @@ describe('TestHarnessPageComponent', () => {
   it('V24D24.3: ngOnDestroy clears the polling interval (no timer leak)', () => {
     jasmine.clock().install();
     try {
-      component.selectedRoundModel = 1;
+      component.selectedRoundModel.set(1);
       harness.simulateRound.and.returnValue(
         of({ roundId: 'round-uuid-1', status: 'IN_PROGRESS' } as any)
       );

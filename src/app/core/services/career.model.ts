@@ -86,6 +86,16 @@ export interface Fixture {
    * or for fixtures served by endpoints that don't hydrate it.
    */
   roundId?: string | null;
+  /**
+   * V24D24.6 — formation snapshot for each team, hydrated by the backend
+   * on GET /api/v1/career/fixtures/round-with-bye (sourced from
+   * `career.getTeamStarting11Formation()` — the V24 engine's source of
+   * truth). Used by the test-harness Panel B "Round N teams" sub-panel
+   * to show every team's current formation and highlight the user team.
+   * Optional: legacy endpoints may not hydrate these.
+   */
+  homeFormation?: string | null;
+  awayFormation?: string | null;
 }
 
 /**
