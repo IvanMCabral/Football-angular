@@ -128,6 +128,7 @@ const DEFAULT_REPLAY_SEED = 12345;
             *ngIf="selectedMatchId()"
             [inputCareerId]="careerId()"
             [inputMatchId]="selectedMatchId()"
+            [refreshTrigger]="refreshTrigger()"
           ></app-v24-match-detail-page>
         </section>
 
@@ -517,6 +518,14 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   /** Currently selected match (Panel C click → Panel A renders). */
   readonly selectedMatchId = signal<string | null>(null);
 
+  /**
+   * V24D24.3-FIX (BUG_REPLAY_NO_REFRESH_UI_V2): bumped each time we want to
+   * force Panel A to re-fetch. Bound to {@code <app-v24-match-detail-page>'s}
+   * {@code refreshTrigger} @Input. Replaces the broken null→current
+   * pattern that collapsed in a single change detection tick.
+   */
+  readonly refreshTrigger = signal<number>(0);
+
   /** All matches of the active career, grouped by round. */
   readonly rounds = signal<RoundGroup[]>([]);
 
@@ -552,16 +561,39 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   /** Monotonic counter for stale-response rejection. */
   private timelineFetchSeq = 0;
 
+  /**
+   * V24D24.3-FIX (BUG_FIXTURES_CACHE_STALE): polling handle for
+   * {@code onSimulateRound}. Backend runs the simulation async and may
+   * take a few seconds to commit each match — a single
+   * {@code loadMatches()} call right after POST would land while the
+   * matches are still PENDING. We poll the fixtures endpoint until all
+   * matches of the round are {@code COMPLETED} or the timeout hits.
+   */
+  private pollTimer: ReturnType<typeof setInterval> | null = null;
+  /** Default poll interval (ms) — matches the analysis recommendation. */
+  private static readonly SIMULATE_POLL_INTERVAL_MS = 2000;
+  /** Default max poll attempts — 7 × 2s = 14s max wait. */
+  private static readonly SIMULATE_POLL_MAX_ATTEMPTS = 7;
+
   // ============== Constructor / effects ==============
 
   constructor() {
     // V24D24 F3: re-fetch the timeline snapshot whenever the selected
     // match or the selected minute changes. Debounced 150ms so a fast
     // slider drag doesn't fire 18 requests.
+    //
+    // V24D24.3-FIX (BUG_REPLAY_NO_REFRESH_UI_V2): also tracks
+    // refreshTrigger so Panel D timeline re-fetches after a mutation
+    // (replay-with-seed, formation change) — the previous null-reset
+    // pattern that fired this effect has been replaced with the
+    // refreshTrigger signal.
     effect(() => {
       const matchId = this.selectedMatchId();
       const minute = this.selectedMinute();
       const careerId = this.careerId();
+      // Read refreshTrigger so this effect re-runs whenever the parent
+      // bumps it (replay / formation). The value itself is irrelevant.
+      this.refreshTrigger();
 
       if (this.timelineFetchTimer) {
         clearTimeout(this.timelineFetchTimer);
@@ -614,6 +646,9 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       clearTimeout(this.timelineFetchTimer);
       this.timelineFetchTimer = null;
     }
+    // V24D24.3-FIX (BUG_FIXTURES_CACHE_STALE): stop polling on unmount so
+    // we don't leak timers when the test-harness route is torn down.
+    this.clearPollTimer();
   }
 
   /** Re-load the career status and the match list. */
@@ -862,16 +897,17 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     this.mutationInFlight.set(true);
     this.harness.simulateRound(roundId, matchesPayload).subscribe({
       next: () => {
-        this.mutationInFlight.set(false);
         this.snackBar.open(
           `Round ${roundNumber} simulation started (${matchesPayload.length} matches).`,
           'OK',
           { duration: 3000 }
         );
-        // The simulation is async — reload the match list once so the UI
-        // catches up on whatever completed by the time the response lands.
-        // Iván can re-click Simulate or Replay later for further updates.
-        this.loadMatches();
+        // V24D24.3-FIX (BUG_FIXTURES_CACHE_STALE): the POST returns
+        // IN_PROGRESS synchronously while the simulation runs async in the
+        // backend. A single loadMatches() here would land while matches are
+        // still PENDING. Poll every 2s until all matches of this round are
+        // COMPLETED (or 14s timeout). Panel C re-renders on every update.
+        this.pollRoundCompletion(roundNumber);
       },
       error: (err) => {
         this.mutationInFlight.set(false);
@@ -882,6 +918,98 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         );
       },
     });
+  }
+
+  /**
+   * V24D24.3-FIX (BUG_FIXTURES_CACHE_STALE): poll the fixtures endpoint
+   * every {@link SIMULATE_POLL_INTERVAL_MS} until every match of
+   * {@code roundNumber} is {@code COMPLETED} or
+   * {@link SIMULATE_POLL_MAX_ATTEMPTS} is reached. Each poll merges the
+   * fetched round into the existing {@code rounds()} signal so Panel C
+   * re-renders incrementally as matches transition PENDING → COMPLETED.
+   *
+   * <p>Releases {@code mutationInFlight} when polling finishes (success,
+   * timeout, or round-not-found).
+   */
+  private pollRoundCompletion(roundNumber: number): void {
+    this.clearPollTimer();
+    let attempts = 0;
+    const max = TestHarnessPageComponent.SIMULATE_POLL_MAX_ATTEMPTS;
+    this.pollTimer = setInterval(() => {
+      attempts++;
+      this.careerService.getAllFixturesWithBye().subscribe({
+        next: (resp) => {
+          const round = (resp?.rounds ?? []).find((r) => r.round === roundNumber);
+          if (!round) {
+            this.clearPollTimer();
+            this.mutationInFlight.set(false);
+            return;
+          }
+          // Merge this round into the signal so Panel C re-renders now
+          // (don't wait for the polling to finish — partial updates are
+          // visible immediately).
+          this.mergeRoundUpdate(roundNumber, round);
+          const allComplete = (round.matches ?? []).every(
+            (m: { status?: string }) => m.status === 'COMPLETED'
+          );
+          if (allComplete) {
+            this.clearPollTimer();
+            this.mutationInFlight.set(false);
+            this.snackBar.open(
+              `Round ${roundNumber} completed.`,
+              'OK',
+              { duration: 2000 }
+            );
+          } else if (attempts >= max) {
+            // Timeout — the simulation is taking longer than expected.
+            // Leave mutationInFlight = true so the UI still shows we're
+            // waiting, but stop polling to avoid hammering the server.
+            this.clearPollTimer();
+            this.mutationInFlight.set(false);
+            this.snackBar.open(
+              `Round ${roundNumber} still running after ${(max * TestHarnessPageComponent.SIMULATE_POLL_INTERVAL_MS) / 1000}s. Reload to check status.`,
+              'OK',
+              { duration: 5000 }
+            );
+          }
+        },
+        error: () => {
+          // Network blip — keep polling until max attempts. Don't release
+          // mutationInFlight; the next successful poll will resolve.
+        }
+      });
+    }, TestHarnessPageComponent.SIMULATE_POLL_INTERVAL_MS);
+  }
+
+  /**
+   * V24D24.3-FIX: merge a polled round payload into the {@code rounds()}
+   * signal without disturbing other rounds. Reuses {@code fixtureToMatchRow}
+   * so Panel C keeps its existing row shape.
+   */
+  private mergeRoundUpdate(
+    roundNumber: number,
+    roundPayload: { matches?: unknown[]; byeTeam?: string | null }
+  ): void {
+    const fixtures = (roundPayload.matches ?? []) as Fixture[];
+    const updatedRound: RoundGroup = {
+      round: roundNumber,
+      byeTeam: roundPayload.byeTeam ?? null,
+      matches: fixtures.map((f) => this.fixtureToMatchRow(f)),
+    };
+    this.rounds.update((all) => {
+      const idx = all.findIndex((r) => r.round === roundNumber);
+      if (idx === -1) return [...all, updatedRound];
+      const next = all.slice();
+      next[idx] = updatedRound;
+      return next;
+    });
+  }
+
+  private clearPollTimer(): void {
+    if (this.pollTimer) {
+      clearInterval(this.pollTimer);
+      this.pollTimer = null;
+    }
   }
 
   // ============== Track-by ==============
@@ -963,15 +1091,18 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Force Panel A to re-fetch by re-setting the signal. The V24 detail
-   * page reads inputs and refetches when they change.
+   * Force Panel A to re-fetch. V24D24.3-FIX: the previous
+   * {@code selectedMatchId.set(null); set(current)} pattern collapsed in the
+   * same change detection tick (Angular 17 with signals never fired a
+   * SimpleChange for inputMatchId), so Panel A kept the pre-mutation xG.
+   *
+   * <p>We now bump {@code refreshTrigger}, which is bound to the child's
+   * {@code @Input() refreshTrigger} — every increment triggers a refetch
+   * in the child's {@code ngOnChanges}.
    */
   private refreshDetailAfterMutation(): void {
-    const current = this.selectedMatchId();
-    if (current) {
-      this.selectedMatchId.set(null);
-      Promise.resolve().then(() => this.selectedMatchId.set(current));
-    }
+    if (!this.selectedMatchId()) return;
+    this.refreshTrigger.update(n => n + 1);
   }
 
   private fmtError(err: any, fallback: string): string {

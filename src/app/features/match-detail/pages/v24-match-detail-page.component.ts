@@ -928,6 +928,20 @@ export class V24MatchDetailPageComponent implements OnInit, OnChanges {
   }
   get inputMatchId(): string | null | undefined { return this._inputMatchId; }
 
+  /**
+   * V24D24.3-FIX (BUG_REPLAY_NO_REFRESH_UI_V2): monotonically increasing counter
+   * the parent increments when it wants to force Panel A to re-fetch (e.g. after
+   * a replay mutation that doesn't change inputMatchId). The previous pattern
+   * {@code selectedMatchId.set(null); set(current)} collapsed in the same change
+   * detection tick and Angular never fired the SimpleChange that drives
+   * {@link ngOnChanges}.
+   *
+   * <p>Consumers (test-harness page) bump this signal in
+   * {@code refreshDetailAfterMutation()} — every increment triggers a re-fetch
+   * here. Default 0 means route-only consumers see no extra fetches.
+   */
+  @Input() refreshTrigger: number = 0;
+
   ngOnInit(): void {
     // P1a: scroll to top on entry to this view (avoid stale scroll position when navigating between matches)
     window.scrollTo(0, 0);
@@ -962,6 +976,10 @@ export class V24MatchDetailPageComponent implements OnInit, OnChanges {
     if (changes['inputMatchId'] && careerId && matchId) {
       this.fetchDetail(careerId, matchId);
     } else if (changes['inputCareerId'] && careerId && matchId) {
+      this.fetchDetail(careerId, matchId);
+    } else if (changes['refreshTrigger'] && careerId && matchId) {
+      // V24D24.3-FIX (BUG_REPLAY_NO_REFRESH_UI_V2): parent incremented
+      // refreshTrigger (e.g. after replay-with-seed). Force-refetch Panel A.
       this.fetchDetail(careerId, matchId);
     }
   }

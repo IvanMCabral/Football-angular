@@ -176,6 +176,50 @@ describe('V24MatchDetailPageComponent — V24D24 @Input path', () => {
     expect(component.detail?.homeGoals).toBe(2);
   });
 
+  // ========== V24D24.3-FIX: BUG_REPLAY_NO_REFRESH_UI_V2 ==========
+
+  it('refreshTrigger change refetches the detail without changing inputMatchId (BUG_REPLAY_NO_REFRESH_UI_V2)', async () => {
+    // Replay/formation mutations don't change inputMatchId, so the previous
+    // null-reset pattern (which only fires when inputMatchId transitions)
+    // collapsed silently. Parents now bump refreshTrigger to force a refetch.
+    const detail1 = makeDetail('match-1', 'career-1', 1, 0);
+    const detail2 = makeDetail('match-1', 'career-1', 4, 2);  // post-replay xG
+    const getSpy = spyOn(api, 'getMatchDetail').and.returnValues(of(detail1), of(detail2));
+
+    component.inputCareerId = 'career-1';
+    component.inputMatchId = 'match-1';
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(getSpy).toHaveBeenCalledTimes(1);
+    expect(component.detail?.homeGoals).toBe(1);
+
+    // Parent bumps refreshTrigger (simulates onReplayWithSeed → refreshDetailAfterMutation).
+    // inputMatchId does NOT change. The child must still refetch.
+    // Use componentRef.setInput() so Angular emits a SimpleChange for refreshTrigger
+    // (the canonical way to set @Input values in unit tests).
+    fixture.componentRef.setInput('refreshTrigger', 1);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(getSpy).toHaveBeenCalledTimes(2);
+    expect(component.detail?.homeGoals).toBe(4);
+  });
+
+  it('refreshTrigger change before initial load does NOT fire fetchDetail (no inputs yet)', async () => {
+    // Guard: ngOnChanges returns early if !_initialised. With no inputs
+    // set yet, the component is not initialised — refreshTrigger bumps must
+    // not produce a stray request.
+    const getSpy = spyOn(api, 'getMatchDetail').and.returnValue(of(makeDetail('match-x', 'career-x', 0, 0)));
+
+    fixture.componentRef.setInput('refreshTrigger', 5);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(getSpy).not.toHaveBeenCalled();
+  });
+
   it('shows an error when no input and route is also empty', async () => {
     // Both inputs null, route stub returns null
     const routeStubEmpty = {

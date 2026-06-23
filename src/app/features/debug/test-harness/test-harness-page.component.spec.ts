@@ -772,6 +772,77 @@ describe('TestHarnessPageComponent', () => {
     expect(callsAfterReplay).toBeGreaterThan(callsAfterSelect);
   });
 
+  // ========== V24D24.3-FIX: BUG_REPLAY_NO_REFRESH_UI_V2 ==========
+
+  it('V24D24.3: onReplayWithSeed bumps refreshTrigger so Panel A re-fetches detail (BUG_REPLAY_NO_REFRESH_UI_V2)', async () => {
+    // Panel A is rendered via <app-v24-match-detail-page> which receives
+    // [refreshTrigger] as an @Input. Replay must bump that signal so the
+    // child's ngOnChanges fires fetchDetail (was: collapsed silently
+    // because the previous null-and-reset pattern didn't fire a
+    // SimpleChange for inputMatchId).
+    matchDetailApi.getMatchDetail.calls.reset();
+    matchDetailApi.getMatchDetail.and.returnValue(of(null));
+
+    // Initial state — no match selected, so refreshTrigger stays at 0.
+    expect(component.refreshTrigger()).toBe(0);
+
+    component.selectMatch(makeMatchRow('match-1'));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const triggerAfterSelect = component.refreshTrigger();
+
+    // Replay with seed → triggers refreshDetailAfterMutation which bumps the signal.
+    harness.replayMatch.and.returnValue(
+      of({
+        matchId: 'match-1',
+        homeTeamId: 'team-1',
+        awayTeamId: 'team-2',
+        round: 1,
+        status: 'COMPLETED',
+        result: { homeGoals: 4, awayGoals: 2 },
+      })
+    );
+    component.onReplayWithSeed();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(component.refreshTrigger()).toBeGreaterThan(triggerAfterSelect,
+        'onReplayWithSeed must bump refreshTrigger so the V24 detail child re-fetches');
+  });
+
+  it('V24D24.3: applyFormation bumps refreshTrigger so Panel A re-fetches detail', async () => {
+    // Same contract as onReplayWithSeed — formation mutation must bump the
+    // signal too (applyFormation also calls refreshDetailAfterMutation).
+    matchDetailApi.getMatchDetail.calls.reset();
+    matchDetailApi.getMatchDetail.and.returnValue(of(null));
+
+    component.selectMatch(makeMatchRow('match-1'));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const triggerAfterSelect = component.refreshTrigger();
+
+    harness.setFormation.and.returnValue(
+      of({ success: true, message: 'ok' } as any)
+    );
+    component.applyFormation();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(component.refreshTrigger()).toBeGreaterThan(triggerAfterSelect,
+        'applyFormation must bump refreshTrigger');
+  });
+
+  it('V24D24.3: refreshDetailAfterMutation is a no-op when no match is selected', () => {
+    // selectedMatchId() is null → no Panel A to refresh → signal stays.
+    component.selectedMatchId.set(null);
+    const before = component.refreshTrigger();
+
+    (component as unknown as { refreshDetailAfterMutation(): void }).refreshDetailAfterMutation();
+
+    expect(component.refreshTrigger()).toBe(before,
+        'refreshDetailAfterMutation must NOT bump the signal when there is no Panel A to refresh');
+  });
+
   it('onSimulateRound calls the service with the roundId + matches of the selected round', () => {
     component.selectedRoundModel = 1;
     harness.simulateRound.and.returnValue(
@@ -791,7 +862,10 @@ describe('TestHarnessPageComponent', () => {
       ]
     );
     expect(snackBarSpy.open).toHaveBeenCalled();
-    expect(component.mutationInFlight()).toBeFalse();
+    // V24D24.3-FIX (BUG_FIXTURES_CACHE_STALE): mutationInFlight stays TRUE
+    // until polling completes (the POST is async). Previously it flipped
+    // back to false right after the POST, leaving Panel C with stale data.
+    expect(component.mutationInFlight()).toBeTrue();
   });
 
   it('onSimulateRound refuses to fire when no round is selected', () => {
@@ -842,6 +916,129 @@ describe('TestHarnessPageComponent', () => {
 
     expect(harness.simulateRound).not.toHaveBeenCalled();
     expect(snackBarSpy.open).toHaveBeenCalled();
+  });
+
+  // ========== V24D24.3-FIX: BUG_FIXTURES_CACHE_STALE (polling) ==========
+  // We use Jasmine's clock to mock setInterval deterministically — fakeAsync
+  // doesn't compose well with TestBed's NgZone here (the ProxyZone error).
+
+  it('V24D24.3: onSimulateRound starts polling after POST and resolves when all matches are COMPLETED', () => {
+    jasmine.clock().install();
+    try {
+      component.selectedRoundModel = 1;
+      harness.simulateRound.and.returnValue(
+        of({ roundId: 'round-uuid-1', status: 'IN_PROGRESS' } as any)
+      );
+
+      // First poll: PENDING. Second poll: COMPLETED.
+      careerService.getAllFixturesWithBye.and.returnValues(
+        of({
+          rounds: [{
+            round: 1, byeTeam: null,
+            matches: [{
+              matchId: 'match-1', homeTeamId: 'team-1', awayTeamId: 'team-2',
+              round: 1, status: 'PENDING', homeGoals: null, awayGoals: null, roundId: 'round-uuid-1',
+            }],
+          }],
+        }),
+        of({
+          rounds: [{
+            round: 1, byeTeam: null,
+            matches: [{
+              matchId: 'match-1', homeTeamId: 'team-1', awayTeamId: 'team-2',
+              round: 1, status: 'COMPLETED', homeGoals: 3, awayGoals: 1, roundId: 'round-uuid-1',
+            }],
+          }],
+        }),
+      );
+
+      component.onSimulateRound();
+      expect(component.mutationInFlight()).toBeTrue();
+
+      // First poll fires after 2s — still PENDING.
+      jasmine.clock().tick(2000);
+      expect(component.mutationInFlight()).toBeTrue();
+      expect(component.rounds()[0].matches[0].status).toBe('PENDING');
+
+      // Second poll after another 2s — COMPLETED. Polling stops,
+      // mutationInFlight released.
+      jasmine.clock().tick(2000);
+      expect(component.rounds()[0].matches[0].status).toBe('COMPLETED');
+      expect(component.rounds()[0].matches[0].homeGoals).toBe(3);
+      expect(component.mutationInFlight()).toBeFalse();
+    } finally {
+      jasmine.clock().uninstall();
+    }
+  });
+
+  it('V24D24.3: polling stops after max attempts (timeout) and releases mutationInFlight', () => {
+    jasmine.clock().install();
+    try {
+      component.selectedRoundModel = 1;
+      harness.simulateRound.and.returnValue(
+        of({ roundId: 'round-uuid-1', status: 'IN_PROGRESS' } as any)
+      );
+      // Always PENDING — never completes.
+      careerService.getAllFixturesWithBye.and.returnValue(
+        of({
+          rounds: [{
+            round: 1, byeTeam: null,
+            matches: [{
+              matchId: 'match-1', homeTeamId: 'team-1', awayTeamId: 'team-2',
+              round: 1, status: 'PENDING', homeGoals: null, awayGoals: null, roundId: 'round-uuid-1',
+            }],
+          }],
+        })
+      );
+
+      component.onSimulateRound();
+      expect(component.mutationInFlight()).toBeTrue();
+
+      // 7 attempts × 2s = 14s. After the 7th the polling stops and
+      // mutationInFlight releases with a "still running" snackbar.
+      for (let i = 0; i < 7; i++) {
+        jasmine.clock().tick(2000);
+      }
+      expect(component.mutationInFlight()).toBeFalse();
+      const lastSnack = snackBarSpy.open.calls.mostRecent().args[0];
+      expect(lastSnack).toMatch(/still running/);
+    } finally {
+      jasmine.clock().uninstall();
+    }
+  });
+
+  it('V24D24.3: ngOnDestroy clears the polling interval (no timer leak)', () => {
+    jasmine.clock().install();
+    try {
+      component.selectedRoundModel = 1;
+      harness.simulateRound.and.returnValue(
+        of({ roundId: 'round-uuid-1', status: 'IN_PROGRESS' } as any)
+      );
+      careerService.getAllFixturesWithBye.and.returnValue(
+        of({
+          rounds: [{
+            round: 1, byeTeam: null,
+            matches: [{
+              matchId: 'match-1', homeTeamId: 'team-1', awayTeamId: 'team-2',
+              round: 1, status: 'PENDING', homeGoals: null, awayGoals: null, roundId: 'round-uuid-1',
+            }],
+          }],
+        })
+      );
+
+      component.onSimulateRound();
+      jasmine.clock().tick(2000);  // first poll fires
+
+      const pollsBeforeDestroy = careerService.getAllFixturesWithBye.calls.count();
+      fixture.destroy();
+
+      // After destroy, no more polls fire even if time advances.
+      jasmine.clock().tick(10000);
+      const pollsAfterDestroy = careerService.getAllFixturesWithBye.calls.count();
+      expect(pollsAfterDestroy).toBe(pollsBeforeDestroy);
+    } finally {
+      jasmine.clock().uninstall();
+    }
   });
 });
 
