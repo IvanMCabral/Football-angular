@@ -37,6 +37,8 @@ describe('TestHarnessPageComponent', () => {
       'setFormation',
       'resetInjuries',
       'replaceFixtures',
+      'replayMatch',
+      'simulateRound',
     ]);
     matchDetailApi = jasmine.createSpyObj('MatchDetailApiService', [
       'getMatchTimeline',
@@ -78,6 +80,7 @@ describe('TestHarnessPageComponent', () => {
                 status: 'PENDING',
                 homeGoals: null,
                 awayGoals: null,
+                roundId: 'round-uuid-1',
               },
             ],
           },
@@ -530,6 +533,196 @@ describe('TestHarnessPageComponent', () => {
     const calls = matchDetailApi.getMatchTimeline.calls.allArgs();
     expect(calls.length).toBeLessThanOrEqual(1);
   });
+
+  // ============== V24D24.2: Replay-with-seed + Simulate-round ==============
+
+  it('seeds the replay input with the documented default (12345)', () => {
+    expect(component.seedInputModel).toBe(12345);
+  });
+
+  it('starts with no round selected in the simulate-round dropdown', () => {
+    expect(component.selectedRoundModel).toBeNull();
+  });
+
+  it('onSeedChange coerces numeric input and rejects non-finite', () => {
+    component.onSeedChange(42);
+    expect(component.seedInputModel).toBe(42);
+
+    component.onSeedChange('99');
+    expect(component.seedInputModel).toBe(99);
+
+    component.onSeedChange('not-a-number');
+    expect(component.seedInputModel).toBeNull();
+
+    component.onSeedChange('');
+    expect(component.seedInputModel).toBeNull();
+
+    component.onSeedChange(null);
+    expect(component.seedInputModel).toBeNull();
+  });
+
+  it('onRoundSelect updates the selected round', () => {
+    component.onRoundSelect(3);
+    expect(component.selectedRoundModel).toBe(3);
+
+    component.onRoundSelect(null);
+    expect(component.selectedRoundModel).toBeNull();
+
+    component.onRoundSelect('7' as unknown as number);
+    // Non-number input is rejected (the dropdown only emits numbers).
+    expect(component.selectedRoundModel).toBeNull();
+  });
+
+  it('onReplayWithSeed calls the service with the typed seed', () => {
+    component.selectMatch(makeMatchRow('match-1'));
+    component.seedInputModel = 999;
+    harness.replayMatch.and.returnValue(
+      of({
+        matchId: 'match-1',
+        homeTeamId: 'team-1',
+        awayTeamId: 'team-2',
+        round: 1,
+        status: 'COMPLETED',
+        result: { homeGoals: 3, awayGoals: 0 },
+      })
+    );
+
+    component.onReplayWithSeed();
+
+    expect(harness.replayMatch).toHaveBeenCalledWith('match-1', 999);
+    expect(snackBarSpy.open).toHaveBeenCalled();
+    expect(component.mutationInFlight()).toBeFalse();
+  });
+
+  it('onReplayWithSeed sends seed=null when the input is cleared', () => {
+    component.selectMatch(makeMatchRow('match-1'));
+    component.seedInputModel = null;
+    harness.replayMatch.and.returnValue(
+      of({
+        matchId: 'match-1',
+        homeTeamId: 'team-1',
+        awayTeamId: 'team-2',
+        round: 1,
+        status: 'COMPLETED',
+        result: { homeGoals: 0, awayGoals: 0 },
+      })
+    );
+
+    component.onReplayWithSeed();
+
+    expect(harness.replayMatch).toHaveBeenCalledWith('match-1', null);
+  });
+
+  it('onReplayWithSeed refuses to fire when no match is selected', () => {
+    component.selectedMatchId.set(null);
+    component.onReplayWithSeed();
+
+    expect(harness.replayMatch).not.toHaveBeenCalled();
+    expect(snackBarSpy.open).toHaveBeenCalled();
+  });
+
+  it('onReplayWithSeed surfaces errors via the snackbar', () => {
+    component.selectMatch(makeMatchRow('match-1'));
+    harness.replayMatch.and.returnValue(throwError(() => new Error('boom')));
+    component.onReplayWithSeed();
+
+    expect(component.mutationInFlight()).toBeFalse();
+    expect(snackBarSpy.open).toHaveBeenCalled();
+  });
+
+  it('onReplayWithSeed reloads the match list after a successful replay', () => {
+    component.selectMatch(makeMatchRow('match-1'));
+    harness.replayMatch.and.returnValue(
+      of({
+        matchId: 'match-1',
+        homeTeamId: 'team-1',
+        awayTeamId: 'team-2',
+        round: 1,
+        status: 'COMPLETED',
+        result: { homeGoals: 2, awayGoals: 1 },
+      })
+    );
+    careerService.getAllFixturesWithBye.calls.reset();
+    careerService.getAllFixturesWithBye.and.returnValue(
+      of({ rounds: [] })
+    );
+
+    component.onReplayWithSeed();
+
+    expect(careerService.getAllFixturesWithBye).toHaveBeenCalled();
+  });
+
+  it('onSimulateRound calls the service with the roundId + matches of the selected round', () => {
+    component.selectedRoundModel = 1;
+    harness.simulateRound.and.returnValue(
+      of({ roundId: 'round-uuid-1', status: 'IN_PROGRESS' } as any)
+    );
+
+    component.onSimulateRound();
+
+    expect(harness.simulateRound).toHaveBeenCalledWith(
+      'round-uuid-1',
+      [
+        {
+          matchId: 'match-1',
+          homeTeamId: 'team-1',
+          awayTeamId: 'team-2',
+        },
+      ]
+    );
+    expect(snackBarSpy.open).toHaveBeenCalled();
+    expect(component.mutationInFlight()).toBeFalse();
+  });
+
+  it('onSimulateRound refuses to fire when no round is selected', () => {
+    component.selectedRoundModel = null;
+    component.onSimulateRound();
+
+    expect(harness.simulateRound).not.toHaveBeenCalled();
+    expect(snackBarSpy.open).toHaveBeenCalled();
+  });
+
+  it('onSimulateRound surfaces errors via the snackbar', () => {
+    component.selectedRoundModel = 1;
+    harness.simulateRound.and.returnValue(throwError(() => new Error('boom')));
+    component.onSimulateRound();
+
+    expect(component.mutationInFlight()).toBeFalse();
+    expect(snackBarSpy.open).toHaveBeenCalled();
+  });
+
+  it('onSimulateRound surfaces a friendly error when a round has no roundId hydrated', () => {
+    // Override the default fixture to strip roundId.
+    careerService.getAllFixturesWithBye.and.returnValue(
+      of({
+        rounds: [
+          {
+            round: 1,
+            byeTeam: null,
+            matches: [
+              {
+                matchId: 'match-1',
+                homeTeamId: 'team-1',
+                awayTeamId: 'team-2',
+                round: 1,
+                status: 'PENDING',
+                homeGoals: null,
+                awayGoals: null,
+                // roundId intentionally omitted (legacy backend)
+              },
+            ],
+          },
+        ],
+      })
+    );
+    component.reload();
+    component.selectedRoundModel = 1;
+
+    component.onSimulateRound();
+
+    expect(harness.simulateRound).not.toHaveBeenCalled();
+    expect(snackBarSpy.open).toHaveBeenCalled();
+  });
 });
 
 function makeMatchRow(matchId: string) {
@@ -545,6 +738,7 @@ function makeMatchRow(matchId: string) {
     awayGoals: null,
     homeFormation: null,
     awayFormation: null,
+    roundId: 'round-uuid-1',
   };
 }
 
