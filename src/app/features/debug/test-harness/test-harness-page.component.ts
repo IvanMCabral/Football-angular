@@ -572,8 +572,8 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   /** Default poll interval (ms) — matches the analysis recommendation. */
   private static readonly SIMULATE_POLL_INTERVAL_MS = 2000;
-  /** Default max poll attempts — 7 × 2s = 14s max wait. */
-  private static readonly SIMULATE_POLL_MAX_ATTEMPTS = 7;
+  /** Default max poll attempts — 35 × 2s = 70s max wait. Covers gameSpeed=SLOW (60s/Partido). */
+  private static readonly SIMULATE_POLL_MAX_ATTEMPTS = 35; // V24D24.3-F2.6: extend timeout (~70s) for backend gameSpeed=SLOW
 
   // ============== Constructor / effects ==============
 

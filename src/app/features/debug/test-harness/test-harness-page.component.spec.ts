@@ -994,9 +994,11 @@ describe('TestHarnessPageComponent', () => {
       component.onSimulateRound();
       expect(component.mutationInFlight()).toBeTrue();
 
-      // 7 attempts × 2s = 14s. After the 7th the polling stops and
-      // mutationInFlight releases with a "still running" snackbar.
-      for (let i = 0; i < 7; i++) {
+      // V24D24.3-F2.6: 35 attempts × 2s = 70s. After the 35th the polling
+      // stops and mutationInFlight releases with a "still running" snackbar.
+      // (Was 7 × 2s = 14s — too short for gameSpeed=SLOW; see
+      // BUG_FIXTURES_POLL_TIMEOUT_TOO_SHORT in smoke F3-bis2.)
+      for (let i = 0; i < 35; i++) {
         jasmine.clock().tick(2000);
       }
       expect(component.mutationInFlight()).toBeFalse();
@@ -1039,6 +1041,22 @@ describe('TestHarnessPageComponent', () => {
     } finally {
       jasmine.clock().uninstall();
     }
+  });
+
+  // ========== V24D24.3-F2.6: BUG_FIXTURES_POLL_TIMEOUT_TOO_SHORT ==========
+
+  it('V24D24.3-F2.6: SIMULATE_POLL_MAX_ATTEMPTS is 35 (~70s timeout, covers gameSpeed=SLOW)', () => {
+    // Direct constant test — the smoke F3-bis2 reported the polling
+    // cancelling before matches COMPLETED at gameSpeed=NORMAL (~45s for 4
+    // matches). Backend can take ~60s/match at gameSpeed=SLOW. We give
+    // the front 70s of headroom: 35 attempts × 2s = 70s.
+    const max = (TestHarnessPageComponent as unknown as Record<string, number>)
+      ['SIMULATE_POLL_MAX_ATTEMPTS'];
+    expect(max).toBe(35);
+    // Sanity: the interval keeps the math clean.
+    const interval = (TestHarnessPageComponent as unknown as Record<string, number>)
+      ['SIMULATE_POLL_INTERVAL_MS'];
+    expect((max * interval) / 1000).toBe(70);
   });
 });
 
