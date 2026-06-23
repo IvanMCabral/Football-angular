@@ -222,11 +222,20 @@ const DEFAULT_REPLAY_SEED = 12345;
               </button>
               <button
                 mat-stroked-button
+                color="warn"
+                (click)="onResetRound()"
+                [disabled]="mutationInFlight() || selectedRoundModel === null"
+                aria-label="Reset selected round back to PENDING"
+              >
+                Reset round {{ selectedRoundModel ?? '—' }}
+              </button>
+              <button
+                mat-stroked-button
                 (click)="onSimulateRound()"
                 [disabled]="mutationInFlight() || selectedRoundModel === null"
-                aria-label="Simulate selected round"
+                aria-label="Reset and re-simulate selected round"
               >
-                Simulate round {{ selectedRoundModel ?? '—' }}
+                Reset + Simulate round {{ selectedRoundModel ?? '—' }}
               </button>
             </div>
           </div>
@@ -852,6 +861,83 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   }
 
   /**
+   * V24D24.5: reset the selected round (Panel B dropdown) WITHOUT
+   * re-simulating. Useful when the manager wants to clean up state
+   * (e.g. rewind after a wrong formation, or stage a round before
+   * running a custom fixture) without committing 45s to a fresh
+   * simulation.
+   *
+   * <p>Calls {@code POST /api/v1/test-harness/career/reset-round} which
+   * (a) clears all fixtures of the round back to PENDING, (b) evicts
+   * cached MatchSessions from MatchEngineRegistry, (c) clears V24
+   * detail from Redis, (d) rewinds career.currentRound to the round
+   * being reset, and (e) forces career.phase back to PRE_MATCH so the
+   * next simulate isn't blocked.
+   *
+   * <p>Releases {@code mutationInFlight} on success or failure. The
+   * sibling buttons in Panel B are disabled while the call is in flight
+   * (same contract as onSimulateRound).
+   *
+   * <p>Snackbar feedback surfaces the roundId that was reset so the
+   * manager can confirm the right round was targeted (the dropdown
+   * label shows the number; the snackbar shows the wire UUID).
+   */
+  onResetRound(): void {
+    const roundNumber = this.selectedRoundModel;
+    if (roundNumber === null) {
+      this.snackBar.open('Pick a round in the dropdown first.', 'OK', {
+        duration: 3000,
+      });
+      return;
+    }
+    const roundGroup = this.rounds().find((r) => r.round === roundNumber);
+    if (!roundGroup || roundGroup.matches.length === 0) {
+      this.snackBar.open(
+        `Round ${roundNumber} has no matches to reset.`,
+        'OK',
+        { duration: 3000 }
+      );
+      return;
+    }
+    const roundId = roundGroup.matches[0]?.roundId ?? null;
+    if (!roundId) {
+      this.snackBar.open(
+        `Round ${roundNumber} has no roundId (backend did not hydrate it). Reload the page.`,
+        'OK',
+        { duration: 5000 }
+      );
+      return;
+    }
+
+    this.mutationInFlight.set(true);
+    this.harness.resetRound(roundId).subscribe({
+      next: () => {
+        this.mutationInFlight.set(false);
+        this.snackBar.open(
+          `Round ${roundNumber} reset (${roundGroup.matches.length} matches → PENDING, engines evicted).`,
+          'OK',
+          { duration: 3000 }
+        );
+        // Reload Panel C so the user sees the round transition
+        // COMPLETED → PENDING immediately. We do NOT call
+        // refreshDetailAfterMutation() because the user didn't pick a
+        // new match — the previously-selected match is still the one
+        // showing in Panel A, and the user can re-click it in Panel C
+        // once it refreshes.
+        this.loadMatches();
+      },
+      error: (err) => {
+        this.mutationInFlight.set(false);
+        this.snackBar.open(
+          this.fmtError(err, `Failed to reset round ${roundNumber}`),
+          'OK',
+          { duration: 5000 }
+        );
+      },
+    });
+  }
+
+  /**
    * V24D24.2: simulate the selected round (Panel B dropdown). Extracts the
    * matches of that round from {@code rounds()}, builds the request body,
    * and POSTs to {@code /api/v1/match-engine/rounds/start}.
@@ -870,6 +956,12 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
    * COMPLETED. {@code resetRound} clears fixtures back to PENDING,
    * evicts the cached sessions, and clears V24 detail from Redis so the
    * next simulate is a fresh run.
+   *
+   * <p><b>V24D24.5:</b> the button label is now "Reset + Simulate
+   * round N" to make it explicit that this handler also resets before
+   * simulating. A standalone "Reset round N" button was added
+   * separately (see {@link onResetRound}) for when the manager wants
+   * only the reset half.
    */
   onSimulateRound(): void {
     const roundNumber = this.selectedRoundModel;
