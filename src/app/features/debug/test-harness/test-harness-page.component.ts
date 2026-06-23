@@ -920,8 +920,18 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
 
   /**
    * Build a TestHarnessMatchRow from a CareerService Fixture.
-   * Team names are not in the Fixture; the UI shows the teamId as a
-   * fallback. A future iteration can resolve names from CareerService.
+   *
+   * <p>Team display names: the backend {@code GET /career/fixtures/
+   * round-with-bye} endpoint (the one this UI calls via
+   * {@code getAllFixturesWithBye}) hydrates {@code homeTeamName} and
+   * {@code awayTeamName} on each fixture via the
+   * {@code FixtureQueryDtos.MatchInfo} record. V24D24.2-F2.5 surfaces
+   * those names in Panel C instead of falling back to the teamId.
+   *
+   * <p>Defensive fallback: if the backend ever returns a fixture
+   * without the names hydrated (legacy endpoint, race condition on a
+   * freshly created career), we still render the teamId so the row is
+   * not blank.
    *
    * <p>V24D24.2: also carries through {@code roundId} so the dropdown /
    * Simulate button can POST it directly to
@@ -932,9 +942,9 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       matchId: f.matchId,
       round: f.round,
       homeTeamId: f.homeTeamId,
-      homeTeamName: f.homeTeamId,
+      homeTeamName: f.homeTeamName ?? f.homeTeamId,
       awayTeamId: f.awayTeamId,
-      awayTeamName: f.awayTeamId,
+      awayTeamName: f.awayTeamName ?? f.awayTeamId,
       status: f.status,
       homeGoals: f.homeGoals ?? null,
       awayGoals: f.awayGoals ?? null,

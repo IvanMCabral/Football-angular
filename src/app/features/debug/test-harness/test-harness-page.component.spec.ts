@@ -652,6 +652,126 @@ describe('TestHarnessPageComponent', () => {
     expect(careerService.getAllFixturesWithBye).toHaveBeenCalled();
   });
 
+  // ============== V24D24.2-F2.5: Bug #1 + Bug #2 regression tests ==============
+
+  it('F2.5: Panel C surfaces backend team names when hydrated (BUG_FIXTURES_TEAM_NAMES_UUID)', async () => {
+    // Backend hydrates team names on /fixtures/round-with-bye (MatchInfo
+    // record). The UI must display those names instead of the teamId
+    // (UUID-style) it was falling back to before F2.5.
+    careerService.getAllFixturesWithBye.and.returnValue(
+      of({
+        rounds: [
+          {
+            round: 1,
+            byeTeam: null,
+            matches: [
+              {
+                matchId: 'match-1',
+                homeTeamId: 'team-uuid-home',
+                homeTeamName: 'Boca Juniors',
+                awayTeamId: 'team-uuid-away',
+                awayTeamName: 'River Plate',
+                round: 1,
+                status: 'PENDING',
+                homeGoals: null,
+                awayGoals: null,
+                roundId: 'round-uuid-1',
+              },
+            ],
+          },
+        ],
+      })
+    );
+
+    component.reload();
+    await fixture.whenStable();
+
+    const row = component.rounds()[0].matches[0];
+    expect(row.homeTeamName).toBe('Boca Juniors');
+    expect(row.awayTeamName).toBe('River Plate');
+    // The teamId stays available for the simulate-round payload.
+    expect(row.homeTeamId).toBe('team-uuid-home');
+    expect(row.awayTeamId).toBe('team-uuid-away');
+  });
+
+  it('F2.5: Panel C falls back to teamId when backend omits team names (legacy endpoint)', async () => {
+    // Defensive fallback: if a future endpoint forgets to hydrate the
+    // names (or a legacy career pre-dates the roll-out), we still
+    // render the teamId so the row is not blank.
+    careerService.getAllFixturesWithBye.and.returnValue(
+      of({
+        rounds: [
+          {
+            round: 1,
+            byeTeam: null,
+            matches: [
+              {
+                matchId: 'match-1',
+                homeTeamId: 'team-uuid-home',
+                awayTeamId: 'team-uuid-away',
+                round: 1,
+                status: 'PENDING',
+                homeGoals: null,
+                awayGoals: null,
+                roundId: 'round-uuid-1',
+              },
+            ],
+          },
+        ],
+      })
+    );
+
+    component.reload();
+    await fixture.whenStable();
+
+    const row = component.rounds()[0].matches[0];
+    expect(row.homeTeamName).toBe('team-uuid-home');
+    expect(row.awayTeamName).toBe('team-uuid-away');
+  });
+
+  it('F2.5: onReplayWithSeed triggers refreshDetailAfterMutation which refetches the timeline (BUG_REPLAY_NO_REFRESH_UI)', async () => {
+    // The replay handler must trigger refreshDetailAfterMutation() in
+    // the success callback so Panel D re-renders with the new state.
+    // We verify the observable side-effect: the timeline is fetched at
+    // least twice (initial on select + after the null-and-reset
+    // microtask triggered by refreshDetailAfterMutation).
+    matchDetailApi.getMatchTimeline.calls.reset();
+    matchDetailApi.getMatchTimeline.and.returnValue(of(sampleSnapshot(0)));
+    matchDetailApi.getMatchDetail.and.returnValue(of(null));
+
+    component.selectMatch(makeMatchRow('match-1'));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await new Promise((r) => setTimeout(r, 200));
+    const callsAfterSelect = matchDetailApi.getMatchTimeline.calls.allArgs().length;
+    expect(callsAfterSelect).toBeGreaterThanOrEqual(1);
+
+    // Stub a successful replay.
+    harness.replayMatch.and.returnValue(
+      of({
+        matchId: 'match-1',
+        homeTeamId: 'team-1',
+        awayTeamId: 'team-2',
+        round: 1,
+        status: 'COMPLETED',
+        result: { homeGoals: 4, awayGoals: 2 },
+      })
+    );
+
+    component.onReplayWithSeed();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    // Allow the null-and-reset microtask + the next 150ms debounce to
+    // settle so the refetch lands.
+    await new Promise((r) => setTimeout(r, 250));
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const callsAfterReplay = matchDetailApi.getMatchTimeline.calls.allArgs().length;
+    // At least one new fetch happened after the replay callback.
+    expect(callsAfterReplay).toBeGreaterThan(callsAfterSelect);
+  });
+
   it('onSimulateRound calls the service with the roundId + matches of the selected round', () => {
     component.selectedRoundModel = 1;
     harness.simulateRound.and.returnValue(

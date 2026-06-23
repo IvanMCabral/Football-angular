@@ -68,6 +68,16 @@ export interface Fixture {
   homeGoals?: number | null;
   awayGoals?: number | null;
   /**
+   * V24D24.2-F2.5 — team display names hydrated by the backend on
+   * GET /api/v1/career/fixtures/round-with-bye (the
+   * FixtureQueryDtos.MatchInfo record carries homeTeamName /
+   * awayTeamName). Optional: absent on endpoints that do not hydrate
+   * them (legacy GET /career/fixtures?round=N). Consumers should fall
+   * back to the corresponding teamId when these fields are missing.
+   */
+  homeTeamName?: string | null;
+  awayTeamName?: string | null;
+  /**
    * V24D24.2 — deterministic UUID for this (careerId, round) pair,
    * hydrated by the backend on GET /api/v1/career/fixtures/round-with-bye.
    * Used by the test-harness UI to POST /match-engine/rounds/start without
