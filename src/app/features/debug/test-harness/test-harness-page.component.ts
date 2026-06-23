@@ -830,6 +830,14 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           'OK',
           { duration: 3000 }
         );
+        // V24D24.6.1: refetch the rounds() signal so the Panel B
+        // "Round N teams" sub-panel picks up the new formation on
+        // next round selection. Without this, the sub-panel stays
+        // pinned to the formations from the initial page load —
+        // BUG_V24D2461_FORMATION_NOT_REFRESHED from smoke
+        // smoke-v24d246-1. Same apply to onResetInjuries + replaceFixtures
+        // below for consistency.
+        this.loadMatches();
         this.refreshDetailAfterMutation();
       },
       error: (err) => {
@@ -853,6 +861,9 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           'OK',
           { duration: 3000 }
         );
+        // V24D24.6.1: refetch rounds so Panel C reflects the
+        // post-mutation state (squad injuries can affect xG, statuses).
+        this.loadMatches();
       },
       error: (err) => {
         this.mutationInFlight.set(false);
