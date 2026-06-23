@@ -67,6 +67,15 @@ export interface Fixture {
   status: 'PENDING' | 'SIMULATING' | 'COMPLETED' | 'CANCELLED';
   homeGoals?: number | null;
   awayGoals?: number | null;
+  /**
+   * V24D24.2 — deterministic UUID for this (careerId, round) pair,
+   * hydrated by the backend on GET /api/v1/career/fixtures/round-with-bye.
+   * Used by the test-harness UI to POST /match-engine/rounds/start without
+   * having to look up the roundId via the live engine registry first.
+   * Optional: absent for careers created before the F1 hydration roll-out,
+   * or for fixtures served by endpoints that don't hydrate it.
+   */
+  roundId?: string | null;
 }
 
 /**

@@ -4,7 +4,11 @@ import { Observable, map } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
   CustomFixture,
+  MatchFixture,
+  ReplayMatchRequest,
+  RoundStateResponse,
   SetFormationRequest,
+  SimulateRoundRequest,
   TestHarnessMutationResponse,
 } from '../models/test-harness.model';
 
@@ -26,6 +30,7 @@ import {
 export class TestHarnessService {
   private http = inject(HttpClient);
   private apiUrl = `${environment.apiUrl}/test-harness/career`;
+  private matchEngineUrl = `${environment.apiUrl}/match-engine`;
 
   /**
    * POST /api/v1/test-harness/career/set-formation
@@ -81,6 +86,69 @@ export class TestHarnessService {
     return this.http.post<TestHarnessMutationResponse>(
       `${this.apiUrl}/replace-fixtures`,
       fixtures
+    );
+  }
+
+  /**
+   * V24D24.2: POST /api/v1/test-harness/career/match/{matchId}/replay
+   *
+   * <p>Re-simulates a single match with the given seed. The match must
+   * exist in the current tournament fixtures; the fixture is reset to
+   * PENDING, re-simulated via the V24 engine, and the new result is
+   * persisted (along with cache invalidation).
+   *
+   * <p>Determinism contract: same match + same {@code seed} + same formation
+   * = byte-exact same result. Pass {@code null} for a non-reproducible
+   * replay (backend falls back to {@code System.currentTimeMillis()}).
+   *
+   * <p>UI flow: Panel C click → user types seed in Panel B (default 12345)
+   * → click "Replay with seed" → this method → refresh Panel A + D.
+   *
+   * @param matchId UUID of the match to replay (from the selected TestHarnessMatchRow)
+   * @param seed explicit numeric seed (e.g. 12345), or null for non-reproducible
+   * @returns Observable<MatchFixture> with the updated fixture (status,
+   *   result.homeGoals/awayGoals/etc.)
+   */
+  replayMatch(matchId: string, seed: number | null): Observable<MatchFixture> {
+    const body: ReplayMatchRequest = { seed };
+    return this.http.post<MatchFixture>(
+      `${this.apiUrl}/match/${matchId}/replay`,
+      body
+    );
+  }
+
+  /**
+   * V24D24.2: POST /api/v1/match-engine/rounds/start
+   *
+   * <p>Starts a round (a batch of matches) via the V24 RoundEngine. The
+   * backend derives {@code userId} from the JWT, so we don't send it.
+   *
+   * <p>UI flow: Panel B dropdown picks a round → user clicks "Simulate round N"
+   * → component extracts matches for that round from {@code rounds()}
+   * → this method POSTs {@code {roundId, matches}} → backend registers the
+   * RoundEngine and starts the simulation asynchronously.
+   *
+   * <p>Note: the backend is fire-and-forget — the round runs in the background
+   * and the response is the initial {@link RoundStateResponse}. Iván sees the
+   * score updates by refreshing the match list (Panel C reloads via the
+   * {@code refreshDetailAfterMutation} pattern).
+   *
+   * @param roundId deterministic UUID for this (careerId, round) — hydrated
+   *   by the backend in {@code /api/v1/career/fixtures/round-with-bye} and
+   *   carried in {@code TestHarnessMatchRow.roundId}.
+   * @param matches the matches of this round (the backend starts one
+   *   MatchEngine per match). All matches of a round share the same roundId
+   *   so the component can pick them from any round group in Panel C.
+   * @returns Observable<RoundStateResponse> with the initial round snapshot
+   */
+  simulateRound(
+    roundId: string,
+    matches: Array<{ matchId: string; homeTeamId: string; awayTeamId: string }>
+  ): Observable<RoundStateResponse> {
+    const body: SimulateRoundRequest = { roundId, matches };
+    return this.http.post<RoundStateResponse>(
+      `${this.matchEngineUrl}/rounds/start`,
+      body
     );
   }
 }

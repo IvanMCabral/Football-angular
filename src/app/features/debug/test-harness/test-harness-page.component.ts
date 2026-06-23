@@ -14,6 +14,7 @@ import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
+import { MatInputModule } from '@angular/material/input';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { CareerService } from '../../../core/services/career.service';
@@ -37,6 +38,13 @@ interface RoundGroup {
 const TIMELINE_DEBOUNCE_MS = 150;
 const TIMELINE_MAX_MINUTE = 90;
 const TIMELINE_STEP = 5;
+
+/**
+ * V24D24.2: Default seed for the "Replay with seed" button. Same number as
+ * the regression-test baseline so Iván can reproduce a known result with
+ * one click. The user is free to override.
+ */
+const DEFAULT_REPLAY_SEED = 12345;
 
 /**
  * V24D24: Test-Harness UI page (4-panel layout).
@@ -71,6 +79,7 @@ const TIMELINE_STEP = 5;
     RouterLink,
     MatButtonModule,
     MatFormFieldModule,
+    MatInputModule,
     MatSelectModule,
     V24MatchDetailPageComponent,
   ],
@@ -165,6 +174,58 @@ const TIMELINE_STEP = 5;
                 aria-label="Replace fixtures with a Barcelona rival"
               >
                 Replace Fixtures
+              </button>
+            </div>
+          </div>
+
+          <!-- V24D24.2: replay-with-seed + simulate-round block.
+               Kept in its own control-group separated by a subtle divider so
+               the layout stays predictable when more controls land later. -->
+          <div class="control-group control-group-replay">
+            <div class="control-group-divider" aria-hidden="true"></div>
+
+            <mat-form-field appearance="outline" class="seed-field">
+              <mat-label>Seed</mat-label>
+              <input
+                matInput
+                type="number"
+                [(ngModel)]="seedInputModel"
+                (ngModelChange)="onSeedChange($event)"
+                placeholder="12345"
+                aria-label="Replay seed (number, empty for non-reproducible)"
+              />
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="round-field">
+              <mat-label>Round</mat-label>
+              <mat-select
+                [(ngModel)]="selectedRoundModel"
+                (selectionChange)="onRoundSelect($event.value)"
+                aria-label="Select round to simulate"
+              >
+                <mat-option *ngFor="let r of rounds()" [value]="r.round">
+                  Round {{ r.round }}
+                </mat-option>
+              </mat-select>
+            </mat-form-field>
+
+            <div class="button-stack">
+              <button
+                mat-raised-button
+                color="primary"
+                (click)="onReplayWithSeed()"
+                [disabled]="mutationInFlight() || !selectedMatchId()"
+                aria-label="Replay selected match with seed"
+              >
+                Replay with seed
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onSimulateRound()"
+                [disabled]="mutationInFlight() || selectedRoundModel === null"
+                aria-label="Simulate selected round"
+              >
+                Simulate round {{ selectedRoundModel ?? '—' }}
               </button>
             </div>
           </div>
@@ -337,6 +398,12 @@ const TIMELINE_STEP = 5;
     .panel-title { margin: 0 0 0.5rem; font-size: 1rem; }
     .panel-hint { margin: 0 0 1rem; color: var(--text-muted, #666); font-size: 0.85rem; }
     .formation-field { width: 100%; }
+    .seed-field, .round-field { width: 100%; }
+    .control-group-divider {
+      height: 1px;
+      background: var(--border-color, #e0e0e0);
+      margin: 1rem 0;
+    }
     .button-stack { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 1rem; }
     .rounds-list { list-style: none; margin: 0; padding: 0; }
     .round-block { margin-bottom: 1rem; }
@@ -435,6 +502,12 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
 
   /** Selected formation (two-way bound to mat-select via ngModel). */
   selectedFormationModel: FormationCode | null = '4-3-3';
+
+  /** V24D24.2: seed for the "Replay with seed" button (null = non-reproducible). */
+  seedInputModel: number | null = DEFAULT_REPLAY_SEED;
+
+  /** V24D24.2: round selected in the "Simulate round N" dropdown. */
+  selectedRoundModel: number | null = null;
 
   // ============== State signals ==============
 
@@ -673,6 +746,144 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     });
   }
 
+  // ============== V24D24.2: Replay-with-seed + Simulate-round handlers ==============
+
+  /**
+   * Two-way binding shim for the seed number input. Empty / NaN input
+   * → null (non-reproducible replay). Otherwise coerce to a number.
+   */
+  onSeedChange(value: unknown): void {
+    if (value === null || value === undefined || value === '') {
+      this.seedInputModel = null;
+      return;
+    }
+    const n = typeof value === 'number' ? value : Number(value);
+    this.seedInputModel = Number.isFinite(n) ? n : null;
+  }
+
+  /** Two-way binding shim for the round mat-select. */
+  onRoundSelect(value: unknown): void {
+    this.selectedRoundModel = typeof value === 'number' ? value : null;
+  }
+
+  /**
+   * V24D24.2: replay the currently-selected match (Panel C click → selected
+   * match) with the seed typed in Panel B. Refresca Panel A + D via
+   * {@link refreshDetailAfterMutation}.
+   *
+   * <p>Respects the existing {@code mutationInFlight} contract: the button
+   * is disabled while any other mutation is in flight, and we set the flag
+   * here so all sibling buttons disable while we wait.
+   */
+  onReplayWithSeed(): void {
+    const matchId = this.selectedMatchId();
+    if (!matchId) {
+      this.snackBar.open('Select a match in Panel C first.', 'OK', {
+        duration: 3000,
+      });
+      return;
+    }
+    this.mutationInFlight.set(true);
+    this.harness.replayMatch(matchId, this.seedInputModel).subscribe({
+      next: (fixture) => {
+        this.mutationInFlight.set(false);
+        const seedDesc =
+          this.seedInputModel !== null
+            ? `seed=${this.seedInputModel}`
+            : 'non-reproducible seed';
+        const score =
+          fixture?.result != null
+            ? ` → ${fixture.result.homeGoals}-${fixture.result.awayGoals}`
+            : '';
+        this.snackBar.open(
+          `Match replayed (${seedDesc})${score}.`,
+          'OK',
+          { duration: 3000 }
+        );
+        // The match list will update too — reload so Panel C reflects the
+        // new score, then refresh Panel A + D (existing pattern).
+        this.loadMatches();
+        this.refreshDetailAfterMutation();
+      },
+      error: (err) => {
+        this.mutationInFlight.set(false);
+        this.snackBar.open(
+          this.fmtError(err, 'Failed to replay match'),
+          'OK',
+          { duration: 5000 }
+        );
+      },
+    });
+  }
+
+  /**
+   * V24D24.2: simulate the selected round (Panel B dropdown). Extracts the
+   * matches of that round from {@code rounds()}, builds the request body,
+   * and POSTs to {@code /api/v1/match-engine/rounds/start}.
+   *
+   * <p>The backend runs the simulation async — we get back the initial
+   * RoundStateResponse and let Iván watch the scores land by reloading
+   * Panel C (the round will eventually mark matches COMPLETED).
+   */
+  onSimulateRound(): void {
+    const roundNumber = this.selectedRoundModel;
+    if (roundNumber === null) {
+      this.snackBar.open('Pick a round in the dropdown first.', 'OK', {
+        duration: 3000,
+      });
+      return;
+    }
+    const roundGroup = this.rounds().find((r) => r.round === roundNumber);
+    if (!roundGroup || roundGroup.matches.length === 0) {
+      this.snackBar.open(
+        `Round ${roundNumber} has no matches to simulate.`,
+        'OK',
+        { duration: 3000 }
+      );
+      return;
+    }
+    // Pick the roundId from the first match — all matches of the round
+    // share the same deterministic UUID (F1 backend contract).
+    const roundId = roundGroup.matches[0]?.roundId ?? null;
+    if (!roundId) {
+      this.snackBar.open(
+        `Round ${roundNumber} has no roundId (backend did not hydrate it). Reload the page.`,
+        'OK',
+        { duration: 5000 }
+      );
+      return;
+    }
+    const matchesPayload = roundGroup.matches.map((m) => ({
+      matchId: m.matchId,
+      homeTeamId: m.homeTeamId,
+      awayTeamId: m.awayTeamId,
+    }));
+
+    this.mutationInFlight.set(true);
+    this.harness.simulateRound(roundId, matchesPayload).subscribe({
+      next: () => {
+        this.mutationInFlight.set(false);
+        this.snackBar.open(
+          `Round ${roundNumber} simulation started (${matchesPayload.length} matches).`,
+          'OK',
+          { duration: 3000 }
+        );
+        // The simulation is async — reload the match list once so the UI
+        // catches up on whatever completed by the time the response lands.
+        // Iván can re-click Simulate or Replay later for further updates.
+        this.loadMatches();
+      },
+      error: (err) => {
+        this.mutationInFlight.set(false);
+        this.snackBar.open(
+          this.fmtError(err, `Failed to simulate round ${roundNumber}`),
+          'OK',
+          { duration: 5000 }
+        );
+      },
+    });
+  }
+
   // ============== Track-by ==============
 
   trackByRound(_index: number, r: RoundGroup): number {
@@ -711,6 +922,10 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
    * Build a TestHarnessMatchRow from a CareerService Fixture.
    * Team names are not in the Fixture; the UI shows the teamId as a
    * fallback. A future iteration can resolve names from CareerService.
+   *
+   * <p>V24D24.2: also carries through {@code roundId} so the dropdown /
+   * Simulate button can POST it directly to
+   * {@code /api/v1/match-engine/rounds/start}.
    */
   private fixtureToMatchRow(f: Fixture): TestHarnessMatchRow {
     return {
@@ -725,6 +940,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       awayGoals: f.awayGoals ?? null,
       homeFormation: null,
       awayFormation: null,
+      roundId: f.roundId ?? null,
     };
   }
 
