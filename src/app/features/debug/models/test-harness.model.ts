@@ -12,7 +12,7 @@
 import { MatchDetail } from '../../match-detail/models/match-detail.model';
 
 /** Formation codes accepted by the V24 engine. */
-export type FormationCode = '4-3-3' | '4-4-2' | '3-5-2' | '4-2-3-1';
+export type FormationCode = '4-3-3' | '4-4-2' | '3-5-2' | '4-2-3-1' | '5-3-2' | '4-1-4-1' | '3-4-3';
 
 /** Allowed formation codes for the UI select. */
 export const FORMATION_CODES: readonly FormationCode[] = [
@@ -20,6 +20,9 @@ export const FORMATION_CODES: readonly FormationCode[] = [
   '4-4-2',
   '3-5-2',
   '4-2-3-1',
+  '5-3-2',
+  '4-1-4-1',
+  '3-4-3',
 ] as const;
 
 /** Body for POST /api/v1/test-harness/career/set-formation. */
