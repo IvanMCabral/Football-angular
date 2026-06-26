@@ -766,7 +766,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   selectedFormation = '4-4-2';
 
   /** Formaciones disponibles */
-  formations = ['4-4-2', '4-3-3', '3-5-2', '4-2-3-1'];
+  formations = ['4-4-2', '4-3-3', '3-5-2', '4-2-3-1', '5-3-2', '4-1-4-1', '3-4-3'];
 
   /** Cache de posiciones de formación */
   private formationPositions: { [key: string]: FormationPositionDTO[] } = {};

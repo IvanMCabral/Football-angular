@@ -124,7 +124,12 @@ export class SquadManagementComponent implements OnInit {
    pendingRiskyConfirm$ = new BehaviorSubject<boolean>(false);
 
    selectedFormation$ = new BehaviorSubject<string>('4-4-2');
-   availableFormations = ['4-4-2', '4-3-3', '4-2-3-1', '3-5-2', '5-3-2'];
+   /**
+    * V25D38-F1: extendido a las 7 formations que el engine soporta
+    * (consistencia con V25D36 backend + formation-modal + squad-editor-modal +
+    * test-harness FORMATION_CODES). Orden alineado con los otros dropdowns.
+    */
+   availableFormations = ['4-4-2', '4-3-3', '3-5-2', '4-2-3-1', '5-3-2', '4-1-4-1', '3-4-3'];
 
    /** Active tab: 'squad' | 'stats' */
    activeTab$ = new BehaviorSubject<'squad' | 'stats'>('squad');

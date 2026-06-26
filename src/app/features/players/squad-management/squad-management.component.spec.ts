@@ -116,4 +116,16 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
     expect(typeof component.openVisualEditor).toBe('function');
     expect(() => component.openVisualEditor()).not.toThrow();
   });
+
+  it('V25D38-F1: availableFormations exposes the 7 formations supported by the engine', () => {
+    // V25D36 backend extendió FormationService.getAllFormations() a 7 formations.
+    // squad-management quedó inconsistente con solo 5; V25D38 lo arregla.
+    // Mismo set que test-harness.model.ts FORMATION_CODES + formation-modal +
+    // squad-editor-modal.
+    const EXPECTED_FORMATIONS = ['4-4-2', '4-3-3', '3-5-2', '4-2-3-1', '5-3-2', '4-1-4-1', '3-4-3'];
+    expect(component.availableFormations.length).toBe(7);
+    for (const formation of EXPECTED_FORMATIONS) {
+      expect(component.availableFormations).toContain(formation);
+    }
+  });
 });

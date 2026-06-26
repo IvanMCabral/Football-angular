@@ -65,7 +65,7 @@ describe('FormationModalComponent — LIVE-MATCH-F3-UI-LIVE FE5', () => {
     // by calling onFormationChange — which calls normalizeFormation.
     component.onFormationChange('4-3-3');
     // The signal was updated; verify it's a valid formation.
-    expect(['4-4-2', '4-3-3', '3-5-2', '4-2-3-1']).toContain(component.selectedFormation());
+    expect(['4-4-2', '4-3-3', '3-5-2', '4-2-3-1', '5-3-2', '4-1-4-1', '3-4-3']).toContain(component.selectedFormation());
   });
 
   it('formationLines returns the correct counts per formation', () => {
