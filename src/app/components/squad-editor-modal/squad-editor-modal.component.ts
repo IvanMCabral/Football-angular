@@ -7,12 +7,15 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatIconModule } from '@angular/material/icon';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../environments/environment';
-import { Subject, BehaviorSubject, takeUntil } from 'rxjs';
+import { Subject, BehaviorSubject, of, takeUntil } from 'rxjs';
+import { debounceTime, distinctUntilChanged, switchMap, catchError } from 'rxjs/operators';
 import { LineupWarningDTO } from '../../shared/models/lineup/lineup-warning.dto';
 import { FieldSubdivisionDTO } from '../../shared/models/lineup/field-subdivision.dto';
 import { FormationDTO, FormationPositionDTO } from '../../shared/models/lineup/formation.dto';
 import { PlayerOnFieldDto } from '../../shared/models/lineup/player-on-field.dto';
 import { LineupSlotDTO } from '../../shared/models/lineup/lineup-slot.dto';
+import { ChemistryDetailDTO } from '../../shared/models/lineup/lineup.dto';
+import { ChemistryPreviewService } from '../../core/services/chemistry-preview.service';
 
 /**
  * Modal del Editor de Formación - MODO PRE-PARTIDO
@@ -41,6 +44,40 @@ import { LineupSlotDTO } from '../../shared/models/lineup/lineup-slot.dto';
           </select>
           <span *ngIf="isFormationChanging" class="formation-change-blocked">(espera...)</span>
         </div>
+
+        <!-- V25D45 (Sprint C10): chemistry preview row. Shows the projected
+             chemistry of the in-progress lineup (debounced 300ms after the
+             last assignment change). Δ vs the current persisted score.
+             Hidden when no preview yet (lineup not complete) or after preview
+             call failed. -->
+        <div class="chemistry-preview-row">
+          <ng-container *ngIf="previewedChemistry$ | async as pc; else previewEmpty">
+            <span class="preview-label">Chemistry proyectado:</span>
+            <span class="preview-score"
+                  [class.high]="pc.score >= 80"
+                  [class.mid]="pc.score >= 60 && pc.score < 80"
+                  [class.low]="pc.score < 60">
+              {{ pc.score }}/99
+            </span>
+            <span class="preview-delta"
+                  *ngIf="currentChemistryScore !== null"
+                  [class.positive]="pc.score > (currentChemistryScore ?? 0)"
+                  [class.negative]="pc.score < (currentChemistryScore ?? 0)"
+                  [title]="'Δ vs chemistry guardado en backend (' + (currentChemistryScore ?? 0) + '/99)'">
+              ({{ pc.score > (currentChemistryScore ?? 0) ? '+' : '' }}{{ pc.score - (currentChemistryScore ?? 0) }})
+            </span>
+          </ng-container>
+          <ng-template #previewEmpty>
+            <span class="preview-label preview-pending"
+                  *ngIf="!previewError; else previewFailed">
+              Proyectando chemistry...
+            </span>
+            <ng-template #previewFailed>
+              <span class="preview-label preview-error">⚠ Chemistry preview unavailable</span>
+            </ng-template>
+          </ng-template>
+        </div>
+
         <button mat-icon-button (click)="close()" class="close-btn" title="Cerrar">✕</button>
       </div>
 
@@ -265,6 +302,81 @@ import { LineupSlotDTO } from '../../shared/models/lineup/lineup-slot.dto';
 
     .close-btn {
       color: #a0d4a8;
+    }
+
+    /* V25D45 (Sprint C10): chemistry preview row — projected chemistry of
+       in-progress lineup. Sits between the formation selector and the
+       close button in the header. */
+    .chemistry-preview-row {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      margin-left: auto;
+      margin-right: 0.5rem;
+      padding: 0.25rem 0.6rem;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 4px;
+      font-size: 0.8rem;
+      color: #fff;
+      white-space: nowrap;
+    }
+
+    .preview-label {
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 0.75rem;
+    }
+
+    .preview-label.preview-pending {
+      color: rgba(255, 255, 255, 0.5);
+      font-style: italic;
+    }
+
+    .preview-label.preview-error {
+      color: #fbb;
+    }
+
+    .preview-score {
+      font-weight: 700;
+      padding: 0.05rem 0.4rem;
+      border-radius: 3px;
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .preview-score.high {
+      background: #48bb78;
+      color: #1a472a;
+    }
+
+    .preview-score.mid {
+      background: #eab308;
+      color: #744210;
+    }
+
+    .preview-score.low {
+      background: #c53030;
+      color: #fff;
+    }
+
+    .preview-delta {
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 0.05rem 0.3rem;
+      border-radius: 3px;
+    }
+
+    .preview-delta.positive {
+      background: #48bb78;
+      color: #1a472a;
+    }
+
+    .preview-delta.negative {
+      background: #fc8181;
+      color: #742a2a;
+    }
+
+    .preview-delta:not(.positive):not(.negative) {
+      background: rgba(255, 255, 255, 0.15);
+      color: rgba(255, 255, 255, 0.85);
     }
 
     /* Field Container */
@@ -781,6 +893,34 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   private isInitializing = true;
   isFormationChanging = false;
 
+  /**
+   * V25D45 (Sprint C10): chemistry preview state.
+   *
+   * <p>{@code previewTrigger$} emits the current home-playerIds whenever
+   * the user assigns/removes a player. The pipeline (debounceTime 300ms +
+   * distinctUntilChanged) collapses rapid edits into one backend call and
+   * avoids duplicate calls if the lineup didn't actually change.
+   *
+   * <p>{@code previewedChemistry$} holds the last successful preview response,
+   * or {@code null} while waiting / after a failure. The template binds via
+   * async pipe and shows the score + Δ vs {@code currentChemistryScore}.
+   *
+   * <p>{@code currentChemistryScore} is the chemistry score of the LAST
+   * PERSISTED lineup (from the initial {@code /career/lineup/current}
+   * response). It's the baseline against which the preview's delta is
+   * computed. {@code null} means "no baseline yet" (cold start / first
+   * preview before any /current response landed).
+   *
+   * <p>{@code previewError} flips to true when the last preview call failed.
+   * The template uses this to swap the "Proyectando chemistry..." placeholder
+   * for a "Chemistry preview unavailable" warning. Resets on the next
+   * successful call.
+   */
+  private previewTrigger$ = new Subject<string[]>();
+  previewedChemistry$ = new BehaviorSubject<ChemistryDetailDTO | null>(null);
+  currentChemistryScore: number | null = null;
+  previewError = false;
+
   /** Getters para compatibilidad con template (sin async pipe) */
   get subdivisions() { return this.subdivisions$.value; }
   get homePlayers() { return this.homePlayers$.value; }
@@ -794,8 +934,11 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     private http: HttpClient,
     private dialogRef: MatDialogRef<SquadEditorModalComponent>,
     @Inject(MAT_DIALOG_DATA) public data: { matchId: string },
-    private cdr: ChangeDetectorRef
-  ) {}
+    private cdr: ChangeDetectorRef,
+    private chemistryPreview: ChemistryPreviewService
+  ) {
+    this.setupChemistryPreviewPipeline();
+  }
 
   ngOnInit() {
     // Formation changes are now immediate (backend is fast)
@@ -805,6 +948,75 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   ngOnDestroy() {
     this.destroy$.next();
     this.destroy$.complete();
+    this.previewTrigger$.complete();
+  }
+
+  /**
+   * V25D45 (Sprint C10): wire the chemistry preview pipeline.
+   *
+   * <p>Pipeline:
+   * <pre>
+   *   previewTrigger$  (Subject&lt;string[]&gt;)
+   *     | debounceTime(300)            // collapse rapid edits
+   *     | distinctUntilChanged(...)     // skip if lineup didn't change
+   *     | switchMap(ids =&gt; previewChemistry(ids))
+   *     | catchError(err =&gt; of(null))  // backend failure → null
+   *     | subscribe(detail =&gt; previewedChemistry$.next(detail))
+   * </pre>
+   *
+   * <p>Triggered from {@code assignPlayerToSlot} and {@code removePlayerFromSlot}
+   * after the local lineup state is updated. {@code previewedChemistry$} feeds
+   * the header preview row in the template.
+   *
+   * <p>Why 300ms debounce: typical user drag-and-drop emits 5-10 events
+   * per second; without debounce, each event would trigger a backend
+   * roundtrip. 300ms is the sweet spot — fast enough that the preview
+   * feels live, slow enough to coalesce a drag gesture into 1 call.
+   *
+   * <p>Why distinctUntilChanged on the joined string: avoids duplicate
+   * calls when the trigger fires but the lineup ids are identical
+   * (e.g., on slot click that doesn't actually change anything).
+   */
+  private setupChemistryPreviewPipeline(): void {
+    this.previewTrigger$
+      .pipe(
+        debounceTime(300),
+        distinctUntilChanged((a, b) => a.join(',') === b.join(',')),
+        switchMap(ids => {
+          // Need exactly 11 to preview — earlier/later states emit null
+          // (template shows "Proyectando chemistry..." placeholder).
+          if (!ids || ids.length !== 11) {
+            this.previewError = false;
+            return of(null);
+          }
+          return this.chemistryPreview.previewChemistry(ids).pipe(
+            catchError(err => {
+              console.warn('[SQUAD-EDITOR] Chemistry preview failed:', err);
+              this.previewError = true;
+              return of(null);
+            })
+          );
+        }),
+        takeUntil(this.destroy$)
+      )
+      .subscribe(detail => {
+        this.previewError = false;
+        this.previewedChemistry$.next(detail);
+      });
+  }
+
+  /**
+   * V25D45 (Sprint C10): trigger a chemistry preview for the current home lineup.
+   * Called from {@code assignPlayerToSlot} and {@code removePlayerFromSlot}
+   * after the local state mutation.
+   *
+   * <p>The pipeline (see {@link setupChemistryPreviewPipeline}) coalesces
+   * rapid calls and deduplicates against the last lineup snapshot. This
+   * method is fire-and-forget — it doesn't await the backend response.
+   */
+  private triggerChemistryPreview(): void {
+    const ids = this.homePlayers.map(p => p.playerId);
+    this.previewTrigger$.next(ids);
   }
 
   /** Carga todas las subdivisiones desde el backend */
@@ -856,6 +1068,14 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   private loadSquadFromBackend(): void {
     this.http.get<any>(`${environment.apiUrl}/career/lineup/current`).subscribe({
       next: (response) => {
+        // V25D45 (Sprint C10): capture the persisted chemistry score as the
+        // baseline for the preview's delta computation. The preview shows
+        // (previewScore - currentChemistryScore) so the manager sees the
+        // impact of their edits vs the saved lineup.
+        this.currentChemistryScore = (typeof response?.chemistryScore === 'number')
+            ? response.chemistryScore
+            : null;
+
         // Usar la formación seleccionada si no viene del backend
         const formationName = response?.formation || this.selectedFormation || '4-4-2';
         const positions = this.formationPositions[formationName] || [];
@@ -1046,6 +1266,8 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     this.selectedSlot = null;
     this.selectedPlayerToAssign = '';
     this.saveLineup();
+    // V25D45 (Sprint C10): trigger chemistry preview (debounced in pipeline).
+    this.triggerChemistryPreview();
     this.cdr.detectChanges();
   }
 
@@ -1062,6 +1284,8 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
 
     this.selectedSlot = null;
     this.saveLineup();
+    // V25D45 (Sprint C10): trigger chemistry preview (debounced in pipeline).
+    this.triggerChemistryPreview();
     this.cdr.detectChanges();
   }
 

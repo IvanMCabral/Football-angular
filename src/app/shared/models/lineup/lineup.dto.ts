@@ -72,6 +72,33 @@ export interface ChemistryBreakdownDTO {
 }
 
 /**
+ * V25D45 (Sprint C10): chemistry detail returned by
+ * {@code POST /career/lineup/preview-chemistry}. Mirrors the back's
+ * {@code ChemistryDetail} record (V25D43). Used by the SquadEditorModalComponent
+ * to show the projected chemistry of an in-progress lineup (without persisting).
+ *
+ * <p>Shape:
+ * <pre>
+ *   {
+ *     score: 82,
+ *     breakdown: ChemistryBreakdownDTO,
+ *     maxSkillByType: { WALL: 99, ... },
+ *     coveragePercentage: 75
+ *   }
+ * </pre>
+ *
+ * <p>Same field set as the back record, deserialized 1:1 by Jackson.
+ * The frontend uses this DTO to populate the live preview UI in the
+ * SquadEditorModalComponent's header.
+ */
+export interface ChemistryDetailDTO {
+  score: number;
+  breakdown: ChemistryBreakdownDTO;
+  maxSkillByType: Record<string, number>;
+  coveragePercentage: number;
+}
+
+/**
  * V24D6U3 + MVP1-lineup-cancha-1 + V25D41 (C6) + V25D42 (C7) + V25D43 (C8):
  * Response shape of /career/lineup/{current, auto-select, manual-select}.
  *
