@@ -579,3 +579,317 @@ describe('SquadEditorModalComponent — V25D45 chemistry preview', () => {
     }, 30);
   });
 });
+
+/**
+ * V25D47 (Sprint C11b): drag-drop tactical field editor + formationEffectiveness
+ * UI integration + chemistry preview weighting.
+ *
+ * <p>Strategy: drive the drop handlers directly via `(component as any).methodName(...)`
+ * with mock CdkDragDrop events rather than simulating real mouse drag events
+ * (CDK drag-drop events are notoriously hard to fire from specs). The handlers
+ * are the only place where swap/move/bench logic lives, so testing them is
+ * equivalent to testing the drag-drop UX.
+ *
+ * <p>For template-render tests we use {@code fixture.detectChanges()} +
+ * {@code fixture.nativeElement.querySelector(...)} to verify the formation-
+ * effectiveness row + per-player color classes render correctly.
+ */
+describe('SquadEditorModalComponent — V25D47 (C11b) drag-drop + effectiveness', () => {
+  let component: SquadEditorModalComponent;
+  let fixture: ComponentFixture<SquadEditorModalComponent>;
+  let httpClientSpy: jasmine.SpyObj<HttpClient>;
+  let dialogRefSpy: jasmine.SpyObj<MatDialogRef<SquadEditorModalComponent>>;
+
+  // Minimal field with 4 slots: 1 GK + 3 outfield (so we can test swap + bench flow).
+  const SUBDIVISIONS_RESPONSE = [
+    { subdivisionId: 'GK-1', isGoalkeeper: true,  sector: 26, subIndex: 1, left: 35, top: 88, width: 30, height: 10, zone: 'GK' },
+    { subdivisionId: 'S22-1', isGoalkeeper: false, sector: 22, subIndex: 1, left: 10, top: 70, width: 25, height: 12, zone: 'DEFENSE' },
+    { subdivisionId: 'S13-2', isGoalkeeper: false, sector: 13, subIndex: 2, left: 40, top: 45, width: 20, height: 12, zone: 'MIDFIELD' },
+    { subdivisionId: 'S05-2', isGoalkeeper: false, sector:  5, subIndex: 2, left: 45, top: 10, width: 10, height: 10, zone: 'ATTACK' }
+  ];
+
+  const FORMATIONS_RESPONSE = [
+    {
+      name: '4-4-2', description: '4-4-2',
+      defenders: 1, midfielders: 1, attackers: 1, outfieldPlayers: 3,
+      positions: [
+        { index: 0, role: 'GK', xPercent: 50, yPercent: 93, actionRangePercent: 5, subdivisionId: 'GK-1' },
+        { index: 1, role: 'DEF', xPercent: 20, yPercent: 75, actionRangePercent: 7, subdivisionId: 'S22-1' },
+        { index: 2, role: 'MID', xPercent: 50, yPercent: 50, actionRangePercent: 7, subdivisionId: 'S13-2' },
+        { index: 3, role: 'ATT', xPercent: 50, yPercent: 10, actionRangePercent: 6, subdivisionId: 'S05-2' }
+      ]
+    }
+  ];
+
+  /**
+   * Builds a /current response with 4 players + a configurable
+   * formationEffectiveness payload. Pass null to simulate a legacy
+   * pre-V25D47 response (formationEffectiveness absent).
+   */
+  function buildCurrentLineup(
+    formationEffectiveness: any | null,
+    chemistryScore: number | null
+  ): any {
+    return {
+      formation: '4-4-2',
+      players: [
+        { playerId: 'p-gk',  name: 'GK',  position: 'GK',  overall: 80, energy: 100, injured: false },
+        { playerId: 'p-def', name: 'DEF', position: 'DEF', overall: 80, energy: 100, injured: false },
+        { playerId: 'p-mid', name: 'MID', position: 'MID', overall: 80, energy: 100, injured: false },
+        { playerId: 'p-att', name: 'ATT', position: 'ATT', overall: 80, energy: 100, injured: false }
+      ],
+      confirmed: true,
+      warnings: [],
+      slots: [],
+      chemistryScore,
+      formationEffectiveness
+    };
+  }
+
+  beforeEach(async () => {
+    httpClientSpy = jasmine.createSpyObj('HttpClient', ['get', 'post']);
+    dialogRefSpy = jasmine.createSpyObj('MatDialogRef', ['close']);
+
+    httpClientSpy.get.and.callFake(((url: string) => {
+      if (url.includes('/editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
+      if (url.includes('/editor/formations'))  return of(FORMATIONS_RESPONSE);
+      if (url.includes('/career/lineup/current')) {
+        // Default: formationEffectiveness present, baseline chemistry 85.
+        return of(buildCurrentLineup(
+          {
+            inferredFormation: '4-4-2',
+            perPlayerEffectiveness: { 'GK-1': 1.0, 'S22-1': 0.85, 'S13-2': 0.7, 'S05-2': 1.0 },
+            teamAverage: 0.8875
+          },
+          85
+        ));
+      }
+      return of([]);
+    }) as any);
+
+    httpClientSpy.post.and.callFake(((_url: string, _body: any) => {
+      if (_url.includes('/career/lineup/preview-chemistry')) {
+        return of({ score: 91, breakdown: { positionGroups: {}, maxSkillByType: {}, coveragePercentage: 10 }, maxSkillByType: {}, coveragePercentage: 10 });
+      }
+      if (_url.includes('/career/lineup/manual-select')) {
+        return of({ players: [], warnings: [] });
+      }
+      if (_url.includes('/career/lineup/confirm')) {
+        return of({ confirmed: true, warnings: [] });
+      }
+      return of({});
+    }) as any);
+
+    await TestBed.configureTestingModule({
+      imports: [SquadEditorModalComponent, NoopAnimationsModule],
+      providers: [
+        { provide: MAT_DIALOG_DATA, useValue: { careerId: 'c1', matchId: null } },
+        { provide: MatDialogRef, useValue: dialogRefSpy },
+        { provide: HttpClient, useValue: httpClientSpy }
+      ]
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(SquadEditorModalComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+  });
+
+  // ---- formationEffectiveness UI ----
+
+  it('should render the formation-effectiveness row when /current includes formationEffectiveness', (done) => {
+    // V25D47: with formationEffectiveness present in /current, the header
+    // shows "Formación inferida: 4-4-2 · Eff. team: 89%".
+    setTimeout(() => {
+      fixture.detectChanges();
+      const row = fixture.nativeElement.querySelector('.formation-effectiveness-row');
+      expect(row).toBeTruthy('formation-effectiveness row must render when formationEffectiveness is present');
+      expect(row?.textContent).toContain('4-4-2');
+      // 0.8875 * 100 = 88.75 → rounded to 89.
+      expect(row?.textContent).toContain('89%');
+      done();
+    }, 30);
+  });
+
+  it('should NOT render the formation-effectiveness row when formationEffectiveness is null', (done) => {
+    // V25D47 backward compat: legacy pre-V25D47 responses don't carry
+    // formationEffectiveness — the row must be hidden.
+    httpClientSpy.get.and.callFake(((url: string) => {
+      if (url.includes('/editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
+      if (url.includes('/editor/formations'))  return of(FORMATIONS_RESPONSE);
+      if (url.includes('/career/lineup/current')) {
+        return of(buildCurrentLineup(null, 85));
+      }
+      return of([]);
+    }) as any);
+    // Re-create the component to pick up the new mock.
+    fixture = TestBed.createComponent(SquadEditorModalComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    setTimeout(() => {
+      fixture.detectChanges();
+      const row = fixture.nativeElement.querySelector('.formation-effectiveness-row');
+      expect(row).toBeFalsy('formation-effectiveness row must NOT render when formationEffectiveness is null');
+      done();
+    }, 30);
+  });
+
+  it('should color-code slots by per-player effectiveness', (done) => {
+    // V25D47: per the mocked perPlayerEffectiveness:
+    //   GK-1  = 1.0  → green
+    //   S22-1 = 0.85 → green  (threshold is >= 0.85)
+    //   S13-2 = 0.7  → yellow
+    //   S05-2 = 1.0  → green
+    setTimeout(() => {
+      fixture.detectChanges();
+      const slots = fixture.nativeElement.querySelectorAll('.slot');
+      let greenCount = 0, yellowCount = 0, redCount = 0;
+      slots.forEach((s: HTMLElement) => {
+        if (s.classList.contains('eff-green'))  greenCount++;
+        if (s.classList.contains('eff-yellow')) yellowCount++;
+        if (s.classList.contains('eff-red'))    redCount++;
+      });
+      // GK-1 + S22-1 + S05-2 = 3 green; S13-2 = 1 yellow.
+      expect(greenCount).toBe(3, '3 slots should be green (effectiveness >= 0.85)');
+      expect(yellowCount).toBe(1, '1 slot should be yellow (0.5 <= eff < 0.85)');
+      expect(redCount).toBe(0, 'no slots should be red');
+      done();
+    }, 30);
+  });
+
+  // ---- drag-drop handlers (direct method calls) ----
+
+  it('handleSlotDrop — moves a slot player to another empty slot', (done) => {
+    // V25D47: drag p-def from S22-1 to S05-2 (currently occupied by p-att
+    // in the role-matched default; we first evict p-att to bench so the
+    // target is empty).
+    setTimeout(() => {
+      // Move p-att to bench first so S05-2 is empty.
+      (component as any).handleBenchDrop({
+        item: { data: (component as any).slotPlayerMap['S05-2'] },
+        previousContainer: { id: 'slot-S05-2' },
+        container: { id: 'bench-list' }
+      } as any);
+
+      // Now drag p-def from S22-1 to S05-2 (empty).
+      const pDef = (component as any).slotPlayerMap['S22-1'];
+      (component as any).handleSlotDrop({
+        item: { data: pDef },
+        previousContainer: { id: 'slot-S22-1' },
+        container: { id: 'slot-S05-2' }
+      } as any);
+
+      // After: p-def is in S05-2, S22-1 is empty.
+      expect((component as any).slotPlayerMap['S05-2']?.playerId).toBe('p-def');
+      expect((component as any).slotPlayerMap['S22-1']).toBeUndefined();
+      done();
+    }, 30);
+  });
+
+  it('handleSlotDrop — swaps two slot players when target is occupied', (done) => {
+    // V25D47: drag p-def from S22-1 onto S13-2 (occupied by p-mid).
+    // Expected: p-def ends in S13-2, p-mid ends in S22-1 (SWAP).
+    setTimeout(() => {
+      const pDef = (component as any).slotPlayerMap['S22-1'];
+      const pMid = (component as any).slotPlayerMap['S13-2'];
+
+      (component as any).handleSlotDrop({
+        item: { data: pDef },
+        previousContainer: { id: 'slot-S22-1' },
+        container: { id: 'slot-S13-2' }
+      } as any);
+
+      expect((component as any).slotPlayerMap['S13-2']?.playerId).toBe('p-def');
+      expect((component as any).slotPlayerMap['S22-1']?.playerId).toBe('p-mid');
+      // Sanity: p-mid's slotId is updated.
+      expect(pMid.slotId).toBe('S22-1');
+      expect(pDef.slotId).toBe('S13-2');
+      done();
+    }, 30);
+  });
+
+  it('handleBenchDrop — moves a slot player to the bench', (done) => {
+    // V25D47: drag p-att from S05-2 to the bench drop list.
+    setTimeout(() => {
+      const pAtt = (component as any).slotPlayerMap['S05-2'];
+      expect(pAtt).toBeTruthy();
+
+      (component as any).handleBenchDrop({
+        item: { data: pAtt },
+        previousContainer: { id: 'slot-S05-2' },
+        container: { id: 'bench-list' }
+      } as any);
+
+      // After: S05-2 is empty, p-att is on the bench.
+      expect((component as any).slotPlayerMap['S05-2']).toBeUndefined();
+      expect(pAtt.slotId).toBe('');
+      const benchIds = (component as any).benchPlayers$.value.map((p: any) => p.playerId);
+      expect(benchIds).toContain('p-att');
+      done();
+    }, 30);
+  });
+
+  // ---- chemistry preview weighting ----
+
+  it('getDisplayedChemistryScore weights raw score by teamAverage', (done) => {
+    // V25D47: raw preview score = 91, teamAverage = 0.8875 → displayed = round(91 * 0.8875) = 81.
+    // The chemistry preview pipeline requires exactly 11 players to fire
+    // (back validates ids.length === 11), so we push 11 here.
+    setTimeout(() => {
+      const ids = ['p0', 'p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8', 'p9', 'p10'];
+      const playerObjs = ids.map(id => ({ playerId: id, name: id, position: 'MID',
+                                         overall: 80, energy: 100, injured: false,
+                                         slotId: 'X', role: 'MID', stamina: 100,
+                                         active: true, isEmpty: false }));
+      (component as any).homePlayers$.next(playerObjs);
+      (component as any).triggerChemistryPreview();
+
+      setTimeout(() => {
+        const displayed = (component as any).getDisplayedChemistryScore();
+        // 91 * 0.8875 = 80.7625 → rounds to 81.
+        expect(displayed).toBe(81,
+          `displayed should be round(91 * 0.8875) = 81, got ${displayed}`);
+        // The ×88% weight chip should be rendered when teamAverage < 1.0.
+        fixture.detectChanges();
+        const weightEl = fixture.nativeElement.querySelector('.preview-eff-weight');
+        expect(weightEl?.textContent).toContain('89%');  // (0.8875 * 100).toFixed(0) = '89'
+        done();
+      }, 400);
+    }, 30);
+  });
+
+  it('getDisplayedChemistryScore returns raw score when formationEffectiveness is null', (done) => {
+    // V25D47 backward compat: when formationEffectiveness is missing, the
+    // chemistry preview shows the raw score unchanged.
+    httpClientSpy.get.and.callFake(((url: string) => {
+      if (url.includes('/editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
+      if (url.includes('/editor/formations'))  return of(FORMATIONS_RESPONSE);
+      if (url.includes('/career/lineup/current')) {
+        return of(buildCurrentLineup(null, 85));  // formationEffectiveness = null
+      }
+      return of([]);
+    }) as any);
+    fixture = TestBed.createComponent(SquadEditorModalComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+
+    setTimeout(() => {
+      const ids = ['p0', 'p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8', 'p9', 'p10'];
+      const playerObjs = ids.map(id => ({ playerId: id, name: id, position: 'MID',
+                                         overall: 80, energy: 100, injured: false,
+                                         slotId: 'X', role: 'MID', stamina: 100,
+                                         active: true, isEmpty: false }));
+      (component as any).homePlayers$.next(playerObjs);
+      (component as any).triggerChemistryPreview();
+
+      setTimeout(() => {
+        const displayed = (component as any).getDisplayedChemistryScore();
+        expect(displayed).toBe(91, 'raw score should be returned unchanged when formationEffectiveness is null');
+        // No ×% weight chip should be rendered.
+        fixture.detectChanges();
+        const weightEl = fixture.nativeElement.querySelector('.preview-eff-weight');
+        expect(weightEl).toBeFalsy('weight chip must NOT render when formationEffectiveness is null');
+        done();
+      }, 400);
+    }, 30);
+  });
+});

@@ -9,12 +9,14 @@ import { HttpClient } from '@angular/common/http';
 import { environment } from '../../environments/environment';
 import { Subject, BehaviorSubject, of, takeUntil } from 'rxjs';
 import { debounceTime, distinctUntilChanged, switchMap, catchError } from 'rxjs/operators';
+import { CdkDragDrop, DragDropModule } from '@angular/cdk/drag-drop';
 import { LineupWarningDTO } from '../../shared/models/lineup/lineup-warning.dto';
 import { FieldSubdivisionDTO } from '../../shared/models/lineup/field-subdivision.dto';
 import { FormationDTO, FormationPositionDTO } from '../../shared/models/lineup/formation.dto';
 import { PlayerOnFieldDto } from '../../shared/models/lineup/player-on-field.dto';
 import { LineupSlotDTO } from '../../shared/models/lineup/lineup-slot.dto';
 import { ChemistryDetailDTO } from '../../shared/models/lineup/lineup.dto';
+import { FormationEffectivenessDTO, effectivenessColor } from '../../shared/models/lineup/formation-effectiveness.dto';
 import { ChemistryPreviewService } from '../../core/services/chemistry-preview.service';
 
 /**
@@ -31,7 +33,7 @@ import { ChemistryPreviewService } from '../../core/services/chemistry-preview.s
 @Component({
   selector: 'app-squad-editor-modal',
   standalone: true,
-  imports: [CommonModule, FormsModule, MatDialogModule, MatButtonModule, MatSelectModule, MatIconModule],
+  imports: [CommonModule, FormsModule, MatDialogModule, MatButtonModule, MatSelectModule, MatIconModule, DragDropModule],
   template: `
     <div class="squad-editor-container">
       <!-- Header -->
@@ -49,33 +51,63 @@ import { ChemistryPreviewService } from '../../core/services/chemistry-preview.s
              chemistry of the in-progress lineup (debounced 300ms after the
              last assignment change). Δ vs the current persisted score.
              Hidden when no preview yet (lineup not complete) or after preview
-             call failed. -->
-        <div class="chemistry-preview-row">
-          <ng-container *ngIf="previewedChemistry$ | async as pc; else previewEmpty">
-            <span class="preview-label">Chemistry proyectado:</span>
-            <span class="preview-score"
-                  [class.high]="pc.score >= 80"
-                  [class.mid]="pc.score >= 60 && pc.score < 80"
-                  [class.low]="pc.score < 60">
-              {{ pc.score }}/99
-            </span>
-            <span class="preview-delta"
-                  *ngIf="currentChemistryScore !== null"
-                  [class.positive]="pc.score > (currentChemistryScore ?? 0)"
-                  [class.negative]="pc.score < (currentChemistryScore ?? 0)"
-                  [title]="'Δ vs chemistry guardado en backend (' + (currentChemistryScore ?? 0) + '/99)'">
-              ({{ pc.score > (currentChemistryScore ?? 0) ? '+' : '' }}{{ pc.score - (currentChemistryScore ?? 0) }})
-            </span>
-          </ng-container>
-          <ng-template #previewEmpty>
-            <span class="preview-label preview-pending"
-                  *ngIf="!previewError; else previewFailed">
-              Proyectando chemistry...
-            </span>
-            <ng-template #previewFailed>
-              <span class="preview-label preview-error">⚠ Chemistry preview unavailable</span>
+             call failed.
+
+             V25D47 (Sprint C11b): the displayed score is weighted by the
+             formationEffectiveness.teamAverage (rawScore * teamAverage,
+             rounded). When formationEffectiveness is missing the raw score
+             is shown unchanged (backward compat with pre-V25D47 lineups). -->
+        <div class="header-preview-stack">
+          <div class="chemistry-preview-row">
+            <ng-container *ngIf="getDisplayedChemistryScore() as displayedScore; else previewEmpty">
+              <span class="preview-label">Chemistry proyectado:</span>
+              <span class="preview-score"
+                    [class.high]="displayedScore >= 80"
+                    [class.mid]="displayedScore >= 60 && displayedScore < 80"
+                    [class.low]="displayedScore < 60">
+                {{ displayedScore }}/99
+              </span>
+              <span *ngIf="teamAverage !== null && teamAverage < 1.0"
+                    class="preview-eff-weight"
+                    [title]="'Ponderado por formación (eff. team ' + (teamAverage * 100).toFixed(0) + '%)'">
+                ×{{ (teamAverage * 100).toFixed(0) }}%
+              </span>
+              <span class="preview-delta"
+                    *ngIf="currentChemistryScore !== null"
+                    [class.positive]="displayedScore > (currentChemistryScore ?? 0)"
+                    [class.negative]="displayedScore < (currentChemistryScore ?? 0)"
+                    [title]="'Δ vs chemistry guardado en backend (' + (currentChemistryScore ?? 0) + '/99)'">
+                ({{ displayedScore > (currentChemistryScore ?? 0) ? '+' : '' }}{{ displayedScore - (currentChemistryScore ?? 0) }})
+              </span>
+            </ng-container>
+            <ng-template #previewEmpty>
+              <span class="preview-label preview-pending"
+                    *ngIf="!previewError; else previewFailed">
+                Proyectando chemistry...
+              </span>
+              <ng-template #previewFailed>
+                <span class="preview-label preview-error">⚠ Chemistry preview unavailable</span>
+              </ng-template>
             </ng-template>
-          </ng-template>
+          </div>
+
+          <!-- V25D47 (Sprint C11b): formation effectiveness row. Hidden when
+               formationEffectiveness is null (legacy pre-V25D47 lineups).
+               Shows the back-inferred formation + team average effectiveness
+               color-coded (green/yellow/red per the same thresholds as
+               per-player markers). -->
+          <div class="formation-effectiveness-row" *ngIf="formationEffectiveness$ | async as fe">
+            <span class="fe-label">Formación inferida:</span>
+            <span class="fe-formation">{{ fe.inferredFormation }}</span>
+            <span class="fe-sep">·</span>
+            <span class="fe-label">Eff. team:</span>
+            <span class="fe-team-avg"
+                  [class.high]="fe.teamAverage >= 0.85"
+                  [class.mid]="fe.teamAverage >= 0.5 && fe.teamAverage < 0.85"
+                  [class.low]="fe.teamAverage < 0.5">
+              {{ (fe.teamAverage * 100).toFixed(0) }}%
+            </span>
+          </div>
         </div>
 
         <button mat-icon-button (click)="close()" class="close-btn" title="Cerrar">✕</button>
@@ -97,22 +129,43 @@ import { ChemistryPreviewService } from '../../core/services/chemistry-preview.s
           <div class="field-line left-goal-area"></div>
           <div class="field-line right-goal-area"></div>
 
-          <!-- SUBDIVISIONES COMO SLOTS (81 + 1 GK) -->
+          <!-- SUBDIVISIONES COMO SLOTS (81 + 1 GK) — V25D47 (C11b) extended
+               each slot as a cdkDropList connected to all other slots +
+               the bench. The slot's player-chip becomes a cdkDrag so the
+               user can drag players between slots. Click is preserved
+               (for opening the assignment panel) — CDK suppresses click
+               when a real drag occurs. -->
           <div class="field-slots">
             <ng-container *ngFor="let sub of subdivisions; let i = index">
               <!-- Slot de arquero (sector 26) -->
               <ng-container *ngIf="sub.isGoalkeeper">
                 <div class="slot slot-gk"
+                     cdkDropList
+                     [id]="'slot-' + sub.subdivisionId"
+                     [cdkDropListConnectedTo]="slotDropListIds.concat([BENCH_DROP_LIST_ID])"
+                     [cdkDropListData]="sub"
+                     (cdkDropListDropped)="handleSlotDrop($event)"
                      [style.left.%]="sub.left"
                      [style.top.%]="sub.top"
                      [style.width.%]="sub.width"
                      [style.height.%]="sub.height"
                      [class.occupied]="isSlotOccupied(sub)"
                      [class.missing-player]="isMissingPlayer(sub)"
+                     [class.eff-green]="getEffectivenessColor(sub.subdivisionId) === 'green'"
+                     [class.eff-yellow]="getEffectivenessColor(sub.subdivisionId) === 'yellow'"
+                     [class.eff-red]="getEffectivenessColor(sub.subdivisionId) === 'red'"
                      (click)="onSlotClick(sub)">
                   <span class="slot-id">{{sub.subdivisionId}}</span>
-                  <div *ngIf="getPlayerInSlot(sub) as player" class="player-chip">
+                  <div *ngIf="getPlayerInSlot(sub) as player"
+                       class="player-chip"
+                       cdkDrag
+                       [cdkDragData]="player">
                     {{player.name | slice:0:10}}
+                  </div>
+                  <div *ngIf="getEffectivenessForSlot(sub.subdivisionId) as eff"
+                       class="slot-eff-badge"
+                       [title]="'Effectiveness: ' + (eff * 100).toFixed(0) + '%'">
+                    {{ (eff * 100).toFixed(0) }}
                   </div>
                   <div *ngIf="isMissingPlayer(sub)" class="missing-indicator">
                     {{getRecommendedRole(sub)}}
@@ -123,6 +176,11 @@ import { ChemistryPreviewService } from '../../core/services/chemistry-preview.s
               <!-- Slots normales (3 por sector) -->
               <ng-container *ngIf="!sub.isGoalkeeper">
                 <div class="slot"
+                     cdkDropList
+                     [id]="'slot-' + sub.subdivisionId"
+                     [cdkDropListConnectedTo]="slotDropListIds.concat([BENCH_DROP_LIST_ID])"
+                     [cdkDropListData]="sub"
+                     (cdkDropListDropped)="handleSlotDrop($event)"
                      [style.left.%]="sub.left"
                      [style.top.%]="sub.top"
                      [style.width.%]="sub.width"
@@ -133,10 +191,21 @@ import { ChemistryPreviewService } from '../../core/services/chemistry-preview.s
                      [class.attack]="sub.zone === 'ATTACK'"
                      [class.midfield]="sub.zone === 'MIDFIELD'"
                      [class.defense]="sub.zone === 'DEFENSE'"
+                     [class.eff-green]="getEffectivenessColor(sub.subdivisionId) === 'green'"
+                     [class.eff-yellow]="getEffectivenessColor(sub.subdivisionId) === 'yellow'"
+                     [class.eff-red]="getEffectivenessColor(sub.subdivisionId) === 'red'"
                      (click)="onSlotClick(sub)">
                   <span class="slot-id">{{sub.subdivisionId}}</span>
-                  <div *ngIf="getPlayerInSlot(sub) as player" class="player-chip">
+                  <div *ngIf="getPlayerInSlot(sub) as player"
+                       class="player-chip"
+                       cdkDrag
+                       [cdkDragData]="player">
                     {{player.name | slice:0:10}}
+                  </div>
+                  <div *ngIf="getEffectivenessForSlot(sub.subdivisionId) as eff"
+                       class="slot-eff-badge"
+                       [title]="'Effectiveness: ' + (eff * 100).toFixed(0) + '%'">
+                    {{ (eff * 100).toFixed(0) }}
                   </div>
                   <div *ngIf="isMissingPlayer(sub)" class="missing-indicator">
                     {{getRecommendedRole(sub)}}
@@ -146,13 +215,18 @@ import { ChemistryPreviewService } from '../../core/services/chemistry-preview.s
             </ng-container>
           </div>
 
-          <!-- Marcadores de jugadores activos -->
+          <!-- Marcadores de jugadores activos — V25D47 (C11b) extended
+               with effectiveness color band. The marker is a visual-only
+               overlay (the slot's player-chip is the draggable handle). -->
           <ng-container *ngFor="let player of homePlayers; let i = index">
             <div *ngIf="player.slotId"
                  class="player-marker"
                  [style.left.%]="getSlotCenterX(player.slotId)"
                  [style.top.%]="getSlotCenterY(player.slotId)"
-                 [class.gk-player]="player.role === 'GK'">
+                 [class.gk-player]="player.role === 'GK'"
+                 [class.eff-green]="getEffectivenessColor(player.slotId) === 'green'"
+                 [class.eff-yellow]="getEffectivenessColor(player.slotId) === 'yellow'"
+                 [class.eff-red]="getEffectivenessColor(player.slotId) === 'red'">
               <div class="player-number">{{i + 1}}</div>
             </div>
           </ng-container>
@@ -161,6 +235,35 @@ import { ChemistryPreviewService } from '../../core/services/chemistry-preview.s
           <div *ngIf="loadingFormation" class="field-loading-overlay">
             <div class="field-spinner"></div>
           </div>
+        </div>
+      </div>
+
+      <!-- V25D47 (Sprint C11b): bench drop list. Drag a bench player onto
+           a slot to assign; drag a slot player onto the bench to remove
+           from the field. Connected to all slot drop lists via
+           [cdkDropListConnectedTo]. Empty state shown when no bench
+           players (whole squad is on the field). -->
+      <div class="bench-container"
+           cdkDropList
+           [id]="BENCH_DROP_LIST_ID"
+           [cdkDropListConnectedTo]="slotDropListIds"
+           [cdkDropListData]="'bench'"
+           (cdkDropListDropped)="handleBenchDrop($event)">
+        <span class="bench-label">
+          Banca ({{ benchPlayers?.length || 0 }})
+        </span>
+        <div class="bench-list">
+          <div *ngFor="let bp of benchPlayers"
+               class="bench-player"
+               cdkDrag
+               [cdkDragData]="bp">
+            <span class="bench-player-name">{{ bp.name }}</span>
+            <span class="bench-player-pos">({{ bp.position }})</span>
+          </div>
+          <span *ngIf="!benchPlayers || benchPlayers.length === 0"
+                class="bench-empty">
+            (vacía — todos en cancha)
+          </span>
         </div>
       </div>
 
@@ -304,6 +407,17 @@ import { ChemistryPreviewService } from '../../core/services/chemistry-preview.s
       color: #a0d4a8;
     }
 
+    /* V25D47 (Sprint C11b): wrapper for chemistry-preview-row +
+       formation-effectiveness-row. Pushes both to the right of the header
+       via margin-left: auto and stacks them vertically with a small gap. */
+    .header-preview-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-left: auto;
+      margin-right: 0.5rem;
+    }
+
     /* V25D45 (Sprint C10): chemistry preview row — projected chemistry of
        in-progress lineup. Sits between the formation selector and the
        close button in the header. */
@@ -311,8 +425,6 @@ import { ChemistryPreviewService } from '../../core/services/chemistry-preview.s
       display: flex;
       align-items: center;
       gap: 0.4rem;
-      margin-left: auto;
-      margin-right: 0.5rem;
       padding: 0.25rem 0.6rem;
       background: rgba(255, 255, 255, 0.08);
       border-radius: 4px;
@@ -377,6 +489,185 @@ import { ChemistryPreviewService } from '../../core/services/chemistry-preview.s
     .preview-delta:not(.positive):not(.negative) {
       background: rgba(255, 255, 255, 0.15);
       color: rgba(255, 255, 255, 0.85);
+    }
+
+    /* V25D47 (Sprint C11b): chemistry preview weight indicator
+       (×85% chip next to the score when formationEffectiveness is
+       applied). Subtle, neutral colors — not the high/mid/low bands. */
+    .preview-eff-weight {
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 0.05rem 0.35rem;
+      border-radius: 3px;
+      background: rgba(255, 255, 255, 0.12);
+      color: rgba(255, 255, 255, 0.85);
+      font-style: italic;
+    }
+
+    /* V25D47 (Sprint C11b): formation-effectiveness row in the header.
+       Shows the back-inferred formation + the teamAverage effectiveness
+       with the same high/mid/low color bands as the per-player markers. */
+    .formation-effectiveness-row {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.25rem 0.6rem;
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 4px;
+      font-size: 0.8rem;
+      color: #fff;
+      white-space: nowrap;
+    }
+    .formation-effectiveness-row .fe-label {
+      color: rgba(255, 255, 255, 0.65);
+      font-size: 0.75rem;
+    }
+    .formation-effectiveness-row .fe-formation {
+      font-weight: 700;
+      padding: 0.05rem 0.4rem;
+      border-radius: 3px;
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+    }
+    .formation-effectiveness-row .fe-sep {
+      color: rgba(255, 255, 255, 0.4);
+    }
+    .formation-effectiveness-row .fe-team-avg {
+      font-weight: 700;
+      padding: 0.05rem 0.4rem;
+      border-radius: 3px;
+    }
+    .formation-effectiveness-row .fe-team-avg.high {
+      background: #48bb78;
+      color: #1a472a;
+    }
+    .formation-effectiveness-row .fe-team-avg.mid {
+      background: #eab308;
+      color: #744210;
+    }
+    .formation-effectiveness-row .fe-team-avg.low {
+      background: #c53030;
+      color: #fff;
+    }
+
+    /* V25D47 (Sprint C11b): bench drop list. Horizontal scrollable strip
+       of bench players below the field. Empty state shows "(vacía)". */
+    .bench-container {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.6rem 1rem;
+      background: rgba(0, 0, 0, 0.35);
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      min-height: 56px;
+    }
+    .bench-container .bench-label {
+      color: #a0d4a8;
+      font-size: 0.85rem;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+    .bench-container .bench-list {
+      display: flex;
+      gap: 0.4rem;
+      overflow-x: auto;
+      flex: 1;
+      padding: 0.2rem 0;
+    }
+    .bench-container .bench-empty {
+      color: rgba(255, 255, 255, 0.45);
+      font-size: 0.8rem;
+      font-style: italic;
+    }
+    .bench-player {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 0.35rem 0.6rem;
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      border-radius: 6px;
+      cursor: grab;
+      min-width: 80px;
+      max-width: 140px;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+    .bench-player:hover {
+      background: rgba(255, 255, 255, 0.2);
+      border-color: rgba(255, 255, 255, 0.5);
+    }
+    .bench-player:active {
+      cursor: grabbing;
+    }
+    .bench-player-name {
+      font-size: 0.75rem;
+      color: #fff;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+    }
+    .bench-player-pos {
+      font-size: 0.65rem;
+      color: rgba(255, 255, 255, 0.6);
+      margin-top: 1px;
+    }
+
+    /* V25D47 (Sprint C11b): per-slot effectiveness badge (small % overlay).
+       Only rendered when formationEffectiveness has a per-player entry
+       for this subdivisionId. */
+    .slot-eff-badge {
+      position: absolute;
+      top: 1px;
+      right: 1px;
+      font-size: 0.5rem;
+      font-weight: 700;
+      padding: 0px 3px;
+      border-radius: 2px;
+      background: rgba(0, 0, 0, 0.7);
+      color: #fff;
+      pointer-events: none;
+    }
+
+    /* V25D47 (Sprint C11b): effectiveness color bands applied to slots
+       (subtle background tint) + player markers (border ring). */
+    .slot.eff-green {
+      background: rgba(72, 187, 120, 0.15);
+      border-color: rgba(72, 187, 120, 0.5);
+    }
+    .slot.eff-yellow {
+      background: rgba(234, 179, 8, 0.15);
+      border-color: rgba(234, 179, 8, 0.5);
+    }
+    .slot.eff-red {
+      background: rgba(197, 48, 48, 0.2);
+      border-color: rgba(197, 48, 48, 0.6);
+    }
+    .player-marker.eff-green .player-number {
+      box-shadow: 0 0 0 3px #48bb78, 0 2px 6px rgba(0, 0, 0, 0.3);
+    }
+    .player-marker.eff-yellow .player-number {
+      box-shadow: 0 0 0 3px #eab308, 0 2px 6px rgba(0, 0, 0, 0.3);
+    }
+    .player-marker.eff-red .player-number {
+      box-shadow: 0 0 0 3px #c53030, 0 2px 6px rgba(0, 0, 0, 0.3);
+    }
+
+    /* CDK drag-drop polish: highlight drop targets on hover/active. */
+    .cdk-drop-list-receiving,
+    .cdk-drop-list-dragging {
+      transition: background 0.15s ease;
+    }
+    .cdk-drop-list-receiving.slot,
+    .cdk-drop-list-dragging.slot {
+      background: rgba(255, 255, 255, 0.25);
+    }
+    .cdk-drop-list-receiving.bench-container,
+    .cdk-drop-list-dragging.bench-container {
+      background: rgba(0, 0, 0, 0.6);
+      border-top-color: rgba(255, 200, 0, 0.5);
     }
 
     /* Field Container */
@@ -921,6 +1212,23 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   currentChemistryScore: number | null = null;
   previewError = false;
 
+  /**
+   * V25D47 (Sprint C11b): formation effectiveness snapshot from the most
+   * recent {@code /career/lineup/current} response. Nullable for backward
+   * compat with lineups created before V25D47 — when null, the formation
+   * effectiveness row in the header and the per-player color codes are
+   * suppressed (the modal still works in click-only mode).
+   *
+   * <p>Updated ONLY on /current load — NOT on every drag-drop. Drag-drop
+   * calls saveLineup() which persists the new slots and (asynchronously)
+   * the back recomputes formationEffectiveness. To avoid an extra round
+   * trip per drop, we let the user re-open the modal (or the parent's
+   * /current refresh) to pick up the latest snapshot. The chemistry preview
+   * already gives instant feedback; per-drag formationEffectiveness update
+   * is a future optimization (C12).
+   */
+  formationEffectiveness$ = new BehaviorSubject<FormationEffectivenessDTO | null>(null);
+
   /** Getters para compatibilidad con template (sin async pipe) */
   get subdivisions() { return this.subdivisions$.value; }
   get homePlayers() { return this.homePlayers$.value; }
@@ -1075,6 +1383,16 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
         this.currentChemistryScore = (typeof response?.chemistryScore === 'number')
             ? response.chemistryScore
             : null;
+
+        // V25D47 (Sprint C11b): capture formationEffectiveness from the
+        // back. Nullable for legacy lineups (pre-V25D47) — when null the
+        // modal hides the effectiveness row and the chemistry preview is
+        // shown unweighted (no teamAverage multiplier).
+        this.formationEffectiveness$.next(
+          (response?.formationEffectiveness && typeof response.formationEffectiveness.teamAverage === 'number')
+            ? response.formationEffectiveness
+            : null
+        );
 
         // Usar la formación seleccionada si no viene del backend
         const formationName = response?.formation || this.selectedFormation || '4-4-2';
@@ -1287,6 +1605,213 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     // V25D45 (Sprint C10): trigger chemistry preview (debounced in pipeline).
     this.triggerChemistryPreview();
     this.cdr.detectChanges();
+  }
+
+  // ============================================================================
+  // V25D47 (Sprint C11b): CDK drag-drop handlers + formationEffectiveness helpers
+  // ============================================================================
+
+  /**
+   * List of subdivisionIds currently rendered as {@code cdkDropList}s.
+   * Passed to {@code [cdkDropListConnectedTo]} on every slot + the bench so
+   * CDK knows the full graph of drop targets. Recomputed when subdivisions
+   * load (the list is static once the field is rendered).
+   */
+  get slotDropListIds(): string[] {
+    return (this.subdivisions || []).map(s => 'slot-' + s.subdivisionId);
+  }
+
+  /** Constant id for the bench drop list (separate from per-slot ids). */
+  readonly BENCH_DROP_LIST_ID = 'bench-list';
+
+  /** Slot id (without 'slot-' prefix) → player currently in that slot. */
+  get playerInTargetSlot(): { [subdivisionId: string]: PlayerOnFieldDto } {
+    return this.slotPlayerMap;
+  }
+
+  /**
+   * V25D47 (Sprint C11b): handle a CDK drop on a slot drop list.
+   *
+   * <p>Source can be either another slot ({@code slot-XYZ}) or the bench
+   * ({@code bench-list}). Target is the slot whose id is encoded in
+   * {@code event.container.id}.
+   *
+   * <p>Behavior matrix:
+   * <ul>
+   *   <li>Same slot → no-op (avoid feedback loops on cdkDragEnd).</li>
+   *   <li>Source=slot-X, target=slot-Y, target empty → move X→Y.</li>
+   *   <li>Source=slot-X, target=slot-Y, target occupied → SWAP X↔Y.</li>
+   *   <li>Source=slot-X, target=bench → move X→bench (remove from field).</li>
+   *   <li>Source=bench, target=slot-Y, target empty → move bench→Y.</li>
+   *   <li>Source=bench, target=slot-Y, target occupied → move bench→Y AND
+   *       evict the previous occupant to the bench.</li>
+   * </ul>
+   *
+   * <p>After any successful drop, persists via {@link saveLineup} and
+   * triggers a chemistry preview (debounced 300ms via the C10 pipeline).
+   * Per the C11b task spec we deliberately do NOT call the back for a fresh
+   * formationEffectiveness on every drop — that would double the backend
+   * load. The user re-opens the modal (or parent refreshes /current) to see
+   * the latest snapshot.
+   */
+  handleSlotDrop(event: CdkDragDrop<any>): void {
+    const player = event.item.data as PlayerOnFieldDto | undefined;
+    if (!player) { return; }
+
+    const targetSubdivisionId = this.subdivisionIdFromDropListId(event.container.id);
+    const sourceDropListId = event.previousContainer.id;
+    if (!targetSubdivisionId) { return; }
+
+    // No-op: source == target (e.g., cdkDragEnd fired on the same list).
+    if (sourceDropListId === 'slot-' + targetSubdivisionId) {
+      return;
+    }
+
+    const sourceSubdivisionId =
+      sourceDropListId === this.BENCH_DROP_LIST_ID
+        ? null
+        : this.subdivisionIdFromDropListId(sourceDropListId);
+
+    const occupant = this.slotPlayerMap[targetSubdivisionId];
+
+    // Step 1: free the source slot (if from a slot).
+    if (sourceSubdivisionId) {
+      delete this.slotPlayerMap[sourceSubdivisionId];
+    }
+
+    // Step 2: place player into target.
+    player.slotId = targetSubdivisionId;
+    this.slotPlayerMap[targetSubdivisionId] = player;
+
+    // Step 3: handle the displaced occupant.
+    if (occupant && occupant.playerId !== player.playerId) {
+      if (sourceSubdivisionId) {
+        // SWAP: push the occupant back into the source slot.
+        occupant.slotId = sourceSubdivisionId;
+        this.slotPlayerMap[sourceSubdivisionId] = occupant;
+      } else {
+        // Source was bench → evict the occupant to the bench.
+        occupant.slotId = '';
+        this.benchPlayers$.next([...this.benchPlayers$.value, occupant]);
+        this.homePlayers$.next(
+          this.homePlayers$.value.filter(p => p.playerId !== occupant.playerId)
+        );
+      }
+    }
+
+    // Step 4: handle the source-side list updates.
+    if (!sourceSubdivisionId) {
+      // Came from bench → remove from bench, add to home (if not already).
+      this.benchPlayers$.next(
+        this.benchPlayers$.value.filter(p => p.playerId !== player.playerId)
+      );
+      if (!this.homePlayers$.value.some(p => p.playerId === player.playerId)) {
+        this.homePlayers$.next([...this.homePlayers$.value, player]);
+      }
+    }
+
+    // Step 5: persist + preview. saveLineup() will POST manual-select with
+    // the updated slot map; triggerChemistryPreview() fires the debounced
+    // POST /preview-chemistry for the new lineup.
+    this.saveLineup();
+    this.triggerChemistryPreview();
+    this.cdr.detectChanges();
+  }
+
+  /**
+   * V25D47 (Sprint C11b): handle a CDK drop onto the bench drop list.
+   * Only valid source → target: slot → bench (move to bench).
+   * Dragging bench → bench is a no-op; dragging slot → bench removes the
+   * player from the field (equivalent to {@link removePlayerFromSlot}).
+   */
+  handleBenchDrop(event: CdkDragDrop<any>): void {
+    const player = event.item.data as PlayerOnFieldDto | undefined;
+    if (!player || !player.slotId) { return; }
+    if (event.previousContainer.id === this.BENCH_DROP_LIST_ID) { return; }
+
+    delete this.slotPlayerMap[player.slotId];
+    player.slotId = '';
+
+    this.homePlayers$.next(
+      this.homePlayers$.value.filter(p => p.playerId !== player.playerId)
+    );
+    if (!this.benchPlayers$.value.some(p => p.playerId === player.playerId)) {
+      this.benchPlayers$.next([...this.benchPlayers$.value, player]);
+    }
+
+    this.saveLineup();
+    this.triggerChemistryPreview();
+    this.cdr.detectChanges();
+  }
+
+  /** Helper: strip the {@code slot-} prefix from a CDK drop list id. */
+  private subdivisionIdFromDropListId(dropListId: string): string | null {
+    if (!dropListId || !dropListId.startsWith('slot-')) { return null; }
+    return dropListId.substring('slot-'.length);
+  }
+
+  /**
+   * V25D47 (Sprint C11b): look up the effectiveness for a given subdivisionId.
+   * Returns {@code null} when formationEffectiveness is missing (legacy
+   * pre-V25D47 response) or the slot is not in the perPlayerEffectiveness map
+   * (shouldn't happen for valid slots, but defensive).
+   */
+  getEffectivenessForSlot(subdivisionId: string | undefined): number | null {
+    if (!subdivisionId) { return null; }
+    const fe = this.formationEffectiveness$.value;
+    if (!fe) { return null; }
+    const v = fe.perPlayerEffectiveness?.[subdivisionId];
+    return typeof v === 'number' ? v : null;
+  }
+
+  /**
+   * V25D47 (Sprint C11b): classify the effectiveness for a slot into a UI
+   * color band (green/yellow/red). Returns null when the slot has no
+   * effectiveness data (used to skip the class binding).
+   */
+  getEffectivenessColor(subdivisionId: string | undefined): 'green' | 'yellow' | 'red' | null {
+    const v = this.getEffectivenessForSlot(subdivisionId);
+    if (v === null) { return null; }
+    return effectivenessColor(v);
+  }
+
+  /**
+   * V25D47 (Sprint C11b): compute the displayed chemistry score by weighting
+   * the preview's raw score with the formationEffectiveness teamAverage.
+   *
+   * <p>{@code displayed = rawScore * teamAverage} (rounded to int).
+   * When formationEffectiveness is missing (legacy pre-V25D47), the raw
+   * score is returned unchanged. When the preview hasn't fired yet
+   * (previewedChemistry$ === null), returns null so the template can
+   * keep the existing "Proyectando chemistry..." placeholder.
+   *
+   * <p>Why weight this way: a 91 chemistry in a poorly-aligned formation
+   * (teamAverage=0.85) effectively behaves as a 91*0.85 = 77 chemistry in
+   * the V24 engine (per C11a's per-player effectiveness weighting). The
+   * preview shows this composed number so the manager sees the real
+   * projected impact of the tactical arrangement, not just the chemistry
+   * score alone.
+   */
+  getDisplayedChemistryScore(): number | null {
+    const raw = this.previewedChemistry$.value;
+    if (!raw) { return null; }
+    const fe = this.formationEffectiveness$.value;
+    if (!fe || typeof fe.teamAverage !== 'number') {
+      return raw.score;
+    }
+    return Math.round(raw.score * fe.teamAverage);
+  }
+
+  /** Convenience: get the teamAverage for template (or null). */
+  get teamAverage(): number | null {
+    const fe = this.formationEffectiveness$.value;
+    return fe && typeof fe.teamAverage === 'number' ? fe.teamAverage : null;
+  }
+
+  /** Convenience: get the inferredFormation for template (or null). */
+  get inferredFormation(): string | null {
+    const fe = this.formationEffectiveness$.value;
+    return fe?.inferredFormation ?? null;
   }
 
   /** Cambia la formación - espera a que termine el ciclo completo incluyendo predicción */
