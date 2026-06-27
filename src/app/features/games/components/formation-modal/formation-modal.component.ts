@@ -17,6 +17,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { FormsModule } from '@angular/forms';
 import { Subject, takeUntil } from 'rxjs';
 import { MatchEngineService } from '../../../../core/services/match-engine.service';
+import { ALL_FORMATIONS, FormationCode } from '../../../../shared/constants/formations';
 
 export interface FormationDialogData {
   matchId: string;
@@ -34,17 +35,12 @@ export interface FormationDialogData {
  * nuevas (P1: 3-5-2-CDM, 5-4-1, 3-4-1-2, 4-2-2-2; P2: 4-3-3-1) para que
  * el dropdown muestre las 12 formations disponibles en el back.
  *
- * Source of truth: `FormationService.getAllFormations()` en el back.
+ * V25D55-C16 P0.1: source of truth moved to
+ * {@code shared/constants/formations.ts}. The 4 dropdowns in this app
+ * (formation-modal, squad-management, squad-editor-modal, test-harness)
+ * now share the same array + the same derived {@link FormationCode} type.
  */
-const FORMATIONS = [
-  '4-4-2', '4-3-3', '3-5-2', '4-2-3-1',
-  '5-3-2', '4-1-4-1', '3-4-3',
-  // V25D54-C15 P1
-  '3-5-2-CDM', '5-4-1', '3-4-1-2', '4-2-2-2',
-  // V25D54-C15 P2
-  '4-3-3-1'
-] as const;
-type Formation = typeof FORMATIONS[number];
+const FORMATIONS = ALL_FORMATIONS;
 
 /**
  * V25D54-C15 P3.2: per-formation role labels por dot.
@@ -199,7 +195,7 @@ export class FormationModalComponent {
   readonly formations: readonly string[] = FORMATIONS;
 
   /** Currently selected formation (signal-based for OnPush compatibility). */
-  readonly selectedFormation = signal<Formation>(
+  readonly selectedFormation = signal<FormationCode>(
     this.normalizeFormation(this.data.currentFormation)
   );
 
@@ -207,10 +203,10 @@ export class FormationModalComponent {
   errorMsg = '';
   private destroy$ = new Subject<void>();
 
-  private normalizeFormation(input: string): Formation {
+  private normalizeFormation(input: string): FormationCode {
     const normalized = (input || '').replace(/\s/g, '');
-    if ((FORMATIONS as readonly string[]).includes(normalized)) {
-      return normalized as Formation;
+    if ((ALL_FORMATIONS as readonly string[]).includes(normalized)) {
+      return normalized as FormationCode;
     }
     return '4-4-2';
   }

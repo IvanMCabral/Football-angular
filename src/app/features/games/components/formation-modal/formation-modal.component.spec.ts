@@ -9,6 +9,13 @@
  * dropdown las incluye, que formationLines devuelve el shape correcto,
  * y que getDotLabel retorna los role labels específicos (LWB, RWB, CDM,
  * CAM, etc.) en lugar de los genéricos anteriores.
+ *
+ * <p>V25D55-C16 P0.1 + P1.3+4: agregados tests para verificar que el HTML
+ * aplica las clases CSS correctas (is-gk, is-def, is-mid, is-att) para
+ * formations con 4, 5 y 6 líneas. Antes los bindings
+ * `[class.is-gk]="last && i === 0"` y `[class.is-att]="i === length - 1 && !last"`
+ * eran siempre false, dejando dots ATT y GK sin styling diferenciado.
+ * Además se valida que la constante compartida tenga 12 formations.
  */
 
 import { ComponentFixture, TestBed } from '@angular/core/testing';
@@ -221,5 +228,134 @@ describe('FormationModalComponent — LIVE-MATCH-F3-UI-LIVE FE5', () => {
     expect(dialogRefSpy.close).toHaveBeenCalledWith(
       jasmine.objectContaining({ success: false, reason: 'cancelled' })
     );
+  });
+
+  // ============================================================================
+  // V25D55 (Sprint C16) P0.1 + P1.3+4 — HTML CSS class bindings
+  // ============================================================================
+
+  /**
+   * Returns the rendered DOM dots for the currently selected formation.
+   * Used by the CSS-class-binding tests below to verify which dots have
+   * `is-gk` / `is-def` / `is-mid` / `is-att` applied.
+   */
+  function renderedDots(): HTMLElement[] {
+    return Array.from(fixture.nativeElement.querySelectorAll('.player-dot'));
+  }
+
+  /** Count dots per pitch-line. */
+  function dotsPerLine(): number[] {
+    const lines = fixture.nativeElement.querySelectorAll('.pitch-line') as NodeListOf<HTMLElement>;
+    const counts: number[] = [];
+    lines.forEach(line => counts.push(line.querySelectorAll('.player-dot').length));
+    return counts;
+  }
+
+  it('V25D55-C16 P0.1: ALL_FORMATIONS (shared constant) has exactly 12 entries', async () => {
+    // Re-import to ensure the source-of-truth constant matches what the
+    // component renders.
+    const { ALL_FORMATIONS: shared } = await import(
+      '../../../../shared/constants/formations'
+    );
+    expect(shared.length).toBe(12);
+    // Spot-check the 5 nuevas from C15 are present.
+    expect(shared).toContain('3-5-2-CDM');
+    expect(shared).toContain('5-4-1');
+    expect(shared).toContain('3-4-1-2');
+    expect(shared).toContain('4-2-2-2');
+    expect(shared).toContain('4-3-3-1');
+  });
+
+  it('V25D55-C16 P1.3+4: GK dot has class is-gk (was always false before the fix)', () => {
+    // 4-4-2: GK is the first dot on the first line.
+    component.onFormationChange('4-4-2');
+    fixture.detectChanges();
+    const dots = renderedDots();
+    expect(dots.length).toBe(11);
+    expect(dots[0].classList.contains('is-gk')).toBeTrue();
+    // No other dot should have is-gk.
+    expect(dots.slice(1).every(d => !d.classList.contains('is-gk'))).toBeTrue();
+  });
+
+  it('V25D55-C16 P1.3+4: ATT dots have class is-att (was always false before the fix)', () => {
+    // 4-4-2: ATT is the last line with 2 dots (indices 9, 10).
+    component.onFormationChange('4-4-2');
+    fixture.detectChanges();
+    const dots = renderedDots();
+    expect(dots[9].classList.contains('is-att')).toBeTrue();
+    expect(dots[10].classList.contains('is-att')).toBeTrue();
+    // No GK/DEF/MID dot should have is-att.
+    for (let i = 0; i < 9; i++) {
+      expect(dots[i].classList.contains('is-att')).toBeFalse();
+    }
+  });
+
+it('V25D55-C16 P1.3+4: 3-5-2-CDM (6 lines) — every MID line gets is-mid (CDM + 2CM + 2WB)', () => {
+    // 3-5-2-CDM shape: GK(1) + 3CB(3) + CDM(1) + 2CM(2) + 2WB(2) + 2ST(2) = 11
+    // Cumulative offsets: line 0 → dots[0], line 1 → dots[1..3], line 2 →
+    // dots[4], line 3 → dots[5..6], line 4 → dots[7..8], line 5 → dots[9..10].
+    component.onFormationChange('3-5-2-CDM');
+    fixture.componentRef.changeDetectorRef.markForCheck();
+    fixture.detectChanges();
+    expect(dotsPerLine()).toEqual([1, 3, 1, 2, 2, 2]);
+
+    const dots = renderedDots();
+    expect(dots.length).toBe(11);
+    // Line 0 (i=0): GK → is-gk
+    expect(dots[0].classList.contains('is-gk')).toBeTrue();
+    // Line 1 (i=1): 3 DEF → is-def (dots 1..3)
+    for (let i = 1; i <= 3; i++) {
+      expect(dots[i].classList.contains('is-def')).toBeTrue();
+    }
+    // Lines 2-4 (i=2,3,4): CDM + 2CM + 2WB → is-mid (dots 4..8, 6 dots)
+    for (let i = 4; i <= 8; i++) {
+      expect(dots[i].classList.contains('is-mid')).toBeTrue();
+    }
+    // Line 5 (i=5): 2 ATT → is-att (dots 9, 10)
+    expect(dots[9].classList.contains('is-att')).toBeTrue();
+    expect(dots[10].classList.contains('is-att')).toBeTrue();
+  });
+
+  it('V25D55-C16 P1.3+4: 5-4-1 (4 lines) — only line 2 is MID, lines 1 is DEF, line 3 is ATT', () => {
+    component.onFormationChange('5-4-1');
+    fixture.detectChanges();
+    expect(dotsPerLine()).toEqual([1, 5, 4, 1]);
+
+    const dots = renderedDots();
+    // Line 0: GK
+    expect(dots[0].classList.contains('is-gk')).toBeTrue();
+    // Line 1: 5 DEF
+    for (let i = 1; i <= 5; i++) {
+      expect(dots[i].classList.contains('is-def')).toBeTrue();
+      expect(dots[i].classList.contains('is-mid')).toBeFalse();
+    }
+    // Line 2: 4 MID
+    for (let i = 6; i <= 9; i++) {
+      expect(dots[i].classList.contains('is-mid')).toBeTrue();
+      expect(dots[i].classList.contains('is-def')).toBeFalse();
+      expect(dots[i].classList.contains('is-att')).toBeFalse();
+    }
+    // Line 3: 1 ATT
+    expect(dots[10].classList.contains('is-att')).toBeTrue();
+  });
+
+  it('V25D55-C16 P1.3+4: 4-2-3-1 (5 lines) — lines 2 and 3 are MID (2 CDM + 3 CAM wide)', () => {
+    component.onFormationChange('4-2-3-1');
+    fixture.detectChanges();
+    expect(dotsPerLine()).toEqual([1, 4, 2, 3, 1]);
+
+    const dots = renderedDots();
+    // Line 0: GK
+    expect(dots[0].classList.contains('is-gk')).toBeTrue();
+    // Line 1: 4 DEF (dots 1-4)
+    for (let i = 1; i <= 4; i++) {
+      expect(dots[i].classList.contains('is-def')).toBeTrue();
+    }
+    // Lines 2-3: 2 CDM + 3 wide CAM = 5 MID (dots 5-9)
+    for (let i = 5; i <= 9; i++) {
+      expect(dots[i].classList.contains('is-mid')).toBeTrue();
+    }
+    // Line 4: 1 ATT (dot 10)
+    expect(dots[10].classList.contains('is-att')).toBeTrue();
   });
 });

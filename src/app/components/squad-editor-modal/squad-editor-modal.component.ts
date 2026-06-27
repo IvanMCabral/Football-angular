@@ -17,6 +17,7 @@ import { PlayerOnFieldDto } from '../../shared/models/lineup/player-on-field.dto
 import { LineupSlotDTO } from '../../shared/models/lineup/lineup-slot.dto';
 import { ChemistryDetailDTO } from '../../shared/models/lineup/lineup.dto';
 import { FormationEffectivenessDTO, effectivenessColor } from '../../shared/models/lineup/formation-effectiveness.dto';
+import { ALL_FORMATIONS } from '../../shared/constants/formations';
 import { ChemistryPreviewService } from '../../core/services/chemistry-preview.service';
 
 /**
@@ -1257,8 +1258,14 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   /** Formación seleccionada */
   selectedFormation = '4-4-2';
 
-  /** Formaciones disponibles */
-  formations = ['4-4-2', '4-3-3', '3-5-2', '4-2-3-1', '5-3-2', '4-1-4-1', '3-4-3'];
+  /**
+   * V25D55-C16 P0.1: source of truth movido a
+   * {@code shared/constants/formations.ts}. Antes eran solo las 7 originales
+   * — faltaban las 5 nuevas de V25D54-C15 (3-5-2-CDM, 5-4-1, 3-4-1-2,
+   * 4-2-2-2, 4-3-3-1). Ahora el dropdown muestra las 12 formations que el
+   * back-end reconoce.
+   */
+  formations: readonly string[] = ALL_FORMATIONS;
 
   /** Cache de posiciones de formación */
   private formationPositions: { [key: string]: FormationPositionDTO[] } = {};

@@ -190,15 +190,21 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
     expect(() => component.openVisualEditor()).not.toThrow();
   });
 
-  it('V25D38-F1: availableFormations exposes the 7 formations supported by the engine', () => {
-    // V25D36 backend extendió FormationService.getAllFormations() a 7 formations.
-    // squad-management quedó inconsistente con solo 5; V25D38 lo arregla.
-    // Mismo set que test-harness.model.ts FORMATION_CODES + formation-modal +
-    // squad-editor-modal.
-    const EXPECTED_FORMATIONS = ['4-4-2', '4-3-3', '3-5-2', '4-2-3-1', '5-3-2', '4-1-4-1', '3-4-3'];
-    expect(component.availableFormations.length).toBe(7);
-    for (const formation of EXPECTED_FORMATIONS) {
-      expect(component.availableFormations).toContain(formation);
+  it('V25D55-C16 P0.1: availableFormations exposes the 12 formations shared constant', () => {
+    // V25D54 backend extendió a 12 formations (7 originales + 5 nuevas).
+    // V25D55-C16 P0.1: source of truth movido a shared/constants/formations.ts;
+    // squad-management ahora referencia ALL_FORMATIONS (12 entries) en lugar
+    // del array hardcoded de 7 que tenía antes.
+    expect(component.availableFormations.length).toBe(12);
+    // Spot-check the 5 nuevas from C15 are now exposed in the squad dropdown.
+    expect(component.availableFormations).toContain('3-5-2-CDM');
+    expect(component.availableFormations).toContain('5-4-1');
+    expect(component.availableFormations).toContain('3-4-1-2');
+    expect(component.availableFormations).toContain('4-2-2-2');
+    expect(component.availableFormations).toContain('4-3-3-1');
+    // Regression: 7 originales siguen presentes.
+    for (const f of ['4-4-2', '4-3-3', '3-5-2', '4-2-3-1', '5-3-2', '4-1-4-1', '3-4-3']) {
+      expect(component.availableFormations).toContain(f);
     }
   });
 
