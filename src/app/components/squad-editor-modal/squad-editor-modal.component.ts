@@ -862,7 +862,27 @@ import { ChemistryPreviewService } from '../../core/services/chemistry-preview.s
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      max-width: 90%;
+      /* V25D50-FRONT-F4-DRAG-FIX (Sprint C12): enlarge the cdkDrag handle so
+         the bounding box is large enough to be a reliable drop target for
+         both mouse and Playwright programmatic drag. Previously max-width
+         90 percent plus small font plus thin padding produced ~47x15px chips
+         on 11.11%-wide slots - Playwright dragTo failed on edge slots like
+         S24-3 (rightmost defense slot at left 88.88 percent, right 100 percent)
+         where the chip right edge sits very close to the field right border.
+         Filling the slot width plus min-height 20px gives a stable drag area
+         for all slots, future-proofing any new edge positions. */
+      width: 100%;
+      max-width: 100%;
+      min-height: 20px;
+      box-sizing: border-box;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      cursor: grab;
+    }
+    .player-chip:active {
+      cursor: grabbing;
     }
 
     /* Player Marker (número sobre el campo) */
