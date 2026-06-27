@@ -18,6 +18,7 @@ import { LineupPlayerCardComponent } from 'app/shared/components/lineup-player-c
 import { SeasonStatsTabComponent } from '../../player-season-stats/components/season-stats-tab/season-stats-tab.component';
 import { LineupDTO, PlayerLineupDTO, ChemistryBreakdownDTO } from 'app/shared/models/lineup/lineup.dto';
 import { LineupWarningDTO } from 'app/shared/models/lineup/lineup-warning.dto';
+import { ALL_FORMATIONS } from 'app/shared/constants/formations';
 import { SquadEditorModalComponent } from 'app/components/squad-editor-modal/squad-editor-modal.component';
 
 interface SessionPlayer {
@@ -143,13 +144,15 @@ export class SquadManagementComponent implements OnInit {
    positionGroupOrder: ReadonlyArray<keyof ChemistryBreakdownDTO['positionGroups']> =
        ['GK', 'DEF', 'MID', 'ATT'];
 
-   selectedFormation$ = new BehaviorSubject<string>('4-4-2');
-   /**
-    * V25D38-F1: extendido a las 7 formations que el engine soporta
-    * (consistencia con V25D36 backend + formation-modal + squad-editor-modal +
-    * test-harness FORMATION_CODES). Orden alineado con los otros dropdowns.
-    */
-   availableFormations = ['4-4-2', '4-3-3', '3-5-2', '4-2-3-1', '5-3-2', '4-1-4-1', '3-4-3'];
+selectedFormation$ = new BehaviorSubject<string>('4-4-2');
+  /**
+   * V25D38-F1: extendido a las 7 formations que el engine soporta.
+   * V25D55-C16 P0.1: extendido a las 12 formations que el back-end
+   * reconoce (7 originales + 5 nuevas from V25D54-C15). Source of truth
+   * movido a `shared/constants/formations.ts` para mantener en sync con
+   * formation-modal, squad-editor-modal y test-harness.
+   */
+  availableFormations: readonly string[] = ALL_FORMATIONS;
 
    /** Active tab: 'squad' | 'stats' */
    activeTab$ = new BehaviorSubject<'squad' | 'stats'>('squad');

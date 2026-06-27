@@ -10,20 +10,26 @@
  */
 
 import { MatchDetail } from '../../match-detail/models/match-detail.model';
+import { ALL_FORMATIONS, FormationCode } from '../../../shared/constants/formations';
 
-/** Formation codes accepted by the V24 engine. */
-export type FormationCode = '4-3-3' | '4-4-2' | '3-5-2' | '4-2-3-1' | '5-3-2' | '4-1-4-1' | '3-4-3';
+/**
+ * V25D55-C16 P0.1: re-export the shared {@link FormationCode} type from
+ * `shared/constants/formations.ts`. Source of truth moved out — every
+ * front-end dropdown that exposes formations now shares the same array
+ * AND the same derived union type, so adding a formation in the back-end
+ * is a one-line change in the shared file.
+ *
+ * Deprecated: hand-written unions like `'4-3-3' | '4-4-2' | ...` will
+ * silently miss any formation added after they were last updated.
+ */
+export type { FormationCode };
 
-/** Allowed formation codes for the UI select. */
-export const FORMATION_CODES: readonly FormationCode[] = [
-  '4-3-3',
-  '4-4-2',
-  '3-5-2',
-  '4-2-3-1',
-  '5-3-2',
-  '4-1-4-1',
-  '3-4-3',
-] as const;
+/**
+ * Allowed formation codes for the test-harness UI select.
+ * V25D55-C16 P0.1: now an alias of {@link ALL_FORMATIONS} (12 formations,
+ * up from the 7 stale entries the file used to hardcode).
+ */
+export const FORMATION_CODES: readonly FormationCode[] = ALL_FORMATIONS;
 
 /** Body for POST /api/v1/test-harness/career/set-formation. */
 export interface SetFormationRequest {
