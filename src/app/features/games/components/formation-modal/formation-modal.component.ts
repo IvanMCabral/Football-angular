@@ -29,14 +29,128 @@ export interface FormationDialogData {
   }>;
 }
 
-const FORMATIONS = ['4-4-2', '4-3-3', '3-5-2', '4-2-3-1', '5-3-2', '4-1-4-1', '3-4-3'] as const;
+/**
+ * All formations exposed by the modal. V25D54-C15: added 5 formations
+ * nuevas (P1: 3-5-2-CDM, 5-4-1, 3-4-1-2, 4-2-2-2; P2: 4-3-3-1) para que
+ * el dropdown muestre las 12 formations disponibles en el back.
+ *
+ * Source of truth: `FormationService.getAllFormations()` en el back.
+ */
+const FORMATIONS = [
+  '4-4-2', '4-3-3', '3-5-2', '4-2-3-1',
+  '5-3-2', '4-1-4-1', '3-4-3',
+  // V25D54-C15 P1
+  '3-5-2-CDM', '5-4-1', '3-4-1-2', '4-2-2-2',
+  // V25D54-C15 P2
+  '4-3-3-1'
+] as const;
 type Formation = typeof FORMATIONS[number];
+
+/**
+ * V25D54-C15 P3.2: per-formation role labels por dot.
+ *
+ * Cada entrada es un array de líneas (GK al TOP del display, ATT al
+ * BOTTOM). Cada línea es un array de role labels (en orden left-to-right)
+ * matching las posiciones del slot en la formación correspondiente.
+ *
+ * Source of truth: `FormationService.buildFormations()` en el back.
+ * Los role labels match los golden masters de
+ * `FormationServiceTest.goldenRolesForOriginal7Formations` y
+ * `goldenRolesForNew5Formations`.
+ */
+const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
+  // ========== 7 formations originales (V25D36-F2) ==========
+  '4-4-2': [
+    ['GK'],
+    ['LB', 'CB', 'CB', 'RB'],
+    ['LM', 'CM', 'CM', 'RM'],
+    ['ST', 'ST']
+  ],
+  '4-3-3': [
+    ['GK'],
+    ['LB', 'CB', 'CB', 'RB'],
+    ['CM', 'CM', 'CM'],
+    ['LW', 'ST', 'RW']
+  ],
+  '3-5-2': [
+    // P0 fixed: pos #4 LM→LWB, pos #8 RM→RWB (wide mids son wing-backs).
+    ['GK'],
+    ['CB', 'CB', 'CB'],
+    ['LWB', 'CM', 'CM', 'CM', 'RWB'],
+    ['ST', 'ST']
+  ],
+  '4-2-3-1': [
+    ['GK'],
+    ['LB', 'CB', 'CB', 'RB'],
+    ['CDM', 'CDM'],
+    ['LW', 'CAM', 'RW'],
+    ['ST']
+  ],
+  '5-3-2': [
+    ['GK'],
+    ['LB', 'CB', 'CB', 'CB', 'RB'],
+    ['CM', 'CM', 'CM'],
+    ['ST', 'ST']
+  ],
+  '4-1-4-1': [
+    ['GK'],
+    ['LB', 'CB', 'CB', 'RB'],
+    ['CDM'],
+    ['LM', 'CM', 'CM', 'RM'],
+    ['ST']
+  ],
+  '3-4-3': [
+    // P0 fixed: pos #4 LM→LWB, pos #7 RM→RWB.
+    ['GK'],
+    ['CB', 'CB', 'CB'],
+    ['LWB', 'CM', 'CM', 'RWB'],
+    ['LW', 'ST', 'RW']
+  ],
+  // ========== V25D54-C15 P1: 4 formations nuevas ==========
+  '3-5-2-CDM': [
+    ['GK'],
+    ['CB', 'CB', 'CB'],
+    ['CDM'],
+    ['CM', 'CM'],
+    ['LWB', 'RWB'],
+    ['ST', 'ST']
+  ],
+  '5-4-1': [
+    ['GK'],
+    ['LB', 'CB', 'CB', 'CB', 'RB'],
+    ['LM', 'CM', 'CM', 'RM'],
+    ['ST']
+  ],
+  '3-4-1-2': [
+    ['GK'],
+    ['CB', 'CB', 'CB'],
+    ['LWB', 'CM', 'CM', 'RWB'],
+    ['CAM'],
+    ['ST', 'ST']
+  ],
+  '4-2-2-2': [
+    ['GK'],
+    ['LB', 'CB', 'CB', 'RB'],
+    ['CDM', 'CDM'],
+    ['LM', 'RM'],
+    ['ST', 'ST']
+  ],
+  // ========== V25D54-C15 P2: variante 4-3-3-1 ==========
+  '4-3-3-1': [
+    ['GK'],
+    ['LB', 'CB', 'CB', 'RB'],
+    ['CDM'],
+    ['CM', 'CM'],
+    ['LW', 'ST', 'RW']
+  ]
+};
 
 /**
  * LIVE-MATCH-F3-UI-LIVE FE5: formation-change modal.
  *
- * <p>D-formation-ui: dropdown with 4 options (4-4-2, 4-3-3, 3-5-2, 4-2-3-1)
- * + a visual pitch that re-renders the layout based on the selection.
+ * <p>D-formation-ui: dropdown with formation options (4-4-2, 4-3-3, 3-5-2,
+ * 4-2-3-1, 5-3-2, 4-1-4-1, 3-4-3 + 5 nuevas V25D54-C15) + a visual pitch
+ * that re-renders the layout based on the selection.
  *
  * <p>The actual swap of players between slots is intentionally NOT exposed
  * here — per the F5 backend contract, the formation-change endpoint expects
@@ -51,6 +165,12 @@ type Formation = typeof FORMATIONS[number];
  * unblocks the visual flow ("Ver mi formacion cambiar"), but the formation
  * string is what the backend stores. The snapshot's {@code homeFormation}
  * field reflects the new formation on the next tick.
+ *
+ * <p>V25D54-C15 P3.2: ahora cada dot muestra el role label específico
+ * (LWB, RWB, CDM, CAM, ST, etc.) en lugar de labels genéricos (DF, MD, AT).
+ * Esto alinea el visual con los role labels que {@code FormationService}
+ * expone en el back (golden-tested en
+ * {@code FormationServiceTest.goldenRolesFor*Formations}).
  */
 @Component({
   selector: 'app-formation-modal',
@@ -103,15 +223,18 @@ export class FormationModalComponent {
   /**
    * Returns the count of players per line for the visual pitch.
    * E.g. 4-4-2 → [1, 4, 4, 2] (GK, DEF, MID, ATT).
+   *
+   * <p>V25D54-C15 P3.2: derived from {@link FORMATION_LINES_BY_FORMATION}
+   * para que el conteo siempre matchee los role labels. Si la formation
+   * no está en el map (no debería pasar, pero defensivo), cae al default
+   * 4-4-2.
    */
   get formationLines(): number[] {
-    switch (this.selectedFormation()) {
-      case '4-4-2':   return [1, 4, 4, 2];
-      case '4-3-3':   return [1, 4, 3, 3];
-      case '3-5-2':   return [1, 3, 5, 2];
-      case '4-2-3-1': return [1, 4, 2, 3, 1];
-      default:        return [1, 4, 4, 2];
+    const lines = FORMATION_LINES_BY_FORMATION[this.selectedFormation()];
+    if (!lines || lines.length === 0) {
+      return [1, 4, 4, 2]; // fallback defensivo
     }
+    return lines.map(line => line.length);
   }
 
   confirm(): void {
@@ -160,19 +283,27 @@ export class FormationModalComponent {
     this.dialogRef.close({ success: false, reason: 'cancelled' });
   }
 
-  /** Returns the label shown on each player dot (role hint). */
-  getDotLabel(lineIdx: number, n: number, _count: number, isLast: boolean): string {
-    // The first line is always the GK. The last line is always the ATT line.
-    if (lineIdx === 0 && isLast) {
-      return 'GK';
+  /**
+   * Returns the role label shown on each player dot.
+   *
+   * <p>V25D54-C15 P3.2: lee de {@link FORMATION_LINES_BY_FORMATION} para
+   * devolver labels específicos por formation (LWB, RWB, CDM, CAM, etc.)
+   * en lugar de los genéricos anteriores (DF, MD, AT).
+   *
+   * <p>Los parámetros {@code count} e {@code isLast} se mantienen por
+   * compat con el template HTML pero ya no se usan para calcular el
+   * label (la info está en el map).
+   *
+   * @param lineIdx índice de la línea en la formación (0 = GK al top,
+   *                última línea = ATT al bottom).
+   * @param n índice del dot dentro de la línea (left-to-right).
+   */
+  getDotLabel(lineIdx: number, n: number, _count: number, _isLast: boolean): string {
+    const lines = FORMATION_LINES_BY_FORMATION[this.selectedFormation()];
+    if (!lines || !lines[lineIdx]) {
+      return '';
     }
-    if (isLast) {
-      // The last line is the ATT line — label "AT".
-      return 'AT';
-    }
-    // Middle lines are DEF / MID.
-    if (lineIdx === 1) { return 'DF'; }
-    return 'MD';
+    return lines[lineIdx][n] ?? '';
   }
 
   ngOnDestroy(): void {
