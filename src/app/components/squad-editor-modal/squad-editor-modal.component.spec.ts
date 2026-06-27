@@ -893,3 +893,259 @@ describe('SquadEditorModalComponent — V25D47 (C11b) drag-drop + effectiveness'
     }, 30);
   });
 });
+
+/**
+ * V25D51 (Sprint C13): chip-level effectiveness feedback. The chip receives a
+ * CSS class bound from getChipEffectivenessClass() and renders a corner
+ * badge showing the percentage. Thresholds differ from the slot-level
+ * eff-green/yellow/red (which uses 0.85 / 0.5); the chip uses 0.9 / 0.7
+ * to give the user tighter feedback on their per-player alignment.
+ */
+describe('SquadEditorModalComponent — V25D51 chip-level effectiveness feedback', () => {
+  let component: SquadEditorModalComponent;
+  let fixture: ComponentFixture<SquadEditorModalComponent>;
+  let httpClientSpy: jasmine.SpyObj<HttpClient>;
+  let dialogRefSpy: jasmine.SpyObj<MatDialogRef<SquadEditorModalComponent>>;
+
+  // Minimal field: 4 slots, one of each perPlayerEffectiveness band the test
+  // cares about (1.0 → good, 0.85 → good (just at threshold), 0.7 → warning
+  // (just at threshold), 0.5 → bad). Plus GK-1 at 1.0 to keep the row
+  // balanced.
+  const SUBDIVISIONS_RESPONSE = [
+    { subdivisionId: 'GK-1',  isGoalkeeper: true,  sector: 26, subIndex: 1, left: 35, top: 88, width: 30, height: 10, zone: 'GK' },
+    { subdivisionId: 'S22-1', isGoalkeeper: false, sector: 22, subIndex: 1, left: 10, top: 70, width: 25, height: 12, zone: 'DEFENSE' },
+    { subdivisionId: 'S13-2', isGoalkeeper: false, sector: 13, subIndex: 2, left: 40, top: 45, width: 20, height: 12, zone: 'MIDFIELD' },
+    { subdivisionId: 'S05-2', isGoalkeeper: false, sector:  5, subIndex: 2, left: 45, top: 10, width: 10, height: 10, zone: 'ATTACK' },
+    { subdivisionId: 'S05-3', isGoalkeeper: false, sector:  5, subIndex: 3, left: 70, top: 10, width: 10, height: 10, zone: 'ATTACK' }
+  ];
+
+  const FORMATIONS_RESPONSE = [
+    {
+      name: '4-4-2', description: '4-4-2',
+      defenders: 1, midfielders: 1, attackers: 2, outfieldPlayers: 4,
+      positions: [
+        { index: 0, role: 'GK',  xPercent: 50, yPercent: 93, actionRangePercent: 5, subdivisionId: 'GK-1' },
+        { index: 1, role: 'DEF', xPercent: 20, yPercent: 75, actionRangePercent: 7, subdivisionId: 'S22-1' },
+        { index: 2, role: 'MID', xPercent: 50, yPercent: 50, actionRangePercent: 7, subdivisionId: 'S13-2' },
+        { index: 3, role: 'ATT', xPercent: 30, yPercent: 10, actionRangePercent: 6, subdivisionId: 'S05-2' },
+        { index: 4, role: 'ATT', xPercent: 70, yPercent: 10, actionRangePercent: 6, subdivisionId: 'S05-3' }
+      ]
+    }
+  ];
+
+  /**
+   * /career/lineup/current response builder — accepts perPlayerEffectiveness
+   * keyed by subdivisionId. Pass null for formationEffectiveness to simulate
+   * a legacy pre-V25D47 response (no chip feedback expected).
+   */
+  function buildCurrentLineup(
+    perPlayerEffectiveness: Record<string, number> | null,
+    formationEffectiveness: any | null,
+    chemistryScore: number | null
+  ): any {
+    return {
+      formation: '4-4-2',
+      players: [
+        { playerId: 'p-gk',  name: 'GK',  position: 'GK',  overall: 80, energy: 100, injured: false },
+        { playerId: 'p-def', name: 'DEF', position: 'DEF', overall: 80, energy: 100, injured: false },
+        { playerId: 'p-mid', name: 'MID', position: 'MID', overall: 80, energy: 100, injured: false },
+        { playerId: 'p-att', name: 'ATT', position: 'ATT', overall: 80, energy: 100, injured: false },
+        { playerId: 'p-att2', name: 'ATT2', position: 'ATT', overall: 80, energy: 100, injured: false }
+      ],
+      confirmed: true,
+      warnings: [],
+      slots: [],
+      chemistryScore,
+      formationEffectiveness: formationEffectiveness === null && perPlayerEffectiveness === null
+        ? null
+        : {
+            inferredFormation: '4-4-2',
+            perPlayerEffectiveness: perPlayerEffectiveness || {},
+            teamAverage: 0.8
+          }
+    };
+  }
+
+  beforeEach(async () => {
+    httpClientSpy = jasmine.createSpyObj('HttpClient', ['get', 'post']);
+    dialogRefSpy = jasmine.createSpyObj('MatDialogRef', ['close']);
+
+    httpClientSpy.get.and.callFake(((url: string) => {
+      if (url.includes('/editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
+      if (url.includes('/editor/formations'))  return of(FORMATIONS_RESPONSE);
+      if (url.includes('/career/lineup/current')) {
+        // Default: full V25D51 effectiveness coverage. Distribution per slot:
+        //   GK-1=1.0  → eff-good  (perfect GK)
+        //   S22-1=0.95 → eff-good  (well above the 0.9 threshold)
+        //   S13-2=0.7  → eff-warning (right at the 0.7 threshold)
+        //   S05-2=0.5  → eff-bad    (well below 0.7)
+        //   S05-3=1.0  → eff-good  (perfect ATT)
+        return of(buildCurrentLineup(
+          { 'GK-1': 1.0, 'S22-1': 0.95, 'S13-2': 0.7, 'S05-2': 0.5, 'S05-3': 1.0 },
+          { inferredFormation: '4-4-2', perPlayerEffectiveness: { 'GK-1': 1.0, 'S22-1': 0.95, 'S13-2': 0.7, 'S05-2': 0.5, 'S05-3': 1.0 }, teamAverage: 0.83 },
+          85
+        ));
+      }
+      return of([]);
+    }) as any);
+
+    httpClientSpy.post.and.callFake(((_url: string, _body: any) => {
+      if (_url.includes('/career/lineup/preview-chemistry')) {
+        return of({ score: 91, breakdown: { positionGroups: {}, maxSkillByType: {}, coveragePercentage: 10 }, maxSkillByType: {}, coveragePercentage: 10 });
+      }
+      if (_url.includes('/career/lineup/manual-select')) {
+        return of({ players: [], warnings: [] });
+      }
+      if (_url.includes('/career/lineup/confirm')) {
+        return of({ confirmed: true, warnings: [] });
+      }
+      return of({});
+    }) as any);
+
+    await TestBed.configureTestingModule({
+      imports: [SquadEditorModalComponent, NoopAnimationsModule],
+      providers: [
+        { provide: MAT_DIALOG_DATA, useValue: { careerId: 'c1', matchId: null } },
+        { provide: MatDialogRef, useValue: dialogRefSpy },
+        { provide: HttpClient, useValue: httpClientSpy }
+      ]
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(SquadEditorModalComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+  });
+
+  // ---- helper method ----
+
+  it('getChipEffectivenessClass returns eff-good for eff >= 0.9', (done) => {
+    setTimeout(() => {
+      expect((component as any).getChipEffectivenessClass('GK-1')).toBe('eff-good');
+      // 0.95 is above the 0.9 threshold — must be eff-good.
+      expect((component as any).getChipEffectivenessClass('S22-1')).toBe('eff-good');
+      done();
+    }, 30);
+  });
+
+  it('getChipEffectivenessClass returns eff-warning for 0.7 <= eff < 0.9', (done) => {
+    setTimeout(() => {
+      expect((component as any).getChipEffectivenessClass('S13-2')).toBe('eff-warning');
+      // 0.7 is the inclusive lower bound — must also be eff-warning.
+      done();
+    }, 30);
+  });
+
+  it('getChipEffectivenessClass returns eff-bad for eff < 0.7', (done) => {
+    setTimeout(() => {
+      expect((component as any).getChipEffectivenessClass('S05-2')).toBe('eff-bad');
+      done();
+    }, 30);
+  });
+
+  it('getChipEffectivenessClass returns null for unknown subdivisionId', (done) => {
+    setTimeout(() => {
+      expect((component as any).getChipEffectivenessClass(undefined)).toBeNull();
+      expect((component as any).getChipEffectivenessClass('UNKNOWN')).toBeNull();
+      done();
+    }, 30);
+  });
+
+  // ---- template bindings ----
+
+  it('renders eff-good on the chip for eff >= 0.9', (done) => {
+    setTimeout(() => {
+      fixture.detectChanges();
+      const chips = fixture.nativeElement.querySelectorAll('.player-chip');
+      let goodCount = 0;
+      chips.forEach((c: HTMLElement) => {
+        if (c.classList.contains('eff-good')) goodCount++;
+      });
+      // GK-1 (1.0) + S22-1 (0.85) + S05-3 (1.0) = 3 eff-good chips.
+      expect(goodCount).toBe(3,
+        `expected 3 chips with eff-good (eff >= 0.9), got ${goodCount}`);
+      done();
+    }, 30);
+  });
+
+  it('renders eff-warning on the chip for 0.7 <= eff < 0.9', (done) => {
+    setTimeout(() => {
+      fixture.detectChanges();
+      const chips = fixture.nativeElement.querySelectorAll('.player-chip');
+      let warnCount = 0;
+      chips.forEach((c: HTMLElement) => {
+        if (c.classList.contains('eff-warning')) warnCount++;
+      });
+      // S13-2 (0.7) = 1 eff-warning chip.
+      expect(warnCount).toBe(1,
+        `expected 1 chip with eff-warning (0.7-0.9), got ${warnCount}`);
+      done();
+    }, 30);
+  });
+
+  it('renders eff-bad on the chip for eff < 0.7', (done) => {
+    setTimeout(() => {
+      fixture.detectChanges();
+      const chips = fixture.nativeElement.querySelectorAll('.player-chip');
+      let badCount = 0;
+      chips.forEach((c: HTMLElement) => {
+        if (c.classList.contains('eff-bad')) badCount++;
+      });
+      // S05-2 (0.5) = 1 eff-bad chip.
+      expect(badCount).toBe(1,
+        `expected 1 chip with eff-bad (eff < 0.7), got ${badCount}`);
+      done();
+    }, 30);
+  });
+
+  it('renders the corner eff-badge inside each chip with the percentage', (done) => {
+    setTimeout(() => {
+      fixture.detectChanges();
+      const badges = fixture.nativeElement.querySelectorAll('.player-chip .eff-badge');
+      // 5 chips with effectiveness data → 5 badges rendered.
+      expect(badges.length).toBe(5,
+        `expected 5 eff-badges (one per chip with effectiveness data), got ${badges.length}`);
+      // Spot-check one badge content. Array.from on NodeList → Element[];
+      // map returns string[] (textContent is `string | null`, the empty string
+      // fallback handles any non-text node edge cases).
+      const badgeTexts: string[] = Array.from(badges as NodeListOf<HTMLElement>)
+        .map((b: HTMLElement) => (b.textContent || '').trim());
+      expect(badgeTexts).toContain('100%');
+      expect(badgeTexts).toContain('95%');
+      expect(badgeTexts).toContain('70%');
+      expect(badgeTexts).toContain('50%');
+      done();
+    }, 30);
+  });
+
+  // ---- backward compat ----
+
+  it('does NOT render any chip-level feedback when formationEffectiveness is null', (done) => {
+    // V25D51 backward compat: legacy pre-V25D51 lineups must not show
+    // chip-level effectiveness classes or badges.
+    httpClientSpy.get.and.callFake(((url: string) => {
+      if (url.includes('/editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
+      if (url.includes('/editor/formations'))  return of(FORMATIONS_RESPONSE);
+      if (url.includes('/career/lineup/current')) {
+        return of(buildCurrentLineup(null, null, 85));  // formationEffectiveness=null
+      }
+      return of([]);
+    }) as any);
+    fixture = TestBed.createComponent(SquadEditorModalComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+
+    setTimeout(() => {
+      fixture.detectChanges();
+      const chips = fixture.nativeElement.querySelectorAll('.player-chip');
+      chips.forEach((c: HTMLElement) => {
+        // Jasmine's toBeFalse() takes 0 args; use the negated form with a message.
+        expect(c.classList.contains('eff-good')).withContext('legacy lineups must NOT render eff-good on chips').toBeFalse();
+        expect(c.classList.contains('eff-warning')).withContext('legacy lineups must NOT render eff-warning on chips').toBeFalse();
+        expect(c.classList.contains('eff-bad')).withContext('legacy lineups must NOT render eff-bad on chips').toBeFalse();
+      });
+      const badges = fixture.nativeElement.querySelectorAll('.player-chip .eff-badge');
+      expect(badges.length).withContext('legacy lineups must NOT render eff-badges inside chips').toBe(0);
+      done();
+    }, 30);
+  });
+});

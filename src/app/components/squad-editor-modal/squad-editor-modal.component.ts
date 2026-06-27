@@ -156,16 +156,26 @@ import { ChemistryPreviewService } from '../../core/services/chemistry-preview.s
                      [class.eff-red]="getEffectivenessColor(sub.subdivisionId) === 'red'"
                      (click)="onSlotClick(sub)">
                   <span class="slot-id">{{sub.subdivisionId}}</span>
+                  <!-- V25D51 (Sprint C13): chip-level effectiveness feedback.
+                       eff-good (>=0.9) keeps the default chip style; eff-warning
+                       (0.7-0.9) draws an orange border; eff-bad (<0.7) draws a red
+                       border. The corner badge (eff-badge) always shows the
+                       percentage when formationEffectiveness has data. The
+                       pre-existing slot-eff-badge was removed from this slot since
+                       the chip-level badge replaces its visual function. -->
                   <div *ngIf="getPlayerInSlot(sub) as player"
                        class="player-chip"
                        cdkDrag
-                       [cdkDragData]="player">
-                    {{player.name | slice:0:10}}
-                  </div>
-                  <div *ngIf="getEffectivenessForSlot(sub.subdivisionId) as eff"
-                       class="slot-eff-badge"
-                       [title]="'Effectiveness: ' + (eff * 100).toFixed(0) + '%'">
-                    {{ (eff * 100).toFixed(0) }}
+                       [cdkDragData]="player"
+                       [class.eff-good]="getChipEffectivenessClass(sub.subdivisionId) === 'eff-good'"
+                       [class.eff-warning]="getChipEffectivenessClass(sub.subdivisionId) === 'eff-warning'"
+                       [class.eff-bad]="getChipEffectivenessClass(sub.subdivisionId) === 'eff-bad'">
+                    <span class="player-chip-name">{{player.name | slice:0:10}}</span>
+                    <span *ngIf="getEffectivenessForSlot(sub.subdivisionId) as eff"
+                          class="eff-badge"
+                          [title]="'Effectiveness: ' + (eff * 100).toFixed(0) + '%'">
+                      {{ (eff * 100).toFixed(0) }}%
+                    </span>
                   </div>
                   <div *ngIf="isMissingPlayer(sub)" class="missing-indicator">
                     {{getRecommendedRole(sub)}}
@@ -196,16 +206,23 @@ import { ChemistryPreviewService } from '../../core/services/chemistry-preview.s
                      [class.eff-red]="getEffectivenessColor(sub.subdivisionId) === 'red'"
                      (click)="onSlotClick(sub)">
                   <span class="slot-id">{{sub.subdivisionId}}</span>
+                  <!-- V25D51 (Sprint C13): chip-level effectiveness feedback.
+                       See the slot-gk block above for full details on the
+                       eff-good/eff-warning/eff-bad classification and the
+                       embedded eff-badge. -->
                   <div *ngIf="getPlayerInSlot(sub) as player"
                        class="player-chip"
                        cdkDrag
-                       [cdkDragData]="player">
-                    {{player.name | slice:0:10}}
-                  </div>
-                  <div *ngIf="getEffectivenessForSlot(sub.subdivisionId) as eff"
-                       class="slot-eff-badge"
-                       [title]="'Effectiveness: ' + (eff * 100).toFixed(0) + '%'">
-                    {{ (eff * 100).toFixed(0) }}
+                       [cdkDragData]="player"
+                       [class.eff-good]="getChipEffectivenessClass(sub.subdivisionId) === 'eff-good'"
+                       [class.eff-warning]="getChipEffectivenessClass(sub.subdivisionId) === 'eff-warning'"
+                       [class.eff-bad]="getChipEffectivenessClass(sub.subdivisionId) === 'eff-bad'">
+                    <span class="player-chip-name">{{player.name | slice:0:10}}</span>
+                    <span *ngIf="getEffectivenessForSlot(sub.subdivisionId) as eff"
+                          class="eff-badge"
+                          [title]="'Effectiveness: ' + (eff * 100).toFixed(0) + '%'">
+                      {{ (eff * 100).toFixed(0) }}%
+                    </span>
                   </div>
                   <div *ngIf="isMissingPlayer(sub)" class="missing-indicator">
                     {{getRecommendedRole(sub)}}
@@ -786,7 +803,12 @@ import { ChemistryPreviewService } from '../../core/services/chemistry-preview.s
       cursor: pointer;
       border-radius: 2px;
       transition: all 0.2s ease;
-      overflow: hidden;
+      /* V25D51 (Sprint C13): overflow:visible so the chip-level eff-badge
+         (positioned at top:-8px, right:-8px against the chip) can extend
+         above the slot's top edge without being clipped. The chip's own
+         text ellipsis is preserved by wrapping the player name in a
+         .player-chip-name span with its own overflow:hidden. */
+      overflow: visible;
     }
 
     .slot:hover {
@@ -859,9 +881,16 @@ import { ChemistryPreviewService } from '../../core/services/chemistry-preview.s
       padding: 1px 4px;
       border-radius: 3px;
       margin-top: 1px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      /* V25D51 (Sprint C13): position:relative so the corner eff-badge
+         (top:-8px, right:-8px) anchors against the chip rather than the
+         slot. overflow:visible so the badge can extend above the chip
+         without being clipped (the slot's overflow:visible is also required
+         for the badge to escape the slot's top edge — see .slot comment).
+         The text-overflow:ellipsis behavior moved to .player-chip-name
+         (a child span wrapping the player name) so long names still truncate
+         with "…" via the child's own overflow:hidden. */
+      position: relative;
+      overflow: visible;
       /* V25D50-FRONT-F4-DRAG-FIX (Sprint C12): enlarge the cdkDrag handle so
          the bounding box is large enough to be a reliable drop target for
          both mouse and Playwright programmatic drag. Previously max-width
@@ -880,6 +909,46 @@ import { ChemistryPreviewService } from '../../core/services/chemistry-preview.s
       justify-content: center;
       text-align: center;
       cursor: grab;
+    }
+    /* V25D51 (Sprint C13): inner span wrapping the player name so the
+       text-overflow:ellipsis handling (moved off the chip itself) still
+       truncates long names with "…". The chip's overflow:visible would
+       otherwise let long names spill outside the chip box. */
+    .player-chip .player-chip-name {
+      flex: 1 1 auto;
+      min-width: 0;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    /* V25D51 (Sprint C13): chip-level effectiveness feedback. The class is
+       bound from getChipEffectivenessClass() which returns eff-good (default
+       look, no border), eff-warning (0.7 <= eff < 0.9, orange border) or
+       eff-bad (eff < 0.7, red border). The border uses box-sizing:border-box
+       semantics from the chip itself (the chip's padding stays put). */
+    .player-chip.eff-warning {
+      border: 1px solid orange;
+    }
+    .player-chip.eff-bad {
+      border: 1px solid red;
+    }
+    /* V25D51 (Sprint C13): corner badge anchored to the chip's top-right.
+       Positioned absolute against the chip (which is position:relative),
+       extending 8px above and 8px left of the chip's top-right corner.
+       Renders only when formationEffectiveness has a value for the slot —
+       pre-V25D51 lineups (effectiveness=null) skip the badge entirely. */
+    .player-chip .eff-badge {
+      position: absolute;
+      top: -8px;
+      right: -8px;
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      font-size: 0.55rem;
+      padding: 1px 4px;
+      border-radius: 8px;
+      pointer-events: none;
+      z-index: 2;
     }
     .player-chip:active {
       cursor: grabbing;
@@ -1793,6 +1862,34 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     const v = this.getEffectivenessForSlot(subdivisionId);
     if (v === null) { return null; }
     return effectivenessColor(v);
+  }
+
+  /**
+   * V25D51 (Sprint C13): classify the effectiveness for a slot into a
+   * chip-level feedback class (eff-good / eff-warning / eff-bad).
+   *
+   * <p>Thresholds differ from {@link getEffectivenessColor} (which uses
+   * {@code 0.85 / 0.5} for the slot's green/yellow/red bands) because the
+   * chip is the user's per-player feedback surface, where the action
+   * thresholds feel different: a 0.85 effectivity is good (slot tier),
+   * but we want to start warning at 0.9 (chip tier) and flag bad at 0.7
+   * so the user notices off-position placement before it costs them.
+   *
+   * <ul>
+   *   <li>{@code eff >= 0.9}              → {@code eff-good} (default, no border)</li>
+   *   <li>{@code 0.7 <= eff < 0.9}       → {@code eff-warning} (orange border)</li>
+   *   <li>{@code eff < 0.7}              → {@code eff-bad} (red border)</li>
+   * </ul>
+   *
+   * <p>Returns {@code null} when the slot has no effectiveness data
+   * (legacy pre-V25D47 response) so the class binding is skipped.
+   */
+  getChipEffectivenessClass(subdivisionId: string | undefined): 'eff-good' | 'eff-warning' | 'eff-bad' | null {
+    const v = this.getEffectivenessForSlot(subdivisionId);
+    if (v === null) { return null; }
+    if (v >= 0.9) { return 'eff-good'; }
+    if (v >= 0.7) { return 'eff-warning'; }
+    return 'eff-bad';
   }
 
   /**
