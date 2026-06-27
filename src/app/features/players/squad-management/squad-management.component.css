@@ -297,6 +297,48 @@
   margin-bottom: 1rem;
 }
 
+.lineup-info-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* V25D42 (Sprint C7): team chemistry badge.
+   Color coding thresholds: >=80 verde (elite), 60-79 amarillo (regular), <60 rojo (bajo).
+   Razon thresholds: lineups elite sin skills inyectadas dan ~80 (base = AVG de overalls).
+   Inyectar skills puede subir hasta ~95 (max lineup). <60 indica lineup corto / muchos null stats. */
+.chemistry-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.6rem;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  background: #e2e8f0;
+  color: #2d3748;
+  border: 1.5px solid #cbd5e0;
+  white-space: nowrap;
+  cursor: help;
+}
+
+.chemistry-badge.chemistry-high {
+  background: #c6f6d5;
+  color: #22543d;
+  border-color: #48bb78;
+}
+
+.chemistry-badge.chemistry-mid {
+  background: #fef9c3;
+  color: #744210;
+  border-color: #eab308;
+}
+
+.chemistry-badge.chemistry-low {
+  background: #fed7d7;
+  color: #742a2a;
+  border-color: #c53030;
+}
+
 .lineup-formation {
   font-weight: bold;
   color: #2d3748;

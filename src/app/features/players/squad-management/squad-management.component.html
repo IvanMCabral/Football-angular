@@ -199,12 +199,26 @@
         <div *ngIf="lineup.players && lineup.players.length > 0" class="lineup-container">
           <div class="lineup-info">
             <span class="lineup-formation">{{lineup.formation}}</span>
-            <span class="lineup-count"
-                  [class.count-short]="lineup.players.length < 7"
-                  [class.count-ok]="lineup.players.length >= 7 && lineup.players.length < 11"
-                  [class.count-full]="lineup.players.length === 11">
-              {{lineup.players.length}} / 11
-            </span>
+            <div class="lineup-info-right">
+              <!-- V25D42 (Sprint C7): team chemistry badge (optional, nullable for
+                   backward compat con lineups pre-V25D41). Color coding:
+                   >=80 verde (elite), 60-79 amarillo (regular), <60 rojo (bajo).
+                   Tooltip explica la fórmula. -->
+              <span *ngIf="lineup.chemistryScore != null"
+                    class="chemistry-badge"
+                    [class.chemistry-high]="lineup.chemistryScore >= 80"
+                    [class.chemistry-mid]="lineup.chemistryScore >= 60 && lineup.chemistryScore < 80"
+                    [class.chemistry-low]="lineup.chemistryScore < 60"
+                    [title]="'Team chemistry: AVG de overalls + skill bonus (team-level MAX) + coverage bonus. Calculado por TeamChemistryCalculator (V25D41).'">
+                ⚗ {{lineup.chemistryScore}}/99
+              </span>
+              <span class="lineup-count"
+                    [class.count-short]="lineup.players.length < 7"
+                    [class.count-ok]="lineup.players.length >= 7 && lineup.players.length < 11"
+                    [class.count-full]="lineup.players.length === 11">
+                {{lineup.players.length}} / 11
+              </span>
+            </div>
           </div>
 
           <!-- V24D6U3: server-issued warning banner (LINEUP_SHORT_HANDED / LINEUP_NO_GOALKEEPER) -->
