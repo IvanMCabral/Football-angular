@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink, Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
@@ -122,6 +122,15 @@ export class SquadManagementComponent implements OnInit {
    lineupSubject$ = new BehaviorSubject<LineupDTO | null>(null);
    confirmationWarning$ = new BehaviorSubject<string | null>(null);
    pendingRiskyConfirm$ = new BehaviorSubject<boolean>(false);
+
+   /**
+    * V25D44 (Sprint C9): the player currently shown in the chemistry breakdown
+    * popover. {@code null} when no popover is visible. Source of truth for the
+    * template (the popover section uses {@code *ngIf="selectedContributor$ | async"}),
+    * and for {@link isSelectedContributor} which adds a visual highlight
+    * (chip-selected class) to the chip whose contributor is currently open.
+    */
+   selectedContributor$ = new BehaviorSubject<PlayerLineupDTO | null>(null);
 
    /**
     * V25D43 (Sprint C8): order in which to render position groups in the
@@ -250,20 +259,92 @@ export class SquadManagementComponent implements OnInit {
      this.pendingRiskyConfirm$.next(false);
    }
 
-   /**
-    * V24D6U3: Reduce a list of backend warnings to a single banner payload.
-    * Priority: ERROR > WARNING. Returns null when no banner should be shown.
-    */
-   private pickLineupWarning(warnings?: LineupWarningDTO[]): LineupWarningDTO | null {
-     if (!warnings || warnings.length === 0) {
-       return null;
-     }
-     const errors = warnings.filter(w => w.severity === 'ERROR');
-     if (errors.length > 0) {
-       return errors[0];
-     }
-     return warnings[0];
-   }
+/**
+     * V24D6U3: Reduce a list of backend warnings to a single banner payload.
+     * Priority: ERROR > WARNING. Returns null when no banner should be shown.
+     */
+    private pickLineupWarning(warnings?: LineupWarningDTO[]): LineupWarningDTO | null {
+      if (!warnings || warnings.length === 0) {
+        return null;
+      }
+      const errors = warnings.filter(w => w.severity === 'ERROR');
+      if (errors.length > 0) {
+        return errors[0];
+      }
+      return warnings[0];
+    }
+
+    // ========== V25D44 (Sprint C9): chemistry breakdown interactivity ==========
+
+    /**
+     * V25D44 (Sprint C9): toggle/switch the contributor popover when the user
+     * clicks a skill chip. Behavior:
+     * <ul>
+     *   <li>Same contributor already open → close the popover (toggle off).</li>
+     *   <li>Different contributor → switch the popover to the new one.</li>
+     *   <li>{@code contributorId} not found in the current lineup → no-op
+     *       (backyard compat: don't open a popover with stale data; don't crash).</li>
+     * </ul>
+     * Lookup uses {@code lineup.players} (the 11 SessionPlayer cards already
+     * fetched by {@code /career/lineup/current}); no extra HTTP call needed.
+     */
+    onSkillChipClick(contributorId: string): void {
+      if (!contributorId) return;
+
+      const current = this.selectedContributor$.value;
+      if (current?.playerId === contributorId) {
+        // Same chip → toggle off
+        this.closeContributorPopover();
+        return;
+      }
+
+      const lineup = this.lineupSubject$.value;
+      if (!lineup?.players) return;
+      const contributor = lineup.players.find(p => p.playerId === contributorId);
+      if (!contributor) {
+        // Backyard compat: chip references a playerId not in this lineup
+        // (shouldn't happen, but defensive — don't open a stale popover).
+        return;
+      }
+      this.selectedContributor$.next(contributor);
+    }
+
+    /** Close the contributor popover (X button or click-outside). */
+    closeContributorPopover(): void {
+      if (this.selectedContributor$.value !== null) {
+        this.selectedContributor$.next(null);
+      }
+    }
+
+    /**
+     * V25D44 (Sprint C9): true when the chip's contributorId matches the
+     * currently-open popover. Template uses this to add the {@code chip-selected}
+     * class (visual highlight on the active chip).
+     */
+    isSelectedContributor(contributorId: string): boolean {
+      return this.selectedContributor$.value?.playerId === contributorId;
+    }
+
+    /**
+     * V25D44 (Sprint C9): click-outside handler — close the popover when
+     * the user clicks anywhere outside {@code .skill-chip} and outside the
+     * popover itself. Clicks on chips / popover content are ignored here
+     * because they have their own handlers (chip: toggle/switch; popover X:
+     * close). Uses {@link HostListener} so it's wired to {@code document}
+     * automatically (Angular runs it on every click anywhere).
+     */
+    @HostListener('document:click', ['$event'])
+    onDocumentClick(event: MouseEvent): void {
+      if (!this.selectedContributor$.value) return;
+      const target = event.target as HTMLElement | null;
+      if (!target) return;
+      // Clicks on chips or inside the popover itself are handled by the
+      // element-local handlers (chip toggle / popover X button). Don't
+      // re-close from the document listener.
+      if (target.closest('.skill-chip')) return;
+      if (target.closest('.contributor-popover')) return;
+      this.closeContributorPopover();
+    }
 
    formatMoney(value: number): string {
      return new Intl.NumberFormat('es-ES', {
