@@ -11,6 +11,11 @@
  * <p>V25D42 (Sprint C7): tests del chemistry badge agregado en la barra
  * de información del lineup. Verifica color coding por threshold y
  * backward compat (chemistryScore opcional).
+ *
+ * <p>V25D43 (Sprint C8): tests del chemistry breakdown agregado debajo del
+ * chemistry badge. Verifica render por position group (GK/DEF/MID/ATT),
+ * color coding por maxLevel, cobertura percentage, y backward compat
+ * (chemistryBreakdown opcional).
  */
 
 import { Component, NO_ERRORS_SCHEMA } from '@angular/core';
@@ -22,7 +27,7 @@ import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { of } from 'rxjs';
 import { SquadManagementComponent } from './squad-management.component';
 import { SquadEditorModalComponent } from '../../../components/squad-editor-modal/squad-editor-modal.component';
-import { LineupDTO, PlayerLineupDTO } from 'app/shared/models/lineup/lineup.dto';
+import { LineupDTO, PlayerLineupDTO, ChemistryBreakdownDTO, SkillCoverageDTO } from 'app/shared/models/lineup/lineup.dto';
 
 // Stub para los child components que no necesitamos testear.
 @Component({ selector: 'app-career-status-bar', standalone: true, template: '' })
@@ -49,8 +54,9 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
   };
 
   // V25D42: helper para construir un LineupDTO con chemistryScore opcional.
+  // V25D43: extendido para aceptar chemistryBreakdown opcional (Sprint C8).
   // Toma players como base (evita duplicar el array literal en cada test).
-  function buildLineup(players: PlayerLineupDTO[], chemistryScore?: number): LineupDTO {
+  function buildLineup(players: PlayerLineupDTO[], chemistryScore?: number, chemistryBreakdown?: ChemistryBreakdownDTO): LineupDTO {
     const base: LineupDTO = {
       formation: '4-3-3',
       players,
@@ -60,7 +66,43 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
     if (chemistryScore !== undefined) {
       base.chemistryScore = chemistryScore;
     }
+    if (chemistryBreakdown !== undefined) {
+      base.chemistryBreakdown = chemistryBreakdown;
+    }
     return base;
+  }
+
+  // V25D43: helper para construir un ChemistryBreakdownDTO con un set
+  // representativo de skills. Coverage percentage = 30% (3 of 10 covered).
+  function buildBreakdown(): ChemistryBreakdownDTO {
+    const positionGroups: Record<string, SkillCoverageDTO[]> = {
+      GK: [
+        { skill: 'WALL',   maxLevel: 99, contributorId: 'p-courtois' },
+        { skill: 'AERIAL', maxLevel: 99, contributorId: 'p-courtois' }
+      ],
+      DEF: [
+        { skill: 'AERIAL', maxLevel: 80, contributorId: 'p-van-dijk' },
+        { skill: 'MARKER', maxLevel: 99, contributorId: 'p-van-dijk' }
+      ],
+      MID: [
+        { skill: 'PLAYMAKER', maxLevel: 99, contributorId: 'p-modric' }
+      ],
+      ATT: [
+        { skill: 'SHOOTER', maxLevel: 99, contributorId: 'p-benzema' }
+      ]
+    };
+    const maxSkillByType: Record<string, number> = {};
+    // 3 covered (WALL=99, AERIAL=99, MARKER=99), 1 mid (PLAYMAKER=99), 1 att (SHOOTER=99)
+    // Total covered = 5 (above 80) → 50% coverage. Let me set this below.
+    for (const skill of ['WALL','AERIAL','MARKER','TACKLER','PLAYMAKER','PASSER','SHOOTER','HEADER','DRIBBLER','SPEEDSTER']) {
+      maxSkillByType[skill] = 0;
+    }
+    maxSkillByType['WALL'] = 99;
+    maxSkillByType['AERIAL'] = 99;
+    maxSkillByType['MARKER'] = 99;
+    maxSkillByType['PLAYMAKER'] = 99;
+    maxSkillByType['SHOOTER'] = 99;
+    return { positionGroups, maxSkillByType, coveragePercentage: 50 };
   }
 
   // 11 players fake para que el lineup "exista" en pantalla.
@@ -231,6 +273,115 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
       badge = fixture.nativeElement.querySelector('.chemistry-badge');
       expect(badge.classList.contains('chemistry-mid')).toBeTrue();
       expect(badge.classList.contains('chemistry-low')).toBeFalse();
+    });
+  });
+
+  // ========== V25D43: chemistry breakdown (Sprint C8) ==========
+
+  describe('V25D43: chemistry breakdown (per position group)', () => {
+    it('should render breakdown section when chemistryBreakdown is present', () => {
+      // V25D43: la sección de breakdown se renderiza cuando el back popula chemistryBreakdown.
+      const breakdown = buildBreakdown();
+      component.lineupSubject$.next(buildLineup(ELEVEN_PLAYERS, 87, breakdown));
+      fixture.detectChanges();
+
+      const breakdownEl = fixture.nativeElement.querySelector('.chemistry-breakdown');
+      expect(breakdownEl).not.toBeNull('Chemistry breakdown should be rendered when present');
+
+      // Coverage percentage visible
+      const coverageEl = breakdownEl.querySelector('.breakdown-coverage');
+      expect(coverageEl.textContent).toContain('50');
+      expect(coverageEl.textContent).toContain('% coverage');
+    });
+
+    it('should render one row per non-empty position group with label + chips', () => {
+      // V25D43: 4 grupos (GK/DEF/MID/ATT) con label, cada uno con sus chips.
+      const breakdown = buildBreakdown();
+      component.lineupSubject$.next(buildLineup(ELEVEN_PLAYERS, 87, breakdown));
+      fixture.detectChanges();
+
+      const rows = fixture.nativeElement.querySelectorAll('.breakdown-row');
+      // 4 groups in positionGroupOrder, all non-empty
+      expect(rows.length).toBe(4);
+
+      // GK row: WALL 99, AERIAL 99
+      const gkRow = rows[0];
+      expect(gkRow.querySelector('.group-label').textContent).toContain('GK');
+      const gkChips = gkRow.querySelectorAll('.skill-chip');
+      expect(gkChips.length).toBe(2);
+      expect(gkChips[0].textContent).toContain('WALL');
+      expect(gkChips[0].textContent).toContain('99');
+      expect(gkChips[1].textContent).toContain('AERIAL');
+
+      // DEF row: AERIAL 80, MARKER 99
+      const defRow = rows[1];
+      expect(defRow.querySelector('.group-label').textContent).toContain('DEF');
+      const defChips = defRow.querySelectorAll('.skill-chip');
+      expect(defChips.length).toBe(2);
+    });
+
+    it('should apply chip-high / chip-mid / chip-low classes per maxLevel threshold', () => {
+      // V25D43: >=80 verde (chip-high), 50-79 amarillo (chip-mid), <50 rojo (chip-low).
+      const positionGroups: Record<string, SkillCoverageDTO[]> = {
+        GK: [
+          { skill: 'WALL',   maxLevel: 99, contributorId: 'p1' },  // high
+          { skill: 'AERIAL', maxLevel: 70, contributorId: 'p1' },  // mid
+          { skill: 'TACKLER', maxLevel: 40, contributorId: 'p1' }   // low
+        ],
+        DEF: [],
+        MID: [],
+        ATT: []
+      };
+      const breakdown: ChemistryBreakdownDTO = {
+        positionGroups,
+        maxSkillByType: { WALL: 99, AERIAL: 70, TACKLER: 40 },
+        coveragePercentage: 10
+      };
+      component.lineupSubject$.next(buildLineup(ELEVEN_PLAYERS, 80, breakdown));
+      fixture.detectChanges();
+
+      const chips = fixture.nativeElement.querySelectorAll('.skill-chip');
+      expect(chips.length).toBe(3);
+
+      // chip 0: WALL 99 → high
+      expect(chips[0].classList.contains('chip-high')).toBeTrue();
+      expect(chips[0].classList.contains('chip-mid')).toBeFalse();
+      expect(chips[0].classList.contains('chip-low')).toBeFalse();
+
+      // chip 1: AERIAL 70 → mid
+      expect(chips[1].classList.contains('chip-mid')).toBeTrue();
+      expect(chips[1].classList.contains('chip-high')).toBeFalse();
+      expect(chips[1].classList.contains('chip-low')).toBeFalse();
+
+      // chip 2: TACKLER 40 → low
+      expect(chips[2].classList.contains('chip-low')).toBeTrue();
+      expect(chips[2].classList.contains('chip-high')).toBeFalse();
+      expect(chips[2].classList.contains('chip-mid')).toBeFalse();
+    });
+
+    it('should NOT render breakdown section when chemistryBreakdown is undefined (backward compat)', () => {
+      // V25D43: chemistryBreakdown es opcional. Lineups pre-V25D43 no lo traen
+      // (legacy V25D41/V25D42 builds). El componente no rompe — no renderiza la sección.
+      component.lineupSubject$.next(buildLineup(ELEVEN_PLAYERS, 87));  // sin breakdown
+      fixture.detectChanges();
+
+      const breakdownEl = fixture.nativeElement.querySelector('.chemistry-breakdown');
+      expect(breakdownEl).toBeNull('Chemistry breakdown should NOT be rendered when undefined');
+    });
+
+    it('should render coverage percentage from chemistryBreakdown.coveragePercentage', () => {
+      // V25D43: coverage percentage se lee del back (no se calcula en el front).
+      const breakdown: ChemistryBreakdownDTO = {
+        positionGroups: { GK: [{ skill: 'WALL', maxLevel: 99, contributorId: 'p1' }], DEF: [], MID: [], ATT: [] },
+        maxSkillByType: { WALL: 99 },
+        coveragePercentage: 10  // 1 of 10 covered
+      };
+      component.lineupSubject$.next(buildLineup(ELEVEN_PLAYERS, 80, breakdown));
+      fixture.detectChanges();
+
+      const coverageEl = fixture.nativeElement.querySelector('.breakdown-coverage');
+      expect(coverageEl.textContent).toContain('10');
+      expect(coverageEl.textContent).toContain('% coverage');
     });
   });
 });
