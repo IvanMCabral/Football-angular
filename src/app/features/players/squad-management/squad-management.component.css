@@ -401,7 +401,20 @@
   color: #2d3748;
   border: 1px solid #cbd5e0;
   white-space: nowrap;
-  cursor: help;
+  cursor: pointer;
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.skill-chip:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* V25D44 (Sprint C9): chip currently associated with the open contributor
+   popover. Stronger outline so the user can see which chip is selected. */
+.skill-chip.chip-selected {
+  outline: 2px solid #4299e1;
+  outline-offset: 1px;
 }
 
 .skill-chip.chip-high {
@@ -420,6 +433,67 @@
   background: #fed7d7;
   color: #742a2a;
   border-color: #c53030;
+}
+
+/* V25D44 (Sprint C9): contributor popover. Inline below the chip rows, shows
+   the contributor of the currently-selected chip. Closes via X button or
+   click-outside (HostListener('document:click')). */
+.contributor-popover {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.6rem;
+  padding: 0.5rem 0.75rem;
+  background: #ebf8ff;
+  border: 1px solid #bee3f8;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: #2c5282;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.contributor-name {
+  font-weight: 600;
+  color: #1a365d;
+}
+
+.contributor-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.contributor-position {
+  padding: 0.05rem 0.4rem;
+  background: #bee3f8;
+  color: #2a4365;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.contributor-overall {
+  padding: 0.05rem 0.4rem;
+  background: #2b6cb0;
+  color: white;
+  border-radius: 4px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.contributor-close {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: #2c5282;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 0.25rem;
+}
+
+.contributor-close:hover {
+  color: #1a365d;
 }
 
 .lineup-formation {

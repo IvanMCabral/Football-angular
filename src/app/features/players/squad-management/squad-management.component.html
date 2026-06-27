@@ -225,7 +225,9 @@
                  chips with skill name + maxLevel. Color coding por maxLevel:
                  >=80 verde (elite), 50-79 amarillo (regular), <50 rojo (bajo).
                  Optional: solo se renderiza si el back popula chemistryBreakdown
-                 (lineups pre-V25D43 no lo traen → null/undefined → no render). -->
+                 (lineups pre-V25D43 no lo traen → null/undefined → no render).
+                 V25D44 (Sprint C9): chips son clickables — onSkillChipClick abre el
+                 popover del contributor. Visual feedback: chip-selected class. -->
             <div *ngIf="lineup.chemistryBreakdown as bd" class="chemistry-breakdown">
               <div class="breakdown-header">
                 Chemistry Breakdown
@@ -240,9 +242,30 @@
                       [class.chip-high]="sc.maxLevel >= 80"
                       [class.chip-mid]="sc.maxLevel >= 50 && sc.maxLevel < 80"
                       [class.chip-low]="sc.maxLevel < 50"
-                      [title]="sc.skill + ' ' + sc.maxLevel + ' (carrier: ' + sc.contributorId + ')'">
+                      [class.chip-selected]="isSelectedContributor(sc.contributorId)"
+                      [title]="sc.skill + ' ' + sc.maxLevel + ' (carrier: ' + sc.contributorId + ')'"
+                      (click)="onSkillChipClick(sc.contributorId)">
                   {{ sc.skill }} {{ sc.maxLevel }}
                 </span>
+              </div>
+
+              <!-- V25D44 (Sprint C9): contributor popover — inline below the chips.
+                   Shows name + position + overall del player con max level para el skill.
+                   Cierra con X button o click outside (HostListener en el component). -->
+              <div *ngIf="selectedContributor$ | async as sc"
+                   class="contributor-popover"
+                   role="dialog"
+                   aria-label="Contributor details">
+                <span class="contributor-name">{{ sc.name }}</span>
+                <span class="contributor-meta">
+                  <span class="contributor-position">{{ sc.position }}</span>
+                  <span class="contributor-overall">OVR {{ sc.overall }}</span>
+                </span>
+                <button type="button"
+                        class="contributor-close"
+                        (click)="closeContributorPopover()"
+                        title="Close"
+                        aria-label="Close contributor details">×</button>
               </div>
             </div>
 

@@ -384,4 +384,142 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
       expect(coverageEl.textContent).toContain('% coverage');
     });
   });
+
+  // ========== V25D44: chemistry breakdown interactivity (Sprint C9) ==========
+
+  describe('V25D44: chemistry breakdown chip click → contributor popover', () => {
+    // 11-player lineup where p0 is Courtois (GK, OVR 86) and p1 is Van Dijk (DEF, OVR 88).
+    // Breakdown points WALL → p0 and MARKER → p1 so we can verify chip switches
+    // (different contributor when clicking a different chip).
+    function buildCourtoisLineup(): { lineup: LineupDTO; players: PlayerLineupDTO[] } {
+      const players: PlayerLineupDTO[] = [
+        { playerId: 'p0', name: 'Courtois',  position: 'GK',  overall: 86, energy: 95, injured: false, age: 32 },
+        { playerId: 'p1', name: 'Van Dijk',  position: 'DEF', overall: 88, energy: 95, injured: false, age: 33 },
+        ...ELEVEN_PLAYERS.slice(2).map((p, i) => ({ ...p, playerId: `p${i + 2}`, name: `Player ${i + 2}` }))
+      ];
+      const breakdown: ChemistryBreakdownDTO = {
+        positionGroups: {
+          GK:  [{ skill: 'WALL',   maxLevel: 99, contributorId: 'p0' }],
+          DEF: [{ skill: 'MARKER', maxLevel: 99, contributorId: 'p1' }],
+          MID: [],
+          ATT: []
+        },
+        maxSkillByType: { WALL: 99, MARKER: 99 },
+        coveragePercentage: 20
+      };
+      const lineup = buildLineup(players, 87, breakdown);
+      return { lineup, players };
+    }
+
+    it('should open popover with contributor (name, position, overall) when chip is clicked', () => {
+      // V25D44: click WALL chip → popover shows Courtois, GK, OVR 86.
+      const { lineup } = buildCourtoisLineup();
+      component.lineupSubject$.next(lineup);
+      fixture.detectChanges();
+
+      // Initially no popover
+      expect(fixture.nativeElement.querySelector('.contributor-popover')).toBeNull();
+
+      // Click the WALL chip
+      const chips = Array.from(fixture.nativeElement.querySelectorAll('.skill-chip')) as HTMLElement[];
+      const wallChip = chips.find(c => c.textContent.includes('WALL'))!;
+      expect(wallChip).toBeTruthy();
+      wallChip.click();
+      fixture.detectChanges();
+
+      // Popover should now show Courtois info
+      const popover = fixture.nativeElement.querySelector('.contributor-popover');
+      expect(popover).not.toBeNull('Popover should appear after chip click');
+      expect(popover.textContent).toContain('Courtois');
+      expect(popover.querySelector('.contributor-position').textContent).toContain('GK');
+      expect(popover.querySelector('.contributor-overall').textContent).toContain('86');
+    });
+
+    it('should switch popover to a different contributor when a different chip is clicked', () => {
+      // V25D44: click WALL chip (Courtois) → click MARKER chip (Van Dijk) → popover switches.
+      const { lineup } = buildCourtoisLineup();
+      component.lineupSubject$.next(lineup);
+      fixture.detectChanges();
+
+      const chips = Array.from(fixture.nativeElement.querySelectorAll('.skill-chip')) as HTMLElement[];
+      const wallChip = chips.find(c => c.textContent.includes('WALL'))!;
+      const markerChip = chips.find(c => c.textContent.includes('MARKER'))!;
+
+      // Click WALL → Courtois shown
+      wallChip.click();
+      fixture.detectChanges();
+      let popover = fixture.nativeElement.querySelector('.contributor-popover');
+      expect(popover.textContent).toContain('Courtois');
+
+      // Click MARKER → Van Dijk shown
+      markerChip.click();
+      fixture.detectChanges();
+      popover = fixture.nativeElement.querySelector('.contributor-popover');
+      expect(popover.textContent).toContain('Van Dijk');
+      expect(popover.querySelector('.contributor-position').textContent).toContain('DEF');
+      expect(popover.querySelector('.contributor-overall').textContent).toContain('88');
+    });
+
+    it('should close popover when the same chip is clicked again (toggle off)', () => {
+      // V25D44: click WALL → open. Click WALL again → close.
+      const { lineup } = buildCourtoisLineup();
+      component.lineupSubject$.next(lineup);
+      fixture.detectChanges();
+
+      const wallChip = (Array.from(fixture.nativeElement.querySelectorAll('.skill-chip')) as HTMLElement[])
+        .find(c => c.textContent.includes('WALL'))!;
+      wallChip.click();
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('.contributor-popover')).not.toBeNull();
+
+      wallChip.click();
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('.contributor-popover'))
+        .toBeNull('Popover should close when same chip is clicked again');
+    });
+
+    it('should close popover when the X close button is clicked', () => {
+      // V25D44: popover X button calls closeContributorPopover() and hides the popover.
+      const { lineup } = buildCourtoisLineup();
+      component.lineupSubject$.next(lineup);
+      fixture.detectChanges();
+
+      const wallChip = (Array.from(fixture.nativeElement.querySelectorAll('.skill-chip')) as HTMLElement[])
+        .find(c => c.textContent.includes('WALL'))!;
+      wallChip.click();
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('.contributor-popover')).not.toBeNull();
+
+      const closeBtn = fixture.nativeElement.querySelector('.contributor-close');
+      expect(closeBtn).not.toBeNull();
+      closeBtn.click();
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('.contributor-popover'))
+        .toBeNull('Popover should close when X button is clicked');
+    });
+
+    it('should NOT open popover when chip references a contributorId not in lineup (backyard compat)', () => {
+      // V25D44: if contributorId is stale (e.g., lineup reloaded and the player
+      // is gone), the chip handler should silently no-op — don't open a
+      // popover with missing data, don't crash.
+      const staleBreakdown: ChemistryBreakdownDTO = {
+        positionGroups: {
+          GK: [{ skill: 'WALL', maxLevel: 99, contributorId: 'p-stale-not-in-lineup' }],
+          DEF: [], MID: [], ATT: []
+        },
+        maxSkillByType: { WALL: 99 },
+        coveragePercentage: 10
+      };
+      component.lineupSubject$.next(buildLineup(ELEVEN_PLAYERS, 80, staleBreakdown));
+      fixture.detectChanges();
+
+      const wallChip = (Array.from(fixture.nativeElement.querySelectorAll('.skill-chip')) as HTMLElement[])
+        .find(c => c.textContent.includes('WALL'))!;
+      expect(() => wallChip.click()).not.toThrow();
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('.contributor-popover'))
+        .toBeNull('Popover must NOT open when contributorId is not found in lineup');
+    });
+  });
 });
