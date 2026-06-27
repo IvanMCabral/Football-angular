@@ -1,5 +1,6 @@
 import { LineupWarningDTO } from './lineup-warning.dto';
 import { LineupSlotDTO } from './lineup-slot.dto';
+import { FormationEffectivenessDTO } from './formation-effectiveness.dto';
 
 /**
  * Per-player card DTO returned by the backend lineup endpoints.
@@ -124,6 +125,15 @@ export interface ChemistryDetailDTO {
  * chips debajo del chemistry badge con WALL=99, AERIAL=99, etc. agrupados
  * por GK / DEF / MID / ATT. Nullable para backward compat con lineups
  * pre-V25D43.
+ *
+ * <p><b>V25D47 (Sprint C11a + C11b):</b> {@code formationEffectiveness}
+ * (opcional) es la efectividad táctica del lineup — formación inferida
+ * desde los subdivisionIds + per-player effectiveness (penalización por
+ * jugar fuera de posición) + teamAverage. C11b lo usa para: (1) renderizar
+ * una sección de "Formación inferida" + colores por jugador en el modal,
+ * (2) ponderar el chemistry preview live multiplicando por teamAverage.
+ * Nullable para backward compat con lineups pre-V25D47 (los renders
+ * correspondientes se ocultan cuando es null).
  */
 export interface LineupDTO {
   formation: string;
@@ -135,4 +145,6 @@ export interface LineupDTO {
   chemistryScore?: number;
   /** V25D43: per-position-group chemistry breakdown (optional, nullable for backward compat). */
   chemistryBreakdown?: ChemistryBreakdownDTO;
+  /** V25D47: tactical position effectiveness (optional, nullable for backward compat). */
+  formationEffectiveness?: FormationEffectivenessDTO;
 }
