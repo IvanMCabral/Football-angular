@@ -16,7 +16,7 @@ import { CareerStatusBarComponent } from 'app/shared/components/career-status-ba
 import { PlayerCardComponent } from 'app/shared/components/player-card/player-card.component';
 import { LineupPlayerCardComponent } from 'app/shared/components/lineup-player-card/lineup-player-card.component';
 import { SeasonStatsTabComponent } from '../../player-season-stats/components/season-stats-tab/season-stats-tab.component';
-import { LineupDTO, PlayerLineupDTO } from 'app/shared/models/lineup/lineup.dto';
+import { LineupDTO, PlayerLineupDTO, ChemistryBreakdownDTO } from 'app/shared/models/lineup/lineup.dto';
 import { LineupWarningDTO } from 'app/shared/models/lineup/lineup-warning.dto';
 import { SquadEditorModalComponent } from 'app/components/squad-editor-modal/squad-editor-modal.component';
 
@@ -122,6 +122,17 @@ export class SquadManagementComponent implements OnInit {
    lineupSubject$ = new BehaviorSubject<LineupDTO | null>(null);
    confirmationWarning$ = new BehaviorSubject<string | null>(null);
    pendingRiskyConfirm$ = new BehaviorSubject<boolean>(false);
+
+   /**
+    * V25D43 (Sprint C8): order in which to render position groups in the
+    * chemistry breakdown. Mirrors the backend {@code ChemistryDetail.PositionGroup.values()}
+    * (GK → DEF → MID → ATT). WINGER skills are folded into ATT on the back.
+    * Exposed as a class field so the template can iterate it deterministically
+    * (the order of {@code Object.keys(bd.positionGroups)} is not guaranteed
+    * by all browsers/runtimes).
+    */
+   positionGroupOrder: ReadonlyArray<keyof ChemistryBreakdownDTO['positionGroups']> =
+       ['GK', 'DEF', 'MID', 'ATT'];
 
    selectedFormation$ = new BehaviorSubject<string>('4-4-2');
    /**

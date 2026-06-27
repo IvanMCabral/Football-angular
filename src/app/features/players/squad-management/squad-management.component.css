@@ -339,6 +339,89 @@
   border-color: #c53030;
 }
 
+/* V25D43 (Sprint C8): chemistry breakdown section.
+   Container under the chemistry badge, shows per-position-group skill chips
+   with color coding (parallels the badge: verde / amarillo / rojo). */
+.chemistry-breakdown {
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  background: #f7fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+
+.breakdown-header {
+  font-weight: 600;
+  color: #2d3748;
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.breakdown-coverage {
+  font-weight: 400;
+  color: #718096;
+  font-size: 0.8rem;
+}
+
+.breakdown-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.25rem;
+  line-height: 1.4;
+}
+
+.breakdown-row:last-child {
+  margin-bottom: 0;
+}
+
+.group-label {
+  font-weight: 600;
+  color: #4a5568;
+  min-width: 2.5rem;
+  font-size: 0.8rem;
+}
+
+/* Skill chip: name + maxLevel, color coded.
+   Thresholds paralelos al chemistry badge:
+     >=80 verde (elite)
+     50-79 amarillo (regular)
+     <50 rojo (bajo) */
+.skill-chip {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: #edf2f7;
+  color: #2d3748;
+  border: 1px solid #cbd5e0;
+  white-space: nowrap;
+  cursor: help;
+}
+
+.skill-chip.chip-high {
+  background: #c6f6d5;
+  color: #22543d;
+  border-color: #48bb78;
+}
+
+.skill-chip.chip-mid {
+  background: #fef9c3;
+  color: #744210;
+  border-color: #eab308;
+}
+
+.skill-chip.chip-low {
+  background: #fed7d7;
+  color: #742a2a;
+  border-color: #c53030;
+}
+
 .lineup-formation {
   font-weight: bold;
   color: #2d3748;
