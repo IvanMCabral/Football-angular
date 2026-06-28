@@ -696,19 +696,33 @@ import { ChemistryPreviewService } from '../../core/services/chemistry-preview.s
       align-items: center;
       padding: 20px;
       overflow: hidden;
+      /* V25D58 (Sprint C18): min-height:0 allows the flex child (.field) to
+         honor its aspect-ratio without being constrained by the container's
+         intrinsic min-content size. Without this, flex children default
+         to min-height:auto and aspect-ratio can be silently overridden in
+         tight viewports. */
+      min-height: 0;
     }
 
     /* Field */
     .field {
       position: relative;
       width: 100%;
-      max-width: 500px;
+      /* V25D58 (Sprint C18): cap progresivo via min(cap, 100%). En desktop
+         mantiene los 500px del default anterior; en viewports chicos
+         permite shrink porque el cap nunca excede el ancho disponible.
+         Era max-width: 500px (fijo) lo que dejaba gap visual en modales
+         menores a 500px de field-container. */
+      max-width: min(500px, 100%);
       /* V25D57 (Sprint C17b): aspect-ratio del campo de futbol.
          Antes height: 100% aplastaba el field a horizontal slab en
          viewports desktop/tablet. height: auto + aspect-ratio 1/1.4
          garantiza que height = 1.4 * width (campo vertical). */
       height: auto;
-      max-height: 700px;
+      /* V25D58 (Sprint C18): max-height: 100% en lugar del cap fijo de 700px
+         para que el field NUNCA exceda el alto del field-container (que
+         es 90vh del squad-editor-container menos header/footer/bench). */
+      max-height: 100%;
       aspect-ratio: 1 / 1.4;
       background: linear-gradient(180deg, #4a8c5c 0%, #5a9c6c 50%, #4a8c5c 100%);
       border: 3px solid #fff;
@@ -1213,9 +1227,13 @@ import { ChemistryPreviewService } from '../../core/services/chemistry-preview.s
       }
 
       .field {
-        /* V25D57 (Sprint C17b): max-height:none. Antes 50vh sobreescribia
-           el aspect-ratio del default y dejaba el field aplastado. */
-        max-height: none;
+        /* V25D58 (Sprint C18): cap 380px para mobile. min(380,100%) shrinkea
+           a 360px en viewports de 375-414px donde el modal mide 98vw. */
+        max-width: min(380px, 100%);
+        /* V25D57 (Sprint C17b): aspect-ratio del campo en mobile. Antes
+           max-height:50vh sobreescribia el aspect-ratio y dejaba el field
+           aplastado. Ahora max-height hereda del default (100% del
+           field-container). */
         aspect-ratio: 1 / 1.4;
         height: auto;
       }
@@ -1257,9 +1275,9 @@ import { ChemistryPreviewService } from '../../core/services/chemistry-preview.s
            Antes no tenia aspect-ratio y quedaba horizontal slab. */
         aspect-ratio: 1 / 1.4;
         height: auto;
-        /* max-height fallback por si aspect-ratio no se respeta en algun
-           browser legacy (aspect-ratio tiene soporte estable desde 2021). */
-        max-height: 60vh;
+        /* V25D58 (Sprint C18): cap 450px para tablet. min(450,100%) shrinkea
+           a 360px en viewports de 600-700px donde el modal mide 90vw. */
+        max-width: min(450px, 100%);
       }
 
       .player-chip {
@@ -1278,6 +1296,13 @@ import { ChemistryPreviewService } from '../../core/services/chemistry-preview.s
     @media (min-width: 1600px) {
       .squad-editor-container {
         max-width: 1200px;
+      }
+
+      .field {
+        /* V25D58 (Sprint C18): cap 600px para large desktop. min(600,100%)
+           mantiene 600px en viewports de 1600-1900px y shrinkea a 500px
+           en viewports borderline 1440-1599px si el modal mide 1200px. */
+        max-width: min(600px, 100%);
       }
     }
   `]
