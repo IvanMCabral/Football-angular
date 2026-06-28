@@ -97,11 +97,16 @@
           <a routerLink="/players/manage" class="btn-create" title="Ir a gestion de jugadores">⚙️ Gestionar</a>
         </div>
 
-        <!-- V24D11 UX-3: mini-CTA en el header del squad con conteo de lineup armado -->
-        <div *ngIf="(lineup$ | async)?.players?.length as lineupCount"
-             [hidden]="!lineupCount"
+        <!-- V25D59-C19 P1: mini-CTA en el header del squad con conteo de lineup armado.
+             El counter refleja los subdivision slots persistidos (no players.length),
+             que era la fuente de la mentira "11/11" cuando auto-select devolvía <11
+             players por el bug C18b. Tras el fix back (C19 P0) auto-select garantiza
+             11 slots; para lineups manuales/legacy el counter muestra el número real. -->
+        <div *ngIf="lineup$ | async"
+             [class.lineup-incomplete]="lineupSlotsCount < 11"
+             [class.lineup-complete]="lineupSlotsCount === 11"
              class="lineup-mini-cta">
-          ⚽ Lineup armado: <strong>{{ lineupCount }} / 11</strong> — <a href="#">Ir a confirmar</a>
+          ⚽ Lineup armado: <strong>{{ lineupSlotsCount }} / 11</strong> — <a href="#">Ir a confirmar</a>
         </div>
 
         <!-- V24D6T2 (bug #6): dedicated short-handed warning when available < 11 -->

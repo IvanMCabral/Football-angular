@@ -28,6 +28,7 @@ import { of } from 'rxjs';
 import { SquadManagementComponent } from './squad-management.component';
 import { SquadEditorModalComponent } from '../../../components/squad-editor-modal/squad-editor-modal.component';
 import { LineupDTO, PlayerLineupDTO, ChemistryBreakdownDTO, SkillCoverageDTO } from 'app/shared/models/lineup/lineup.dto';
+import { LineupSlotDTO } from 'app/shared/models/lineup/lineup-slot.dto';
 
 // Stub para los child components que no necesitamos testear.
 @Component({ selector: 'app-career-status-bar', standalone: true, template: '' })
@@ -526,6 +527,136 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
 
       expect(fixture.nativeElement.querySelector('.contributor-popover'))
         .toBeNull('Popover must NOT open when contributorId is not found in lineup');
+    });
+  });
+
+  // ========== V25D59-C19 P1: hero label "Lineup armado: X/11" reflects actual persisted slots ==========
+
+  describe('V25D59-C19 P1: hero label reflects actual persisted slots', () => {
+    /**
+     * Helper to build a LineupDTO with explicit subdivision {@code slots}
+     * array of size {@code slotsCount}. Mirrors the MVP1-lineup-cancha-1
+     * wire contract (post-V25D59 back returns {@code slots} with one
+     * entry per filled subdivision on the field).
+     */
+    function buildLineupWithSlots(slotsCount: number, players: PlayerLineupDTO[]): LineupDTO {
+      const slots: LineupSlotDTO[] = Array.from({ length: slotsCount }, (_, i) => ({
+        playerId: players[i % players.length]?.playerId ?? `p${i}`,
+        subdivisionId: `S${String(i).padStart(2, '0')}-1`
+      }));
+      return {
+        formation: '4-4-2',
+        players,
+        confirmed: false,
+        warnings: [],
+        slots
+      };
+    }
+
+    it('V25D59-C19 P1: should display "7/11" when lineup has 7 persisted slots', () => {
+      // V25D59-C19 P1 (Test 1): lineup con 7 slots persistidos (caso del bug C18b —
+      // auto-select había devuelto 7 players). El label debe reflejar 7/11, no
+      // 11/11 hardcoded.
+      const lineup7 = buildLineupWithSlots(7, ELEVEN_PLAYERS.slice(0, 7));
+      component.lineupSubject$.next(lineup7);
+      fixture.detectChanges();
+
+      const cta = fixture.nativeElement.querySelector('.lineup-mini-cta');
+      expect(cta).not.toBeNull('Hero CTA should render when lineup exists');
+      expect(cta.textContent).toContain('7');
+      expect(cta.textContent).toContain('/ 11');
+      expect(cta.textContent).not.toContain('11/11');
+      // V25D59-C19 P1: incomplete class applies for < 11
+      expect(cta.classList.contains('lineup-incomplete'))
+        .withContext('Should have lineup-incomplete class for 7/11')
+        .toBeTrue();
+      expect(cta.classList.contains('lineup-complete')).toBeFalse();
+    });
+
+    it('V25D59-C19 P1: should display "11/11" when lineup has 11 persisted slots', () => {
+      // V25D59-C19 P1: caso happy path post-fix C19 P0 back — auto-select
+      // garantiza 11 slots. El label muestra 11/11 con styling "complete".
+      const lineup11 = buildLineupWithSlots(11, ELEVEN_PLAYERS);
+      component.lineupSubject$.next(lineup11);
+      fixture.detectChanges();
+
+      const cta = fixture.nativeElement.querySelector('.lineup-mini-cta');
+      expect(cta).not.toBeNull();
+      expect(cta.textContent).toContain('11');
+      expect(cta.textContent).toContain('/ 11');
+      expect(cta.classList.contains('lineup-complete'))
+        .withContext('Should have lineup-complete class for 11/11')
+        .toBeTrue();
+      expect(cta.classList.contains('lineup-incomplete')).toBeFalse();
+    });
+
+    it('V25D59-C19 P1: should display "0/11" when lineup has no players and no slots', () => {
+      // V25D59-C19 P1 (Test 2): lineup vacío (players=[], slots=[]). Spec exige
+      // "0/11" visible, no hidden — para que el usuario sepa que NO hay lineup armado.
+      const lineupEmpty: LineupDTO = {
+        formation: '',
+        players: [],
+        confirmed: false,
+        warnings: [],
+        slots: []
+      };
+      component.lineupSubject$.next(lineupEmpty);
+      fixture.detectChanges();
+
+      const cta = fixture.nativeElement.querySelector('.lineup-mini-cta');
+      expect(cta).not.toBeNull('Hero CTA should render even when lineup is empty (shows "0/11")');
+      expect(cta.textContent).toContain('0');
+      expect(cta.textContent).toContain('/ 11');
+      expect(cta.classList.contains('lineup-incomplete')).toBeTrue();
+    });
+
+    it('V25D59-C19 P1: should NOT render hero CTA when no lineup is loaded', () => {
+      // V25D59-C19 P1: cuando lineupSubject$ es null (initial state antes
+      // de GET /career/lineup/current), el hero NO se renderiza — no hay
+      // información para mostrar.
+      component.lineupSubject$.next(null as unknown as LineupDTO);
+      fixture.detectChanges();
+
+      const cta = fixture.nativeElement.querySelector('.lineup-mini-cta');
+      expect(cta).toBeNull('Hero CTA must not render when no lineup is loaded');
+    });
+
+    it('V25D59-C19 P1: should fall back to players.length for legacy lineups without slots', () => {
+      // V25D59-C19 P1: backward compat — lineups pre-MVP1-lineup-cancha-1
+      // (sin `slots` field) caen al fallback de players.length para no
+      // mostrar "0/11" en carreras activas que aún no re-armaron via auto-select.
+      const legacyLineup: LineupDTO = {
+        formation: '4-4-2',
+        players: ELEVEN_PLAYERS,
+        confirmed: false,
+        warnings: []
+        // slots intencionalmente ausente (legacy)
+      };
+      component.lineupSubject$.next(legacyLineup);
+      fixture.detectChanges();
+
+      const cta = fixture.nativeElement.querySelector('.lineup-mini-cta');
+      expect(cta).not.toBeNull();
+      expect(cta.textContent).toContain('11');
+      expect(cta.textContent).toContain('/ 11');
+    });
+
+    it('V25D59-C19 P1: hero label updates reactively when lineup changes (7 → 11)', () => {
+      // V25D59-C19 P1: regression — el counter debe actualizarse cuando
+      // lineupSubject$ emite un nuevo lineup (e.g., después de auto-select).
+      // Antes del fix, el counter quedaba stale en 11/11 aunque el back
+      // devolvía 7 players.
+      component.lineupSubject$.next(buildLineupWithSlots(7, ELEVEN_PLAYERS.slice(0, 7)));
+      fixture.detectChanges();
+      let cta = fixture.nativeElement.querySelector('.lineup-mini-cta');
+      expect(cta.textContent).toContain('7');
+
+      component.lineupSubject$.next(buildLineupWithSlots(11, ELEVEN_PLAYERS));
+      fixture.detectChanges();
+      cta = fixture.nativeElement.querySelector('.lineup-mini-cta');
+      expect(cta.textContent).toContain('11');
+      expect(cta.textContent).toContain('/ 11');
+      expect(cta.classList.contains('lineup-complete')).toBeTrue();
     });
   });
 });

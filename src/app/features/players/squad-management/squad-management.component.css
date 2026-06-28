@@ -758,6 +758,24 @@
   color: #2c5282;
 }
 
+/* V25D59-C19 P1: visual cue cuando lineupSlotsCount < 11. El back
+   ahora garantiza 11 en auto-select (C19 P0) — esta clase sólo dispara
+   para lineups manuales/legacy incompletos. Amarillo para diferenciar
+   del verde de "completo" sin alarmar como el rojo del short-handed. */
+.lineup-mini-cta.lineup-incomplete {
+  background: #fffaf0;
+  border-color: #fbd38d;
+  color: #7b341e;
+}
+
+/* V25D59-C19 P1: visual cue cuando lineupSlotsCount === 11. Verde
+   discreto para confirmar visualmente que el lineup está completo. */
+.lineup-mini-cta.lineup-complete {
+  background: #f0fff4;
+  border-color: #9ae6b4;
+  color: #22543d;
+}
+
 .lineup-mini-cta a {
   color: #2b6cb0;
   text-decoration: underline;
