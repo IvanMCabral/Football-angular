@@ -19,6 +19,7 @@ import { ChemistryDetailDTO } from '../../shared/models/lineup/lineup.dto';
 import { FormationEffectivenessDTO, effectivenessColor } from '../../shared/models/lineup/formation-effectiveness.dto';
 import { ALL_FORMATIONS } from '../../shared/constants/formations';
 import { ChemistryPreviewService } from '../../core/services/chemistry-preview.service';
+import { SessionPlayer } from '../../shared/models/player.model';
 
 /**
  * Modal del Editor de Formación - MODO PRE-PARTIDO
@@ -1442,7 +1443,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   constructor(
     private http: HttpClient,
     private dialogRef: MatDialogRef<SquadEditorModalComponent>,
-    @Inject(MAT_DIALOG_DATA) public data: { matchId: string },
+    @Inject(MAT_DIALOG_DATA) public data: { careerId?: string; matchId: string | null; squad?: SessionPlayer[] },
     private cdr: ChangeDetectorRef,
     private chemistryPreview: ChemistryPreviewService
   ) {
@@ -1617,8 +1618,28 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
           // Noreturn aquí - necesitamos terminar la inicialización después del auto-select
         }
 
+        // V25D66-C26 (Sprint C26): si el caller (squad-management) pasó el
+        // squad completo vía dialog data, lo usamos como source de bench en
+        // lugar de response.players (que solo trae los 11 del LINEUP). Si
+        // data.squad está vacío o ausente, fallback al comportamiento legacy
+        // (bench = filter !slotId sobre lineup, que da 0 cuando lineup = 11).
+        const squadSource: any[] = (this.data?.squad && this.data.squad.length > 0)
+          ? this.data.squad.map((sp: SessionPlayer) => ({
+              // SessionPlayer.sessionPlayerId → lineup player playerId.
+              // El back usa sessionPlayerId como playerId en /career/lineup/current,
+              // entonces mapear mantiene la consistencia con persistedSlots y
+              // slotPlayerMap que matchean por playerId.
+              playerId: sp.sessionPlayerId,
+              name: sp.name,
+              position: sp.position,
+              overall: sp.attack ?? 70,  // squad no expone overall; fallback suave
+              energy: sp.energy ?? 100,
+              injured: sp.injured ?? false
+            }))
+          : playersList;
+
         // Convertir jugadores del response
-        const allPlayers: PlayerOnFieldDto[] = playersList.map((p: any) => ({
+        const allPlayers: PlayerOnFieldDto[] = squadSource.map((p: any) => ({
           playerId: p.playerId,
           name: p.name,
           position: p.position,
@@ -2122,8 +2143,23 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
 
     const positions = this.formationPositions[formationName] || [];
 
+    // V25D66-C26 (Sprint C26): si el caller pasó squad via dialog data,
+    // usarlo como pool completo para que la banca muestre los jugadores
+    // no seleccionados del squad (no solo del response de auto-select).
+    // Fallback al playersList legacy cuando squad está ausente.
+    const squadSource: any[] = (this.data?.squad && this.data.squad.length > 0)
+      ? this.data.squad.map((sp: SessionPlayer) => ({
+          playerId: sp.sessionPlayerId,
+          name: sp.name,
+          position: sp.position,
+          overall: sp.attack ?? 70,
+          energy: sp.energy ?? 100,
+          injured: sp.injured ?? false
+        }))
+      : playersList;
+
     // Convertir jugadores del response
-    const allPlayers: PlayerOnFieldDto[] = playersList.map((p: any) => ({
+    const allPlayers: PlayerOnFieldDto[] = squadSource.map((p: any) => ({
       playerId: p.playerId,
       name: p.name,
       position: p.position,

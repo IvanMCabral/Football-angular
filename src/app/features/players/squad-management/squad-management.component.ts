@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { RouterLink, Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
-import { Observable, combineLatest, forkJoin, of, switchMap, map, tap, catchError, shareReplay, BehaviorSubject, firstValueFrom } from 'rxjs';
+import { Observable, combineLatest, forkJoin, of, switchMap, map, tap, catchError, shareReplay, BehaviorSubject, firstValueFrom, take } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { FixtureService } from 'app/core/services/fixture.service';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
@@ -416,31 +416,39 @@ openVisualEditor(): void {
     if (!status || !status.careerId) {
       return;
     }
-    const ref = this.dialog.open(SquadEditorModalComponent, {
-      data: {
-        careerId: status.careerId,
-        matchId: null
-      },
-      width: '95vw',
-      height: '90vh',
-      disableClose: false,
-      panelClass: 'squad-editor-panel'
-    });
-    ref.afterClosed().subscribe(() => {
-      // Refresca el lineup para que la grid del squad-management muestre los cambios.
-      this.http.get<LineupDTO>(`${environment.apiUrl}/career/lineup/current`)
-        .pipe(
-          tap(lineup => {
-            this.lineupSubject$.next(lineup);
-            this.lineupWarning$.next(this.pickLineupWarning(lineup.warnings));
-          }),
-          catchError(() => {
-            this.lineupSubject$.next(null);
-            this.lineupWarning$.next(null);
-            return of(null);
-          })
-        )
-        .subscribe();
+    // V25D66-C26 (Sprint C26): pasar el squad completo via dialog data para
+    // que el modal pueda mostrar la banca con los jugadores del squad no
+    // seleccionados (no solo los del response /career/lineup/current, que
+    // son los 11 del lineup). El modal hace fallback a playersList si el
+    // squad está vacío o ausente (backward compat con callers legacy).
+    this.squad$.pipe(take(1)).subscribe(squad => {
+      const ref = this.dialog.open(SquadEditorModalComponent, {
+        data: {
+          careerId: status.careerId,
+          matchId: null,
+          squad: squad ?? []
+        },
+        width: '95vw',
+        height: '90vh',
+        disableClose: false,
+        panelClass: 'squad-editor-panel'
+      });
+      ref.afterClosed().subscribe(() => {
+        // Refresca el lineup para que la grid del squad-management muestre los cambios.
+        this.http.get<LineupDTO>(`${environment.apiUrl}/career/lineup/current`)
+          .pipe(
+            tap(lineup => {
+              this.lineupSubject$.next(lineup);
+              this.lineupWarning$.next(this.pickLineupWarning(lineup.warnings));
+            }),
+            catchError(() => {
+              this.lineupSubject$.next(null);
+              this.lineupWarning$.next(null);
+              return of(null);
+            })
+          )
+          .subscribe();
+      });
     });
   });
 }
