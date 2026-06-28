@@ -22,6 +22,15 @@ export interface SubstitutionDialogData {
   startingXi: SubModalPlayer[];
   bench: SubModalPlayer[];
   substitutionsRemaining: number;
+  /**
+   * V25D63-C23 P0: map sessionPlayerId → effectiveness (0-1).
+   * Construido por live-match-modals.service desde
+   * formationEffectiveness.perPlayerEffectiveness (keyed subdivisionId)
+   * invertido via lineup.slots. Null cuando formationEffectiveness es
+   * null/undefined (legacy pre-V25D47 lineup) — el modal renderiza sin
+   * feedback de effectiveness en ese caso.
+   */
+  effectivenessMap?: Record<string, number>;
 }
 
 /**
@@ -151,6 +160,31 @@ export class SubstitutionModalComponent {
 
   /** trackBy for *ngFor on player lists. */
   trackByPlayer = (_idx: number, p: SubModalPlayer) => p.sessionPlayerId;
+
+  /**
+   * V25D63-C23 P0: effectiveness classification para chips SALE/ENTRA.
+   * Mismo threshold que squad-editor-modal (eff >= 0.9 good,
+   * 0.7-0.9 warning, <0.7 bad). Retorna null si el jugador no está en
+   * el effectivenessMap (bench sin data pre-match, o lineup legacy
+   * pre-V25D47 sin formationEffectiveness).
+   */
+  getEffClass(sessionPlayerId: string): 'eff-good' | 'eff-warning' | 'eff-bad' | null {
+    const v = this.data.effectivenessMap?.[sessionPlayerId];
+    if (v == null) { return null; }
+    if (v >= 0.9) { return 'eff-good'; }
+    if (v >= 0.7) { return 'eff-warning'; }
+    return 'eff-bad';
+  }
+
+  /**
+   * V25D63-C23 P0: retorna el porcentaje rounded (e.g. '95%') o null
+   * si no hay data para ese sessionPlayerId.
+   */
+  getEffBadge(sessionPlayerId: string): string | null {
+    const v = this.data.effectivenessMap?.[sessionPlayerId];
+    if (v == null) { return null; }
+    return `${Math.round(v * 100)}%`;
+  }
 
   ngOnDestroy(): void {
     this.destroy$.next();

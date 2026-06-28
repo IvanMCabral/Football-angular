@@ -154,3 +154,119 @@ describe('SubstitutionModalComponent — LIVE-MATCH-F3-UI-LIVE FE4', () => {
     );
   });
 });
+
+describe('V25D63-C23 P0: substitution modal shows effectiveness feedback', () => {
+  let component: SubstitutionModalComponent;
+  let fixture: ComponentFixture<SubstitutionModalComponent>;
+  let engineServiceSpy: jasmine.SpyObj<MatchEngineService>;
+  let dialogRefSpy: jasmine.SpyObj<MatDialogRef<SubstitutionModalComponent>>;
+  let snackBarSpy: jasmine.SpyObj<MatSnackBar>;
+
+  /**
+   * Build a SubstitutionDialogData with effectivenessMap populated.
+   *
+   * <p>Players:
+   * <ul>
+   *   <li>p1 (GK, rating 85)            → eff=1.0  (eff-good)</li>
+   *   <li>p2 (CB, rating 80)            → eff=0.95 (eff-good, just above 0.9)</li>
+   *   <li>p3 (CDM, rating 78)           → eff=0.75 (eff-warning, 0.7-0.9 band)</li>
+   *   <li>b1 (CB-bench, rating 75)      → NO en el map (no jugó en XI pre-match) → null</li>
+   * </ul>
+   */
+  function buildDataWithEffectiveness(): SubstitutionDialogData {
+    return {
+      matchId: 'm1',
+      currentMinute: 30,
+      substitutionsRemaining: 5,
+      startingXi: [
+        { sessionPlayerId: 'p1', displayName: 'GK', position: 'GK', rating: 85, isStarter: true },
+        { sessionPlayerId: 'p2', displayName: 'CB-good', position: 'CB', rating: 80, isStarter: true },
+        { sessionPlayerId: 'p3', displayName: 'CDM-warning', position: 'CDM', rating: 78, isStarter: true }
+      ],
+      bench: [
+        { sessionPlayerId: 'b1', displayName: 'CB-bench', position: 'CB', rating: 75, isStarter: false }
+      ],
+      effectivenessMap: {
+        p1: 1.0,    // eff-good
+        p2: 0.95,   // eff-good
+        p3: 0.75    // eff-warning
+        // b1 NO en el map (no jugó en XI pre-match) → null
+      }
+    };
+  }
+
+  beforeEach(async () => {
+    engineServiceSpy = jasmine.createSpyObj('MatchEngineService', ['substitutePlayer']);
+    dialogRefSpy = jasmine.createSpyObj('MatDialogRef', ['close']);
+    snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
+
+    // V25D63-C23 P0: resetTestingModule antes de re-configurar para que el
+    // MAT_DIALOG_DATA del describe anterior (SAMPLE_DATA) no contamine este.
+    TestBed.resetTestingModule();
+    await TestBed.configureTestingModule({
+      imports: [SubstitutionModalComponent, NoopAnimationsModule],
+      providers: [
+        { provide: MAT_DIALOG_DATA, useValue: buildDataWithEffectiveness() },
+        { provide: MatDialogRef, useValue: dialogRefSpy },
+        { provide: MatSnackBar, useValue: snackBarSpy },
+        { provide: MatchEngineService, useValue: engineServiceSpy },
+        { provide: HttpClient, useValue: jasmine.createSpyObj('HttpClient', ['get', 'post']) }
+      ]
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(SubstitutionModalComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+  });
+
+  it('getEffClass returns eff-good for p1 (eff=1.0)', () => {
+    expect(component.getEffClass('p1')).toBe('eff-good');
+  });
+
+  it('getEffClass returns eff-warning for p3 (eff=0.75)', () => {
+    expect(component.getEffClass('p3')).toBe('eff-warning');
+  });
+
+  it('getEffClass returns null for bench player without data (b1)', () => {
+    expect(component.getEffClass('b1')).toBeNull();
+  });
+
+  it('getEffBadge returns "100%" for p1', () => {
+    expect(component.getEffBadge('p1')).toBe('100%');
+  });
+
+  it('getEffBadge returns "75%" for p3', () => {
+    expect(component.getEffBadge('p3')).toBe('75%');
+  });
+
+  it('renders eff-good class on starting XI li for p1', () => {
+    const lis = fixture.nativeElement.querySelectorAll('.col-starter .player-list li') as NodeListOf<HTMLElement>;
+    const p1Li = Array.from(lis).find((li: HTMLElement) =>
+      li.querySelector('.player-name')?.textContent?.includes('GK') ?? false);
+    expect(p1Li?.classList.contains('eff-good')).toBeTrue();
+  });
+
+  it('renders eff-warning class on starting XI li for p3', () => {
+    const lis = fixture.nativeElement.querySelectorAll('.col-starter .player-list li') as NodeListOf<HTMLElement>;
+    const p3Li = Array.from(lis).find((li: HTMLElement) =>
+      li.querySelector('.player-name')?.textContent?.includes('CDM-warning') ?? false);
+    expect(p3Li?.classList.contains('eff-warning')).toBeTrue();
+  });
+
+  it('renders eff-badge with percentage inside starting XI li for p1', () => {
+    const lis = fixture.nativeElement.querySelectorAll('.col-starter .player-list li') as NodeListOf<HTMLElement>;
+    const p1Li = Array.from(lis).find((li: HTMLElement) =>
+      li.querySelector('.player-name')?.textContent?.includes('GK') ?? false);
+    const badge = p1Li?.querySelector('.eff-badge');
+    expect(badge?.textContent?.trim()).toBe('100%');
+  });
+
+  it('bench player without effectiveness data renders NO eff class and NO eff-badge', () => {
+    const lis = fixture.nativeElement.querySelectorAll('.col-bench .player-list li') as NodeListOf<HTMLElement>;
+    const b1Li = lis[0];
+    expect(b1Li.classList.contains('eff-good')).toBeFalse();
+    expect(b1Li.classList.contains('eff-warning')).toBeFalse();
+    expect(b1Li.classList.contains('eff-bad')).toBeFalse();
+    expect(b1Li.querySelector('.eff-badge')).toBeNull();
+  });
+});
