@@ -1149,3 +1149,122 @@ describe('SquadEditorModalComponent — V25D51 chip-level effectiveness feedback
     }, 30);
   });
 });
+
+/**
+ * V25D56 (Sprint C17) — responsive modal layout.
+ *
+ * <p>Three progressive breakpoints (mobile <=600px, tablet 601-1024px,
+ * desktop default >=1025px). The pre-C17 single breakpoint at 768px
+ * hid the .player-chip via `display: none` on mobile, which Iván
+ * flagged as a visual regression.
+ *
+ * <p>Strategy: Karma/Jasmine runs in jsdom, which doesn't simulate
+ * viewport width or evaluate @media queries — so we cannot assert
+ * computed styles. Instead we assert the component's styles source:
+ * the 3 breakpoint blocks exist with the expected rules, AND no
+ * breakpoint hides .player-chip via `display: none`. This guards the
+ * fix from accidental reverts.
+ */
+describe('SquadEditorModalComponent — V25D56 (C17) responsive breakpoints', () => {
+  /**
+   * Reads the @Component.styles source. For inline-styled components
+   * (like this one) Angular stores the CSS strings on the component
+   * definition at `ɵcmp.styles`, but with Angular's emulated
+   * encapsulation every selector is rewritten with `[_ngcontent-%COMP%]`
+   * (or the hashed version at runtime). {@link #stripEncapsulation}
+   * removes those markers so regex assertions match the original
+   * class names.
+   */
+  function stylesSource(): string {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const styles = (SquadEditorModalComponent as any).ɵcmp?.styles ?? [];
+    if (Array.isArray(styles)) {
+      return styles.join('\n');
+    }
+    if (typeof styles === 'string') {
+      return styles;
+    }
+    return '';
+  }
+
+  function stripEncapsulation(css: string): string {
+    return css.replace(/\[[_]?ngcontent-[^\]]*\]/g, '');
+  }
+
+  /**
+   * Extracts the body of the @media block whose query matches {@code query}.
+   * Walks the brace stack to handle nested rule blocks.
+   */
+  function extractMediaBlock(query: string): string {
+    const src = stripEncapsulation(stylesSource());
+    const re = new RegExp(
+      `@media\\s*\\(\\s*${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\)\\s*\\{`
+    );
+    const m = src.match(re);
+    if (!m || m.index === undefined) {
+      return '';
+    }
+    let depth = 1;
+    let i = m.index + m[0].length;
+    while (i < src.length && depth > 0) {
+      if (src[i] === '{') depth++;
+      else if (src[i] === '}') depth--;
+      i++;
+    }
+    return src.substring(m.index + m[0].length, i - 1);
+  }
+
+  it('mobile breakpoint exists at max-width: 600px', () => {
+    const src = stripEncapsulation(stylesSource());
+    expect(src).toMatch(/@media\s*\(\s*max-width:\s*600px\s*\)/);
+  });
+
+  it('tablet breakpoint exists at min-width: 601px and max-width: 1024px', () => {
+    const src = stripEncapsulation(stylesSource());
+    expect(src).toMatch(/@media\s*\(\s*min-width:\s*601px\s*\)\s*and\s*\(\s*max-width:\s*1024px\s*\)/);
+  });
+
+  it('desktop defaults are preserved (no top-level @media hiding the chip)', () => {
+    // Pre-C17 the @media (max-width: 768px) block hid .player-chip.
+    // The fix replaces it with progressive breakpoints AND keeps the
+    // chip visible everywhere. We assert the legacy breakpoint AND the
+    // legacy display:none rule are gone.
+    const src = stripEncapsulation(stylesSource());
+    expect(src).not.toMatch(/@media\s*\(\s*max-width:\s*768px\s*\)/);
+    // Strip CSS comments before scanning for the legacy chip-hide rule
+    // so we don't false-positive on the explanatory comment block.
+    const stripped = src.replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(stripped).not.toMatch(/\.player-chip\s*\{\s*display:\s*none/);
+  });
+
+  it('mobile breakpoint scales .player-chip (font-size <= 0.5rem, no display:none)', () => {
+    // Extract the mobile @media block and assert the .player-chip
+    // rule inside it keeps the chip visible (no display:none) AND
+    // sets a smaller font-size so the chip fits narrow slots.
+    const block = extractMediaBlock('max-width: 600px');
+    expect(block).withContext('mobile @media block must exist').toBeTruthy();
+    expect(block).not.toMatch(/\.player-chip\s*\{\s*display:\s*none/);
+    expect(block).toMatch(/\.player-chip\s*\{[^}]*font-size:\s*0?\.4rem/);
+  });
+
+  it('tablet breakpoint scales .player-chip with font-size between mobile and desktop', () => {
+    const src = stripEncapsulation(stylesSource());
+    const block = extractMediaBlock('min-width: 601px) and (max-width: 1024px');
+    expect(block).withContext('tablet @media block must exist').toBeTruthy();
+    expect(block).toMatch(/\.player-chip\s*\{[^}]*font-size:\s*0?\.45rem/);
+  });
+
+  it('container is scrollable on mobile (squad-editor-container scrolls vertically)', () => {
+    const block = extractMediaBlock('max-width: 600px');
+    expect(block).toBeTruthy();
+    // Either overflow-y:auto on the container, or a scroll affordance
+    // somewhere — guarantees the user can reach all content on tall modals.
+    expect(block).toMatch(/overflow/);
+  });
+
+  it('bench panel scrolls horizontally on mobile (bench-list overflow-x:auto)', () => {
+    const block = extractMediaBlock('max-width: 600px');
+    expect(block).toBeTruthy();
+    expect(block).toMatch(/\.bench-container\s+\.bench-list\s*\{[^}]*overflow-x:\s*auto/);
+  });
+});

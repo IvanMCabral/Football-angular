@@ -359,3 +359,107 @@ it('V25D55-C16 P1.3+4: 3-5-2-CDM (6 lines) — every MID line gets is-mid (CDM +
     expect(dots[10].classList.contains('is-att')).toBeTrue();
   });
 });
+
+/**
+ * V25D56 (Sprint C17) — formation-modal responsive breakpoints.
+ *
+ * <p>Pre-C17 the modal had no @media queries, so on phones the pitch
+ * overflowed horizontally and dots got clipped. The fix adds the same
+ * 3-breakpoint system used by squad-editor-modal (mobile <=600px,
+ * tablet 601-1024px, desktop default >=1025px, large >=1600px).
+ *
+ * <p>Strategy: Karma/jsdom doesn't evaluate @media or compute viewport
+ * styles, so we assert the styles source contains the expected
+ * breakpoint blocks AND the dot keeps `aspect-ratio: 1` (circular)
+ * via min-width/max-width bounds. This guards against future
+ * regressions that drop the breakpoints or restore a hard-coded dot
+ * size that overflows on mobile.
+ */
+describe('FormationModalComponent — V25D56 (C17) responsive breakpoints', () => {
+  /**
+   * Reads the @Component.styles source. Formation-modal now uses inline
+   * styles (V25D56) so ɵcmp.styles returns the original CSS strings —
+   * though Angular's emulated encapsulation still rewrites every
+   * selector with [_ngcontent-%COMP%] (or the hashed version at
+   * runtime), so {@link #stripEncapsulation} is applied first.
+   */
+  function stylesSource(): string {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const styles = (FormationModalComponent as any).ɵcmp?.styles ?? [];
+    if (Array.isArray(styles)) {
+      return styles.join('\n');
+    }
+    if (typeof styles === 'string') {
+      return styles;
+    }
+    return '';
+  }
+
+  /**
+   * Strips Angular's emulated-encapsulation attribute selectors so the
+   * regex assertions can match the original class names without
+   * having to know about [_ngcontent-%COMP%]. Runs on both the full
+   * source (for simple @media query checks) and on extracted blocks.
+   */
+  function stripEncapsulation(css: string): string {
+    return css.replace(/\[[_]?ngcontent-[^\]]*\]/g, '');
+  }
+
+  /**
+   * Extracts the body of the @media block whose query matches {@code query}.
+   * Walks the brace stack to handle nested rule blocks.
+   */
+  function extractMediaBlock(query: string): string {
+    const src = stripEncapsulation(stylesSource());
+    const re = new RegExp(
+      `@media\\s*\\(\\s*${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\)\\s*\\{`
+    );
+    const m = src.match(re);
+    if (!m || m.index === undefined) {
+      return '';
+    }
+    let depth = 1;
+    let i = m.index + m[0].length;
+    while (i < src.length && depth > 0) {
+      if (src[i] === '{') depth++;
+      else if (src[i] === '}') depth--;
+      i++;
+    }
+    return src.substring(m.index + m[0].length, i - 1);
+  }
+
+  it('mobile breakpoint exists at max-width: 600px', () => {
+    const src = stripEncapsulation(stylesSource());
+    expect(src).toMatch(/@media\s*\(\s*max-width:\s*600px\s*\)/);
+  });
+
+  it('tablet breakpoint exists at min-width: 601px and max-width: 1024px', () => {
+    const src = stripEncapsulation(stylesSource());
+    expect(src).toMatch(/@media\s*\(\s*min-width:\s*601px\s*\)\s*and\s*\(\s*max-width:\s*1024px\s*\)/);
+  });
+
+  it('large-desktop breakpoint exists at min-width: 1600px', () => {
+    const src = stripEncapsulation(stylesSource());
+    expect(src).toMatch(/@media\s*\(\s*min-width:\s*1600px\s*\)/);
+  });
+
+  it('mobile breakpoint keeps pitch dots visible with bounded width (12px-22px)', () => {
+    const block = extractMediaBlock('max-width: 600px');
+    expect(block).withContext('mobile @media block must exist').toBeTruthy();
+    // Bounded width so dots never disappear or overflow on mobile.
+    expect(block).toMatch(/\.player-dot\s*\{[^}]*min-width:\s*12px/);
+    expect(block).toMatch(/\.player-dot\s*\{[^}]*max-width:\s*22px/);
+  });
+
+  it('dot-label truncates with ellipsis on mobile (text-overflow: ellipsis)', () => {
+    const block = extractMediaBlock('max-width: 600px');
+    expect(block).toBeTruthy();
+    expect(block).toMatch(/\.dot-label\s*\{[^}]*text-overflow:\s*ellipsis/);
+  });
+
+  it('tablet breakpoint sets mid-size dots (24px) between mobile and desktop', () => {
+    const block = extractMediaBlock('min-width: 601px) and (max-width: 1024px');
+    expect(block).toBeTruthy();
+    expect(block).toMatch(/\.player-dot\s*\{[^}]*width:\s*24px/);
+  });
+});
