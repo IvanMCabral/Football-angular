@@ -703,8 +703,13 @@ import { ChemistryPreviewService } from '../../core/services/chemistry-preview.s
       position: relative;
       width: 100%;
       max-width: 500px;
-      height: 100%;
+      /* V25D57 (Sprint C17b): aspect-ratio del campo de futbol.
+         Antes height: 100% aplastaba el field a horizontal slab en
+         viewports desktop/tablet. height: auto + aspect-ratio 1/1.4
+         garantiza que height = 1.4 * width (campo vertical). */
+      height: auto;
       max-height: 700px;
+      aspect-ratio: 1 / 1.4;
       background: linear-gradient(180deg, #4a8c5c 0%, #5a9c6c 50%, #4a8c5c 100%);
       border: 3px solid #fff;
       border-radius: 4px;
@@ -1208,7 +1213,9 @@ import { ChemistryPreviewService } from '../../core/services/chemistry-preview.s
       }
 
       .field {
-        max-height: 50vh;
+        /* V25D57 (Sprint C17b): max-height:none. Antes 50vh sobreescribia
+           el aspect-ratio del default y dejaba el field aplastado. */
+        max-height: none;
         aspect-ratio: 1 / 1.4;
         height: auto;
       }
@@ -1246,6 +1253,12 @@ import { ChemistryPreviewService } from '../../core/services/chemistry-preview.s
       }
 
       .field {
+        /* V25D57 (Sprint C17b): aspect-ratio del campo en tablet.
+           Antes no tenia aspect-ratio y quedaba horizontal slab. */
+        aspect-ratio: 1 / 1.4;
+        height: auto;
+        /* max-height fallback por si aspect-ratio no se respeta en algun
+           browser legacy (aspect-ratio tiene soporte estable desde 2021). */
         max-height: 60vh;
       }
 

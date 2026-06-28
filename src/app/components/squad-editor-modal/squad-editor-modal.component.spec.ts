@@ -1267,4 +1267,45 @@ describe('SquadEditorModalComponent — V25D56 (C17) responsive breakpoints', ()
     expect(block).toBeTruthy();
     expect(block).toMatch(/\.bench-container\s+\.bench-list\s*\{[^}]*overflow-x:\s*auto/);
   });
+
+  // V25D57 (Sprint C17b): aspect-ratio del campo en los 3 breakpoints.
+  // Bug pre-C17b: desktop/tablet sin aspect-ratio (height:100% aplastaba
+  // el field a horizontal slab). Mobile tenia aspect-ratio pero
+  // max-height:50vh lo sobreescribia. Verificamos que los 3 bloques
+  // tienen la regla correcta y que NO hay height/max-height que anule
+  // el ratio.
+  describe('SquadEditorModalComponent — V25D57 (C17b) field aspect-ratio', () => {
+    it('default viewport (>=1025px): .field has aspect-ratio 1 / 1.4 outside any @media block', () => {
+      const src = stripEncapsulation(stylesSource());
+      // Strip @media blocks so we only inspect the default rules.
+      const nonMedia = src.replace(/@media[\s\S]*?\}\s*\}/g, '');
+      // Find the .field rule in the non-media part. Allow nested rules
+      // (we strip comments + the rule body).
+      const fieldRule = nonMedia.match(/\.field\s*\{[^}]*\}/);
+      expect(fieldRule).withContext('top-level .field rule must exist').toBeTruthy();
+      expect(fieldRule![0]).toMatch(/aspect-ratio:\s*1\s*\/\s*1\.4/);
+      // Sanity: height:100% was the original bug source — assert it's gone.
+      expect(fieldRule![0]).not.toMatch(/height:\s*100%/);
+    });
+
+    it('tablet viewport (601-1024px): .field has aspect-ratio 1 / 1.4 inside the @media block', () => {
+      const block = extractMediaBlock('min-width: 601px) and (max-width: 1024px');
+      expect(block).withContext('tablet @media block must exist').toBeTruthy();
+      const fieldRule = block.match(/\.field\s*\{[^}]*\}/);
+      expect(fieldRule).withContext('tablet .field rule must exist').toBeTruthy();
+      expect(fieldRule![0]).toMatch(/aspect-ratio:\s*1\s*\/\s*1\.4/);
+    });
+
+    it('mobile viewport (<=600px): .field has aspect-ratio 1 / 1.4 AND no max-height cap that would override it', () => {
+      const block = extractMediaBlock('max-width: 600px');
+      expect(block).withContext('mobile @media block must exist').toBeTruthy();
+      const fieldRule = block.match(/\.field\s*\{[^}]*\}/);
+      expect(fieldRule).withContext('mobile .field rule must exist').toBeTruthy();
+      expect(fieldRule![0]).toMatch(/aspect-ratio:\s*1\s*\/\s*1\.4/);
+      // The original bug: max-height: 50vh overrode aspect-ratio in jsdom
+      // and real browsers alike, leaving the field wider than tall.
+      // The fix sets max-height:none. Assert neither vh nor px cap is present.
+      expect(fieldRule![0]).not.toMatch(/max-height:\s*\d+(vh|px)/);
+    });
+  });
 });
