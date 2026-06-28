@@ -761,4 +761,75 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
         .toContain('Confirmar y Jugar');
     });
   });
+
+  // ========== V25D62-C21 P0.1: in-page Confirm button must use lineupSlotsCount ==========
+  //
+  // V25D60-C20 P1 fixed the .sticky-confirm-bar Confirm button (línea 338) y los
+  // displays de count, pero el verifier detectó que el botón DENTRO de
+  // .lineup-actions (líneas 306-316) todavía usaba `lineup.players.length`
+  // (legacy < 7 || > 11). Esto causa que un lineup con slots persistidos truth
+  // (e.g. 11) y players stale (e.g. 5) permita confirmar — el botón queda
+  // disabled por players<7 aunque slots=11 está OK.
+
+  describe('V25D62-C21 P0.1: in-page Confirm button uses lineupSlotsCount (not lineup.players.length)', () => {
+    /**
+     * Helper local: lineup con N slots persistidos (truth) y M players
+     * stale (legacy `players[]`). El bug C21 surge cuando N y M caen en
+     * lados opuestos del rango [7, 11] — el viejo `lineup.players.length`
+     * daba un disabled distinto al `lineupSlotsCount` real.
+     */
+    function buildLineupWithSlotsAndPlayers(slotsCount: number, playersCount: number): LineupDTO {
+      const players: PlayerLineupDTO[] = Array.from({ length: playersCount }, (_, i) => ({
+        playerId: `p${i}`,
+        name: `Player ${i}`,
+        position: 'MID',
+        overall: 80,
+        energy: 100,
+        injured: false,
+        age: 25
+      }));
+      const slots: LineupSlotDTO[] = Array.from({ length: slotsCount }, (_, i) => ({
+        playerId: players[i % players.length]?.playerId ?? `p${i}`,
+        subdivisionId: `S${String(i).padStart(2, '0')}-1`
+      }));
+      return {
+        formation: '4-4-2',
+        players,
+        confirmed: false,
+        warnings: [],
+        slots
+      };
+    }
+
+    it('should be ENABLED when lineup.slots.length=11 even though lineup.players.length=5 < 7', () => {
+      // Caso del bug: lineup con 11 slots persistidos (truth) pero solo 5
+      // players stale (players.length < 7). Con el código viejo que usaba
+      // `lineup.players.length`, el botón quedaba DISABLED porque 5 < 7.
+      // Con el fix (lineupSlotsCount = lineup.slots.length = 11), el botón
+      // queda ENABLED porque 11 ∈ [7, 11].
+      const lineup = buildLineupWithSlotsAndPlayers(11, 5);
+      component.lineupSubject$.next(lineup);
+      fixture.detectChanges();
+
+      // Selector: el botón in-page vive dentro de .lineup-actions (NO dentro
+      // de .sticky-confirm-bar, ese es otro botón cubierto por C20 P1).
+      const btn = fixture.nativeElement.querySelector('.lineup-actions .btn-confirm-lineup');
+      expect(btn)
+        .not.toBeNull('in-page Confirm button should exist inside .lineup-actions');
+      expect(btn.disabled)
+        .withContext('in-page Confirm button must be ENABLED when lineupSlotsCount=11 ' +
+                     '(slots truth), even though players.length=5 < 7 ' +
+                     '— proves the button now reads from lineupSlotsCount, not lineup.players.length')
+        .toBeFalse();
+      // Title attribute: con lineupSlotsCount=11 (in-range), debe decir 'Confirmar'.
+      // Con el código viejo (players.length=5), diría 'Mínimo 7 jugadores'.
+      expect(btn.getAttribute('title'))
+        .withContext('Title must reflect the in-range state (lineupSlotsCount=11), ' +
+                     'not the stale players.length=5')
+        .toContain('Confirmar');
+      expect(btn.getAttribute('title'))
+        .withContext('Title must NOT indicate "Mínimo 7 jugadores" — that was the old behavior reading players.length')
+        .not.toContain('Mínimo 7 jugadores');
+    });
+  });
 });
