@@ -1629,3 +1629,337 @@ describe('SquadEditorModalComponent — V25D64 (C24) eff-good green border', () 
     }, 30);
   });
 });
+
+/**
+ * V25D66-C26 (Sprint C26): bench display fix. Previously the modal used
+ * `response.players` (the 11 from /career/lineup/current) as the bench source,
+ * which meant bench always rendered 0 when lineup had 11 players. After the
+ * fix, the modal accepts `data.squad` from the caller (squad-management) and
+ * uses it as the source of truth. This block verifies:
+ *
+ *   - with squad of 22 + lineup of 11 → benchPlayers.length === 11
+ *   - with squad of 7 + lineup of 7 (short-handed) → benchPlayers.length === 0
+ *   - with no squad in dialog data → fallback to response.players (legacy)
+ */
+describe('SquadEditorModalComponent — V25D66-C26 bench display', () => {
+  let component: SquadEditorModalComponent;
+  let fixture: ComponentFixture<SquadEditorModalComponent>;
+  let httpClientSpy: jasmine.SpyObj<HttpClient>;
+  let dialogRefSpy: jasmine.SpyObj<MatDialogRef<SquadEditorModalComponent>>;
+
+  /**
+   * 4-4-2 formation: 1 GK + 2 CB + 1 LB + 1 RB + 2 CM + 2 ST = 10 outfield + 1 GK = 11.
+   * Positions dictadas por la formación devuelta por /editor/formations.
+   */
+  const FORMATIONS_RESPONSE = [
+    {
+      name: '4-4-2',
+      description: '4-4-2',
+      defenders: 4, midfielders: 4, attackers: 2, outfieldPlayers: 10,
+      positions: [
+        { index: 0, role: 'GK', xPercent: 50, yPercent: 93, actionRangePercent: 5, subdivisionId: 'GK-1' },
+        { index: 1, role: 'LB', xPercent: 11, yPercent: 83, actionRangePercent: 7, subdivisionId: 'S22-1' },
+        { index: 2, role: 'CB', xPercent: 33, yPercent: 83, actionRangePercent: 6, subdivisionId: 'S22-2' },
+        { index: 3, role: 'CB', xPercent: 67, yPercent: 83, actionRangePercent: 6, subdivisionId: 'S23-2' },
+        { index: 4, role: 'RB', xPercent: 89, yPercent: 83, actionRangePercent: 7, subdivisionId: 'S24-3' },
+        { index: 5, role: 'CM', xPercent: 25, yPercent: 50, actionRangePercent: 8, subdivisionId: 'S12-1' },
+        { index: 6, role: 'CM', xPercent: 50, yPercent: 55, actionRangePercent: 7, subdivisionId: 'S14-2' },
+        { index: 7, role: 'CM', xPercent: 75, yPercent: 50, actionRangePercent: 8, subdivisionId: 'S16-3' },
+        { index: 8, role: 'ST', xPercent: 35, yPercent: 15, actionRangePercent: 6, subdivisionId: 'S05-1' },
+        { index: 9, role: 'ST', xPercent: 65, yPercent: 15, actionRangePercent: 6, subdivisionId: 'S05-3' },
+        { index: 10, role: 'CM', xPercent: 25, yPercent: 35, actionRangePercent: 7, subdivisionId: 'S09-1' }
+      ]
+    }
+  ];
+
+  /**
+   * Build a SessionPlayer-shaped object compatible with the modal's
+   * {@code data.squad} mapping (sessionPlayerId → playerId). 22 players:
+   * 11 starters + 11 bench, all from the same team (no overlap by playerId).
+   */
+  function buildSquad22(): any[] {
+    const positions = ['GK', 'LB', 'CB', 'CB', 'RB', 'CM', 'CM', 'CM', 'CM', 'ST', 'ST'];
+    const players: any[] = [];
+    // Starters: 11 (one per slot role)
+    for (let i = 0; i < 11; i++) {
+      players.push({
+        sessionPlayerId: `squad-starter-${i}`,
+        name: `Starter ${i}`,
+        position: positions[i],
+        age: 25,
+        attack: 80, defense: 80, technique: 80, speed: 80, stamina: 80, mentality: 80,
+        marketValue: 1000000, energy: 100, form: 80,
+        injured: false, injuryType: null, injuryRemainingMatches: 0,
+        origin: 'CLONED'
+      });
+    }
+    // Bench: 11 (mix of positions, none of them a duplicate sessionPlayerId)
+    const benchPositions = ['GK', 'CB', 'CB', 'RB', 'LB', 'CM', 'CM', 'CM', 'ST', 'ST', 'MID'];
+    for (let i = 0; i < 11; i++) {
+      players.push({
+        sessionPlayerId: `squad-bench-${i}`,
+        name: `Bench Player ${i}`,
+        position: benchPositions[i],
+        age: 23,
+        attack: 70, defense: 70, technique: 70, speed: 70, stamina: 70, mentality: 70,
+        marketValue: 500000, energy: 90, form: 70,
+        injured: false, injuryType: null, injuryRemainingMatches: 0,
+        origin: 'CLONED'
+      });
+    }
+    return players;
+  }
+
+  /**
+   * Build the /career/lineup/current response with 11 players. The players
+   * use the SAME playerId as the squad starters (since the back uses
+   * sessionPlayerId as playerId).
+   */
+  function buildLineupResponse(): any {
+    const positions = ['GK', 'LB', 'CB', 'CB', 'RB', 'CM', 'CM', 'CM', 'CM', 'ST', 'ST'];
+    const players = positions.map((pos, i) => ({
+      playerId: `squad-starter-${i}`,
+      name: `Starter ${i}`,
+      position: pos,
+      overall: 80,
+      energy: 100,
+      injured: false,
+      age: 25
+    }));
+    return {
+      formation: '4-4-2',
+      players,
+      confirmed: true,
+      warnings: [],
+      slots: players.map((p, i) => ({
+        playerId: p.playerId,
+        subdivisionId: FORMATIONS_RESPONSE[0].positions[i].subdivisionId
+      }))
+    };
+  }
+
+  beforeEach(async () => {
+    httpClientSpy = jasmine.createSpyObj('HttpClient', ['get', 'post']);
+    dialogRefSpy = jasmine.createSpyObj('MatDialogRef', ['close']);
+
+    httpClientSpy.get.and.callFake(((url: string) => {
+      if (url.includes('/editor/subdivisions')) {
+        return of([{
+          subdivisionId: 'GK-1', isGoalkeeper: true, sector: 26, subIndex: 1,
+          left: 35, top: 88, width: 30, height: 10, zone: 'GK'
+        }]);
+      }
+      if (url.includes('/editor/formations')) {
+        return of(FORMATIONS_RESPONSE);
+      }
+      return of(null);
+    }) as any);
+
+    httpClientSpy.post.and.callFake(((_url: string, _body: any) => {
+      return of({ formation: '4-4-2', players: [], warnings: [] });
+    }) as any);
+
+    await TestBed.configureTestingModule({
+      imports: [SquadEditorModalComponent, NoopAnimationsModule],
+      providers: [
+        { provide: MAT_DIALOG_DATA, useValue: { careerId: 'c1', matchId: null, squad: buildSquad22() } },
+        { provide: MatDialogRef, useValue: dialogRefSpy },
+        { provide: HttpClient, useValue: httpClientSpy }
+      ]
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(SquadEditorModalComponent);
+    component = fixture.componentInstance;
+  });
+
+  it('C26 P0: with squad=22 and lineup=11, benchPlayers.length === 11 (squad − lineup)', (done) => {
+    // Mock /career/lineup/current → 11 players con slots persistidos
+    httpClientSpy.get.and.callFake(((url: string) => {
+      if (url.includes('/editor/subdivisions')) {
+        return of([{
+          subdivisionId: 'GK-1', isGoalkeeper: true, sector: 26, subIndex: 1,
+          left: 35, top: 88, width: 30, height: 10, zone: 'GK'
+        }]);
+      }
+      if (url.includes('/editor/formations')) {
+        return of(FORMATIONS_RESPONSE);
+      }
+      if (url.includes('/career/lineup/current')) {
+        return of(buildLineupResponse());
+      }
+      return of(null);
+    }) as any);
+
+    fixture.detectChanges();
+    setTimeout(() => {
+      const bench = component.benchPlayers;
+      const home = component.homePlayers;
+      expect(bench.length).toBe(11,
+        `expected bench=11 (squad 22 − lineup 11), got ${bench.length}`);
+      expect(home.length).toBe(11,
+        `expected home=11 (lineup), got ${home.length}`);
+      // Bench player IDs deben ser los 11 squad-bench-*, NO los starters.
+      const benchIds = bench.map((p: any) => p.playerId).sort();
+      expect(benchIds[0]).toMatch(/^squad-bench-/);
+      expect(benchIds.every((id: string) => id.startsWith('squad-bench-'))).toBe(true,
+        'bench should contain only the squad bench players');
+      done();
+    }, 50);
+  });
+
+  it('C26 P0: with squad=7 (short-handed) and lineup=7, benchPlayers.length === 0 (no extras)', (done) => {
+    // Short-handed: squad tiene 7 players que cubren las 7 slots del lineup
+    // (formación 4-4-2 mínimo = 7 jugadores; el auto-select con squad corto
+    // puede no llegar a 11, pero el bench no debería mostrar más jugadores
+    // que los que existen).
+    const shortSquad: any[] = Array.from({ length: 7 }, (_, i) => ({
+      sessionPlayerId: `short-${i}`,
+      name: `Short ${i}`,
+      position: ['GK', 'CB', 'CB', 'CM', 'CM', 'ST', 'ST'][i],
+      age: 25, attack: 70, defense: 70, technique: 70, speed: 70, stamina: 70, mentality: 70,
+      marketValue: 500000, energy: 100, form: 70,
+      injured: false, injuryType: null, injuryRemainingMatches: 0,
+      origin: 'CLONED'
+    }));
+    // Reconfigure TestBed con squad corto
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [SquadEditorModalComponent, NoopAnimationsModule],
+      providers: [
+        { provide: MAT_DIALOG_DATA, useValue: { careerId: 'c1', matchId: null, squad: shortSquad } },
+        { provide: MatDialogRef, useValue: dialogRefSpy },
+        { provide: HttpClient, useValue: httpClientSpy }
+      ]
+    }).compileComponents();
+
+    // Mock lineup con 7 players (todos short-*)
+    httpClientSpy.get.and.callFake(((url: string) => {
+      if (url.includes('/editor/subdivisions')) {
+        return of([{
+          subdivisionId: 'GK-1', isGoalkeeper: true, sector: 26, subIndex: 1,
+          left: 35, top: 88, width: 30, height: 10, zone: 'GK'
+        }]);
+      }
+      if (url.includes('/editor/formations')) {
+        return of(FORMATIONS_RESPONSE);
+      }
+      if (url.includes('/career/lineup/current')) {
+        return of({
+          formation: '4-4-2',
+          players: shortSquad.map((sp) => ({
+            playerId: sp.sessionPlayerId,
+            name: sp.name,
+            position: sp.position,
+            overall: 70,
+            energy: 100,
+            injured: false,
+            age: 25
+          })),
+          confirmed: true,
+          warnings: [],
+          slots: shortSquad.map((sp, i) => ({
+            playerId: sp.sessionPlayerId,
+            subdivisionId: FORMATIONS_RESPONSE[0].positions[i]?.subdivisionId ?? 'GK-1'
+          }))
+        });
+      }
+      return of(null);
+    }) as any);
+
+    const shortFixture = TestBed.createComponent(SquadEditorModalComponent);
+    const shortComponent = shortFixture.componentInstance;
+    shortFixture.detectChanges();
+    setTimeout(() => {
+      const bench = shortComponent.benchPlayers;
+      const home = shortComponent.homePlayers;
+      expect(bench.length).toBe(0,
+        `expected bench=0 when squad=lineup=7, got ${bench.length}`);
+      expect(home.length).toBe(7,
+        `expected home=7, got ${home.length}`);
+      done();
+    }, 50);
+  });
+
+  it('C26 P0 fallback: with no squad in dialog data, benchPlayers.length === 0 (legacy behavior)', (done) => {
+    // Reconfigure TestBed sin squad en MAT_DIALOG_DATA → fallback a playersList.
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [SquadEditorModalComponent, NoopAnimationsModule],
+      providers: [
+        // NOTA: squad ausente. El fallback debe usar response.players (11 del lineup).
+        { provide: MAT_DIALOG_DATA, useValue: { careerId: 'c1', matchId: null } },
+        { provide: MatDialogRef, useValue: dialogRefSpy },
+        { provide: HttpClient, useValue: httpClientSpy }
+      ]
+    }).compileComponents();
+
+    httpClientSpy.get.and.callFake(((url: string) => {
+      if (url.includes('/editor/subdivisions')) {
+        return of([{
+          subdivisionId: 'GK-1', isGoalkeeper: true, sector: 26, subIndex: 1,
+          left: 35, top: 88, width: 30, height: 10, zone: 'GK'
+        }]);
+      }
+      if (url.includes('/editor/formations')) {
+        return of(FORMATIONS_RESPONSE);
+      }
+      if (url.includes('/career/lineup/current')) {
+        return of(buildLineupResponse());
+      }
+      return of(null);
+    }) as any);
+
+    const legacyFixture = TestBed.createComponent(SquadEditorModalComponent);
+    const legacyComponent = legacyFixture.componentInstance;
+    legacyFixture.detectChanges();
+    setTimeout(() => {
+      // Legacy fallback: bench = filter !slotId sobre playersList → 0
+      // (porque los 11 players del lineup reciben slotId via persistedSlots/role-match).
+      expect(legacyComponent.benchPlayers.length).toBe(0,
+        'legacy fallback should produce bench=0 (no squad source)');
+      expect(legacyComponent.homePlayers.length).toBe(11,
+        'legacy fallback should still map 11 lineup players to home');
+      done();
+    }, 50);
+  });
+
+  it('C26 P0 fallback: with squad=[] empty, behaves like no squad (fallback to playersList)', (done) => {
+    // Reconfigure TestBed con squad=[] (vacío, distinto de ausente).
+    // El fallback debe dispararse también en este caso (length === 0).
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [SquadEditorModalComponent, NoopAnimationsModule],
+      providers: [
+        { provide: MAT_DIALOG_DATA, useValue: { careerId: 'c1', matchId: null, squad: [] } },
+        { provide: MatDialogRef, useValue: dialogRefSpy },
+        { provide: HttpClient, useValue: httpClientSpy }
+      ]
+    }).compileComponents();
+
+    httpClientSpy.get.and.callFake(((url: string) => {
+      if (url.includes('/editor/subdivisions')) {
+        return of([{
+          subdivisionId: 'GK-1', isGoalkeeper: true, sector: 26, subIndex: 1,
+          left: 35, top: 88, width: 30, height: 10, zone: 'GK'
+        }]);
+      }
+      if (url.includes('/editor/formations')) {
+        return of(FORMATIONS_RESPONSE);
+      }
+      if (url.includes('/career/lineup/current')) {
+        return of(buildLineupResponse());
+      }
+      return of(null);
+    }) as any);
+
+    const emptySquadFixture = TestBed.createComponent(SquadEditorModalComponent);
+    const emptySquadComponent = emptySquadFixture.componentInstance;
+    emptySquadFixture.detectChanges();
+    setTimeout(() => {
+      expect(emptySquadComponent.benchPlayers.length).toBe(0,
+        'squad=[] should fall back to playersList (bench=0)');
+      expect(emptySquadComponent.homePlayers.length).toBe(11);
+      done();
+    }, 50);
+  });
+});

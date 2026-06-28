@@ -191,6 +191,37 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
     expect(() => component.openVisualEditor()).not.toThrow();
   });
 
+  // ========== V25D66-C26 (Sprint C26): openVisualEditor passes squad via dialog data ==========
+
+  it('V25D66-C26: squad$ observable emits the squad (HTTP mock returns [])', (done) => {
+    // V25D66-C26: verifica que squad$ (que se pasa al dialog data.squad)
+    // emite el squad del HTTP GET /career/players/squad. El mock default
+    // retorna [], por lo que squad$ debe emitir []. Esto valida que el
+    // data flow (HTTP → squad$ observable) está funcionando, sobre el cual
+    // openVisualEditor construye el dialog data.
+    let emittedSquad: any[] | undefined;
+    component.squad$.subscribe(sq => {
+      emittedSquad = sq;
+    });
+    fixture.whenStable().then(() => {
+      expect(emittedSquad).toBeDefined('squad$ must emit a value');
+      expect(Array.isArray(emittedSquad)).toBe(true,
+        'squad$ must emit an array (possibly empty)');
+      // Con el mock default (return []), squad$ debe emitir [].
+      expect(emittedSquad?.length).toBe(0,
+        `expected squad.length=0 (mock default), got ${emittedSquad?.length}`);
+      done();
+    });
+  });
+
+  it('V25D66-C26: openVisualEditor does not throw with empty squad (backward compat)', () => {
+    // V25D66-C26: openVisualEditor no debe romperse cuando squad está vacío
+    // (HTTP mock retorna []). El dialog.open se llama con data.squad = [],
+    // que es la condición de fallback que el modal maneja correctamente.
+    expect(() => component.openVisualEditor()).not.toThrow(
+      'openVisualEditor should not throw even with empty squad');
+  });
+
   it('V25D55-C16 P0.1: availableFormations exposes the 12 formations shared constant', () => {
     // V25D54 backend extendió a 12 formations (7 originales + 5 nuevas).
     // V25D55-C16 P0.1: source of truth movido a shared/constants/formations.ts;
