@@ -289,6 +289,14 @@
   box-sizing: border-box;
 }
 
+/* V25D64 (Sprint C24): eff-good border verde distintivo para simetria
+   visual con eff-warning (amber) y eff-bad (red). Mismo patron que en
+   squad-editor-modal.component.ts. */
+.player-list li.eff-good {
+  border: 2px solid #10b981 !important; /* emerald-500 */
+  box-sizing: border-box;
+}
+
 .player-list li .eff-badge {
   position: absolute;
   top: 2px;
