@@ -269,4 +269,22 @@ describe('V25D63-C23 P0: substitution modal shows effectiveness feedback', () =>
     expect(b1Li.classList.contains('eff-bad')).toBeFalse();
     expect(b1Li.querySelector('.eff-badge')).toBeNull();
   });
+
+  // V25D64 (Sprint C24) P0: eff-good border verde (#10b981 emerald-500) para
+  // simetria visual con eff-warning (amber) y eff-bad (red). El color real se
+  // valida en smoke REVISOR; aca validamos que el class eff-good sigue bindeando
+  // en el DOM para los SALE li con eff >= 0.9 (consistency check).
+  it('eff-good class is applied to SALE li with eff >= 0.9 (green border symmetry check)', () => {
+    const lis = fixture.nativeElement.querySelectorAll('.col-starter .player-list li') as NodeListOf<HTMLElement>;
+    // p1 (eff=1.0) y p2 (eff=0.95) deben tener eff-good. p3 (eff=0.75) eff-warning.
+    const goodLis = Array.from(lis).filter((li: HTMLElement) =>
+      li.classList.contains('eff-good'));
+    expect(goodLis.length).toBe(2,
+      `expected 2 SALE li with eff-good (p1 eff=1.0, p2 eff=0.95), got ${goodLis.length}`);
+    // Sanity: los li eff-good no deben colisionar con eff-warning ni eff-bad.
+    goodLis.forEach((li: HTMLElement) => {
+      expect(li.classList.contains('eff-warning')).withContext('eff-good li must not also be eff-warning').toBeFalse();
+      expect(li.classList.contains('eff-bad')).withContext('eff-good li must not also be eff-bad').toBeFalse();
+    });
+  });
 });

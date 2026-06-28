@@ -1509,3 +1509,123 @@ describe('SquadEditorModalComponent — V25D58 (C18) field responsive sizing', (
       '.field-container must include min-height: 0 so flex children respect aspect-ratio');
   });
 });
+
+/**
+ * V25D64 (Sprint C24): eff-good border verde distintivo (#10b981 emerald-500)
+ * para simetria visual con eff-warning (amber) y eff-bad (red). Cubre chips
+ * de /squad squad-editor-modal. El color real se valida en smoke REVISOR;
+ * aca validamos que el class eff-good sigue bindeando en el DOM (consistency
+ * check con los tests V25D51 existentes).
+ */
+describe('SquadEditorModalComponent — V25D64 (C24) eff-good green border', () => {
+  let component: SquadEditorModalComponent;
+  let fixture: ComponentFixture<SquadEditorModalComponent>;
+  let httpClientSpy: jasmine.SpyObj<HttpClient>;
+  let dialogRefSpy: jasmine.SpyObj<MatDialogRef<SquadEditorModalComponent>>;
+
+  // Mismo setup que describe V25D51: 5 slots con perPlayerEffectiveness
+  //   GK-1=1.0  → eff-good  (>= 0.9)
+  //   S22-1=0.95 → eff-good (>= 0.9)
+  //   S13-2=0.7 → eff-warning (0.7-0.9)
+  //   S05-2=0.5 → eff-bad   (< 0.7)
+  //   S05-3=1.0 → eff-good  (>= 0.9)
+  // → 3 chips eff-good, 1 eff-warning, 1 eff-bad.
+  const SUBDIVISIONS_RESPONSE = [
+    { subdivisionId: 'GK-1',  isGoalkeeper: true,  sector: 26, subIndex: 1, left: 35, top: 88, width: 30, height: 10, zone: 'GK' },
+    { subdivisionId: 'S22-1', isGoalkeeper: false, sector: 22, subIndex: 1, left: 10, top: 70, width: 25, height: 12, zone: 'DEFENSE' },
+    { subdivisionId: 'S13-2', isGoalkeeper: false, sector: 13, subIndex: 2, left: 40, top: 45, width: 20, height: 12, zone: 'MIDFIELD' },
+    { subdivisionId: 'S05-2', isGoalkeeper: false, sector:  5, subIndex: 2, left: 45, top: 10, width: 10, height: 10, zone: 'ATTACK' },
+    { subdivisionId: 'S05-3', isGoalkeeper: false, sector:  5, subIndex: 3, left: 70, top: 10, width: 10, height: 10, zone: 'ATTACK' }
+  ];
+
+  const FORMATIONS_RESPONSE = [
+    {
+      name: '4-4-2', description: '4-4-2',
+      defenders: 1, midfielders: 1, attackers: 2, outfieldPlayers: 4,
+      positions: [
+        { index: 0, role: 'GK',  xPercent: 50, yPercent: 93, actionRangePercent: 5, subdivisionId: 'GK-1' },
+        { index: 1, role: 'DEF', xPercent: 20, yPercent: 75, actionRangePercent: 7, subdivisionId: 'S22-1' },
+        { index: 2, role: 'MID', xPercent: 50, yPercent: 50, actionRangePercent: 7, subdivisionId: 'S13-2' },
+        { index: 3, role: 'ATT', xPercent: 30, yPercent: 10, actionRangePercent: 6, subdivisionId: 'S05-2' },
+        { index: 4, role: 'ATT', xPercent: 70, yPercent: 10, actionRangePercent: 6, subdivisionId: 'S05-3' }
+      ]
+    }
+  ];
+
+  beforeEach(async () => {
+    httpClientSpy = jasmine.createSpyObj('HttpClient', ['get', 'post']);
+    dialogRefSpy = jasmine.createSpyObj('MatDialogRef', ['close']);
+
+    httpClientSpy.get.and.callFake(((url: string) => {
+      if (url.includes('/editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
+      if (url.includes('/editor/formations'))  return of(FORMATIONS_RESPONSE);
+      if (url.includes('/career/lineup/current')) {
+        return of({
+          formation: '4-4-2',
+          players: [
+            { playerId: 'p-gk',   name: 'GK',    position: 'GK',  overall: 80, energy: 100, injured: false },
+            { playerId: 'p-def',  name: 'DEF',   position: 'DEF', overall: 80, energy: 100, injured: false },
+            { playerId: 'p-mid',  name: 'MID',   position: 'MID', overall: 80, energy: 100, injured: false },
+            { playerId: 'p-att',  name: 'ATT',   position: 'ATT', overall: 80, energy: 100, injured: false },
+            { playerId: 'p-att2', name: 'ATT2',  position: 'ATT', overall: 80, energy: 100, injured: false }
+          ],
+          confirmed: true,
+          warnings: [],
+          slots: [],
+          chemistryScore: 85,
+          formationEffectiveness: {
+            inferredFormation: '4-4-2',
+            perPlayerEffectiveness: { 'GK-1': 1.0, 'S22-1': 0.95, 'S13-2': 0.7, 'S05-2': 0.5, 'S05-3': 1.0 },
+            teamAverage: 0.83
+          }
+        });
+      }
+      return of([]);
+    }) as any);
+
+    httpClientSpy.post.and.callFake(((_url: string, _body: any) => {
+      if (_url.includes('/career/lineup/preview-chemistry')) {
+        return of({ score: 91, breakdown: { positionGroups: {}, maxSkillByType: {}, coveragePercentage: 10 }, maxSkillByType: {}, coveragePercentage: 10 });
+      }
+      if (_url.includes('/career/lineup/manual-select')) {
+        return of({ players: [], warnings: [] });
+      }
+      if (_url.includes('/career/lineup/confirm')) {
+        return of({ confirmed: true, warnings: [] });
+      }
+      return of({});
+    }) as any);
+
+    await TestBed.configureTestingModule({
+      imports: [SquadEditorModalComponent, NoopAnimationsModule],
+      providers: [
+        { provide: MAT_DIALOG_DATA, useValue: { careerId: 'c1', matchId: null } },
+        { provide: MatDialogRef, useValue: dialogRefSpy },
+        { provide: HttpClient, useValue: httpClientSpy }
+      ]
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(SquadEditorModalComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+  });
+
+  // V25D64 C24 P0: el chip con eff >= 0.9 debe tener la clase eff-good en el DOM.
+  // El border verde (#10b981) se valida visualmente con REVISOR smoke
+  // (no se puede medir color en Karma/jsdom sin Playwright e2e).
+  it('CSS class eff-good applies to chips with eff >= 0.9 (green border visual symmetry check)', (done) => {
+    setTimeout(() => {
+      fixture.detectChanges();
+      const goodChips = fixture.nativeElement.querySelectorAll('.player-chip.eff-good') as NodeListOf<HTMLElement>;
+      // 3 chips con eff >= 0.9 (GK-1=1.0, S22-1=0.95, S05-3=1.0).
+      expect(goodChips.length).toBeGreaterThan(0,
+        'expected at least 1 eff-good chip rendered in the DOM');
+      // Sanity: eff-good no deberia colisionar con eff-warning ni eff-bad.
+      goodChips.forEach((c: HTMLElement) => {
+        expect(c.classList.contains('eff-warning')).withContext('eff-good chip must not also be eff-warning').toBeFalse();
+        expect(c.classList.contains('eff-bad')).withContext('eff-good chip must not also be eff-bad').toBeFalse();
+      });
+      done();
+    }, 30);
+  });
+});

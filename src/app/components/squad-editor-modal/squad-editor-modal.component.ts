@@ -947,12 +947,23 @@ import { ChemistryPreviewService } from '../../core/services/chemistry-preview.s
        look, no border), eff-warning (0.7 <= eff < 0.9, orange border) or
        eff-bad (eff < 0.7, red border). The border uses box-sizing:border-box
        semantics from the chip itself (the chip's padding stays put). */
-    .player-chip.eff-warning {
-      border: 1px solid orange;
-    }
-    .player-chip.eff-bad {
-      border: 1px solid red;
-    }
+     /* V25D64 (Sprint C24): eff-good border verde distintivo + alignment de
+        eff-warning y eff-bad a 2px para simetría visual con eff-good y con
+        substitution-modal (que ya usaba 2px en C23). Pre-C24 warning/bad
+        estaban en 1px — ahora las 3 clases son 2px simétricas.
+        Mismo patron que V25D63-C23 en substitution-modal.component.css. */
+     .player-chip.eff-warning {
+       border: 2px solid #f59e0b !important; /* amber-500 */
+       box-sizing: border-box;
+     }
+     .player-chip.eff-bad {
+       border: 2px solid #dc2626 !important; /* red-600 */
+       box-sizing: border-box;
+     }
+     .player-chip.eff-good {
+       border: 2px solid #10b981 !important; /* emerald-500 */
+       box-sizing: border-box;
+     }
     /* V25D51 (Sprint C13): corner badge anchored to the chip's top-right.
        Positioned absolute against the chip (which is position:relative),
        extending 8px above and 8px left of the chip's top-right corner.
