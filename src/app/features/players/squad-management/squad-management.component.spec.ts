@@ -659,4 +659,106 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
       expect(cta.classList.contains('lineup-complete')).toBeTrue();
     });
   });
+
+  // ========== V25D60-C20 P1: 3 displays must use lineupSlotsCount (not lineup.players.length) ==========
+
+  describe('V25D60-C20 P1: lineup displays use lineupSlotsCount (consistency fix)', () => {
+    /**
+     * Helper: lineup with persisted slots + 11 players in the players[] array
+     * (simulating the bug scenario: back now persists 11 slots but for
+     * short-handed legacy lineups the players array has 11 stale entries
+     * while the slots array reflects the true subdivision count of 7).
+     */
+    function buildLineupWithSlotsAndStalePlayers(slotsCount: number): LineupDTO {
+      const slots: LineupSlotDTO[] = Array.from({ length: slotsCount }, (_, i) => ({
+        playerId: ELEVEN_PLAYERS[i % ELEVEN_PLAYERS.length]?.playerId ?? `p${i}`,
+        subdivisionId: `S${String(i).padStart(2, '0')}-1`
+      }));
+      return {
+        formation: '4-4-2',
+        players: ELEVEN_PLAYERS, // stale — 11 entries
+        confirmed: false,
+        warnings: [],
+        slots // truth — 7 entries
+      };
+    }
+
+    it('V25D60-C20 P1: .lineup-count should display "7 / 11" when lineup has 7 persisted slots (not 11)', () => {
+      // V25D60-C20 P1 (Test 1): el verifier C19 detectó que .lineup-count
+      // mostraba "11 / 11" usando lineup.players.length mientras el hero
+      // label (correcto) mostraba "7 / 11" usando lineupSlotsCount. Tras el
+      // fix ambos displays muestran el mismo número.
+      const lineup = buildLineupWithSlotsAndStalePlayers(7);
+      component.lineupSubject$.next(lineup);
+      fixture.detectChanges();
+
+      const count = fixture.nativeElement.querySelector('.lineup-count');
+      expect(count).not.toBeNull();
+      expect(count.textContent).toContain('7');
+      expect(count.textContent).toContain('/ 11');
+      expect(count.textContent).not.toContain('11 / 11');
+      // V25D60-C20 P1: el count-short class aplica para < 7, count-ok para 7..10
+      expect(count.classList.contains('count-ok'))
+        .withContext('Should have count-ok class for 7/11 (count-short is < 7)')
+        .toBeTrue();
+      expect(count.classList.contains('count-full')).toBeFalse();
+    });
+
+    it('V25D60-C20 P1: .sticky-confirm-info should display "⚽ 7 / 11 jugadores" when lineup has 7 slots', () => {
+      // V25D60-C20 P1 (Test 2): el verifier C19 detectó que el sticky-confirm
+      // bar mostraba "⚽ 11 / 11 jugadores" usando lineup.players.length.
+      const lineup = buildLineupWithSlotsAndStalePlayers(7);
+      component.lineupSubject$.next(lineup);
+      fixture.detectChanges();
+
+      const info = fixture.nativeElement.querySelector('.sticky-confirm-info');
+      expect(info).not.toBeNull();
+      expect(info.textContent).toContain('⚽');
+      expect(info.textContent).toContain('7');
+      expect(info.textContent).toContain('/ 11');
+      expect(info.textContent).not.toContain('11 / 11');
+      expect(info.textContent).toContain('jugadores');
+    });
+
+    it('V25D60-C20 P1: Confirm button should be disabled when lineup has 7 persisted slots', () => {
+      // V25D60-C20 P1 (Test 3): el verifier C19 detectó que el Confirm button
+      // permitía confirmar un lineup con 7 slots (porque lineup.players.length=11
+      // pero lineupSlotsCount=7). Con el fix, el botón está disabled porque
+      // el contrato es ahora 11/11 completo (no 7+).
+      //
+      // Scope: el botón objetivo es el del .sticky-confirm-bar (línea 338 del
+      // HTML), no el botón primario dentro de .lineup-actions (línea 306, que
+      // sigue con lógica legacy — fuera de scope del task C20).
+      const lineup = buildLineupWithSlotsAndStalePlayers(7);
+      component.lineupSubject$.next(lineup);
+      fixture.detectChanges();
+
+      const btn = fixture.nativeElement.querySelector('.sticky-confirm-bar .btn-confirm-lineup');
+      expect(btn).not.toBeNull('Confirm button should exist inside .sticky-confirm-bar');
+      expect(btn.disabled)
+        .withContext('Confirm button should be disabled when lineupSlotsCount < 11')
+        .toBeTrue();
+      // Title attribute reflects the reason
+      expect(btn.getAttribute('title'))
+        .withContext('Confirm button title should indicate 11/11 required')
+        .toContain('11');
+    });
+
+    it('V25D60-C20 P1: Confirm button should be enabled when lineup has 11 persisted slots', () => {
+      // V25D60-C20 P1 (Test 3b): positive case — el Confirm button se habilita
+      // cuando lineupSlotsCount === 11 (contrato del fix C20 P1).
+      const lineup = buildLineupWithSlotsAndStalePlayers(11);
+      component.lineupSubject$.next(lineup);
+      fixture.detectChanges();
+
+      const btn = fixture.nativeElement.querySelector('.sticky-confirm-bar .btn-confirm-lineup');
+      expect(btn).not.toBeNull('Confirm button should exist inside .sticky-confirm-bar');
+      expect(btn.disabled)
+        .withContext('Confirm button should be enabled when lineupSlotsCount === 11')
+        .toBeFalse();
+      expect(btn.getAttribute('title'))
+        .withContext('Confirm button title should show ready-to-confirm text')
+        .toContain('Confirmar y Jugar');
+    });
+  });
 });
