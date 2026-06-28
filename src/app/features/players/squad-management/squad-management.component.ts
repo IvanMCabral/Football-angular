@@ -133,16 +133,43 @@ export class SquadManagementComponent implements OnInit {
     */
    selectedContributor$ = new BehaviorSubject<PlayerLineupDTO | null>(null);
 
-   /**
-    * V25D43 (Sprint C8): order in which to render position groups in the
-    * chemistry breakdown. Mirrors the backend {@code ChemistryDetail.PositionGroup.values()}
-    * (GK → DEF → MID → ATT). WINGER skills are folded into ATT on the back.
-    * Exposed as a class field so the template can iterate it deterministically
-    * (the order of {@code Object.keys(bd.positionGroups)} is not guaranteed
-    * by all browsers/runtimes).
-    */
-   positionGroupOrder: ReadonlyArray<keyof ChemistryBreakdownDTO['positionGroups']> =
-       ['GK', 'DEF', 'MID', 'ATT'];
+    /**
+     * V25D43 (Sprint C8): order in which to render position groups in the
+     * chemistry breakdown. Mirrors the backend {@code ChemistryDetail.PositionGroup.values()}
+     * (GK → DEF → MID → ATT). WINGER skills are folded into ATT on the back.
+     * Exposed as a class field so the template can iterate it deterministically
+     * (the order of {@code Object.keys(bd.positionGroups)} is not guaranteed
+     * by all browsers/runtimes).
+     */
+    positionGroupOrder: ReadonlyArray<keyof ChemistryBreakdownDTO['positionGroups']> =
+        ['GK', 'DEF', 'MID', 'ATT'];
+
+    /**
+     * V25D59-C19 P1 (front): count of persisted subdivision slots for the
+     * current lineup, used by the hero label "Lineup armado: X/11".
+     *
+     * <p>Previously the counter read {@code lineup.players.length}. That lied
+     * when the auto-select back bug (C18b) persisted a short-handed lineup
+     * (e.g. 7 players) — the label still showed "11/11" because some other
+     * display path cached a stale count. After the back fix (C19 P0) auto-select
+     * always returns 11 players AND 11 slots, but for manual-select / legacy
+     * lineups (pre-MVP1-lineup-cancha-1) the {@code slots} field can be absent.
+     *
+     * <p>Resolution: prefer {@code lineup.slots.length} (the persisted subdivision
+     * count, MVP1-lineup-cancha-1 contract) and fall back to
+     * {@code lineup.players.length} for backward compat with careers that haven't
+     * re-armed via auto-select yet.
+     */
+    get lineupSlotsCount(): number {
+      const lineup = this.lineupSubject$.value;
+      if (lineup == null) {
+        return 0;
+      }
+      if (lineup.slots != null && lineup.slots.length > 0) {
+        return lineup.slots.length;
+      }
+      return lineup.players?.length ?? 0;
+    }
 
 selectedFormation$ = new BehaviorSubject<string>('4-4-2');
   /**
