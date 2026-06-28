@@ -27,6 +27,9 @@
           <li *ngFor="let p of data.startingXi; trackBy: trackByPlayer"
               role="option"
               [class.selected]="playerOffId === p.sessionPlayerId"
+              [class.eff-good]="getEffClass(p.sessionPlayerId) === 'eff-good'"
+              [class.eff-warning]="getEffClass(p.sessionPlayerId) === 'eff-warning'"
+              [class.eff-bad]="getEffClass(p.sessionPlayerId) === 'eff-bad'"
               [attr.aria-selected]="playerOffId === p.sessionPlayerId"
               (click)="selectOff(p)"
               (keydown.enter)="selectOff(p)"
@@ -34,6 +37,7 @@
             <span class="pos-badge">{{ p.position }}</span>
             <span class="player-name">{{ p.displayName }}</span>
             <span class="player-ovr" *ngIf="p.rating != null">{{ p.rating }}</span>
+            <span class="eff-badge" *ngIf="getEffBadge(p.sessionPlayerId) as badge">{{ badge }}</span>
             <span *ngIf="playerOffId === p.sessionPlayerId" class="x-mark" (click)="clearOff($event)">×</span>
           </li>
         </ul>
@@ -46,6 +50,9 @@
           <li *ngFor="let p of data.bench; trackBy: trackByPlayer"
               role="option"
               [class.selected]="playerOnId === p.sessionPlayerId"
+              [class.eff-good]="getEffClass(p.sessionPlayerId) === 'eff-good'"
+              [class.eff-warning]="getEffClass(p.sessionPlayerId) === 'eff-warning'"
+              [class.eff-bad]="getEffClass(p.sessionPlayerId) === 'eff-bad'"
               [attr.aria-selected]="playerOnId === p.sessionPlayerId"
               (click)="selectOn(p)"
               (keydown.enter)="selectOn(p)"
@@ -53,6 +60,7 @@
             <span class="pos-badge">{{ p.position }}</span>
             <span class="player-name">{{ p.displayName }}</span>
             <span class="player-ovr" *ngIf="p.rating != null">{{ p.rating }}</span>
+            <span class="eff-badge" *ngIf="getEffBadge(p.sessionPlayerId) as badge">{{ badge }}</span>
             <span *ngIf="playerOnId === p.sessionPlayerId" class="x-mark" (click)="clearOn($event)">×</span>
           </li>
         </ul>

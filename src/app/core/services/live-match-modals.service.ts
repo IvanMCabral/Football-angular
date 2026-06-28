@@ -74,6 +74,27 @@ export class LiveMatchModalsService {
             const bench: SubModalPlayer[] = squad
               .filter(sp => !startingIds.has(sp.sessionPlayerId))
               .map(sp => this.toSubModalPlayerFromSession(sp, false));
+
+            // V25D63-C23 P0: construir effectivenessMap (sessionPlayerId → eff)
+            // invirtiendo formationEffectiveness.perPlayerEffectiveness (keyed
+            // subdivisionId) via lineup.slots. Si formationEffectiveness es null
+            // (legacy pre-V25D47) o slots está ausente, el map queda {} y el
+            // modal renderiza sin feedback de effectiveness (legacy fallback OK,
+            // replicando squad-editor-modal behavior).
+            const slotToEff: Record<string, number> =
+              lineup?.formationEffectiveness?.perPlayerEffectiveness ?? {};
+            const slotToPlayerId: Record<string, string> = {};
+            (lineup?.slots ?? []).forEach(s => {
+              slotToPlayerId[s.subdivisionId] = s.playerId;
+            });
+            const effectivenessMap: Record<string, number> = {};
+            Object.entries(slotToEff).forEach(([subdivisionId, eff]) => {
+              const playerId = slotToPlayerId[subdivisionId];
+              if (playerId) {
+                effectivenessMap[playerId] = eff;
+              }
+            });
+
             const data: SubstitutionDialogData = {
               matchId,
               currentMinute: state.currentMinute ?? 0,
@@ -82,7 +103,9 @@ export class LiveMatchModalsService {
               // Live snapshot doesn't carry substitutionsRemaining yet;
               // default to 5 (F2 per-team cap). The backend returns the
               // real count after each substitution.
-              substitutionsRemaining: 5
+              substitutionsRemaining: 5,
+              // V25D63-C23 P0: position-effectiveness feedback para chips SALE/ENTRA.
+              effectivenessMap
             };
 
             // LIVE-MATCH-F5.3.3 BUG-015: pause the round BEFORE the dialog
