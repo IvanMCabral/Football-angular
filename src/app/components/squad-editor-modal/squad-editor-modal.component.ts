@@ -1188,27 +1188,83 @@ import { ChemistryPreviewService } from '../../core/services/chemistry-preview.s
       line-height: 1;
     }
 
-    /* Responsive */
-    @media (max-width: 768px) {
+    /* Responsive — V25D56 (Sprint C17)
+       Progressive breakpoints: mobile (<=600px), tablet (601-1024px),
+       desktop (default >=1025px). The previous single breakpoint at
+       768px hid the .player-chip via display:none on mobile, which
+       Iván flagged as a visual regression ("falta alguien en ese
+       espacio"). The chip now stays visible at all viewports, with
+       font-size/padding scaled to fit narrow slots. */
+    @media (max-width: 600px) {
       .squad-editor-container {
         width: 98vw;
-        height: 80vh;
+        height: 90vh;
+        max-width: none;
+      }
+
+      .field-container {
+        padding: 8px 4px;
+        overflow: visible;
       }
 
       .field {
-        max-height: 300px;
+        max-height: 50vh;
+        aspect-ratio: 1 / 1.4;
+        height: auto;
       }
 
       .slot-id {
-        font-size: 0.4rem;
+        font-size: 0.35rem;
       }
 
+      /* Mobile chips keep visible — shrink font-size + padding so they
+         fit narrow slots without overflowing. */
       .player-chip {
-        display: none;
+        font-size: 0.4rem;
+        padding: 0 2px;
+        line-height: 1;
       }
 
       .squad-header h2 {
-        font-size: 1.1rem;
+        font-size: 1rem;
+      }
+
+      .bench-container {
+        padding: 0.4rem 0.5rem;
+        flex-wrap: nowrap;
+      }
+
+      .bench-container .bench-list {
+        overflow-x: auto;
+      }
+    }
+
+    @media (min-width: 601px) and (max-width: 1024px) {
+      .squad-editor-container {
+        width: 90vw;
+        height: 85vh;
+      }
+
+      .field {
+        max-height: 60vh;
+      }
+
+      .player-chip {
+        font-size: 0.45rem;
+      }
+
+      .slot-id {
+        font-size: 0.45rem;
+      }
+
+      .squad-header h2 {
+        font-size: 1.2rem;
+      }
+    }
+
+    @media (min-width: 1600px) {
+      .squad-editor-container {
+        max-width: 1200px;
       }
     }
   `]
