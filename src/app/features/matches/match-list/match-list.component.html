@@ -3,55 +3,58 @@
     <h1>Matches</h1>
   </div>
 
-  @if (loading) {
-    <app-loading-spinner></app-loading-spinner>
-  } @else if (errorMessage) {
-    <app-error-message
-      [message]="errorMessage"
-      [showRetry]="true"
-      (retry)="loadMatches()"
-    ></app-error-message>
-  } @else if (matches.length === 0) {
-    @if (!hasCareer()) {
-      <div class="empty-state">
-        <div class="empty-icon">🏆</div>
-        <h2>No tenés carrera activa</h2>
-        <p>Iniciá una carrera para jugar tu primera temporada</p>
-        <a routerLink="/career/setup" class="create-button">Iniciar Carrera</a>
-      </div>
+  <!-- V25D77-C42 F1: single async-pipe binding drives the entire @if/@else tree. -->
+  @if (viewState$ | async; as state) {
+    @if (state.loading) {
+      <app-loading-spinner></app-loading-spinner>
+    } @else if (state.errorMessage) {
+      <app-error-message
+        [message]="state.errorMessage"
+        [showRetry]="true"
+        (retry)="loadMatches()"
+      ></app-error-message>
+    } @else if (state.matches.length === 0) {
+      @if (!hasCareer(state)) {
+        <div class="empty-state">
+          <div class="empty-icon">🏆</div>
+          <h2>No tenés carrera activa</h2>
+          <p>Iniciá una carrera para jugar tu primera temporada</p>
+          <a routerLink="/career/setup" class="create-button">Iniciar Carrera</a>
+        </div>
+      } @else {
+        <div class="empty-state">
+          <div class="empty-icon">⚽</div>
+          <h2>Los partidos se juegan desde el Dashboard</h2>
+          <p>Los partidos de tu career se gestionan desde el resumen de fechas</p>
+          <a routerLink="/dashboard" class="create-button">Ir al Dashboard</a>
+        </div>
+      }
     } @else {
-      <div class="empty-state">
-        <div class="empty-icon">⚽</div>
-        <h2>Los partidos se juegan desde el Dashboard</h2>
-        <p>Los partidos de tu career se gestionan desde el resumen de fechas</p>
-        <a routerLink="/dashboard" class="create-button">Ir al Dashboard</a>
+      <div class="matches-list">
+        @for (match of state.matches; track match.id) {
+          <a [routerLink]="['/matches', match.id]" class="match-card" [class.completed]="match.status === 'SIMULATED'">
+            <div class="match-status">
+              <span [class]="'status-badge ' + match.status.toLowerCase()">
+                {{ formatStatus(match.status) }}
+              </span>
+            </div>
+            <div class="match-content">
+              <div class="teams">
+                <span class="team home">Team</span>
+                <span class="vs">vs</span>
+                <span class="team away">Team</span>
+              </div>
+              @if (match.result) {
+                <div class="result">
+                  <span class="goals">{{ match.result.homeGoals }} - {{ match.result.awayGoals }}</span>
+                </div>
+              }
+              <div class="date">{{ formatDate(match.scheduledAt) }}</div>
+            </div>
+            <div class="match-arrow">→</div>
+          </a>
+        }
       </div>
     }
-  } @else {
-    <div class="matches-list">
-      @for (match of matches; track match.id) {
-        <a [routerLink]="['/matches', match.id]" class="match-card" [class.completed]="match.status === 'SIMULATED'">
-          <div class="match-status">
-            <span [class]="'status-badge ' + match.status.toLowerCase()">
-              {{ formatStatus(match.status) }}
-            </span>
-          </div>
-          <div class="match-content">
-            <div class="teams">
-              <span class="team home">Team</span>
-              <span class="vs">vs</span>
-              <span class="team away">Team</span>
-            </div>
-            @if (match.result) {
-              <div class="result">
-                <span class="goals">{{ match.result.homeGoals }} - {{ match.result.awayGoals }}</span>
-              </div>
-            }
-            <div class="date">{{ formatDate(match.scheduledAt) }}</div>
-          </div>
-          <div class="match-arrow">→</div>
-        </a>
-      }
-    </div>
   }
 </div>
