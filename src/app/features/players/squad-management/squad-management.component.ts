@@ -426,7 +426,12 @@ openVisualEditor(): void {
         data: {
           careerId: status.careerId,
           matchId: null,
-          squad: squad ?? []
+          squad: squad ?? [],
+          // V25D75-C40 B4: pass the parent's current formation so the
+          // dialog opens with the SAME state the parent shows (was
+          // defaulting to '4-4-2' when response.formation was missing,
+          // causing the parent/dialog desync — parent 5-4-1, dialog 4-4-2).
+          currentFormation: this.selectedFormation$.value
         },
         width: '95vw',
         height: '90vh',
