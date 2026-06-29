@@ -349,7 +349,11 @@ export class RoundSummaryComponent implements OnInit, OnDestroy {
     this.careerService.continueToNewSeason().subscribe({
       next: (response) => {
         if (response.success) {
-          alert('¡Nueva temporada ' + response.season + ' iniciada!');
+          // V25D75-C40 B2: backend ContinueSeasonUseCase.ContinueResult
+          // serializes the season as `newSeason` (NOT `season`). Reading
+          // response.season produced the literal "undefined" in the alert.
+          const newSeason = response.newSeason ?? response.season ?? '?';
+          alert('¡Nueva temporada ' + newSeason + ' iniciada!');
           this.router.navigate(['/squad']);
         } else {
           alert('Error: ' + response.message);
