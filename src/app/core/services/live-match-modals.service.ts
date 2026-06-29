@@ -69,10 +69,26 @@ export class LiveMatchModalsService {
           squad: this.teamService.getMyTeamSquad()
         }).pipe(
           map(({ lineup, squad }) => {
-            const startingIds = new Set(lineup.players.map(p => p.playerId));
-            const startingXi: SubModalPlayer[] = lineup.players.map(p => this.toSubModalPlayer(p, true));
+            // V25D75-C40 B1: dedupe starting XI by playerId (some upstream
+            // paths can return duplicates — modal would show 22 entries per
+            // column). Same for bench by sessionPlayerId. Pick first occurrence.
+            const seenStarters = new Set<string>();
+            const startingXi: SubModalPlayer[] = lineup.players
+              .filter(p => {
+                if (!p.playerId || seenStarters.has(p.playerId)) { return false; }
+                seenStarters.add(p.playerId);
+                return true;
+              })
+              .map(p => this.toSubModalPlayer(p, true));
+            const startingIds = seenStarters;
+            const seenBench = new Set<string>();
             const bench: SubModalPlayer[] = squad
               .filter(sp => !startingIds.has(sp.sessionPlayerId))
+              .filter(sp => {
+                if (!sp.sessionPlayerId || seenBench.has(sp.sessionPlayerId)) { return false; }
+                seenBench.add(sp.sessionPlayerId);
+                return true;
+              })
               .map(sp => this.toSubModalPlayerFromSession(sp, false));
 
             // V25D63-C23 P0: construir effectivenessMap (sessionPlayerId → eff)
