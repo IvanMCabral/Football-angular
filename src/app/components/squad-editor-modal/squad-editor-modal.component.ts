@@ -1443,7 +1443,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   constructor(
     private http: HttpClient,
     private dialogRef: MatDialogRef<SquadEditorModalComponent>,
-    @Inject(MAT_DIALOG_DATA) public data: { careerId?: string; matchId: string | null; squad?: SessionPlayer[] },
+    @Inject(MAT_DIALOG_DATA) public data: { careerId?: string; matchId: string | null; squad?: SessionPlayer[]; currentFormation?: string },
     private cdr: ChangeDetectorRef,
     private chemistryPreview: ChemistryPreviewService
   ) {
@@ -1596,8 +1596,15 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
             : null
         );
 
-        // Usar la formación seleccionada si no viene del backend
-        const formationName = response?.formation || this.selectedFormation || '4-4-2';
+        // V25D75-C40 B4: use the parent's currentFormation first (passed
+        // via MAT_DIALOG_DATA) so the dialog opens with the SAME state the
+        // parent shows. Was: response.formation || this.selectedFormation
+        // || '4-4-2' — fell back to 4-4-2 when response.formation was null
+        // and parent had e.g. 5-4-1, causing the dialog/parent desync.
+        const formationName = response?.formation
+          || this.data?.currentFormation
+          || this.selectedFormation
+          || '4-4-2';
         const positions = this.formationPositions[formationName] || [];
 
         // MVP1-lineup-cancha-1.5 FIX (F3): setear selectedFormation ANTES del

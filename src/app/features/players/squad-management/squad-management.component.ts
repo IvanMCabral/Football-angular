@@ -426,7 +426,12 @@ openVisualEditor(): void {
         data: {
           careerId: status.careerId,
           matchId: null,
-          squad: squad ?? []
+          squad: squad ?? [],
+          // V25D75-C40 B4: pass the parent's current formation so the
+          // dialog opens with the SAME state the parent shows (was
+          // defaulting to '4-4-2' when response.formation was missing,
+          // causing the parent/dialog desync — parent 5-4-1, dialog 4-4-2).
+          currentFormation: this.selectedFormation$.value
         },
         width: '95vw',
         height: '90vh',
@@ -594,7 +599,11 @@ openVisualEditor(): void {
         next: (response) => {
           if (response.success) {
             this.refreshCareerStatus();
-            alert('🏆 ¡Nueva temporada ' + response.season + ' iniciada!');
+            // V25D75-C40 B2: backend ContinueSeasonUseCase.ContinueResult
+            // serializes the season as `newSeason` (NOT `season`). Reading
+            // response.season produced the literal "undefined" in the alert.
+            const newSeason = response.newSeason ?? response.season ?? '?';
+            alert('🏆 ¡Nueva temporada ' + newSeason + ' iniciada!');
           } else {
             alert('Error: ' + response.message);
           }
