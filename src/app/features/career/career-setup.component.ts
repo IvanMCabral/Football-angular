@@ -45,7 +45,14 @@ export class CareerSetupComponent implements OnInit {
   totalTeamsInLeague$: Observable<number>;
   loading$: Observable<boolean>;
   error$ = new BehaviorSubject<string | null>(null);
-  
+
+  // V25D78-C48.1: setup-flow UX gap fix. `seedingWorld` is true while POST
+  // /world/seed-la-liga is in flight; the UI uses it to disable the seed button
+  // and show a spinner. `refreshLeaguesTrigger` is a tick observable that, when
+  // emitted, re-fetches the leagues list (used after a successful seed).
+  seedingWorld = false;
+  private refreshLeaguesTrigger = new BehaviorSubject<void>(undefined);
+
   private _selectedLeagueId: string | null = null;
   
   get selectedLeagueId(): string | null {
@@ -86,8 +93,11 @@ export class CareerSetupComponent implements OnInit {
     private router: Router,
     private authService: AuthService
   ) {
-    this.leagues$ = this.authService.getUserInfo().pipe(
-      switchMap(userInfo => 
+    this.leagues$ = combineLatest([
+      this.authService.getUserInfo(),
+      this.refreshLeaguesTrigger
+    ]).pipe(
+      switchMap(([userInfo]) =>
         this.http.get<League[]>(`${environment.apiUrl}/world/leagues?userId=${userInfo.id}`)
       ),
       catchError(err => {
@@ -176,6 +186,53 @@ export class CareerSetupComponent implements OnInit {
 
   selectTeam(teamId: string): void {
     this.selectedTeamId = teamId;
+  }
+
+  /**
+   * V25D78-C48.1: setup-flow UX gap fix.
+   *
+   * <p>REVISOR C48 V7 found that a new user can register and reach /career/setup
+   * but the world has not been seeded yet (no leagues visible, dropdown empty).
+   * Before this fix the user was stuck: the backend exposes POST /world/seed-la-liga
+   * but no UI button or auto-trigger called it during the registration flow.
+   *
+   * <p>This handler is the UI-side trigger. The HTTP call sends the JWT of the
+   * authenticated user via the existing authInterceptor (no need to set the
+   * Authorization header manually). On 200 OK, we refresh the leagues$ observable
+   * by emitting on `refreshLeaguesTrigger` so the dropdown auto-populates with
+   * La Liga 2024/25 without requiring a page reload.
+   */
+  seedWorld(): void {
+    if (this.seedingWorld) {
+      return; // debounce: ignore double-clicks while in flight
+    }
+    this.seedingWorld = true;
+    this.error$.next(null);
+    this.authService.getUserInfo().subscribe({
+      next: (userInfo) => {
+        this.http.post(
+          `${environment.apiUrl}/world/seed-la-liga?userId=${userInfo.id}`,
+          {}
+        ).subscribe({
+          next: () => {
+            this.seedingWorld = false;
+            // Trigger leagues$ re-fetch so the dropdown updates with the new La Liga entry.
+            this.refreshLeaguesTrigger.next();
+          },
+          error: (err) => {
+            this.seedingWorld = false;
+            const msg = err?.error?.message || err?.statusText || 'Error al inicializar el mundo';
+            this.error$.next(`Error al inicializar el mundo: ${msg}`);
+            console.error('[CAREER-SETUP] seed error:', err);
+          }
+        });
+      },
+      error: (err) => {
+        this.seedingWorld = false;
+        this.error$.next('No se pudo obtener el usuario actual para inicializar el mundo.');
+        console.error('[CAREER-SETUP] getUserInfo error:', err);
+      }
+    });
   }
 
   async startCareer(): Promise<void> {

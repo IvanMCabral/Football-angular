@@ -12,6 +12,31 @@
       {{ error }}
     </div>
 
+    <!-- V25D78-C48.1: setup-flow UX gap fix.
+         Shows when the world has no leagues yet (new user, post-register).
+         The button calls POST /world/seed-la-liga?userId=me (with JWT via
+         authInterceptor) and refreshes leagues$ on 200 OK so the dropdown
+         below auto-populates with La Liga 2024/25. Without this, the user
+         reaches /career/setup with an empty dropdown and no path forward. -->
+    <div *ngIf="!(loading$ | async) && (leagues$ | async) as leagues" class="seed-flow">
+      <div *ngIf="leagues.length === 0 && !seedingWorld" class="seed-prompt">
+        <h3>🌍 Tu mundo aún no está inicializado</h3>
+        <p>Pulsa el botón para cargar La Liga 2024/25 con 20 equipos y 406 jugadores.</p>
+        <button
+          (click)="seedWorld()"
+          class="btn-seed-world"
+          [disabled]="seedingWorld"
+          data-testid="seed-world-button"
+        >
+          🌍 Inicializar Mi Mundo
+        </button>
+      </div>
+      <div *ngIf="seedingWorld" class="seeding-state">
+        <div class="spinner"></div>
+        <p>Inicializando tu mundo con La Liga 2024/25... (~10-30s)</p>
+      </div>
+    </div>
+
     <div *ngIf="!(loading$ | async) && !(error$ | async)" class="setup-form">
       <!-- Liga -->
       <div class="form-group">
