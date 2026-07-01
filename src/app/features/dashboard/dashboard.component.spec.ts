@@ -367,4 +367,204 @@ describe('DashboardComponent — V25D78-C55.2 phase 4 UI (c) + (d2)', () => {
       done();
     });
   });
+
+  it('(C55.10 Item 2): re-fetches dependent datasets when careerPhase changes to POST_SEASON', (done: DoneFn) => {
+    // C55.10 Item 2 — gap A13: when the engine signals a season just ended
+    // (careerPhase goes WAITING_USER → POST_SEASON), the dashboard must
+    // re-fetch squad, userStats, and worldStatus. Without this the page
+    // keeps displaying stale numbers even after the career advance on
+    // the back. We invoke loadCareerStatus() manually with a controlled
+    // second emission and verify the dependent GETs re-fire.
+
+    // FIRST emission: WAITING_USER (initial ngOnInit path).
+    httpSpy.get.and.callFake(((url: string) => {
+      if (url.includes('/career/status')) {
+        return of({
+          careerId: CAREER_ID,
+          userSessionTeamId: 'session-team-1',
+          currentRound: 38,
+          totalRounds: 38,
+          isFinished: false,
+          careerPhase: 'WAITING_USER',
+          season: SEASON,
+          userDivision: 'PRIMERA'
+        });
+      }
+      if (url.includes('/career/players/squad')) return of([]);
+      if (url.includes('/dashboard/user-stats')) return of({ matchesPlayed: 0, matchesWon: 0, matchesLost: 0, winPercentage: 0 });
+      if (url.includes('/dashboard/world-status')) return of({ clubs: 0, players: 0, matches: 0 });
+      return of({});
+    }) as any);
+
+    fixture.detectChanges();
+    fixture.whenStable().then(() => {
+      // Baseline counts after the first load.
+      const squadCallsBefore = httpSpy.get.calls.allArgs().filter(a => String(a[0]).includes('/career/players/squad')).length;
+      const userStatsCallsBefore = httpSpy.get.calls.allArgs().filter(a => String(a[0]).includes('/dashboard/user-stats')).length;
+      const worldStatusCallsBefore = httpSpy.get.calls.allArgs().filter(a => String(a[0]).includes('/dashboard/world-status')).length;
+
+      expect(squadCallsBefore).toBeGreaterThanOrEqual(1, 'initial load must fetch squad');
+      expect(userStatsCallsBefore).toBeGreaterThanOrEqual(1, 'initial load must fetch user-stats');
+      expect(worldStatusCallsBefore).toBeGreaterThanOrEqual(1, 'initial load must fetch world-status');
+
+      // SECOND emission: POST_SEASON (season just ended).
+      httpSpy.get.and.callFake(((url: string) => {
+        if (url.includes('/career/status')) {
+          return of({
+            careerId: CAREER_ID,
+            userSessionTeamId: 'session-team-1',
+            currentRound: 38,
+            totalRounds: 38,
+            isFinished: true,
+            careerPhase: 'POST_SEASON',
+            season: SEASON,
+            userDivision: 'PRIMERA'
+          });
+        }
+        if (url.includes('/career/players/squad')) return of([]);
+        if (url.includes('/dashboard/user-stats')) return of({ matchesPlayed: 38, matchesWon: 25, matchesLost: 6, winPercentage: 65 });
+        if (url.includes('/dashboard/world-status')) return of({ clubs: 1, players: 25, matches: 38 });
+        return of({});
+      }) as any);
+
+      // Trigger a 2nd emission of /career/status by calling the private
+      // method directly (same entry point the dashboard uses in production
+      // when refreshCareerStatus() runs after /career/continue).
+      (component as any).loadCareerStatus();
+
+      fixture.whenStable().then(() => {
+        const squadCallsAfter = httpSpy.get.calls.allArgs().filter(a => String(a[0]).includes('/career/players/squad')).length;
+        const userStatsCallsAfter = httpSpy.get.calls.allArgs().filter(a => String(a[0]).includes('/dashboard/user-stats')).length;
+        const worldStatusCallsAfter = httpSpy.get.calls.allArgs().filter(a => String(a[0]).includes('/dashboard/world-status')).length;
+
+        expect(squadCallsAfter).toBe(squadCallsBefore + 1,
+          `squad GET must re-fire on phase change (was ${squadCallsBefore}, now ${squadCallsAfter})`);
+        expect(userStatsCallsAfter).toBe(userStatsCallsBefore + 1,
+          `user-stats GET must re-fire on phase change (was ${userStatsCallsBefore}, now ${userStatsCallsAfter})`);
+        expect(worldStatusCallsAfter).toBe(worldStatusCallsBefore + 1,
+          `world-status GET must re-fire on phase change (was ${worldStatusCallsBefore}, now ${worldStatusCallsAfter})`);
+        done();
+      });
+    });
+  });
+
+  it('(C55.10 Item 2): re-fetches dependent datasets when season changes (e.g. after /career/continue)', (done: DoneFn) => {
+    // C55.10 Item 2 — same refresh-on-change contract, but for the season
+    // axis: when the user hits /career/continue, the back bumps season
+    // 1 → 2 and the dashboard must pick up the new numbers even though
+    // careerPhase may stay (or move to POST_SEASON). We bypass the initial
+    // snapshot via a single POST_SEASON emission that primes
+    // lastSeenPhase/Season with the final-round state, then issue a
+    // second loadCareerStatus() with season=2 to verify the refresh fires.
+
+    // FIRST emission: season 1, POST_SEASON.
+    httpSpy.get.and.callFake(((url: string) => {
+      if (url.includes('/career/status')) {
+        return of({
+          careerId: CAREER_ID,
+          userSessionTeamId: 'session-team-1',
+          currentRound: 38,
+          totalRounds: 38,
+          isFinished: true,
+          careerPhase: 'POST_SEASON',
+          season: 1,
+          userDivision: 'PRIMERA'
+        });
+      }
+      if (url.includes('/career/players/squad')) return of([]);
+      if (url.includes('/dashboard/user-stats')) return of({ matchesPlayed: 38, matchesWon: 20, matchesLost: 8, winPercentage: 52 });
+      if (url.includes('/dashboard/world-status')) return of({ clubs: 1, players: 25, matches: 38 });
+      return of({});
+    }) as any);
+
+    fixture.detectChanges();
+    fixture.whenStable().then(() => {
+      const squadCallsBefore = httpSpy.get.calls.allArgs().filter(a => String(a[0]).includes('/career/players/squad')).length;
+      const userStatsCallsBefore = httpSpy.get.calls.allArgs().filter(a => String(a[0]).includes('/dashboard/user-stats')).length;
+
+      // SECOND emission: season 2 (post-/career/continue).
+      httpSpy.get.and.callFake(((url: string) => {
+        if (url.includes('/career/status')) {
+          return of({
+            careerId: CAREER_ID,
+            userSessionTeamId: 'session-team-1',
+            currentRound: 1,
+            totalRounds: 38,
+            isFinished: false,
+            careerPhase: 'PRE_MATCH',
+            season: 2,
+            userDivision: 'SEGUNDA'  // promoted/relegated tier
+          });
+        }
+        if (url.includes('/career/players/squad')) return of([]);
+        if (url.includes('/dashboard/user-stats')) return of({ matchesPlayed: 0, matchesWon: 0, matchesLost: 0, winPercentage: 0 });
+        if (url.includes('/dashboard/world-status')) return of({ clubs: 1, players: 25, matches: 0 });
+        return of({});
+      }) as any);
+
+      (component as any).loadCareerStatus();
+
+      fixture.whenStable().then(() => {
+        const squadCallsAfter = httpSpy.get.calls.allArgs().filter(a => String(a[0]).includes('/career/players/squad')).length;
+        const userStatsCallsAfter = httpSpy.get.calls.allArgs().filter(a => String(a[0]).includes('/dashboard/user-stats')).length;
+
+        expect(squadCallsAfter).toBe(squadCallsBefore + 1,
+          'squad GET must re-fire on season change (POST_SEASON → PRE_MATCH with season 1→2)');
+        expect(userStatsCallsAfter).toBe(userStatsCallsBefore + 1,
+          'user-stats GET must re-fire on season change');
+        done();
+      });
+    });
+  });
+
+  it('(C55.10 Item 2): no-op refresh when neither careerPhase nor season changes', (done: DoneFn) => {
+    // Negative test: if the second /career/status response has the same
+    // (phase, season) as the snapshot, the dashboard must NOT re-fetch
+    // the dependent datasets. Re-firing unconditionally would multiply
+    // backend traffic on every poll.
+
+    httpSpy.get.and.callFake(((url: string) => {
+      if (url.includes('/career/status')) {
+        return of({
+          careerId: CAREER_ID,
+          userSessionTeamId: 'session-team-1',
+          currentRound: 5,
+          totalRounds: 38,
+          isFinished: false,
+          careerPhase: 'WAITING_USER',
+          season: SEASON,
+          userDivision: 'PRIMERA'
+        });
+      }
+      if (url.includes('/career/players/squad')) return of([]);
+      if (url.includes('/dashboard/user-stats')) return of({ matchesPlayed: 0, matchesWon: 0, matchesLost: 0, winPercentage: 0 });
+      if (url.includes('/dashboard/world-status')) return of({ clubs: 0, players: 0, matches: 0 });
+      return of({});
+    }) as any);
+
+    fixture.detectChanges();
+    fixture.whenStable().then(() => {
+      const squadCallsBefore = httpSpy.get.calls.allArgs().filter(a => String(a[0]).includes('/career/players/squad')).length;
+      const userStatsCallsBefore = httpSpy.get.calls.allArgs().filter(a => String(a[0]).includes('/dashboard/user-stats')).length;
+      const worldStatusCallsBefore = httpSpy.get.calls.allArgs().filter(a => String(a[0]).includes('/dashboard/world-status')).length;
+
+      // Same (phase, season). Trigger another loadCareerStatus manually.
+      (component as any).loadCareerStatus();
+
+      fixture.whenStable().then(() => {
+        const squadCallsAfter = httpSpy.get.calls.allArgs().filter(a => String(a[0]).includes('/career/players/squad')).length;
+        const userStatsCallsAfter = httpSpy.get.calls.allArgs().filter(a => String(a[0]).includes('/dashboard/user-stats')).length;
+        const worldStatusCallsAfter = httpSpy.get.calls.allArgs().filter(a => String(a[0]).includes('/dashboard/world-status')).length;
+
+        // Only the /career/status GET increments. Squad/stats/world stay flat.
+        expect(squadCallsAfter).toBe(squadCallsBefore,
+          'squad GET must NOT re-fire when (phase, season) unchanged');
+        expect(userStatsCallsAfter).toBe(userStatsCallsBefore,
+          'user-stats GET must NOT re-fire when (phase, season) unchanged');
+        expect(worldStatusCallsAfter).toBe(worldStatusCallsBefore,
+          'world-status GET must NOT re-fire when (phase, season) unchanged');
+        done();
+      });
+    });
+  });
 });
