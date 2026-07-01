@@ -568,3 +568,54 @@ describe('DashboardComponent — V25D78-C55.2 phase 4 UI (c) + (d2)', () => {
     });
   });
 });
+
+/**
+ * V25D78-C55.7.7 BUG-M3: dashboard "Jugar Fecha" label is season-aware.
+ *
+ * <p>Pre-fix the label hardcoded `currentRound + 1` which overshot
+ * `totalRounds` at season end (T1 R10 finished → "Jugar Fecha 11", which
+ * doesn't exist). Post-fix: when `currentRound + 1 > totalRounds`, the
+ * label flips to "Continuar Temporada {season+1}" and the subtitle hints
+ * "Temporada finalizada, ver resultados".
+ *
+ * <p>Coverage:
+ * <ul>
+ *   <li>Mid-season (currentRound=3, totalRounds=10): "Jugar Fecha 4".</li>
+ *   <li>Last round played (currentRound=10, totalRounds=10): "Continuar Temporada 2".</li>
+ *   <li>Null/omitted status: safe fallback "Jugar Próxima Fecha".</li>
+ *   <li>Subtitle mirrors the same season-end logic.</li>
+ * </ul>
+ */
+describe('DashboardComponent — V25D78-C55.7.7 BUG-M3 (season-aware Jugar Fecha label)', () => {
+  let component: DashboardComponent;
+
+  beforeEach(() => {
+    component = Object.create(DashboardComponent.prototype);
+  });
+
+  it('M3 mid-season (currentRound=3, totalRounds=10): label = "Jugar Fecha 4"', () => {
+    const status = { currentRound: 3, totalRounds: 10, season: 1 } as any;
+    expect(component.playNextRoundLabel(status)).toBe('Jugar Fecha 4');
+    expect(component.playNextRoundSubtitle(status)).toBe('Confirmar para iniciar');
+  });
+
+  it('M3 last round played (currentRound=10, totalRounds=10): label = "Continuar Temporada 2"', () => {
+    // BUG-M3 reproduction: pre-fix this would have said "Jugar Fecha 11"
+    // (currentRound + 1 = 11, which doesn't exist in a 10-round tournament).
+    const status = { currentRound: 10, totalRounds: 10, season: 1 } as any;
+    expect(component.playNextRoundLabel(status))
+      .toBe('Continuar Temporada 2');
+    expect(component.playNextRoundSubtitle(status))
+      .toBe('Temporada finalizada, ver resultados');
+  });
+
+  it('M3 season already advanced (currentRound=1, totalRounds=10, season=2): "Jugar Fecha 2"', () => {
+    const status = { currentRound: 1, totalRounds: 10, season: 2 } as any;
+    expect(component.playNextRoundLabel(status)).toBe('Jugar Fecha 2');
+  });
+
+  it('M3 null/undefined status: safe fallback', () => {
+    expect(component.playNextRoundLabel(null)).toBe('Jugar Próxima Fecha');
+    expect(component.playNextRoundLabel(undefined)).toBe('Jugar Próxima Fecha');
+  });
+});

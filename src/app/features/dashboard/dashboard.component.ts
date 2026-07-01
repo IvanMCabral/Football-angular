@@ -102,6 +102,45 @@ export class DashboardComponent implements OnInit {
   loading = false;
   generatingPlayers = false;
 
+  /**
+   * V25D78-C55.7.7 BUG-M3: label for the "Jugar Próxima Fecha" button when
+   * career is in WAITING_USER phase.
+   *
+   * <p>Pre-fix: {@code `Jugar Fecha ${currentRound + 1}`} always added 1 to
+   * {@code currentRound}, which overshoots {@code totalRounds} at season end
+   * (T1 R10 finished → button said "Jugar Fecha 11", which doesn't exist).
+   *
+   * <p>Post-fix: when {@code currentRound >= totalRounds} (season just
+   * finished and the engine is waiting for the user to advance), show a
+   * "Continuar T{N+1}" label instead of an impossible round number.
+   */
+  playNextRoundLabel(status: CareerStatus | null | undefined): string {
+    if (!status) return 'Jugar Próxima Fecha';
+    const nextRound = (status.currentRound ?? 0) + 1;
+    const totalRounds = status.totalRounds ?? 0;
+    if (nextRound > totalRounds) {
+      const nextSeason = (status.season ?? 1) + 1;
+      return `Continuar Temporada ${nextSeason}`;
+    }
+    return `Jugar Fecha ${nextRound}`;
+  }
+
+  /**
+   * V25D78-C55.7.7 BUG-M3: subtitle for the play-next button. Mirrors
+   * the season-end logic in {@link playNextRoundLabel} — when the season
+   * is finished we hint "Ver resultados finales" instead of "Confirmar
+   * para iniciar".
+   */
+  playNextRoundSubtitle(status: CareerStatus | null | undefined): string {
+    if (!status) return 'Confirmar para iniciar';
+    const nextRound = (status.currentRound ?? 0) + 1;
+    const totalRounds = status.totalRounds ?? 0;
+    if (nextRound > totalRounds) {
+      return 'Temporada finalizada, ver resultados';
+    }
+    return 'Confirmar para iniciar';
+  }
+
 
   ngOnInit(): void {
     this.loadDashboardData();
