@@ -16,6 +16,13 @@ import { DivisionStandings, AllStandingsResponse } from 'app/core/services/caree
   styleUrls: ['./standings-modal.component.css']
 })
 export class StandingsModalComponent implements OnInit {
+  /**
+   * V25D78-C55.2 phase 4 UI (c2): number of teams promoted/relegated at the
+   * end of each season. Mirrors `PromotionRelegationService.TEAMS_PROMOTED_OR_RELEGATED`
+   * on the back. Top-3 of each division ascends, bottom-3 descends.
+   */
+  readonly TEAMS_PROMOTED_OR_RELEGATED = 3;
+
   loading$ = new BehaviorSubject<boolean>(true);
   error$ = new BehaviorSubject<string | null>(null);
   divisions$!: Observable<DivisionStandings[]>;

@@ -19,6 +19,11 @@ import { MatchCreateComponent } from './features/matches/match-create/match-crea
 import { V24MatchDetailPageComponent } from './features/match-detail/pages/v24-match-detail-page.component';
 import { MatchComparePageComponent } from './features/match-detail/pages/match-compare-page.component';
 
+// V25D78-C55.2 phase 4 UI (b2): standalone /standings page reachable from
+// the dashboard. Reuses CareerService.getAllStandings() and the existing
+// DivisionStandings types.
+import { StandingsPageComponent } from './pages/standings/standings-page.component';
+
 import { GameDetailComponent } from './features/games/game-detail.component';
 import { PlayRoundComponent } from './features/games/play-round.component';
 import { MatchLiveComponent } from './features/games/match-live.component';
@@ -43,6 +48,10 @@ export const routes: Routes = [
   { path: 'players/create', component: PlayerCreateComponent, canActivate: [authGuard] },
   { path: 'players/manage', component: PlayerManagementComponent, canActivate: [authGuard] },
   { path: 'squad', component: SquadManagementComponent, canActivate: [authGuard] },
+  // V25D78-C55.2 phase 4 UI (b2): standalone page version of the standings
+  // modal. Reachable from the dashboard; renders the same 3-tab PRIMERA /
+  // SEGUNDA / TERCERA view + green/red zone indicator + user-division pill.
+  { path: 'standings', component: StandingsPageComponent, canActivate: [authGuard] },
   { path: 'matches', component: MatchListComponent, canActivate: [authGuard] },
   { path: 'matches/create', component: MatchCreateComponent, canActivate: [authGuard] },
   { path: 'matches/:id', component: MatchDetailComponent, canActivate: [authGuard] },

@@ -22,6 +22,19 @@
       </ng-container>
 
       <ng-template #standingsContent>
+        <!-- V25D78-C55.2 phase 4 UI (c2): legend so users understand the
+             green/red row coloring below. -->
+        <div class="zone-legend">
+          <span class="zone-legend-item zone-promotion">
+            <span class="zone-swatch"></span>
+            Zona de Ascenso ({{ TEAMS_PROMOTED_OR_RELEGATED }} mejores)
+          </span>
+          <span class="zone-legend-item zone-relegation">
+            <span class="zone-swatch"></span>
+            Zona de Descenso ({{ TEAMS_PROMOTED_OR_RELEGATED }} peores)
+          </span>
+        </div>
+
         <mat-tab-group [selectedIndex]="selectedTabIndex$ | async" animationDuration="200ms">
 
           <mat-tab *ngFor="let div of divisions$ | async; let i = index">
@@ -49,8 +62,15 @@
                   </tr>
                 </thead>
                 <tbody>
+                  <!-- V25D78-C55.2 phase 4 UI (c2): top-3 promotion zone (green)
+                       and bottom-3 relegation zone (red). Class binding is
+                       driven off the 0-indexed loop index so it works on any
+                       list size ≥ 6 (the minimum multi-division field is 60
+                       teams / 3 divisions × 20 each). -->
                   <tr *ngFor="let team of div.standings; let i = index"
-                      [class.highlight]="team.teamId === userTeamId">
+                      [class.highlight]="team.teamId === userTeamId"
+                      [class.zone-promotion]="i < TEAMS_PROMOTED_OR_RELEGATED"
+                      [class.zone-relegation]="i >= div.standings.length - TEAMS_PROMOTED_OR_RELEGATED && div.standings.length > TEAMS_PROMOTED_OR_RELEGATED">
                     <td class="pos">{{ i + 1 }}</td>
                     <td class="team">
                       <span *ngIf="team.teamId === userTeamId" class="user-team-marker">⭐</span>

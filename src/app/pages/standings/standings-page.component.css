@@ -1,35 +1,123 @@
-/* Modal Container */
-.standings-modal {
-  width: 85vw;
-  max-width: 1100px;
+/* V25D78-C55.2 phase 4 UI (b2): /standings page styles. Mirrors the visual
+   language of standings-modal but as a full page (top-level route, not a
+   dialog) so it can be linked from the dashboard. */
+
+.standings-page {
+  min-height: calc(100vh - 60px);
+  padding: 2rem;
   background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
   color: #ffffff;
 }
 
-h2[mat-dialog-title] {
-  margin: 0;
-  padding: 20px 24px;
-  border-bottom: 2px solid #667eea;
-  background: linear-gradient(90deg, #16213e 0%, #1a1a2e 100%);
-  color: #fff;
+.page-header {
   display: flex;
   align-items: center;
-  gap: 12px;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(102, 126, 234, 0.18);
+  color: #ffffff;
+  text-decoration: none;
+  transition: background 0.2s;
+}
+
+.back-link:hover {
+  background: rgba(102, 126, 234, 0.35);
+}
+
+.page-header h1 {
+  margin: 0;
+  font-size: 1.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .title-icon {
   font-size: 28px;
 }
 
-mat-dialog-content {
-  padding: 0;
-  background: transparent;
-  color: #fff;
-  max-height: 65vh;
-  overflow-y: auto;
+/* (c) consume — user's division pill in the page header */
+.user-division-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: white;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
 }
 
-/* Loading & Error States */
+.tier-primera {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+}
+
+.tier-segunda {
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+}
+
+.tier-tercera {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
+
+/* (c2) — legend above the tab group, same as the modal. */
+.zone-legend {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  padding: 12px 16px;
+  background: rgba(26, 26, 46, 0.6);
+  border: 1px solid rgba(102, 126, 234, 0.2);
+  border-radius: 10px;
+  margin-bottom: 1rem;
+  font-size: 13px;
+  color: #b8b8d1;
+  flex-wrap: wrap;
+}
+
+.zone-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.zone-legend .zone-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+}
+
+.zone-legend .zone-promotion .zone-swatch {
+  background: rgba(72, 187, 120, 0.4);
+  border-left: 3px solid #48bb78;
+}
+
+.zone-legend .zone-relegation .zone-swatch {
+  background: rgba(245, 101, 101, 0.4);
+  border-left: 3px solid #f56565;
+}
+
 .loading,
 .error {
   padding: 60px 40px;
@@ -62,8 +150,8 @@ mat-dialog-content {
   font-size: 48px;
 }
 
-/* Material Tabs Theme */
-::ng-deep .mat-mdc-tab-group {
+/* Tab group — re-uses the same dark theme tokens from the modal. */
+::ng-deep .standings-page .mat-mdc-tab-group {
   --mdc-tab-indicator-active-indicator-color: #ffd700;
   --mat-tab-header-active-label-text-color: #ffd700;
   --mat-tab-header-active-focus-label-text-color: #ffd700;
@@ -71,16 +159,12 @@ mat-dialog-content {
   --mat-tab-header-inactive-label-text-color: #b8b8d1;
 }
 
-::ng-deep .mat-mdc-tab-header {
+::ng-deep .standings-page .mat-mdc-tab-header {
   background: rgba(45, 53, 97, 0.8);
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px 10px 0 0;
 }
 
-::ng-deep .mat-mdc-tab-body-wrapper {
-  padding: 16px;
-}
-
-/* Division Tab Styles */
 .division-tab {
   display: flex;
   align-items: center;
@@ -120,10 +204,11 @@ mat-dialog-content {
 }
 
 .division-content {
-  padding: 8px;
+  padding: 16px 8px;
+  background: rgba(26, 26, 46, 0.4);
+  border-radius: 0 0 10px 10px;
 }
 
-/* Standings Table */
 .standings-table {
   width: 100%;
   border-collapse: collapse;
@@ -199,23 +284,7 @@ mat-dialog-content {
   font-style: italic;
 }
 
-/* Dialog Actions */
-mat-dialog-actions {
-  background: linear-gradient(90deg, #16213e 0%, #1a1a2e 100%);
-  padding: 16px 24px;
-  border-top: 1px solid rgba(102, 126, 234, 0.3);
-}
-
-::ng-deep .mat-mdc-raised-button.mat-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white !important;
-}
-
-/* V25D78-C55.2 phase 4 UI (c2): green/red zone indicator for promotion /
-   relegation. Top-3 rows get a green left-border + tint; bottom-3 rows get
-   red. The user's own row (`.highlight`) overrides the zone tint with gold
-   so the user always sees themselves clearly, but the zone border still
-   remains visible. */
+/* (c2) — green/red zone indicator on rows */
 .standings-table tbody tr.zone-promotion {
   background: rgba(72, 187, 120, 0.12);
   border-left: 3px solid #48bb78;
@@ -226,7 +295,6 @@ mat-dialog-actions {
 }
 
 .standings-table tbody tr.zone-promotion.highlight {
-  /* User row in promotion zone: gold + green combined */
   background: linear-gradient(90deg, rgba(255, 215, 0, 0.2) 0%, rgba(72, 187, 120, 0.12) 100%);
   border-left: 3px solid #ffd700;
 }
@@ -241,43 +309,6 @@ mat-dialog-actions {
 }
 
 .standings-table tbody tr.zone-relegation.highlight {
-  /* User row in relegation zone: gold + red combined */
   background: linear-gradient(90deg, rgba(255, 215, 0, 0.2) 0%, rgba(245, 101, 101, 0.12) 100%);
   border-left: 3px solid #ffd700;
-}
-
-/* Legend above the tab group — explains what the colored borders mean. */
-.zone-legend {
-  display: flex;
-  justify-content: center;
-  gap: 1.5rem;
-  padding: 12px 16px;
-  background: rgba(26, 26, 46, 0.6);
-  border-bottom: 1px solid rgba(102, 126, 234, 0.2);
-  font-size: 12px;
-  color: #b8b8d1;
-  flex-wrap: wrap;
-}
-
-.zone-legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.zone-legend .zone-swatch {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  border-radius: 3px;
-}
-
-.zone-legend .zone-promotion .zone-swatch {
-  background: rgba(72, 187, 120, 0.4);
-  border-left: 3px solid #48bb78;
-}
-
-.zone-legend .zone-relegation .zone-swatch {
-  background: rgba(245, 101, 101, 0.4);
-  border-left: 3px solid #f56565;
 }
