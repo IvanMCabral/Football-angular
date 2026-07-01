@@ -3,7 +3,11 @@
   <!-- Hero Section with Play Button -->
   <section class="hero-section">
     <h1 class="welcome-title">⚽ MY FOOTBALL UNIVERSE</h1>
-    <p class="welcome-subtitle">Welcome back, {{ username$ | async }}!</p>
+    <p class="welcome-subtitle">
+      <!-- V25D78-C55.7.7 BUG-L1: prefer displayName (when backend emits it),
+           fallback to email (instead of raw username). -->
+      Welcome back, <span class="welcome-name">{{ displayNameOf(user$ | async) }}</span>!
+    </p>
     
     <!-- No Career: Single Button -->
     <!-- TEST: el contenido dentro de este ng-container debería verse si careerStatus$ emite cualquier valor -->
@@ -48,8 +52,11 @@
             [disabled]="loading">
       <span class="action-icon">⚽</span>
       <span class="action-text">
-        <span class="action-label">Jugar Fecha {{careerStatus.currentRound + 1}}</span>
-        <span class="action-subtitle">Confirmar para iniciar</span>
+        <!-- V25D78-C55.7.7 BUG-M3: season-aware label. Pre-fix this hardcoded
+             `currentRound + 1` and overshot totalRounds at season end
+             (T1 R10 finished → "Jugar Fecha 11" which doesn't exist). -->
+        <span class="action-label">{{ playNextRoundLabel(careerStatus) }}</span>
+        <span class="action-subtitle">{{ playNextRoundSubtitle(careerStatus) }}</span>
       </span>
     </button>
     </div>

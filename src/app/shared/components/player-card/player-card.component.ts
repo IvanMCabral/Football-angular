@@ -12,6 +12,15 @@ import { PlayerCardData } from './player-card.model';
 export class PlayerCardComponent {
   @Input() player!: PlayerCardData;
   @Input() isSquad: boolean = false;
+  /**
+   * V25D78-C55.7.7 BUG-L3: optional current round number. When provided,
+   * the injury detail surfaces a "Returns Fecha N" hint (e.g. "Out 1 match
+   * · Returns Fecha 6") so the user knows exactly when the player is
+   * available again. When null/undefined, the detail falls back to the
+   * pre-fix "Out N matches" wording (back-compat for callers that don't
+   * have career context — e.g. detail pages with no current round loaded).
+   */
+  @Input() currentRound: number | null = null;
 
   isSuspended(): boolean {
     return this.player.suspended === true || (this.player.suspensionRemainingMatches ?? 0) > 0;
@@ -56,7 +65,24 @@ export class PlayerCardComponent {
     if (remaining === null || remaining === undefined || remaining <= 0) {
       return 'Unavailable';
     }
-    return remaining === 1 ? 'Out 1 match' : `Out ${remaining} matches`;
+    // V25D78-C55.7.7 BUG-L3: when the parent provides the current round,
+    // append "Returns Fecha N" so the user knows when the player is back.
+    // Pre-fix the detail was just "Out N matches" with no specificity.
+    const returnRound = this.computeReturnRound(remaining);
+    const baseText = remaining === 1 ? 'Out 1 match' : `Out ${remaining} matches`;
+    return returnRound !== null ? `${baseText} · Returns Fecha ${returnRound}` : baseText;
+  }
+
+  /**
+   * V25D78-C55.7.7 BUG-L3: compute the absolute round number when the
+   * player is expected to return. Returns null when currentRound is
+   * missing (no career context) so the caller can fall back to the
+   * pre-fix "Out N matches" wording.
+   */
+  private computeReturnRound(remaining: number): number | null {
+    if (this.currentRound === null || this.currentRound === undefined) return null;
+    if (!Number.isFinite(this.currentRound) || this.currentRound < 1) return null;
+    return this.currentRound + remaining;
   }
 
   injuryTooltip(): string {
