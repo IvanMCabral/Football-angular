@@ -144,7 +144,8 @@
           <app-player-card
             *ngFor="let player of (squad$ | async)"
             [player]="player"
-            [isSquad]="true">
+            [isSquad]="true"
+            [currentRound]="(careerStatus$ | async)?.currentRound ?? null">
           </app-player-card>
         </div>
       </div>
