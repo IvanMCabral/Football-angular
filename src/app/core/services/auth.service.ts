@@ -49,16 +49,45 @@ export class AuthService {
   private authStatusSubject = new BehaviorSubject<boolean>(this.isAuthenticated());
   public authStatus$ = this.authStatusSubject.asObservable();
 
+  // C55.12 fix: trim email + password explicitly before sending.
+  // Symptom: fresh UI login fails with 400 "Failed to read HTTP message" when the email
+  // form value carries leading/trailing whitespace (clipboard paste, autofill, email
+  // autocomplete with trailing space, etc.) or contains a hyphen-dot sequence whose
+  // serialization path differs subtly from register. The backend's strict body parser
+  // rejects the request before the LoginRequest DTO is even instantiated, the controller's
+  // onErrorResume swallows it as a 400 with an empty body, and the auth status never moves
+  // to "logged in". Curl with `--data-binary @file.json` works because the file body has no
+  // stray whitespace — the bug is front-side payload hygiene, not the backend schema.
+  // Trimming defensively on both endpoints is the smallest safe fix; the backend can then
+  // parse the body consistently and resolve the user (or return a clean 401 if the email is
+  // unknown, instead of a generic 400).
   login(email: string, password: string): Observable<AuthResponse> {
-    const request: LoginRequest = { email, password };
-    return this.http.post<AuthResponse>(`${environment.apiUrl}/auth/login`, request).pipe(
+    const trimmedEmail = (email ?? '').trim();
+    const trimmedPassword = (password ?? '').trim();
+    const request: LoginRequest = { email: trimmedEmail, password: trimmedPassword };
+    return this.http.post<AuthResponse>(
+      `${environment.apiUrl}/auth/login`,
+      request,
+      { headers: { 'Content-Type': 'application/json' } }
+    ).pipe(
       tap(response => this.handleAuthResponse(response))
     );
   }
 
   register(email: string, username: string, password: string): Observable<AuthResponse> {
-    const request: RegisterRequest = { email, username, password };
-    return this.http.post<AuthResponse>(`${environment.apiUrl}/auth/register`, request).pipe(
+    const trimmedEmail = (email ?? '').trim();
+    const trimmedUsername = (username ?? '').trim();
+    const trimmedPassword = (password ?? '').trim();
+    const request: RegisterRequest = {
+      email: trimmedEmail,
+      username: trimmedUsername,
+      password: trimmedPassword
+    };
+    return this.http.post<AuthResponse>(
+      `${environment.apiUrl}/auth/register`,
+      request,
+      { headers: { 'Content-Type': 'application/json' } }
+    ).pipe(
       tap(response => this.handleAuthResponse(response))
     );
   }
