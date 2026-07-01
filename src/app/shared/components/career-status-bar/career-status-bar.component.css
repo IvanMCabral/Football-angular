@@ -80,5 +80,48 @@
 
 .btn-promotions:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
+  box-shadow: 0 4px 12px rgba(76, 175, 76, 0.4);
+}
+
+/* =============================================================
+   C55.10 Item 4 — División pill (gap A1 reaparecido)
+
+   Reuses the same tier-* CSS class names as the dashboard pill
+   (tier-primera / tier-segunda / tier-tercera / tier-default) so a
+   single visual language identifies the user's tier across /dashboard,
+   /squad, /standings. Sized down to fit the denser horizontal status
+   bar (gradient pill instead of pill-on-card).
+   ============================================================= */
+.status-item-division {
+  padding: 0 1rem;
+}
+
+.status-division-pill {
+  display: inline-block;
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: white;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  min-width: 70px;
+  text-align: center;
+}
+
+.tier-primera {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+}
+
+.tier-segunda {
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+}
+
+.tier-tercera {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
+
+.tier-default {
+  background: linear-gradient(135deg, #64748b 0%, #475569 100%);
 }

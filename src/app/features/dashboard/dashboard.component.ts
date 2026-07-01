@@ -75,6 +75,21 @@ export class DashboardComponent implements OnInit {
   private careerStatusSubject = new BehaviorSubject<CareerStatus | null>(null);
   careerStatus$ = this.careerStatusSubject.asObservable();
 
+  /**
+   * C55.10 Item 2 — dashboard refresh on (careerPhase, season) change.
+   *
+   * <p>Latched on the first successful {@code /career/status} emission.
+   * Subsequent emissions are compared against this snapshot; if either
+   * field differs (e.g. user finished a season → phase went from
+   * {@code 'WAITING_USER'} → {@code 'POST_SEASON'} → season bumped, OR
+   * the user just hit {@code /career/continue} → season went from
+   * {@code 1} → {@code 2}), the dashboard re-fetches the dependent
+   * datasets (squad, user-stats, world-status). Without this the page
+   * retains stale numbers even after the career advance on the back.
+   */
+  private lastSeenPhase: string | null = null;
+  private lastSeenSeason: number | null = null;
+
   // Squad data for condition warnings
   private squadSubject = new BehaviorSubject<SessionPlayer[]>([]);
   squad$ = this.squadSubject.asObservable();
@@ -124,6 +139,27 @@ export class DashboardComponent implements OnInit {
       })
     ).subscribe(status => {
       this.careerStatusSubject.next(status);
+
+      // C55.10 Item 2 — detect (careerPhase, season) change and re-fetch
+      // the dependent datasets that were captured once at
+      // {@link loadDashboardData}. The first emission seeds the snapshot
+      // without triggering the refresh — that initial fetch already
+      // runs in ngOnInit. Subsequent emissions that change phase OR
+      // season force a refresh so the UI doesn't display stale numbers
+      // after the user finishes a season + advances to the next one.
+      const phase = status?.careerPhase ?? null;
+      const season = status?.season ?? 0;
+      if (this.lastSeenPhase !== null) {
+        const phaseChanged = phase !== this.lastSeenPhase;
+        const seasonChanged = season !== this.lastSeenSeason;
+        if (phaseChanged || seasonChanged) {
+          this.loadSquadData();
+          this.refreshUserStats();
+          this.refreshWorldStatus();
+        }
+      }
+      this.lastSeenPhase = phase;
+      this.lastSeenSeason = season;
 
       // V25D78-C55.2 phase 4 UI (d2): auto-trigger promotions dialog.
       // localStorage key is per-career so when a brand-new career finishes
@@ -177,6 +213,32 @@ export class DashboardComponent implements OnInit {
    */
   private refreshCareerStatus(): void {
     this.loadCareerStatus();
+  }
+
+  /**
+   * C55.10 Item 1 — tier-real badge: map the {@code careerStatus.userDivision}
+   * label (whatever the backend sends) to a CSS class that styles the pill.
+   *
+   * <p>The backend now sends the literal display label
+   * (PRIMERA, SEGUNDA, TERCERA, CUARTA, QUINTA, SEXTA, …) instead of an enum
+   * ID. The front CONSUMES that label directly (no remapping) but needs a
+   * visual style for every possible tier. {@link tierCssClass} returns:
+   * <ul>
+   *   <li>{@code 'tier-primera'} for {@code 'PRIMERA'}</li>
+   *   <li>{@code 'tier-segunda'} for {@code 'SEGUNDA'}</li>
+   *   <li>{@code 'tier-tercera'} for {@code 'TERCERA'}</li>
+   *   <li>{@code 'tier-default'} for any other tier (CUARTA, QUINTA, …) or
+   *       null/undefined — neutral gray-indigo gradient so the pill is still
+   *       legible.</li>
+   * </ul>
+   * Used by the dashboard {@code .user-division-pill} for parity with the
+   * standings page (same component pattern, same CSS contract).
+   */
+  tierCssClass(userDivision: string | null | undefined): string {
+    if (userDivision === 'PRIMERA') return 'tier-primera';
+    if (userDivision === 'SEGUNDA') return 'tier-segunda';
+    if (userDivision === 'TERCERA') return 'tier-tercera';
+    return 'tier-default';
   }
 
   /**
@@ -268,26 +330,38 @@ export class DashboardComponent implements OnInit {
     // Load squad data for condition warnings
     this.loadSquadData();
 
+    this.refreshUserStats();
+
+    // Inicializar Observables (async pipe se encarga del subscribe)
+    this.refreshWorldStatus();
+  }
+
+  /**
+   * C55.10 Item 2 — re-issue {@code /dashboard/user-stats}. Reassigns the
+   * {@link userStats$} field so any {@code (userStats$ | async)} consumer
+   * re-subscribes to the new (still cold) Observable. Safe to call
+   * multiple times; used by the (careerPhase, season) change handler in
+   * {@link loadCareerStatus}.
+   */
+  private refreshUserStats(): void {
     this.userStats$ = this.http.get<UserStats>(`${environment.apiUrl}/dashboard/user-stats`).pipe(
       shareReplay(1),
       catchError(err => {
         return of({ matchesPlayed: 0, matchesWon: 0, matchesLost: 0, winPercentage: 0 });
       })
     );
+  }
 
-
-    // Inicializar Observables (async pipe se encarga del subscribe)
-    this.worldStatus$ = this.http.get<WorldStatus>('http://localhost:8080/api/v1/dashboard/world-status').pipe(
+  /**
+   * C55.10 Item 2 — re-issue {@code /dashboard/world-status}. Mirrors
+   * {@link refreshUserStats}: same pattern, independent HTTP call so a
+   * transient failure on one doesn't block the other.
+   */
+  private refreshWorldStatus(): void {
+    this.worldStatus$ = this.http.get<WorldStatus>(`${environment.apiUrl}/dashboard/world-status`).pipe(
       shareReplay(1),
       catchError(err => {
         return of({ clubs: 0, players: 0, matches: 0 });
-      })
-    );
-
-    this.userStats$ = this.http.get<UserStats>(`${environment.apiUrl}/dashboard/user-stats`).pipe(
-      shareReplay(1),
-      catchError(err => {
-        return of({ matchesPlayed: 0, matchesWon: 0, matchesLost: 0, winPercentage: 0 });
       })
     );
   }
@@ -413,6 +487,4 @@ export class DashboardComponent implements OnInit {
       }
     });
   }
-
-
 }

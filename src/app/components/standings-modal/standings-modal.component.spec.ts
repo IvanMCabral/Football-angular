@@ -108,4 +108,28 @@ describe('StandingsModalComponent — V25D78-C55.2 phase 4 UI (c2)', () => {
       done();
     });
   });
+
+  it('(C55.10 Item 3): user team row has `.highlight` class and the ⭐ marker (gap A3/B5)', (done: DoneFn) => {
+    // C55.10 Item 3 — same fix as standings-page: the modal used the same
+    // subtle 3px gold border + 15% tint before. Now 6px + gradient + bold.
+    // Visual prominence is verified via smoke; this spec asserts the
+    // structural wiring (.highlight + .user-team-marker) lands on the
+    // user's row.
+    fixture.detectChanges();
+    fixture.whenStable().then(() => {
+      const highlightedRows = fixture.nativeElement.querySelectorAll('tr.highlight');
+      expect(highlightedRows.length).toBeGreaterThan(0, 'at least one tr.highlight must render');
+      expect(highlightedRows.length).toBe(1,
+        `expected exactly 1 highlighted row in the user-division tab, got ${highlightedRows.length}`);
+
+      const userRow = highlightedRows[0];
+      expect(userRow.textContent).toContain('A',
+        "user-team row should contain the user-team name (data: 'A' for t-1)");
+
+      const marker = userRow.querySelector('.user-team-marker');
+      expect(marker).not.toBeNull('highlighted row should contain the .user-team-marker');
+      expect(marker.textContent.trim()).toBe('⭐');
+      done();
+    });
+  });
 });

@@ -12,13 +12,13 @@
 
     <!-- V25D78-C55.2 phase 4 UI (c) consume: show the user's division
          tier as a prominent badge in the page header, so the user lands
-         on the page already knowing which tier they play in. -->
+         on the page already knowing which tier they play in.
+         C55.10 Item 1: consume the backend label verbatim and pick the CSS
+         class via {@link tierCssClass} so any tier (CUARTA, QUINTA, SEXTA,
+         …) renders with a sensible default style instead of unstyled
+         text. -->
     <div class="header-right" *ngIf="userDivision">
-      <span class="user-division-pill" [ngClass]="{
-        'tier-primera': userDivision === 'PRIMERA',
-        'tier-segunda': userDivision === 'SEGUNDA',
-        'tier-tercera': userDivision === 'TERCERA'
-      }">
+      <span class="user-division-pill" [class]="tierCssClass(userDivision)">
         Tu división: {{ userDivision }}
       </span>
     </div>

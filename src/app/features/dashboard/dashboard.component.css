@@ -111,6 +111,14 @@
   background: linear-gradient(135deg, #10b981 0%, #059669 100%);
 }
 
+/* C55.10 Item 1 — fallback for any tier not explicitly styled above
+   (CUARTA, QUINTA, SEXTA, …). Neutral gray-indigo so the pill still
+   reads as a tier badge even when the user lands in a lower division
+   they weren't expecting. */
+.tier-default {
+  background: linear-gradient(135deg, #64748b 0%, #475569 100%);
+}
+
 .view-standings-link {
   margin-left: auto;
   color: #667eea;
