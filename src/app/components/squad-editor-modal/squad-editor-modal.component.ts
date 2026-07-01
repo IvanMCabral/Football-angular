@@ -2256,7 +2256,10 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     // would 422 anyway; we surface the error inline without sending a doomed request.
     const playerCount = this.homePlayers.length;
     if (playerCount < 7) {
-      this.errorMessage$.next('Mínimo 7 jugadores para guardar');
+      // V25D78-C55.7.7.1 BUG_L4 (continuation from C55.7.7 squad-management.component.html
+      // commit 31822e3): clarify that 7 is a floor, NOT a ceiling — the user can save with
+      // any valid lineup between 7 and 11. The actual guard logic (< 7 → block) is unchanged.
+      this.errorMessage$.next('Mínimo 7 jugadores para guardar (puedes tener más)');
       this.lineupWarning$.next(null);
       return;
     }
