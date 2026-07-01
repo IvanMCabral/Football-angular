@@ -1962,4 +1962,53 @@ describe('SquadEditorModalComponent — V25D66-C26 bench display', () => {
       done();
     }, 50);
   });
+
+  /**
+   * V25D78-C55.7.7.1 BUG_L4 (continuation from C55.7.7 squad-management.component.html
+   * commit 31822e3): the squad-editor-modal still used the wording "Mínimo 7 jugadores
+   * para guardar" without clarification. The C55.7.7 fix only touched squad-management,
+   * so users hitting the modal confirm with <7 players still saw the ambiguous text.
+   *
+   * Post-fix: error message reads
+   *   "Mínimo 7 jugadores para guardar (puedes tener más)"
+   * so the 7 is clearly a FLOOR (you can have 8, 9, 10, or 11), NOT a ceiling.
+   *
+   * Test strategy: push the player list through homePlayers$.next() (homePlayers
+   * itself is a getter over the BehaviorSubject, see component.ts:1436) and read
+   * the resulting error via errorMessage$.value (the matching getter). assertContains,
+   * NOT exact match — future copy edits must not require a code review of this spec.
+   */
+  describe('squad-editor-modal — V25D78-C55.7.7.1 BUG_L4 (Mínimo 7 wording)', () => {
+    it('L4 happy path: error message includes "(puedes tener más)" clarification', () => {
+      const threePlayerFixture = TestBed.createComponent(SquadEditorModalComponent);
+      const threePlayerComponent = threePlayerFixture.componentInstance;
+      threePlayerFixture.detectChanges();
+
+      // Force the < 7 branch of saveLineup(): push 3 players through homePlayers$.next().
+      (threePlayerComponent as any).homePlayers$.next([{}, {}, {}] as any);
+      (threePlayerComponent as any).saveLineup();
+
+      const captured = (threePlayerComponent as any).errorMessage$.value;
+      expect(captured).toContain('Mínimo 7',
+        'error must still mention the 7-player floor (no copy regression)');
+      expect(captured).toContain('(puedes tener más)',
+        'BUG_L4 fix: the clarification "(puedes tener más)" must be present so users '
+          + 'understand 7 is a floor, not a ceiling');
+    });
+
+    it('L4 regression: 7 ≤ playerCount ≤ 11 path does NOT emit the Mínimo 7 message', () => {
+      // The clarification only applies to the < 7 branch; the save path with enough
+      // players must clear the error instead of re-emitting the Mínimo 7 message.
+      const okFixture = TestBed.createComponent(SquadEditorModalComponent);
+      const okComponent = okFixture.componentInstance;
+      okFixture.detectChanges();
+
+      (okComponent as any).homePlayers$.next(new Array(11).fill({}) as any);
+      (okComponent as any).saveLineup();
+
+      const captured = (okComponent as any).errorMessage$.value;
+      expect(captured).not.toContain('Mínimo 7',
+        'with a valid lineup (11 players) the Mínimo 7 message must NOT be emitted');
+    });
+  });
 });
