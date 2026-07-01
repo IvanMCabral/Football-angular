@@ -3,6 +3,7 @@ import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink, Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { Observable, of, firstValueFrom, BehaviorSubject } from 'rxjs';
 import { map, catchError, shareReplay, tap } from 'rxjs/operators';
 import { TeamService } from '../teams/services/team.service';
@@ -11,6 +12,8 @@ import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { environment } from '../../environments/environment';
 import { SessionPlayer } from '../../shared/models/player.model';
+import { PromotionsDialogComponent } from '../../components/promotions-dialog/promotions-dialog.component';
+import { PromotionResult } from '../../core/services/career.model';
 
 interface UserStats {
   matchesPlayed: number;
@@ -33,6 +36,17 @@ interface CareerStatus {
   isFinished: boolean;
   careerPhase: string | null; // PRE_MATCH, IN_MATCH, POST_MATCH, WAITING_USER, FINISHED
   season: number;
+  /**
+   * V25D78-C55.2 phase 4 UI (c): user's division tier from
+   * GET /api/v1/career/status. PRIMERA / SEGUNDA / TERCERA / null (legacy).
+   */
+  userDivision?: string | null;
+  /**
+   * V25D78-C55.2 phase 4 UI (d2): true when a season just ended and the
+   * engine computed promotion/relegation movements. Front uses localStorage
+   * to mark 'viewed' so the dialog doesn't re-pop on every reload.
+   */
+  promotionsAvailable?: boolean;
 }
 
 interface RecentActivity {
@@ -44,7 +58,7 @@ interface RecentActivity {
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, MatDialogModule],
   templateUrl: './dashboard.component.html',
   styleUrls: ['./dashboard.component.css']
 })
@@ -55,6 +69,7 @@ export class DashboardComponent implements OnInit {
   private http = inject(HttpClient);
   private router = inject(Router);
   private toastService = inject(ToastService);
+  private dialog = inject(MatDialog);
 
   // BehaviorSubject para career status reactivo
   private careerStatusSubject = new BehaviorSubject<CareerStatus | null>(null);
@@ -91,7 +106,15 @@ export class DashboardComponent implements OnInit {
             totalRounds: status.totalRounds || 38,
             isFinished: status.isFinished || false,
             careerPhase: status.careerPhase || 'PRE_MATCH',
-            season: status.season || 1
+            season: status.season || 1,
+            // V25D78-C55.2 phase 4 UI (c) consume: tier the user is in.
+            // Backend may emit null for legacy careers; we surface it as-is.
+            userDivision: status.userDivision ?? null,
+            // V25D78-C55.2 phase 4 UI (d2) auto-trigger: when true, the
+            // engine just finished a season and the promotion/relegation
+            // movements are queued. We'll auto-open the dialog below
+            // (gated by localStorage so it doesn't pop on every reload).
+            promotionsAvailable: status.promotionsAvailable === true
           } as CareerStatus;
         }
         return null;
@@ -101,6 +124,51 @@ export class DashboardComponent implements OnInit {
       })
     ).subscribe(status => {
       this.careerStatusSubject.next(status);
+
+      // V25D78-C55.2 phase 4 UI (d2): auto-trigger promotions dialog.
+      // localStorage key is per-career so when a brand-new career finishes
+      // its first season, the dialog opens exactly once. After the user
+      // closes it, we mark the season as 'viewed' so subsequent loads
+      // don't re-pop.
+      if (status && status.promotionsAvailable && status.careerId) {
+        this.maybeShowPromotionsDialog(status.careerId);
+      }
+    });
+  }
+
+  /**
+   * V25D78-C55.2 phase 4 UI (d2): if the engine flagged promotions as
+   * available for this career and we haven't shown them yet this season,
+   * fetch the promotions list and pop the existing {@link PromotionsDialogComponent}.
+   * Marks the season as 'viewed' in localStorage so the dialog is one-shot.
+   */
+  private maybeShowPromotionsDialog(careerId: string): void {
+    const lastViewedSeasonKey = `c55.phase4.viewedSeason.${careerId}`;
+    const lastViewedSeason = Number(localStorage.getItem(lastViewedSeasonKey) || '0');
+    const currentSeasonRaw = this.careerStatusSubject.value?.season ?? 0;
+    const currentSeason = typeof currentSeasonRaw === 'number' ? currentSeasonRaw : 0;
+
+    if (lastViewedSeason >= currentSeason && currentSeason > 0) {
+      return; // already shown for this season
+    }
+
+    this.http.get<PromotionResult[]>(`${environment.apiUrl}/career/promotions`).subscribe({
+      next: (promotions) => {
+        if (!promotions || promotions.length === 0) {
+          return; // engine flag was stale or no movements → don't pop
+        }
+        this.dialog.open(PromotionsDialogComponent, {
+          data: { promotions },
+          width: '450px',
+          maxWidth: '90vw'
+        }).afterClosed().subscribe(() => {
+          localStorage.setItem(lastViewedSeasonKey, String(currentSeason));
+        });
+      },
+      error: () => {
+        // Silent: if /promotions fails we don't want to spam the user.
+        // The next dashboard load will retry.
+      }
     });
   }
 

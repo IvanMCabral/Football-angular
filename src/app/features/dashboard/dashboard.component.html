@@ -17,6 +17,22 @@
 <div *ngIf="(careerStatus$ | async) as careerStatus">
   <!-- Active Career: Two Buttons -->
   <div class="career-actions" *ngIf="careerStatus && !careerStatus.isFinished">
+    <!-- V25D78-C55.2 phase 4 UI (c): show the user's division tier as a
+         prominent badge right next to the action buttons, so the user
+         always knows what tier they play in (PRIMERA / SEGUNDA / TERCERA). -->
+    <div *ngIf="careerStatus.userDivision" class="user-division-card">
+      <span class="user-division-card-label">Tu división</span>
+      <span class="user-division-pill" [ngClass]="{
+        'tier-primera': careerStatus.userDivision === 'PRIMERA',
+        'tier-segunda': careerStatus.userDivision === 'SEGUNDA',
+        'tier-tercera': careerStatus.userDivision === 'TERCERA'
+      }">
+        {{ careerStatus.userDivision }}
+      </span>
+      <!-- Quick link to the standalone /standings page (b2). -->
+      <a routerLink="/standings" class="view-standings-link">Ver tabla completa →</a>
+    </div>
+
     <!-- NUEVO: Botón Jugar Próxima Fecha (solo si está en WAITING_USER) -->
     <div *ngIf="careerStatus.careerPhase === 'WAITING_USER'" class="squad-warning-container">
       <div *ngIf="hasSquadConditionWarning()" class="squad-condition-warning" role="alert">

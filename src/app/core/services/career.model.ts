@@ -14,6 +14,20 @@ export interface SessionTeam {
 
 /**
  * CareerStatus - Career session status from backend GetCareerStatusUseCase
+ *
+ * <p><b>V25D78-C55.2 phase 4 UI</b> added two fields to the back contract:
+ * <ul>
+ *   <li><b>{@link userDivision}</b> — 'PRIMERA' | 'SEGUNDA' | 'TERCERA' | null.
+ *       Tells the dashboard what tier the user's team is currently in so it
+ *       can render the badge prominent without a 2nd round-trip to
+ *       /career/divisions. null when the career is legacy (pre-C55.2) or
+ *       absent.</li>
+ *   <li><b>{@link promotionsAvailable}</b> — true when the engine just
+ *       finished a season and computed promotion/relegation movements. The
+ *       frontend uses this flag (plus localStorage) to auto-open the
+ *       {@link PromotionsDialogComponent} instead of waiting for the user
+ *       to click the manual button.</li>
+ * </ul>
  */
 export interface CareerStatus {
   careerId: string | null;
@@ -30,6 +44,17 @@ export interface CareerStatus {
   careerPhase: string | null;
   squadSize: number;
   freePlayersCount: number;
+  /**
+   * V25D78-C55.2 phase 4 UI (c): user's division tier.
+   * PRIMERA / SEGUNDA / TERCERA / null (legacy or no career).
+   */
+  userDivision?: string | null;
+  /**
+   * V25D78-C55.2 phase 4 UI (d2): true when a season just ended and
+   * promotions are queued for display. Front uses localStorage to mark
+   * 'viewed' so the dialog doesn't re-pop on every reload.
+   */
+  promotionsAvailable?: boolean;
 }
 
 /**

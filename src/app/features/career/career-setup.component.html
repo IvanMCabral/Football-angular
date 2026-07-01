@@ -67,11 +67,19 @@
       <div *ngIf="selectedLeagueId && selectedTeamsPerDivision && (divisionPreviews$ | async) as divisions" class="divisions-preview">
         <h3>📋 Vista Previa de Divisiones</h3>
         <p class="preview-hint">Los equipos se ordenan automáticamente por OVR</p>
-        
+
         <div class="divisions-grid">
-          <div *ngFor="let division of divisions" class="division-card">
+          <div *ngFor="let division of divisions; let divIndex = index" class="division-card">
             <div class="division-header">
               <h4>{{ division.name }}</h4>
+              <!-- V25D78-C55.2 phase 4 UI (a2): tier badge PRIMERA/SEGUNDA/TERCERA
+                   drives off the card's 1-indexed position in the divisions array
+                   (the backend emits them sorted by tier). -->
+              <span class="division-badge" [ngClass]="{
+                'division-badge-primera': divIndex === 0,
+                'division-badge-segunda': divIndex === 1,
+                'division-badge-tercera': divIndex === 2
+              }">{{ ['PRIMERA', 'SEGUNDA', 'TERCERA'][divIndex] }}</span>
               <span class="team-count">{{ division.teams.length }} equipos</span>
             </div>
             <div class="division-teams">
@@ -99,16 +107,20 @@
       <!-- Equipo (única división) -->
       <div class="form-group" *ngIf="selectedLeagueId && !selectedTeamsPerDivision">
         <label>🏆 Equipo</label>
-        <select 
-          [(ngModel)]="selectedTeamId" 
-          class="form-select" 
+        <select
+          [(ngModel)]="selectedTeamId"
+          class="form-select"
           [disabled]="!selectedLeagueId"
         >
           <option [value]="null">Selecciona un equipo...</option>
           <option *ngFor="let team of (teamsWithOVR$ | async)" [value]="team.worldTeamId">
-            {{ team.name }} ({{ team.ovr }} OVR)
+            {{ team.name }} ({{ team.ovr }} OVR) - PRIMERA
           </option>
         </select>
+        <small class="hint division-hint-single">
+          <span class="division-badge division-badge-primera">PRIMERA</span>
+          Todos los equipos juegan en la primera división cuando no se subdivide.
+        </small>
       </div>
 
       <!-- Equipo (múltiples divisiones) -->

@@ -324,3 +324,43 @@ h1 {
   margin: 0.5rem 0 0 0;
   font-size: 0.95rem;
 }
+
+/* V25D78-C55.2 phase 4 UI (a)+(a2): tier badges (PRIMERA / SEGUNDA / TERCERA)
+   used both in the single-division team selector hint and the multi-division
+   preview cards. Each tier gets a distinct palette consistent with the
+   existing gradient theme but with enough hue separation for the eye to
+   latch on at a glance. */
+.division-badge {
+  display: inline-block;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: white;
+  margin-right: 0.5rem;
+  vertical-align: middle;
+}
+
+.division-badge-primera {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  box-shadow: 0 1px 3px rgba(245, 158, 11, 0.4);
+}
+
+.division-badge-segunda {
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+  box-shadow: 0 1px 3px rgba(99, 102, 241, 0.4);
+}
+
+.division-badge-tercera {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  box-shadow: 0 1px 3px rgba(16, 185, 129, 0.4);
+}
+
+.division-hint-single {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
