@@ -309,11 +309,10 @@ describe('StandingsPageComponent — V25D78-C55.2 phase 4 UI (b2)', () => {
       // We assert the row has BOTH highlight AND zone-promotion classes.
       const userRow = Array.from(rows).find((r: any) =>
         r.textContent.includes('Real Madrid (us)')
-      );
+      ) as HTMLElement | undefined;
       expect(userRow).toBeDefined('user row must render');
-      expect(userRow.classList.contains('highlight')).toBeTrue('user row must have .highlight');
-      expect(userRow.classList.contains('zone-promotion')).toBeTrue(
-        'user row at #3 must also be in zone-promotion (gold + green stacked)');
+      expect(userRow!.classList.contains('highlight')).toBeTrue();
+      expect(userRow!.classList.contains('zone-promotion')).toBeTrue();
       done();
     });
   });
