@@ -14,6 +14,7 @@ import { environment } from '../../environments/environment';
 import { SessionPlayer } from '../../shared/models/player.model';
 import { PromotionsDialogComponent } from '../../components/promotions-dialog/promotions-dialog.component';
 import { PromotionResult } from '../../core/services/career.model';
+import { UserInfo } from '../../shared/models/auth.model';
 
 interface UserStats {
   matchesPlayed: number;
@@ -94,7 +95,29 @@ export class DashboardComponent implements OnInit {
   private squadSubject = new BehaviorSubject<SessionPlayer[]>([]);
   squad$ = this.squadSubject.asObservable();
 
-  username$?: Observable<string>;
+  /**
+ * V25D78-C55.7.7 BUG-L1: the welcome banner now resolves display name via
+ * {@link #displayNameOf}, so we expose the full user info (UserInfo) instead
+ * of the bare username string. Pre-fix the template only saw the username
+ * which felt impersonal ("Welcome back, smoke-c55.7.4!").
+ */
+  user$?: Observable<UserInfo | null>;
+  /**
+   * V25D78-C55.7.7 BUG-L1: pick the best human-friendly name for the welcome
+   * banner. Order: {@code displayName} → {@code email} → {@code username}.
+   * Pre-fix the template hardcoded {@code username$} which surfaced the
+   * raw username (e.g. "smoke-c55.7.4") and felt impersonal.
+   *
+   * <p>Until the backend starts emitting {@code displayName}, the email is
+   * used as a friendlier fallback than the opaque username.
+   */
+  displayNameOf(info: { displayName?: string | null; email?: string; username?: string } | null | undefined): string {
+    if (!info) return '';
+    const dn = (info.displayName ?? '').trim();
+    if (dn) return dn;
+    if (info.email) return info.email;
+    return info.username ?? '';
+  }
   userStats$?: Observable<UserStats>;
   worldStatus$?: Observable<WorldStatus>;
   recentActivities: RecentActivity[] = [];
@@ -354,11 +377,11 @@ export class DashboardComponent implements OnInit {
   }
 
   loadDashboardData(): void {
-    // Username como observable, para template async
-    this.username$ = this.authService.getUserInfo().pipe(
-      map(info => info.username),
+    // V25D78-C55.7.7 BUG-L1: emit the full user info so the welcome banner
+    // can pick displayName → email → username via displayNameOf().
+    this.user$ = this.authService.getUserInfo().pipe(
       catchError(err => {
-        return of('');
+        return of(null);
       }),
       shareReplay(1)
     );

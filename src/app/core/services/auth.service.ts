@@ -134,8 +134,8 @@ export class AuthService {
   }
 
   // Obtiene la información del usuario actual (id, nombre y equipo)
-  getUserInfo(): Observable<{ id: string; username: string; email: string; teamId?: string; teamName?: string }> {
-    return this.http.get<{ id: string; username: string; email: string; teamId?: string; teamName?: string }>(`${environment.apiUrl}/auth/me`);
+  getUserInfo(): Observable<{ id: string; username: string; email: string; teamId?: string; teamName?: string; displayName?: string | null }> {
+    return this.http.get<{ id: string; username: string; email: string; teamId?: string; teamName?: string; displayName?: string | null }>(`${environment.apiUrl}/auth/me`);
   }
 
   private handleAuthResponse(response: AuthResponse): void {

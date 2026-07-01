@@ -22,4 +22,11 @@ export interface UserInfo {
   email: string;
   teamId?: string;
   teamName?: string;
+  /**
+   * V25D78-C55.7.7 BUG-L1: optional human-friendly display name. When the
+   * backend starts returning this field (post C55.7.x), the dashboard
+   * welcome banner will prefer it over the raw username. Until then the
+   * helper falls back to the email so the banner is still readable.
+   */
+  displayName?: string | null;
 }

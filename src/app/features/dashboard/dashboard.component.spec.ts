@@ -619,3 +619,65 @@ describe('DashboardComponent — V25D78-C55.7.7 BUG-M3 (season-aware Jugar Fecha
     expect(component.playNextRoundLabel(undefined)).toBe('Jugar Próxima Fecha');
   });
 });
+
+/**
+ * V25D78-C55.7.7 BUG-L1: dashboard welcome banner prefers displayName.
+ *
+ * <p>Pre-fix the template hardcoded `info.username` and showed e.g.
+ * "Welcome back, smoke-c55.7.4!" which felt impersonal. Post-fix
+ * {@link DashboardComponent#displayNameOf} picks:
+ * {@code displayName} → {@code email} → {@code username}.
+ *
+ * <p>Coverage:
+ * <ul>
+ *   <li>Backend emits displayName: it wins.</li>
+ *   <li>No displayName yet: email is friendlier than username.</li>
+ *   <li>Empty / whitespace displayName: treated as absent.</li>
+ *   <li>Null/undefined user: safe empty string (banner shows just "!").</li>
+ * </ul>
+ */
+describe('DashboardComponent — V25D78-C55.7.7 BUG-L1 (displayNameOf helper)', () => {
+  let component: DashboardComponent;
+
+  beforeEach(() => {
+    component = Object.create(DashboardComponent.prototype);
+  });
+
+  it('L1 happy path: displayName wins when present', () => {
+    expect(component.displayNameOf({
+      displayName: 'Iván Cabral',
+      email: 'ivan@example.com',
+      username: 'ivan-cabral'
+    })).toBe('Iván Cabral');
+  });
+
+  it('L1 fallback: email when no displayName (current backend state)', () => {
+    // Pre-fix showed username; post-fix shows the email until backend
+    // starts emitting displayName.
+    expect(component.displayNameOf({
+      displayName: null,
+      email: 'smoke-c55.7.4-20260701160000@test.com',
+      username: 'smoke-c55.7.4'
+    })).toBe('smoke-c55.7.4-20260701160000@test.com');
+  });
+
+  it('L1 whitespace displayName: treated as absent (trim check)', () => {
+    expect(component.displayNameOf({
+      displayName: '   ',
+      email: 'fallback@example.com',
+      username: 'fallback-username'
+    })).toBe('fallback@example.com');
+  });
+
+  it('L1 null/undefined user: safe empty string', () => {
+    expect(component.displayNameOf(null)).toBe('');
+    expect(component.displayNameOf(undefined)).toBe('');
+  });
+
+  it('L1 fallback chain: no displayName + no email → username', () => {
+    expect(component.displayNameOf({
+      displayName: null,
+      username: 'last-resort'
+    })).toBe('last-resort');
+  });
+});
