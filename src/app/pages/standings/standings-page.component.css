@@ -251,9 +251,25 @@
   background: rgba(102, 126, 234, 0.1);
 }
 
+/* C55.10 Item 3 — user-team row highlight, prominent version.
+   Was a subtle 3px gold border + 15% gold tint before (gap A3/B5 — easy
+   to miss when scanning the table). Now: 6px gold border + stronger
+   gradient + bold font-weight + gold text-color on the team cell so the
+   user always spots their team in any tier. */
 .standings-table tbody tr.highlight {
-  background: rgba(255, 215, 0, 0.15);
-  border-left: 3px solid #ffd700;
+  background: linear-gradient(90deg, rgba(255, 215, 0, 0.25) 0%, rgba(255, 215, 0, 0.08) 100%);
+  border-left: 6px solid #ffd700;
+  font-weight: 700;
+}
+
+.standings-table tbody tr.highlight td.team {
+  color: #ffd700;
+  font-weight: 700;
+}
+
+.standings-table tbody tr.highlight td.points {
+  color: #ffd700;
+  font-weight: 800;
 }
 
 .pos {
@@ -301,9 +317,11 @@
   background: rgba(72, 187, 120, 0.22);
 }
 
+/* (c2) — user row in promotion zone: gold + green combined, prominent. */
 .standings-table tbody tr.zone-promotion.highlight {
-  background: linear-gradient(90deg, rgba(255, 215, 0, 0.2) 0%, rgba(72, 187, 120, 0.12) 100%);
-  border-left: 3px solid #ffd700;
+  background: linear-gradient(90deg, rgba(255, 215, 0, 0.28) 0%, rgba(72, 187, 120, 0.14) 100%);
+  border-left: 6px solid #ffd700;
+  font-weight: 700;
 }
 
 .standings-table tbody tr.zone-relegation {
@@ -315,7 +333,11 @@
   background: rgba(245, 101, 101, 0.22);
 }
 
+/* (c2) — user row in relegation zone: gold + red combined, prominent.
+   Stronger gold border overrides the red zone border so the user always
+   spots their own row regardless of position. */
 .standings-table tbody tr.zone-relegation.highlight {
-  background: linear-gradient(90deg, rgba(255, 215, 0, 0.2) 0%, rgba(245, 101, 101, 0.12) 100%);
-  border-left: 3px solid #ffd700;
+  background: linear-gradient(90deg, rgba(255, 215, 0, 0.28) 0%, rgba(245, 101, 101, 0.14) 100%);
+  border-left: 6px solid #ffd700;
+  font-weight: 700;
 }

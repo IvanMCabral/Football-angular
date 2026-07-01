@@ -159,9 +159,24 @@ mat-dialog-content {
   background: rgba(102, 126, 234, 0.1);
 }
 
+/* C55.10 Item 3 — user-team row highlight, prominent version.
+   Mirrors the standings-page CSS contract: 6px gold border + stronger
+   gradient + bold font-weight + gold team cell so the user always spots
+   their team regardless of which tier / zone they land in. */
 .standings-table tbody tr.highlight {
-  background: rgba(255, 215, 0, 0.15);
-  border-left: 3px solid #ffd700;
+  background: linear-gradient(90deg, rgba(255, 215, 0, 0.25) 0%, rgba(255, 215, 0, 0.08) 100%);
+  border-left: 6px solid #ffd700;
+  font-weight: 700;
+}
+
+.standings-table tbody tr.highlight td.team {
+  color: #ffd700;
+  font-weight: 700;
+}
+
+.standings-table tbody tr.highlight td.points {
+  color: #ffd700;
+  font-weight: 800;
 }
 
 .pos {
@@ -226,9 +241,10 @@ mat-dialog-actions {
 }
 
 .standings-table tbody tr.zone-promotion.highlight {
-  /* User row in promotion zone: gold + green combined */
-  background: linear-gradient(90deg, rgba(255, 215, 0, 0.2) 0%, rgba(72, 187, 120, 0.12) 100%);
-  border-left: 3px solid #ffd700;
+  /* User row in promotion zone: gold + green combined, prominent. */
+  background: linear-gradient(90deg, rgba(255, 215, 0, 0.28) 0%, rgba(72, 187, 120, 0.14) 100%);
+  border-left: 6px solid #ffd700;
+  font-weight: 700;
 }
 
 .standings-table tbody tr.zone-relegation {
@@ -241,9 +257,10 @@ mat-dialog-actions {
 }
 
 .standings-table tbody tr.zone-relegation.highlight {
-  /* User row in relegation zone: gold + red combined */
-  background: linear-gradient(90deg, rgba(255, 215, 0, 0.2) 0%, rgba(245, 101, 101, 0.12) 100%);
-  border-left: 3px solid #ffd700;
+  /* User row in relegation zone: gold + red combined, prominent. */
+  background: linear-gradient(90deg, rgba(255, 215, 0, 0.28) 0%, rgba(245, 101, 101, 0.14) 100%);
+  border-left: 6px solid #ffd700;
+  font-weight: 700;
 }
 
 /* Legend above the tab group — explains what the colored borders mean. */
