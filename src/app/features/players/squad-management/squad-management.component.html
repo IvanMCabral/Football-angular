@@ -118,7 +118,10 @@
           <span class="banner-text">
             <ng-container *ngIf="availableSquadCount(s) < 7; else shortHanded">
               Plantilla muy corta: {{ availableSquadCount(s) }} disponibles.
-              Mínimo 7 para jugar.
+              <!-- V25D78-C55.7.7 BUG-L4: clarify that 7 is a minimum, not exact.
+                   Pre-fix wording suggested "exactly 7 is the minimum" which
+                   left users wondering if 8 or 9 was OK. -->
+              Mínimo 7 jugadores para jugar (puedes tener más).
               <a routerLink="/players/manage" class="banner-link">Gestionar plantilla</a>
             </ng-container>
             <ng-template #shortHanded>
@@ -314,9 +317,9 @@
               (click)="onConfirmLineup()"
               [disabled]="(lineupLoading$ | async) || lineupSlotsCount < 7 || lineupSlotsCount > 11"
               [title]="lineupSlotsCount < 7
-                       ? 'Mínimo 7 jugadores'
+                       ? 'Mínimo 7 jugadores (puedes tener más)'
                        : (lineupSlotsCount > 11
-                          ? 'Máximo 11 jugadores'
+                          ? 'Máximo 11 jugadores (ideal para 4-4-2/3-5-2/4-3-3)'
                           : 'Confirmar')"
               class="btn-confirm-lineup">
               ✅ Confirmar y Jugar
