@@ -147,6 +147,57 @@ describe('StandingsPageComponent — V25D78-C55.2 phase 4 UI (b2)', () => {
     });
   });
 
+  it('(C55.10 Item 1): tier-real — pill renders CUARTA verbatim with tier-default fallback', (done: DoneFn) => {
+    // C55.10 Item 1: backend sends the literal tier label (CUARTA, QUINTA,
+    // …) — the front must consume it AS-IS without remapping. CSS contract:
+    // the unknown-tier pill gets `tier-default` styling so it stays visually
+    // distinct from PRIMERA/SEGUNDA/TERCERA instead of falling back to
+    // unstyled text. Same contract as the dashboard pill.
+    careerServiceSpy.getCareerStatus.and.returnValue(of({
+      careerId: 'career-1',
+      season: 3,
+      currentRound: 1,
+      totalRounds: 38,
+      userTeamId: USER_TEAM_ID,
+      userSessionTeamId: USER_TEAM_ID,
+      userTeamName: 'Real Madrid',
+      hasLastMatchPlayed: false,
+      nextMatchId: null,
+      engineStatus: 'IDLE',
+      canAdvanceRound: true,
+      careerPhase: 'WAITING_USER',
+      squadSize: 11,
+      freePlayersCount: 0,
+      userDivision: 'CUARTA',
+      promotionsAvailable: false
+    } as CareerStatus));
+    fixture.detectChanges();
+    fixture.whenStable().then(() => {
+      const pill = fixture.nativeElement.querySelector('.user-division-pill');
+      expect(pill).not.toBeNull('user-division-pill must render when userDivision=CUARTA');
+      expect(pill.textContent).toContain('CUARTA',
+        'pill must display the backend label verbatim, not remap to PRIMERA');
+      expect(pill.className).toContain('tier-default',
+        'pill must have tier-default class for unknown tier (CUARTA)');
+      expect(pill.className).not.toContain('tier-primera',
+        'pill must NOT have tier-primera when userDivision=CUARTA');
+      done();
+    });
+  });
+
+  it('(C55.10 Item 1): tierCssClass() helper covers PRIMERA/SEGUNDA/TERCERA/tier-default', () => {
+    // Unit test of the tier-class helper. Same contract as the dashboard
+    // pill, duplicated here so each component can extend independently
+    // (e.g. additional tier color schemes) without silently diverging.
+    expect(component.tierCssClass('PRIMERA')).toBe('tier-primera');
+    expect(component.tierCssClass('SEGUNDA')).toBe('tier-segunda');
+    expect(component.tierCssClass('TERCERA')).toBe('tier-tercera');
+    expect(component.tierCssClass('CUARTA')).toBe('tier-default');
+    expect(component.tierCssClass('QUINTA')).toBe('tier-default');
+    expect(component.tierCssClass(null)).toBe('tier-default');
+    expect(component.tierCssClass(undefined)).toBe('tier-default');
+  });
+
   it('renders the green/red zone legend (c2)', (done: DoneFn) => {
     fixture.detectChanges();
     fixture.whenStable().then(() => {

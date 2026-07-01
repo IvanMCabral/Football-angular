@@ -162,6 +162,59 @@ describe('DashboardComponent — V25D78-C55.2 phase 4 UI (c) + (d2)', () => {
     });
   });
 
+  it('(C55.10 Item 1): tier-real — pill renders CUARTA verbatim with tier-default fallback', (done: DoneFn) => {
+    // C55.10 Item 1: backend now sends the literal tier label (CUARTA,
+    // QUINTA, …) — the front must consume it AS-IS without mapping. CSS
+    // contract: the unknown-tier pill gets `tier-default` styling so it
+    // stays visually distinct from PRIMERA/SEGUNDA/TERCERA instead of
+    // falling back to unstyled text.
+    httpSpy.get.and.callFake(((url: string) => {
+      if (url.includes('/career/status')) {
+        return of({
+          careerId: CAREER_ID,
+          userSessionTeamId: 'session-team-1',
+          currentRound: 5,
+          totalRounds: 38,
+          isFinished: false,
+          careerPhase: 'WAITING_USER',
+          season: SEASON,
+          userDivision: 'CUARTA'
+        });
+      }
+      if (url.includes('/career/players/squad')) return of([]);
+      if (url.includes('/dashboard/user-stats')) return of({ matchesPlayed: 0, matchesWon: 0, matchesLost: 0, winPercentage: 0 });
+      if (url.includes('/dashboard/world-status')) return of({ clubs: 0, players: 0, matches: 0 });
+      return of({});
+    }) as any);
+
+    fixture.detectChanges();
+    fixture.whenStable().then(() => {
+      const pill = fixture.nativeElement.querySelector('.user-division-pill');
+      expect(pill).not.toBeNull('user-division-pill must render when status has userDivision=CUARTA');
+      expect(pill.textContent.trim()).toContain('CUARTA',
+        'pill must display the backend label verbatim, not remap to PRIMERA');
+      expect(pill.className).toContain('tier-default',
+        'pill must have tier-default class for unknown tier (CUARTA)');
+      expect(pill.className).not.toContain('tier-primera',
+        'pill must NOT have tier-primera when userDivision=CUARTA');
+      done();
+    });
+  });
+
+  it('(C55.10 Item 1): tierCssClass() helper covers PRIMERA/SEGUNDA/TERCERA/tier-default', () => {
+    // Unit test of the tier-class helper. Verifies the mapping contract
+    // used by both the dashboard pill template binding and the standings
+    // page.
+    expect(component.tierCssClass('PRIMERA')).toBe('tier-primera');
+    expect(component.tierCssClass('SEGUNDA')).toBe('tier-segunda');
+    expect(component.tierCssClass('TERCERA')).toBe('tier-tercera');
+    expect(component.tierCssClass('CUARTA')).toBe('tier-default');
+    expect(component.tierCssClass('QUINTA')).toBe('tier-default');
+    expect(component.tierCssClass('SEXTA')).toBe('tier-default');
+    expect(component.tierCssClass(null)).toBe('tier-default');
+    expect(component.tierCssClass(undefined)).toBe('tier-default');
+  });
+
   it('(d2): auto-opens PromotionsDialog when promotionsAvailable=true and not yet viewed (direct)', () => {
     // V25D78-C55.2 phase 4 UI (d2): direct unit test of the auto-trigger
     // path. We invoke the private method directly with a manually bound

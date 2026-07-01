@@ -80,6 +80,13 @@
   background: linear-gradient(135deg, #10b981 0%, #059669 100%);
 }
 
+/* C55.10 Item 1 — fallback for any tier not explicitly styled above
+   (CUARTA, QUINTA, SEXTA, …). Neutral gray-indigo so the pill still
+   reads as a tier badge. Mirrors the dashboard pill contract exactly. */
+.tier-default {
+  background: linear-gradient(135deg, #64748b 0%, #475569 100%);
+}
+
 /* (c2) — legend above the tab group, same as the modal. */
 .zone-legend {
   display: flex;

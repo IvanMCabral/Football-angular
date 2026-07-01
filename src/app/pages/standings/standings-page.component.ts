@@ -83,4 +83,18 @@ export class StandingsPageComponent implements OnInit {
       }
     });
   }
+
+  /**
+   * C55.10 Item 1 — tier-real badge: same contract as the dashboard pill.
+   * Maps {@code careerStatus.userDivision} (literal label from the backend)
+   * to one of the existing tier-* CSS classes, with {@code 'tier-default'}
+   * as the fallback for tiers the codebase didn't previously style
+   * (CUARTA, QUINTA, SEXTA, …).
+   */
+  tierCssClass(userDivision: string | null | undefined): string {
+    if (userDivision === 'PRIMERA') return 'tier-primera';
+    if (userDivision === 'SEGUNDA') return 'tier-segunda';
+    if (userDivision === 'TERCERA') return 'tier-tercera';
+    return 'tier-default';
+  }
 }

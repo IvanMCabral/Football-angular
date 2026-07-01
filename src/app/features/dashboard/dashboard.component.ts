@@ -180,6 +180,32 @@ export class DashboardComponent implements OnInit {
   }
 
   /**
+   * C55.10 Item 1 — tier-real badge: map the {@code careerStatus.userDivision}
+   * label (whatever the backend sends) to a CSS class that styles the pill.
+   *
+   * <p>The backend now sends the literal display label
+   * (PRIMERA, SEGUNDA, TERCERA, CUARTA, QUINTA, SEXTA, …) instead of an enum
+   * ID. The front CONSUMES that label directly (no remapping) but needs a
+   * visual style for every possible tier. {@link tierCssClass} returns:
+   * <ul>
+   *   <li>{@code 'tier-primera'} for {@code 'PRIMERA'}</li>
+   *   <li>{@code 'tier-segunda'} for {@code 'SEGUNDA'}</li>
+   *   <li>{@code 'tier-tercera'} for {@code 'TERCERA'}</li>
+   *   <li>{@code 'tier-default'} for any other tier (CUARTA, QUINTA, …) or
+   *       null/undefined — neutral gray-indigo gradient so the pill is still
+   *       legible.</li>
+   * </ul>
+   * Used by the dashboard {@code .user-division-pill} for parity with the
+   * standings page (same component pattern, same CSS contract).
+   */
+  tierCssClass(userDivision: string | null | undefined): string {
+    if (userDivision === 'PRIMERA') return 'tier-primera';
+    if (userDivision === 'SEGUNDA') return 'tier-segunda';
+    if (userDivision === 'TERCERA') return 'tier-tercera';
+    return 'tier-default';
+  }
+
+  /**
    * Load squad data for condition warnings (V24D6G5A)
    */
   private loadSquadData(): void {
