@@ -116,10 +116,13 @@ export class LiveMatchModalsService {
               currentMinute: state.currentMinute ?? 0,
               startingXi,
               bench,
-              // Live snapshot doesn't carry substitutionsRemaining yet;
-              // default to 5 (F2 per-team cap). The backend returns the
-              // real count after each substitution.
-              substitutionsRemaining: 5,
+              // V25D79 (D5): substitutionsRemaining sourced from the live
+              // SSE snapshot. The backend computes it from the SUBSTITUTION
+              // event count with a 5-per-match cap (floored at 0). Falls
+              // back to the cap (5) when the feed hasn't arrived yet — the
+              // modal's isOutOfSubs gate will refuse to register selections
+              // when the counter is 0.
+              substitutionsRemaining: state.substitutionsRemaining ?? 5,
               // V25D63-C23 P0: position-effectiveness feedback para chips SALE/ENTRA.
               effectivenessMap,
               // V25D79: pass formation + per-player live stats + which side

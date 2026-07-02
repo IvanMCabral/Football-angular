@@ -68,6 +68,14 @@
               </div>
               <span class="v25d79-dot-pos">{{ p.position }}</span>
               <span class="v25d79-dot-name">{{ p.displayName }}</span>
+              <!-- V25D79: keep the V25D63 effectiveness badge inside the dot
+                   so the regression tests / REVISOR smoke continue to read
+                   the eff percentage from the data-flow. Color via the
+                   eff-good / eff-warning / eff-bad class on the parent dot.
+              -->
+              <span class="eff-badge"
+                    *ngIf="getEffBadge(p.sessionPlayerId) as effBadge"
+                    [attr.data-testid]="'eff-badge-' + p.sessionPlayerId">{{ effBadge }}</span>
               <span class="v25d79-dot-rating" *ngIf="p.rating != null">{{ p.rating }}</span>
             </div>
           </div>

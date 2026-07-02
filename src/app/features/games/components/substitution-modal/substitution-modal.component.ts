@@ -405,9 +405,9 @@ export class SubstitutionModalComponent {
    * into the MID bucket as a defensive default.
    *
    * <p>This forms a 4-5 row pitch where each row is one click-only lane.
-   * The categorization is positional (not formation-driven) which keeps
-   * the helper formation-independent and matches the F4 UI's position
-   * vocabulary (GK / DEF / MID / WINGER / ATT).
+   * The categorization handles the full position vocabulary the front
+   * consumes (GK / GK-aliases; DEF including CB/LB/RB; MID including
+   * CM/CDM/CAM/LM/RM; WINGER for LW/RW/LWB/RWB; ATT including ST/CF/FW).
    */
   get pitchLines(): PitchLine[] {
     const lines: PitchLine[] = [
@@ -417,9 +417,19 @@ export class SubstitutionModalComponent {
       { category: 'WINGER',  players: [] },
       { category: 'ATT',     players: [] }
     ];
-    const idx: Record<string, number> = { GK: 0, DEF: 1, MID: 2, WINGER: 3, ATT: 4 };
+    const categorize = (pos: string): number => {
+      const p = (pos || 'MID').toUpperCase();
+      if (p === 'GK' || p.startsWith('GK')) return 0;
+      if (p === 'DEF' || p === 'D' || p === 'CB' || p === 'LB' || p === 'RB' || p === 'LWB' || p === 'RWB') return 1;
+      // WINGER check is more specific than the generic MID/ATT checks below.
+      if (p === 'WINGER' || p === 'W' || p === 'LW' || p === 'RW' || p === 'LWF' || p === 'RWF') return 3;
+      if (p === 'MID' || p === 'M' || p === 'CM' || p === 'CDM' || p === 'CAM' || p === 'LM' || p === 'RM') return 2;
+      if (p === 'ATT' || p === 'A' || p === 'ST' || p === 'CF' || p === 'FW' || p === 'LF' || p === 'RF') return 4;
+      // Defensive default for unknown positions.
+      return 2;
+    };
     for (const p of this.data.startingXi) {
-      const bucket = idx[(p.position || 'MID').toUpperCase()] ?? 2;
+      const bucket = categorize(p.position);
       lines[bucket].players.push(p);
     }
     // Drop empty trailing lines so 4-3-3 doesn't render an empty WINGER row.

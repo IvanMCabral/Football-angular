@@ -239,25 +239,29 @@ describe('V25D63-C23 P0: substitution modal shows effectiveness feedback', () =>
     expect(component.getEffBadge('p3')).toBe('75%');
   });
 
-  it('renders eff-good class on starting XI li for p1', () => {
-    const lis = fixture.nativeElement.querySelectorAll('.col-starter .player-list li') as NodeListOf<HTMLElement>;
-    const p1Li = Array.from(lis).find((li: HTMLElement) =>
-      li.querySelector('.player-name')?.textContent?.includes('GK') ?? false);
-    expect(p1Li?.classList.contains('eff-good')).toBeTrue();
+  it('renders eff-good class on starting XI dot for p1', () => {
+    // V25D79: starting XI is rendered as a click-only visual pitch (not a
+    // list). The eff-good / eff-warning / eff-bad classes move from the
+    // <li> to the corresponding .v25d79-pitch-dot so the V25D63 / V25D64
+    // effectiveness-feedback chain keeps working visually.
+    const dots = fixture.nativeElement.querySelectorAll('.v25d79-pitch-dot') as NodeListOf<HTMLElement>;
+    const p1Dot = Array.from(dots).find((dot: HTMLElement) =>
+      dot.querySelector('.v25d79-dot-name')?.textContent?.includes('GK') ?? false);
+    expect(p1Dot?.classList.contains('eff-good')).toBeTrue();
   });
 
-  it('renders eff-warning class on starting XI li for p3', () => {
-    const lis = fixture.nativeElement.querySelectorAll('.col-starter .player-list li') as NodeListOf<HTMLElement>;
-    const p3Li = Array.from(lis).find((li: HTMLElement) =>
-      li.querySelector('.player-name')?.textContent?.includes('CDM-warning') ?? false);
-    expect(p3Li?.classList.contains('eff-warning')).toBeTrue();
+  it('renders eff-warning class on starting XI dot for p3', () => {
+    const dots = fixture.nativeElement.querySelectorAll('.v25d79-pitch-dot') as NodeListOf<HTMLElement>;
+    const p3Dot = Array.from(dots).find((dot: HTMLElement) =>
+      dot.querySelector('.v25d79-dot-name')?.textContent?.includes('CDM-warning') ?? false);
+    expect(p3Dot?.classList.contains('eff-warning')).toBeTrue();
   });
 
-  it('renders eff-badge with percentage inside starting XI li for p1', () => {
-    const lis = fixture.nativeElement.querySelectorAll('.col-starter .player-list li') as NodeListOf<HTMLElement>;
-    const p1Li = Array.from(lis).find((li: HTMLElement) =>
-      li.querySelector('.player-name')?.textContent?.includes('GK') ?? false);
-    const badge = p1Li?.querySelector('.eff-badge');
+  it('renders eff-badge with percentage inside starting XI dot for p1', () => {
+    const dots = fixture.nativeElement.querySelectorAll('.v25d79-pitch-dot') as NodeListOf<HTMLElement>;
+    const p1Dot = Array.from(dots).find((dot: HTMLElement) =>
+      dot.querySelector('.v25d79-dot-name')?.textContent?.includes('GK') ?? false);
+    const badge = p1Dot?.querySelector('.eff-badge');
     expect(badge?.textContent?.trim()).toBe('100%');
   });
 
@@ -273,18 +277,254 @@ describe('V25D63-C23 P0: substitution modal shows effectiveness feedback', () =>
   // V25D64 (Sprint C24) P0: eff-good border verde (#10b981 emerald-500) para
   // simetria visual con eff-warning (amber) y eff-bad (red). El color real se
   // valida en smoke REVISOR; aca validamos que el class eff-good sigue bindeando
-  // en el DOM para los SALE li con eff >= 0.9 (consistency check).
-  it('eff-good class is applied to SALE li with eff >= 0.9 (green border symmetry check)', () => {
-    const lis = fixture.nativeElement.querySelectorAll('.col-starter .player-list li') as NodeListOf<HTMLElement>;
+  // en el DOM para los SALE dots con eff >= 0.9 (consistency check).
+  //
+  // V25D79: query changed from `.col-starter .player-list li` to
+  // `.v25d79-pitch-dot` because the starting XI is now a pitch, not a list.
+  it('eff-good class is applied to SALE dot with eff >= 0.9 (green border symmetry check)', () => {
+    const dots = fixture.nativeElement.querySelectorAll('.v25d79-pitch-dot') as NodeListOf<HTMLElement>;
     // p1 (eff=1.0) y p2 (eff=0.95) deben tener eff-good. p3 (eff=0.75) eff-warning.
-    const goodLis = Array.from(lis).filter((li: HTMLElement) =>
-      li.classList.contains('eff-good'));
-    expect(goodLis.length).toBe(2,
-      `expected 2 SALE li with eff-good (p1 eff=1.0, p2 eff=0.95), got ${goodLis.length}`);
-    // Sanity: los li eff-good no deben colisionar con eff-warning ni eff-bad.
-    goodLis.forEach((li: HTMLElement) => {
-      expect(li.classList.contains('eff-warning')).withContext('eff-good li must not also be eff-warning').toBeFalse();
-      expect(li.classList.contains('eff-bad')).withContext('eff-good li must not also be eff-bad').toBeFalse();
+    const goodDots = Array.from(dots).filter((dot: HTMLElement) =>
+      dot.classList.contains('eff-good'));
+    expect(goodDots.length).toBe(2,
+      `expected 2 SALE dots with eff-good (p1 eff=1.0, p2 eff=0.95), got ${goodDots.length}`);
+    // Sanity: los dots eff-good no deben colisionar con eff-warning ni eff-bad.
+    goodDots.forEach((dot: HTMLElement) => {
+      expect(dot.classList.contains('eff-warning')).withContext('eff-good dot must not also be eff-warning').toBeFalse();
+      expect(dot.classList.contains('eff-bad')).withContext('eff-good dot must not also be eff-bad').toBeFalse();
     });
+  });
+});
+
+/**
+ * V25D79: visual pitch + per-player stats chips + substitutionsRemaining
+ * derived from the SSE-fed MatchState (D3 + D5).
+ *
+ * <p>3 tests per task spec:
+ * <ol>
+ *   <li>{@code rendersStatsChips_whenPlayerRatingsContainsPlayerId} —
+ *       stats chips (goals G, keyPasses KP, yellows Y, fouls F, injuries I)
+ *       render on each dot when {@code data.playerRatings} carries a
+ *       matching entry for that playerId.</li>
+ *   <li>{@code rendersVisualFormationPitch_withLinesGroupedByCategory} —
+ *       the starting XI renders as a click-only visual pitch (not a flat
+ *       list) when {@code data.formation} is present.</li>
+ *   <li>{@code substitutionsRemaining_isSourcedFromData} — the modal
+ *       derives the canConfirm + isOutOfSubs gates from
+ *       {@code data.substitutionsRemaining}, which the service
+ *       propagates from the SSE state's V25D79 field (D5).</li>
+ * </ol>
+ */
+describe('V25D79: visual pitch + stats chips + substitutionsRemaining', () => {
+  let component: SubstitutionModalComponent;
+  let fixture: ComponentFixture<SubstitutionModalComponent>;
+  let engineServiceSpy: jasmine.SpyObj<MatchEngineService>;
+  let dialogRefSpy: jasmine.SpyObj<MatDialogRef<SubstitutionModalComponent>>;
+  let snackBarSpy: jasmine.SpyObj<MatSnackBar>;
+
+  /**
+   * Build a controlled SubstitutionDialogData with playerRatings (per spec
+   * task: "Render stats chips cuando hay eventos con playerId"). Player
+   * states mimic what the back's V24PlayerMatchStatsModel.computeRatings
+   * produces after the engine has run for some minutes:
+   *  - p1 (GK): one goal (rare for a GK but illustrative), one foul.
+   *  - p2 (CB): one yellow card, 3 key passes.
+   *  - p3 (CDM): one injury, no other stats.
+   *  - p4 (ST): 2 goals, 1 key pass, 1 yellow.
+   *  - b1 (CB-bench): 1 goal, but on the bench (no chips since the bench
+   *    is a list not a pitch).
+   */
+  function buildDataWithStats(): SubstitutionDialogData {
+    return {
+      matchId: 'm1',
+      currentMinute: 35,
+      startingXi: [
+        { sessionPlayerId: 'p1', displayName: 'Home GK', position: 'GK', rating: 80, isStarter: true },
+        { sessionPlayerId: 'p2', displayName: 'Home CB', position: 'CB', rating: 75, isStarter: true },
+        { sessionPlayerId: 'p3', displayName: 'Home CDM', position: 'CDM', rating: 78, isStarter: true },
+        { sessionPlayerId: 'p4', displayName: 'Home ST', position: 'ST', rating: 82, isStarter: true }
+      ],
+      bench: [
+        { sessionPlayerId: 'b1', displayName: 'Bench CB', position: 'CB', rating: 70, isStarter: false }
+      ],
+      // V25D79 (D5): 3 subs remaining (2 already used).
+      substitutionsRemaining: 3,
+      formation: '4-3-3',
+      playerRatings: [
+        // GK — defensive stats only (rare for a GK to score, but spec illustrates chip rendering).
+        { playerId: 'p1', playerName: 'Home GK', teamId: 'home', position: 'GK',
+          rating: 7.2, goals: 0, assists: 0, keyPasses: 0, shots: 0,
+          yellowCards: 1, redCards: 0, injuries: 0, fouls: 2,
+          substitutedIn: false, substitutedOut: false },
+        // CB — yellow card + key passes (typical defensive mid).
+        { playerId: 'p2', playerName: 'Home CB', teamId: 'home', position: 'CB',
+          rating: 7.0, goals: 0, assists: 1, keyPasses: 3, shots: 0,
+          yellowCards: 1, redCards: 0, injuries: 0, fouls: 1,
+          substitutedIn: false, substitutedOut: false },
+        // CDM — injury (no other stats).
+        { playerId: 'p3', playerName: 'Home CDM', teamId: 'home', position: 'CDM',
+          rating: 6.5, goals: 0, assists: 0, keyPasses: 0, shots: 0,
+          yellowCards: 0, redCards: 0, injuries: 1, fouls: 0,
+          substitutedIn: false, substitutedOut: false },
+        // ST — prolific: 2 goals + 1 KP + 1 yellow.
+        { playerId: 'p4', playerName: 'Home ST', teamId: 'home', position: 'ST',
+          rating: 8.4, goals: 2, assists: 0, keyPasses: 1, shots: 4,
+          yellowCards: 1, redCards: 0, injuries: 0, fouls: 0,
+          substitutedIn: false, substitutedOut: false }
+      ],
+      managerSide: 'HOME'
+    };
+  }
+
+  beforeEach(async () => {
+    engineServiceSpy = jasmine.createSpyObj('MatchEngineService', ['substitutePlayer']);
+    dialogRefSpy = jasmine.createSpyObj('MatDialogRef', ['close']);
+    snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
+
+    // V25D79: resetTestingModule para que el MAT_DIALOG_DATA del describe
+    // anterior (SAMPLE_DATA / buildDataWithEffectiveness) no contamine este.
+    TestBed.resetTestingModule();
+    await TestBed.configureTestingModule({
+      imports: [SubstitutionModalComponent, NoopAnimationsModule],
+      providers: [
+        { provide: MAT_DIALOG_DATA, useValue: buildDataWithStats() },
+        { provide: MatDialogRef, useValue: dialogRefSpy },
+        { provide: MatSnackBar, useValue: snackBarSpy },
+        { provide: MatchEngineService, useValue: engineServiceSpy },
+        { provide: HttpClient, useValue: jasmine.createSpyObj('HttpClient', ['get', 'post']) }
+      ]
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(SubstitutionModalComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+  });
+
+  it('rendersStatsChips_whenPlayerRatingsContainsPlayerId', () => {
+    // The visual pitch renders each starting-XI dot. p4 (ST) has the richest
+    // chips: 2G + 1KP + 1Y. Verifying via data-testid leaves a stable hook
+    // for REVISOR smoke checks too.
+    const stChip = fixture.nativeElement.querySelector(
+      '[data-testid="chip-goals-p4"]') as HTMLElement;
+    expect(stChip).withContext('ST goals chip should render for player p4').not.toBeNull();
+    expect(stChip.textContent?.trim()).toBe('2G');
+
+    const stKp = fixture.nativeElement.querySelector(
+      '[data-testid="chip-kp-p4"]') as HTMLElement;
+    expect(stKp?.textContent?.trim()).toBe('1KP');
+
+    const stYc = fixture.nativeElement.querySelector(
+      '[data-testid="chip-yc-p4"]') as HTMLElement;
+    expect(stYc?.textContent?.trim()).toBe('1Y');
+
+    // p2 (CB) — yellow + keyPasses (no goals, no injuries, no fouls in this setup for p2's KPs).
+    const cbKp = fixture.nativeElement.querySelector(
+      '[data-testid="chip-kp-p2"]') as HTMLElement;
+    expect(cbKp?.textContent?.trim()).toBe('3KP');
+
+    // p3 (CDM) — injury (1I).
+    const cdmInj = fixture.nativeElement.querySelector(
+      '[data-testid="chip-inj-p3"]') as HTMLElement;
+    expect(cdmInj?.textContent?.trim()).toBe('1I');
+
+    // Bench players must NOT render chip strips (only the visual pitch does).
+    const benchGoalsChip = fixture.nativeElement.querySelector('[data-testid="chip-goals-b1"]');
+    expect(benchGoalsChip).withContext('bench player chips are intentionally not rendered').toBeNull();
+  });
+
+  it('rendersVisualFormationPitch_withLinesGroupedByCategory', () => {
+    // Per spec D4: visual formation click-only, NO drag. Each pitch-line
+    // should have at least one dot; the GK line should be a single dot
+    // (GK category always 1); DEF line should hold any CB/CDM players;
+    // ATT line should hold any ST/CF players. The lines are categorized,
+    // not formation-line-counts (4-4-2 → 4 lines, etc.) — this is the
+    // V25D79 simplification documented in pitchLines getter.
+    const pitchLines = fixture.nativeElement.querySelectorAll(
+      '.v25d79-pitch .v25d79-pitch-line');
+    expect(pitchLines.length).withContext('pitch should have at least one line').toBeGreaterThan(0);
+
+    // GK line should be a single row holding p1 (GK).
+    const gkLine = Array.from(pitchLines as NodeListOf<HTMLElement>).find(
+      line => line.getAttribute('data-category') === 'GK');
+    expect(gkLine).withContext('GK line should be present').not.toBeNull();
+    const gkDots = gkLine!.querySelectorAll('.v25d79-pitch-dot');
+    expect(gkDots.length).toBe(1, 'GK line should hold exactly 1 GK player');
+
+    // ATT line should hold p4 (ST).
+    const attLine = Array.from(pitchLines as NodeListOf<HTMLElement>).find(
+      line => line.getAttribute('data-category') === 'ATT');
+    expect(attLine).withContext('ATT line should be present (ST >= 1)').not.toBeNull();
+    const attDots = attLine!.querySelectorAll('.v25d79-pitch-dot');
+    expect(attDots.length).toBeGreaterThanOrEqual(1, 'ATT line should hold p4 (ST)');
+
+    // All dots must be clickable (click-only, no drag). The (click) handler
+    // is selectOff — verify clicking a dot sets playerOffId.
+    const p4Dot = attLine!.querySelector(
+      '.v25d79-pitch-dot[aria-label*="Home ST"]') as HTMLElement;
+    expect(p4Dot).withContext('ST player p4 dot should be in the ATT line').not.toBeNull();
+    p4Dot.click();
+    // OnPush component — re-run change detection so the [class.selected]
+    // binding re-evaluates with the new playerOffId.
+    fixture.detectChanges();
+    expect(component.playerOffId).toBe('p4', 'clicking the dot must set playerOffId = p4');
+
+    // The selected dot must carry the .selected class.
+    expect(p4Dot.classList.contains('selected'))
+      .withContext('selected dot must carry the .selected class for visual feedback').toBeTrue();
+
+    // Empty WINGER row must NOT render — sanity for the empty-line filter.
+    const wingerLine = Array.from(pitchLines as NodeListOf<HTMLElement>).find(
+      line => line.getAttribute('data-category') === 'WINGER');
+    expect(wingerLine).withContext('WINGER line is filtered out when no WINGER players').toBeUndefined();
+  });
+
+  it('substitutionsRemaining_isSourcedFromData', () => {
+    // V25D79 (D5): substitutionsRemaining comes from the live SSE state
+    // (computed by MatchSession.adaptV24Snapshot as max(0, 5 - SUBSTITUTION
+    // events)). The modal uses it to gate canConfirm + isOutOfSubs. The
+    // service sources it from `state.substitutionsRemaining` and falls back
+    // to 5 when the SSE feed hasn't arrived.
+    //
+    // This test rebuilds the TestBed with TWO distinct dialog-data shapes:
+    // one with subs=3 (positive case), one with subs=0 (zero case). Each
+    // gets a fresh component instance so the OnPush change-detection
+    // binds reliably on first render.
+    expect(component.isOutOfSubs).withContext('3 remaining (initial) → NOT out of subs').toBeFalse();
+
+    component.selectOff({ sessionPlayerId: 'p4', displayName: 'Home ST',
+      position: 'ST', rating: 82, isStarter: true } as SubModalPlayer);
+    component.selectOn({ sessionPlayerId: 'b1', displayName: 'Bench CB',
+      position: 'CB', rating: 70, isStarter: false } as SubModalPlayer);
+    expect(component.canConfirm).withContext('selection is valid + subs remaining → canConfirm = true').toBeTrue();
+
+    // Rebuild the test bed with substitutionsRemaining=0 so the modal
+    // renders the .is-zero class on first detection (no mutation, no CD
+    // workaround). Each rebuild yields a clean component instance + clean
+    // data reference.
+    TestBed.resetTestingModule();
+    const zeroSubsData = { ...buildDataWithStats(), substitutionsRemaining: 0 };
+    TestBed.configureTestingModule({
+      imports: [SubstitutionModalComponent, NoopAnimationsModule],
+      providers: [
+        { provide: MAT_DIALOG_DATA, useValue: zeroSubsData },
+        { provide: MatDialogRef, useValue: jasmine.createSpyObj('MatDialogRef', ['close']) },
+        { provide: MatSnackBar, useValue: jasmine.createSpyObj('MatSnackBar', ['open']) },
+        { provide: MatchEngineService, useValue: jasmine.createSpyObj('MatchEngineService', ['substitutePlayer']) },
+        { provide: HttpClient, useValue: jasmine.createSpyObj('HttpClient', ['get', 'post']) }
+      ]
+    });
+    const zeroFixture = TestBed.createComponent(SubstitutionModalComponent);
+    zeroFixture.detectChanges();
+    const zeroComponent = zeroFixture.componentInstance;
+
+    expect(zeroComponent.isOutOfSubs).withContext('0 remaining → isOutOfSubs must be true on fresh render').toBeTrue();
+    expect(zeroComponent.canConfirm).withContext('canConfirm must be false when 0 subs remaining').toBeFalse();
+
+    // Also verify the styled remaining-tag carries the is-zero class for
+    // visual feedback (the user-facing indicator).
+    const remainingTag = zeroFixture.nativeElement.querySelector('.v25d79-remaining') as HTMLElement;
+    expect(remainingTag).not.toBeNull();
+    expect(remainingTag.classList.contains('is-zero'))
+      .withContext('is-zero class must be applied when substitutionsRemaining = 0').toBeTrue();
   });
 });
