@@ -337,20 +337,29 @@
   <div *ngIf="error$ | async as error" class="error">{{error}}</div>
 
   <!-- V24D11 UX-3: sticky CTA bar visible cuando hay lineup armado -->
-  <div *ngIf="(lineup$ | async) as lineup"
-       [hidden]="!lineup?.players?.length"
-       class="sticky-confirm-bar">
-    <span class="sticky-confirm-info">
-      ⚽ {{ lineupSlotsCount }} / 11 jugadores
-    </span>
-    <button
-      (click)="onConfirmLineup()"
-      [disabled]="(lineupLoading$ | async) || lineupSlotsCount < 11"
-      [title]="lineupSlotsCount < 11
-               ? 'Necesitás armar 11/11'
-               : 'Confirmar y Jugar'"
-      class="btn-confirm-lineup">
-      ✅ Confirmar y Jugar
-    </button>
+  <!-- V25D78-C55.13 BUG-2 (BUG_V25D78_CONFIRMAR_YUGAR_FOOTER_PERSIST_FINISHED):
+       Iván pidió que el footer "0/11 jugadores + Confirmar y Jugar disabled"
+       NO aparezca en careerPhase=FINISHED — en ese estado el único botón
+       visible debe ser el verde "Continuar Carrera" (dentro del bloque
+       tournament-ended arriba). Sin este guard, los usuarios veían dos CTAs
+       contradictorios: el verde "Continuar Carrera" arriba y el deshabilitado
+       "Confirmar y Jugar" abajo. -->
+  <div *ngIf="(careerStatus$ | async)?.careerPhase !== 'FINISHED'">
+    <div *ngIf="(lineup$ | async) as lineup"
+         [hidden]="!lineup?.players?.length"
+         class="sticky-confirm-bar">
+      <span class="sticky-confirm-info">
+        ⚽ {{ lineupSlotsCount }} / 11 jugadores
+      </span>
+      <button
+        (click)="onConfirmLineup()"
+        [disabled]="(lineupLoading$ | async) || lineupSlotsCount < 11"
+        [title]="lineupSlotsCount < 11
+                 ? 'Necesitás armar 11/11'
+                 : 'Confirmar y Jugar'"
+        class="btn-confirm-lineup">
+        ✅ Confirmar y Jugar
+      </button>
+    </div>
   </div>
 </div>

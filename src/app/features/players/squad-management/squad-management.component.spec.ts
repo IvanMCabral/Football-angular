@@ -928,4 +928,75 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
       expect(httpClientSpy.post).not.toHaveBeenCalled();
     });
   });
+
+  // ========== V25D78-C55.13 BUG-2: sticky-confirm-bar hidden when careerPhase=FINISHED ==========
+  //
+  // BUG-2 (BUG_V25D78_CONFIRMAR_YUGAR_FOOTER_PERSIST_FINISHED):
+  //   Footer .sticky-confirm-bar con "0 / 11 jugadores" + "Confirmar y
+  //   Jugar" disabled persiste visible en careerPhase=FINISHED. Iván pidió
+  //   que en FINISHED el único botón visible sea "Continuar Carrera" (verde),
+  //   no el footer de confirmar. Fix: envolver .sticky-confirm-bar con un
+  //   *ngIf que lo oculta cuando careerPhase === 'FINISHED'.
+
+  describe('V25D78-C55.13 BUG-2: sticky-confirm-bar hidden when careerPhase=FINISHED', () => {
+    it('should NOT render .sticky-confirm-bar when careerPhase=FINISHED', () => {
+      // V25D78-C55.13 BUG-2: con careerPhase=FINISHED, el footer .sticky-confirm-bar
+      // NO debe renderizar (mostraría "Confirmar y Jugar" disabled). Iván pidió
+      // que el único botón visible en FINISHED sea el verde "Continuar Carrera"
+      // (que vive dentro del bloque tournament-ended arriba en el template).
+      //
+      // Para que el test pruebe lo correcto: simulamos un lineup válido con
+      // players y slots (sin esto, el bar estaría hidden via [hidden] por el
+      // `!lineup?.players?.length` aunque careerPhase no sea FINISHED).
+      component.careerStatus$ = of({
+        ...CAREER_STATUS_RESPONSE,
+        careerPhase: 'FINISHED',
+        season: 2,
+        currentRound: 38
+      } as any);
+      component.lineupSubject$.next({
+        formation: '4-4-2',
+        players: ELEVEN_PLAYERS,
+        confirmed: false,
+        warnings: [],
+        slots: ELEVEN_PLAYERS.map((_, i) => ({
+          playerId: `p${i}`,
+          subdivisionId: `S${String(i).padStart(2, '0')}-1`
+        }))
+      });
+      fixture.detectChanges();
+
+      const stickyBar = fixture.nativeElement.querySelector('.sticky-confirm-bar');
+      expect(stickyBar)
+        .withContext('sticky-confirm-bar must NOT render when careerPhase=FINISHED')
+        .toBeNull();
+    });
+
+    it('control: SHOULD render .sticky-confirm-bar when careerPhase=PRE_MATCH with valid lineup', () => {
+      // V25D78-C55.13 BUG-2 control test: en careerPhase=PRE_MATCH con un lineup
+      // válido (11 players + 11 slots), el .sticky-confirm-bar SÍ debe
+      // renderizar. Esto confirma que el fix BUG-2 (hide en FINISHED) no rompe
+      // el render normal en otros careerPhases.
+      component.careerStatus$ = of({
+        ...CAREER_STATUS_RESPONSE,
+        careerPhase: 'PRE_MATCH'
+      } as any);
+      component.lineupSubject$.next({
+        formation: '4-4-2',
+        players: ELEVEN_PLAYERS,
+        confirmed: false,
+        warnings: [],
+        slots: ELEVEN_PLAYERS.map((_, i) => ({
+          playerId: `p${i}`,
+          subdivisionId: `S${String(i).padStart(2, '0')}-1`
+        }))
+      });
+      fixture.detectChanges();
+
+      const stickyBar = fixture.nativeElement.querySelector('.sticky-confirm-bar');
+      expect(stickyBar)
+        .withContext('sticky-confirm-bar SHOULD render when careerPhase=PRE_MATCH with 11/11 lineup')
+        .not.toBeNull();
+    });
+  });
 });
