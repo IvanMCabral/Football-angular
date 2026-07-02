@@ -604,6 +604,16 @@ openVisualEditor(): void {
             // response.season produced the literal "undefined" in the alert.
             const newSeason = response.newSeason ?? response.season ?? '?';
             alert('🏆 ¡Nueva temporada ' + newSeason + ' iniciada!');
+            // V25D78-C55.13 BUG-1 (BUG_V25D78_CONTINUE_CAREER_SQUAD_BUTTON_NOOP):
+            // Backend successfully creates T3 (careerPhase=PRE_MATCH) but the
+            // squad-management component keeps showing the stale T2 FINISHED
+            // state because the ngOnInit observables (careerStatus$, team$,
+            // squad$, lineup$) were bound once at mount and the alert blocks
+            // the user from perceiving the change. The /dashboard button
+            // works because it uses router.navigate(['/squad']) which forces
+            // re-instantiation. We mirror that behavior here with a full page
+            // reload — simplest and most robust fix for a 2-button component.
+            this.reloadPage();
           } else {
             alert('Error: ' + response.message);
           }
@@ -613,6 +623,17 @@ openVisualEditor(): void {
           alert(err.error?.message || 'Error al iniciar nueva temporada');
         }
       });
+    }
+
+    /**
+     * V25D78-C55.13 BUG-1: thin wrapper around {@code window.location.reload()}.
+     * Indirected so spec tests can spyOn it via {@code spyOn(component, 'reloadPage')}
+     * without hitting jsdom's non-writable {@code window.location.reload} property
+     * (which throws "reload is not declared writable or has no setter" on
+     * {@code spyOn(window.location, 'reload')}).
+     */
+    protected reloadPage(): void {
+      window.location.reload();
     }
 
     viewPalmares(): void {

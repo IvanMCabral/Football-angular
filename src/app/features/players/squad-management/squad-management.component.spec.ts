@@ -863,4 +863,69 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
         .not.toContain('Mínimo 7 jugadores');
     });
   });
+
+  // ========== V25D78-C55.13 BUG-1: continueToNewSeason reloads the page on success ==========
+  //
+  // BUG-1 (BUG_V25D78_CONTINUE_CAREER_SQUAD_BUTTON_NOOP):
+  //   Click "Continuar Carrera" verde en /squad → backend crea T3 OK pero
+  //   la UI queda stale (T2 Finalizada sigue visible). El botón del
+  //   /dashboard funciona porque hace router.navigate(['/squad']). El fix
+  //   agrega reloadPage() post-alert en continueToNewSeason() — wrapper
+  //   alrededor de window.location.reload() para que sea testeable
+  //   (jsdom hace reload non-writable, spyOn(window.location, 'reload')
+  //   tira "reload is not declared writable or has no setter").
+
+  describe('V25D78-C55.13 BUG-1: continueToNewSeason reloads the page on success', () => {
+    it('should call reloadPage() after /career/continue returns success', () => {
+      // V25D78-C55.13 BUG-1: el backend crea T3 (careerPhase=PRE_MATCH)
+      // correctamente, pero sin reload el component squad-management queda
+      // mostrando el estado stale de T2. El dashboard button funciona porque
+      // hace router.navigate(['/squad']) que re-instancia. Acá mirroreamos
+      // ese comportamiento con reloadPage() en el mismo handler.
+      //
+      // Spyamos el wrapper reloadPage() (no window.location.reload directo)
+      // porque jsdom hace reload non-writable — spyOn(window.location, 'reload')
+      // tira "reload is not declared writable or has no setter".
+      const reloadSpy = spyOn(component as any, 'reloadPage');
+      // Auto-accept el confirm() inicial
+      spyOn(window, 'confirm').and.returnValue(true);
+      // Stub alert() (jsdom lo permite sin pop-up nativo; explícito por defensa)
+      spyOn(window, 'alert');
+
+      // Override el http.post del beforeEach para devolver success en /career/continue
+      const httpClientSpy = TestBed.inject(HttpClient) as jasmine.SpyObj<HttpClient>;
+      httpClientSpy.post.and.callFake((url: string) => {
+        if (String(url).includes('/career/continue')) {
+          return of({ success: true, newSeason: 3 } as any);
+        }
+        return of(null as any);
+      });
+
+      component.continueToNewSeason();
+
+      // El reload debe haberse invocado exactamente 1 vez
+      expect(reloadSpy)
+        .withContext('reloadPage() must be called after successful /career/continue')
+        .toHaveBeenCalled();
+      expect(reloadSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('should NOT call reloadPage() when user cancels the confirm() dialog', () => {
+      // V25D78-C55.13 BUG-1 negative case: si el usuario cancela el confirm,
+      // no se llama al endpoint ni se recarga la página. Es solo el branch
+      // de "no quiero iniciar nueva temporada".
+      const reloadSpy = spyOn(component as any, 'reloadPage');
+      spyOn(window, 'confirm').and.returnValue(false);
+
+      const httpClientSpy = TestBed.inject(HttpClient) as jasmine.SpyObj<HttpClient>;
+      // Asegurar que post NO se llama — spy por defecto no devuelve nada y
+      // tiraríamos error si se invocara
+      httpClientSpy.post.calls.reset();
+
+      component.continueToNewSeason();
+
+      expect(reloadSpy).not.toHaveBeenCalled();
+      expect(httpClientSpy.post).not.toHaveBeenCalled();
+    });
+  });
 });
