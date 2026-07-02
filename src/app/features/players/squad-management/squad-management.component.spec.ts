@@ -863,4 +863,140 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
         .not.toContain('Mínimo 7 jugadores');
     });
   });
+
+  // ========== V25D78-C55.13 BUG-1: continueToNewSeason reloads the page on success ==========
+  //
+  // BUG-1 (BUG_V25D78_CONTINUE_CAREER_SQUAD_BUTTON_NOOP):
+  //   Click "Continuar Carrera" verde en /squad → backend crea T3 OK pero
+  //   la UI queda stale (T2 Finalizada sigue visible). El botón del
+  //   /dashboard funciona porque hace router.navigate(['/squad']). El fix
+  //   agrega reloadPage() post-alert en continueToNewSeason() — wrapper
+  //   alrededor de window.location.reload() para que sea testeable
+  //   (jsdom hace reload non-writable, spyOn(window.location, 'reload')
+  //   tira "reload is not declared writable or has no setter").
+
+  describe('V25D78-C55.13 BUG-1: continueToNewSeason reloads the page on success', () => {
+    it('should call reloadPage() after /career/continue returns success', () => {
+      // V25D78-C55.13 BUG-1: el backend crea T3 (careerPhase=PRE_MATCH)
+      // correctamente, pero sin reload el component squad-management queda
+      // mostrando el estado stale de T2. El dashboard button funciona porque
+      // hace router.navigate(['/squad']) que re-instancia. Acá mirroreamos
+      // ese comportamiento con reloadPage() en el mismo handler.
+      //
+      // Spyamos el wrapper reloadPage() (no window.location.reload directo)
+      // porque jsdom hace reload non-writable — spyOn(window.location, 'reload')
+      // tira "reload is not declared writable or has no setter".
+      const reloadSpy = spyOn(component as any, 'reloadPage');
+      // Auto-accept el confirm() inicial
+      spyOn(window, 'confirm').and.returnValue(true);
+      // Stub alert() (jsdom lo permite sin pop-up nativo; explícito por defensa)
+      spyOn(window, 'alert');
+
+      // Override el http.post del beforeEach para devolver success en /career/continue
+      const httpClientSpy = TestBed.inject(HttpClient) as jasmine.SpyObj<HttpClient>;
+      httpClientSpy.post.and.callFake((url: string) => {
+        if (String(url).includes('/career/continue')) {
+          return of({ success: true, newSeason: 3 } as any);
+        }
+        return of(null as any);
+      });
+
+      component.continueToNewSeason();
+
+      // El reload debe haberse invocado exactamente 1 vez
+      expect(reloadSpy)
+        .withContext('reloadPage() must be called after successful /career/continue')
+        .toHaveBeenCalled();
+      expect(reloadSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('should NOT call reloadPage() when user cancels the confirm() dialog', () => {
+      // V25D78-C55.13 BUG-1 negative case: si el usuario cancela el confirm,
+      // no se llama al endpoint ni se recarga la página. Es solo el branch
+      // de "no quiero iniciar nueva temporada".
+      const reloadSpy = spyOn(component as any, 'reloadPage');
+      spyOn(window, 'confirm').and.returnValue(false);
+
+      const httpClientSpy = TestBed.inject(HttpClient) as jasmine.SpyObj<HttpClient>;
+      // Asegurar que post NO se llama — spy por defecto no devuelve nada y
+      // tiraríamos error si se invocara
+      httpClientSpy.post.calls.reset();
+
+      component.continueToNewSeason();
+
+      expect(reloadSpy).not.toHaveBeenCalled();
+      expect(httpClientSpy.post).not.toHaveBeenCalled();
+    });
+  });
+
+  // ========== V25D78-C55.13 BUG-2: sticky-confirm-bar hidden when careerPhase=FINISHED ==========
+  //
+  // BUG-2 (BUG_V25D78_CONFIRMAR_YUGAR_FOOTER_PERSIST_FINISHED):
+  //   Footer .sticky-confirm-bar con "0 / 11 jugadores" + "Confirmar y
+  //   Jugar" disabled persiste visible en careerPhase=FINISHED. Iván pidió
+  //   que en FINISHED el único botón visible sea "Continuar Carrera" (verde),
+  //   no el footer de confirmar. Fix: envolver .sticky-confirm-bar con un
+  //   *ngIf que lo oculta cuando careerPhase === 'FINISHED'.
+
+  describe('V25D78-C55.13 BUG-2: sticky-confirm-bar hidden when careerPhase=FINISHED', () => {
+    it('should NOT render .sticky-confirm-bar when careerPhase=FINISHED', () => {
+      // V25D78-C55.13 BUG-2: con careerPhase=FINISHED, el footer .sticky-confirm-bar
+      // NO debe renderizar (mostraría "Confirmar y Jugar" disabled). Iván pidió
+      // que el único botón visible en FINISHED sea el verde "Continuar Carrera"
+      // (que vive dentro del bloque tournament-ended arriba en el template).
+      //
+      // Para que el test pruebe lo correcto: simulamos un lineup válido con
+      // players y slots (sin esto, el bar estaría hidden via [hidden] por el
+      // `!lineup?.players?.length` aunque careerPhase no sea FINISHED).
+      component.careerStatus$ = of({
+        ...CAREER_STATUS_RESPONSE,
+        careerPhase: 'FINISHED',
+        season: 2,
+        currentRound: 38
+      } as any);
+      component.lineupSubject$.next({
+        formation: '4-4-2',
+        players: ELEVEN_PLAYERS,
+        confirmed: false,
+        warnings: [],
+        slots: ELEVEN_PLAYERS.map((_, i) => ({
+          playerId: `p${i}`,
+          subdivisionId: `S${String(i).padStart(2, '0')}-1`
+        }))
+      });
+      fixture.detectChanges();
+
+      const stickyBar = fixture.nativeElement.querySelector('.sticky-confirm-bar');
+      expect(stickyBar)
+        .withContext('sticky-confirm-bar must NOT render when careerPhase=FINISHED')
+        .toBeNull();
+    });
+
+    it('control: SHOULD render .sticky-confirm-bar when careerPhase=PRE_MATCH with valid lineup', () => {
+      // V25D78-C55.13 BUG-2 control test: en careerPhase=PRE_MATCH con un lineup
+      // válido (11 players + 11 slots), el .sticky-confirm-bar SÍ debe
+      // renderizar. Esto confirma que el fix BUG-2 (hide en FINISHED) no rompe
+      // el render normal en otros careerPhases.
+      component.careerStatus$ = of({
+        ...CAREER_STATUS_RESPONSE,
+        careerPhase: 'PRE_MATCH'
+      } as any);
+      component.lineupSubject$.next({
+        formation: '4-4-2',
+        players: ELEVEN_PLAYERS,
+        confirmed: false,
+        warnings: [],
+        slots: ELEVEN_PLAYERS.map((_, i) => ({
+          playerId: `p${i}`,
+          subdivisionId: `S${String(i).padStart(2, '0')}-1`
+        }))
+      });
+      fixture.detectChanges();
+
+      const stickyBar = fixture.nativeElement.querySelector('.sticky-confirm-bar');
+      expect(stickyBar)
+        .withContext('sticky-confirm-bar SHOULD render when careerPhase=PRE_MATCH with 11/11 lineup')
+        .not.toBeNull();
+    });
+  });
 });
