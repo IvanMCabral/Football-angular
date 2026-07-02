@@ -1,4 +1,30 @@
 /**
+ * V25D79: per-player live stats used by the F4 substitution modal.
+ *
+ * <p>Mirrors {@code com.footballmanager.application.service.simulation.v24.V24PlayerMatchRatingDto}
+ * field-for-field. Serialized as part of the SSE payload — the modal uses
+ * this to render the chips (goals, keyPasses, yellowCards, fouls, injuries)
+ * for each player on the visual pitch.
+ */
+export interface V24LivePlayerRating {
+  playerId: string;
+  playerName: string;
+  teamId: string;
+  position: string;
+  rating: number;
+  goals: number;
+  assists: number;
+  keyPasses: number;
+  shots: number;
+  yellowCards: number;
+  redCards: number;
+  injuries: number;
+  fouls: number;
+  substitutedIn: boolean;
+  substitutedOut: boolean;
+}
+
+/**
  * MatchState - Estado del partido en tiempo real
  */
 export interface MatchState {
@@ -39,6 +65,27 @@ export interface MatchState {
   cards: any[];
   substitutions: any[];
   players: any[];
+  /**
+   * V25D79: per-player live stats for the home team. One entry per player
+   * (starter + bench combined). Computed by the backend on every SSE tick
+   * via {@code V24PlayerMatchStatsModel.computeRatings()} applied to the
+   * LIVE partial timeline (events up to currentMinute). The modal reads
+   * this when the manager team is the home side.
+   */
+  homePlayerRatings?: V24LivePlayerRating[];
+  /**
+   * V25D79: per-player live stats for the away team. Mirrors
+   * {@code homePlayerRatings} for the away side. The modal reads this when
+   * the manager team is the away side.
+   */
+  awayPlayerRatings?: V24LivePlayerRating[];
+  /**
+   * V25D79 (D5): subs the manager team can still make. Source of truth
+   * (the backend computes it from the SUBSTITUTION event count and the
+   * 5-per-match cap, floors at 0). Defaults to 5 when the SSE feed is
+   * not yet established or running on the legacy path.
+   */
+  substitutionsRemaining?: number;
 }
 
 /**

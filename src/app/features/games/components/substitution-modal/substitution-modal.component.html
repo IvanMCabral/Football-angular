@@ -16,36 +16,85 @@
       <span>{{ errorMsg }}</span>
     </div>
 
-    <!-- LIVE-MATCH-F5.2 BUG-014: 3-column CSS grid layout.
-         Desktop:  Starting XI | Bench  | Acciones
-         Mobile:   Stack vertical (single column). -->
+    <!-- V25D79: 2-column layout — visual pitch (left) + bench list (right).
+         Replaces the pre-V25D79 3-column starter-list layout. Starter list
+         is rendered as a click-only visual pitch with per-player stats
+         chips sourced from data.playerRatings. Bench stays as a simple
+         list (no canvas, no chips) so the swap-in column stays scannable.
+    -->
     <div class="substitution-modal-grid">
-      <!-- Starting XI (left) -->
-      <section class="col col-starter" data-area="starting">
-        <h3>Sale</h3>
-        <ul class="player-list" role="listbox" aria-label="Starting XI">
-          <li *ngFor="let p of data.startingXi; trackBy: trackByPlayer"
-              role="option"
-              [class.selected]="playerOffId === p.sessionPlayerId"
-              [class.eff-good]="getEffClass(p.sessionPlayerId) === 'eff-good'"
-              [class.eff-warning]="getEffClass(p.sessionPlayerId) === 'eff-warning'"
-              [class.eff-bad]="getEffClass(p.sessionPlayerId) === 'eff-bad'"
-              [attr.aria-selected]="playerOffId === p.sessionPlayerId"
-              (click)="selectOff(p)"
-              (keydown.enter)="selectOff(p)"
-              tabindex="0">
-            <span class="pos-badge">{{ p.position }}</span>
-            <span class="player-name">{{ p.displayName }}</span>
-            <span class="player-ovr" *ngIf="p.rating != null">{{ p.rating }}</span>
-            <span class="eff-badge" *ngIf="getEffBadge(p.sessionPlayerId) as badge">{{ badge }}</span>
-            <span *ngIf="playerOffId === p.sessionPlayerId" class="x-mark" (click)="clearOff($event)">×</span>
-          </li>
-        </ul>
+      <!-- Visual pitch (manager team starting XI + stats chips) -->
+      <section class="col col-starter" data-area="starting" aria-label="Visual pitch">
+        <h3>Selecciona el jugador que sale (click)</h3>
+        <div class="v25d79-pitch" role="img" [attr.aria-label]="'Visual pitch formation ' + (data.formation || '4-4-2')">
+          <div class="v25d79-pitch-line"
+               *ngFor="let line of pitchLines; trackBy: trackByDot"
+               [attr.data-category]="line.category">
+            <div class="v25d79-pitch-dot"
+                 *ngFor="let p of line.players; trackBy: trackByDot"
+                 [class]="dotClass(line.category)"
+                 [class.selected]="playerOffId === p.sessionPlayerId"
+                 [class.eff-good]="getEffClass(p.sessionPlayerId) === 'eff-good'"
+                 [class.eff-warning]="getEffClass(p.sessionPlayerId) === 'eff-warning'"
+                 [class.eff-bad]="getEffClass(p.sessionPlayerId) === 'eff-bad'"
+                 [class.is-disabled]="isOutOfSubs"
+                 role="button"
+                 tabindex="0"
+                 [attr.aria-pressed]="playerOffId === p.sessionPlayerId"
+                 [attr.aria-label]="p.position + ' ' + p.displayName + ', rating ' + p.rating"
+                 (click)="selectOff(p)"
+                 (keydown.enter)="selectOff(p)">
+              <div class="v25d79-dot-chips" *ngIf="hasAnyChip(p.sessionPlayerId)">
+                <span class="v25d79-chip v25d79-chip-goals"
+                      *ngIf="getRating(p.sessionPlayerId) as r"
+                      [hidden]="r.goals === 0"
+                      [attr.data-testid]="'chip-goals-' + r.playerId">{{ r.goals }}G</span>
+                <span class="v25d79-chip v25d79-chip-key-passes"
+                      *ngIf="getRating(p.sessionPlayerId) as r"
+                      [hidden]="r.keyPasses === 0"
+                      [attr.data-testid]="'chip-kp-' + r.playerId">{{ r.keyPasses }}KP</span>
+                <span class="v25d79-chip v25d79-chip-yellows"
+                      *ngIf="getRating(p.sessionPlayerId) as r"
+                      [hidden]="r.yellowCards === 0"
+                      [attr.data-testid]="'chip-yc-' + r.playerId">{{ r.yellowCards }}Y</span>
+                <span class="v25d79-chip v25d79-chip-fouls"
+                      *ngIf="getRating(p.sessionPlayerId) as r"
+                      [hidden]="r.fouls === 0"
+                      [attr.data-testid]="'chip-fl-' + r.playerId">{{ r.fouls }}F</span>
+                <span class="v25d79-chip v25d79-chip-injuries"
+                      *ngIf="getRating(p.sessionPlayerId) as r"
+                      [hidden]="r.injuries === 0"
+                      [attr.data-testid]="'chip-inj-' + r.playerId">{{ r.injuries }}I</span>
+              </div>
+              <span class="v25d79-dot-pos">{{ p.position }}</span>
+              <span class="v25d79-dot-name">{{ p.displayName }}</span>
+              <!-- V25D79: keep the V25D63 effectiveness badge inside the dot
+                   so the regression tests / REVISOR smoke continue to read
+                   the eff percentage from the data-flow. Color via the
+                   eff-good / eff-warning / eff-bad class on the parent dot.
+              -->
+              <span class="eff-badge"
+                    *ngIf="getEffBadge(p.sessionPlayerId) as effBadge"
+                    [attr.data-testid]="'eff-badge-' + p.sessionPlayerId">{{ effBadge }}</span>
+              <span class="v25d79-dot-rating" *ngIf="p.rating != null">{{ p.rating }}</span>
+            </div>
+          </div>
+        </div>
+        <!-- Selection summary (manager can see what they picked at a glance) -->
+        <div class="v25d79-actions-summary" *ngIf="playerOff">
+          <span class="label">Sale:</span>
+          <span class="name">{{ playerOff.displayName }}</span>
+          <span class="arrow">→</span>
+          <span class="name" *ngIf="playerOn; else noOnYet">{{ playerOn.displayName }}</span>
+          <ng-template #noOnYet>
+            <span class="label">Selecciona un suplente →</span>
+          </ng-template>
+        </div>
       </section>
 
-      <!-- Bench (center) -->
+      <!-- Bench (right) — simple list, no canvas / no chips -->
       <section class="col col-bench" data-area="bench">
-        <h3>Entra</h3>
+        <h3>Selecciona el suplente que entra</h3>
         <ul class="player-list" role="listbox" aria-label="Bench">
           <li *ngFor="let p of data.bench; trackBy: trackByPlayer"
               role="option"
@@ -64,30 +113,11 @@
             <span *ngIf="playerOnId === p.sessionPlayerId" class="x-mark" (click)="clearOn($event)">×</span>
           </li>
         </ul>
-      </section>
 
-      <!-- Acciones (right) — shows current selection + hint -->
-      <section class="col col-actions" data-area="actions">
-        <h3>Acciones</h3>
-        <div class="actions-summary" *ngIf="playerOff || playerOn; else noSelection">
-          <div *ngIf="playerOff" class="action-row action-row-off">
-            <span class="action-label">Sale</span>
-            <span class="action-name">{{ playerOff.displayName }}</span>
-            <span class="action-pos">{{ playerOff.position }}</span>
-          </div>
-          <div class="arrow-inline" aria-hidden="true">→</div>
-          <div *ngIf="playerOn" class="action-row action-row-on">
-            <span class="action-label">Entra</span>
-            <span class="action-name">{{ playerOn.displayName }}</span>
-            <span class="action-pos">{{ playerOn.position }}</span>
-          </div>
-        </div>
-        <ng-template #noSelection>
-          <p class="actions-hint">Selecciona un jugador del equipo titular y uno del banco.</p>
-        </ng-template>
-        <div class="actions-footer">
-          <span class="remaining-tag">
-            Restantes: <b>{{ data.substitutionsRemaining }}</b>
+        <div class="v25d79-actions-summary">
+          <span class="label">Restantes:</span>
+          <span class="v25d79-remaining" [class.is-zero]="isOutOfSubs">
+            <b>{{ data.substitutionsRemaining }}</b> sustituciones
           </span>
         </div>
       </section>
@@ -99,7 +129,6 @@
     </div>
   </mat-dialog-content>
 
-  <!-- LIVE-MATCH-F5.2 BUG-014: footer con Cancelar/Confirmar -->
   <mat-dialog-actions align="end" class="sub-modal-actions">
     <button mat-button (click)="cancel()" [disabled]="isSubmitting">Cancelar</button>
     <button mat-flat-button
