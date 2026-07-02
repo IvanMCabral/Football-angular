@@ -121,7 +121,18 @@ export class LiveMatchModalsService {
               // real count after each substitution.
               substitutionsRemaining: 5,
               // V25D63-C23 P0: position-effectiveness feedback para chips SALE/ENTRA.
-              effectivenessMap
+              effectivenessMap,
+              // V25D79: pass formation + per-player live stats + which side
+              // the manager team is playing on. The modal visual pitch and
+              // the per-dot chips consume these. Falls back to defaults when
+              // the SSE feed hasn't arrived yet (legacy pre-V25D79 snapshots).
+              formation: (userTeamId === state.homeTeamId)
+                  ? (state.homeFormation ?? '4-4-2')
+                  : (state.awayFormation ?? '4-4-2'),
+              playerRatings: (userTeamId === state.homeTeamId)
+                  ? (state.homePlayerRatings ?? [])
+                  : (state.awayPlayerRatings ?? []),
+              managerSide: (userTeamId === state.homeTeamId) ? 'HOME' : 'AWAY'
             };
 
             // LIVE-MATCH-F5.3.3 BUG-015: pause the round BEFORE the dialog
