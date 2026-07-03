@@ -32,7 +32,7 @@ import { ActivatedRoute, provideRouter, Router } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { BehaviorSubject, of, Subject } from 'rxjs';
+import { BehaviorSubject, of, Subject, Observable } from 'rxjs';
 import { RoundLiveComponent } from './round-live.component';
 import { CareerService } from '../../core/services/career.service';
 import { MatchEngineService } from '../../core/services/match-engine.service';
@@ -117,8 +117,11 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
 
     modalsSpy = jasmine.createSpyObj<LiveMatchModalsService>('LiveMatchModalsService', [
       'openSubstitutionModal',
-      'openFormationModal'
+      'openFormationModal',
+      // V25D81.1 BUG #3: rival RED_CARD awareness modal.
+      'openRivalCardInfoModal'
     ]);
+    modalsSpy.openRivalCardInfoModal.and.returnValue(of({ dismissed: true }));
 
     await TestBed.configureTestingModule({
       imports: [RoundLiveComponent, NoopAnimationsModule],
@@ -198,5 +201,229 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
 
     const vm = (component as any).vmSubject.value as RoundLiveViewModel;
     expect(vm.matches[0].match.status).toBe('SCHEDULED');
+  });
+
+  // ========== V25D81.1 BUG #3 rival RED_CARD awareness tests ==========
+
+  /**
+   * Helper: set up a match with a home-team user + away rival. Returns the
+   * isUserMatch=true VM. The away team is the "rival" from the perspective
+   * of the awareness modal.
+   */
+  function setVmWithUserAndRival(userHome: boolean = true): RoundMatchVM[] {
+    const matches: RoundMatchVM[] = [];
+    if (userHome) {
+      matches.push({
+        match: { ...makeMatch('SCHEDULED'), homeTeamId: SAMPLE_HOME_TEAM_ID },
+        isUserMatch: true
+      });
+    } else {
+      matches.push({
+        match: { ...makeMatch('SCHEDULED'), homeTeamId: SAMPLE_HOME_TEAM_ID, awayTeamId: SAMPLE_AWAY_TEAM_ID },
+        isUserMatch: true
+      });
+    }
+    setVm(matches);
+    return matches;
+  }
+
+  it('BUG #3 (1/5): RED_CARD on rival opens awareness modal', (done) => {
+    setVm([{ match: makeMatch('SCHEDULED'), isUserMatch: true }]);
+    (component as any).startRoundEngine(SAMPLE_GAME_ID, (component as any).vmSubject.value.matches);
+
+    // RED_CARD for the AWAY team (the rival) — must trigger openRivalCardInfoModal.
+    roundStateSubject.next(makeRoundState([makeMatchState({
+      status: 'RUNNING',
+      currentMinute: 47,
+      events: [
+        {
+          eventType: 'RED_CARD',
+          minute: 47,
+          playerName: 'Gerard Piqué',
+          playerId: 'p-rival-1',
+          teamId: SAMPLE_AWAY_TEAM_ID,
+          description: 'InJURED_V23_LEGACY'
+        }
+      ]
+    })]));
+
+    fixture.whenStable().then(() => {
+      expect(modalsSpy.openRivalCardInfoModal).toHaveBeenCalledTimes(1);
+      const [matchIdArg, stateArg, infoArg] = modalsSpy.openRivalCardInfoModal.calls.mostRecent().args;
+      expect(matchIdArg).toBe(SAMPLE_MATCH_ID);
+      expect(stateArg.matchId).toBe(SAMPLE_MATCH_ID);
+      expect(infoArg.playerName).toBe('Gerard Piqué');
+      expect(infoArg.minute).toBe(47);
+      expect(infoArg.cardType).toBe('RED');
+      done();
+    });
+  });
+
+  it('BUG #3 (2/5): RED_CARD on manager team does NOT trigger awareness modal', (done) => {
+    setVm([{ match: makeMatch('SCHEDULED'), isUserMatch: true }]);
+    (component as any).startRoundEngine(SAMPLE_GAME_ID, (component as any).vmSubject.value.matches);
+
+    // RED_CARD for the HOME team (the manager team). Awareness modal must
+    // NOT fire — manager cards are already shown in their own timeline.
+    roundStateSubject.next(makeRoundState([makeMatchState({
+      status: 'RUNNING',
+      currentMinute: 32,
+      events: [
+        {
+          eventType: 'RED_CARD',
+          minute: 32,
+          playerName: 'Sergio Ramos',
+          playerId: 'p-user-1',
+          teamId: SAMPLE_HOME_TEAM_ID,
+          description: 'InJURED_V23_LEGACY'
+        }
+      ]
+    })]));
+
+    fixture.whenStable().then(() => {
+      expect(modalsSpy.openRivalCardInfoModal).not.toHaveBeenCalled();
+      done();
+    });
+  });
+
+  it('BUG #3 (3/5): RED_CARD on FINISHED match does NOT trigger awareness modal', (done) => {
+    setVm([{ match: makeMatch('SCHEDULED'), isUserMatch: true }]);
+    (component as any).startRoundEngine(SAMPLE_GAME_ID, (component as any).vmSubject.value.matches);
+
+    // RED_CARD on FINISHED match — late tick from a stale replay. Must not fire.
+    roundStateSubject.next(makeRoundState([makeMatchState({
+      status: 'FINISHED',
+      currentMinute: 90,
+      events: [
+        {
+          eventType: 'RED_CARD',
+          minute: 88,
+          playerName: 'Diego Godín',
+          playerId: 'p-rival-2',
+          teamId: SAMPLE_AWAY_TEAM_ID,
+          description: 'InJURED_V23_LEGACY'
+        }
+      ]
+    })]));
+
+    fixture.whenStable().then(() => {
+      expect(modalsSpy.openRivalCardInfoModal).not.toHaveBeenCalled();
+      done();
+    });
+  });
+
+  it('BUG #3 (4/5): repeated rival RED_CARD for same eventId does NOT re-trigger', (done) => {
+    setVm([{ match: makeMatch('SCHEDULED'), isUserMatch: true }]);
+    (component as any).startRoundEngine(SAMPLE_GAME_ID, (component as any).vmSubject.value.matches);
+
+    const rivalCard = {
+      eventType: 'RED_CARD' as const,
+      minute: 60,
+      playerName: 'Pepe',
+      playerId: 'p-rival-pepe',
+      teamId: SAMPLE_AWAY_TEAM_ID,
+      description: 'InJURED_V23_LEGACY'
+    };
+
+    // First SSE: red card arrives → modal opens.
+    roundStateSubject.next(makeRoundState([makeMatchState({
+      status: 'RUNNING',
+      currentMinute: 60,
+      events: [rivalCard]
+    })]));
+    fixture.whenStable().then(() => {
+      expect(modalsSpy.openRivalCardInfoModal).toHaveBeenCalledTimes(1);
+
+      // Second SSE: same event already in events list (SSE replay after
+      // reconnect). Dedup must suppress the second open.
+      roundStateSubject.next(makeRoundState([makeMatchState({
+        status: 'RUNNING',
+        currentMinute: 70,
+        events: [rivalCard]
+      })]));
+      return fixture.whenStable();
+    }).then(() => {
+      expect(modalsSpy.openRivalCardInfoModal).toHaveBeenCalledTimes(1);
+      done();
+    });
+  });
+
+  it('BUG #3 (5/5): rival RED_CARD queues when previous awareness modal still open', (done) => {
+    // Make the first openRivalCardInfoModal call return an Observable that
+    // doesn't complete until we resolve it (simulates "still open").
+    let resolveFirst: () => void = () => {};
+    const firstClosed = new Promise<void>((res) => { resolveFirst = res; });
+    let firstCall = true;
+    modalsSpy.openRivalCardInfoModal.and.callFake(() => {
+      if (firstCall) {
+        firstCall = false;
+        return new Observable(sub => {
+          // never emit + never complete until resolveFirst() runs
+          firstClosed.then(() => sub.next({ dismissed: true }));
+          firstClosed.then(() => sub.complete());
+        });
+      }
+      return of({ dismissed: true });
+    });
+
+    setVm([{ match: makeMatch('SCHEDULED'), isUserMatch: true }]);
+    (component as any).startRoundEngine(SAMPLE_GAME_ID, (component as any).vmSubject.value.matches);
+
+    // First rival red card — opens awareness modal (still "open").
+    roundStateSubject.next(makeRoundState([makeMatchState({
+      status: 'RUNNING',
+      currentMinute: 30,
+      events: [
+        {
+          eventType: 'RED_CARD',
+          minute: 30,
+          playerName: 'Diego Godín',
+          playerId: 'p-rival-3',
+          teamId: SAMPLE_AWAY_TEAM_ID,
+          description: 'InJURED_V23_LEGACY'
+        }
+      ]
+    })]));
+
+    // Second rival red card while the first is still "open" — must be queued.
+    roundStateSubject.next(makeRoundState([makeMatchState({
+      status: 'RUNNING',
+      currentMinute: 75,
+      events: [
+        {
+          eventType: 'RED_CARD',
+          minute: 30,
+          playerName: 'Diego Godín',
+          playerId: 'p-rival-3',
+          teamId: SAMPLE_AWAY_TEAM_ID,
+          description: 'InJURED_V23_LEGACY'
+        },
+        {
+          eventType: 'RED_CARD',
+          minute: 75,
+          playerName: 'Pepe',
+          playerId: 'p-rival-pepe2',
+          teamId: SAMPLE_AWAY_TEAM_ID,
+          description: 'InJURED_V23_LEGACY'
+        }
+      ]
+    })]));
+
+    fixture.whenStable().then(() => {
+      // After 2 SSE updates but only one modal open: exactly 1 call so far.
+      // The second red card's modal call is queued, not yet emitted.
+      expect(modalsSpy.openRivalCardInfoModal).toHaveBeenCalledTimes(1);
+
+      // Close the first modal — should fire the queued modal.
+      resolveFirst();
+      // Wait for the macrotask setTimeout in openRivalCardInfoModal.
+      return new Promise<void>(r => setTimeout(r, 10));
+    }).then(() => fixture.whenStable()).then(() => {
+      expect(modalsSpy.openRivalCardInfoModal).toHaveBeenCalledTimes(2);
+      const queuedCall = modalsSpy.openRivalCardInfoModal.calls.mostRecent();
+      expect(queuedCall.args[2].playerName).toBe('Pepe');
+      expect(queuedCall.args[2].minute).toBe(75);
+      done();
+    });
   });
 });

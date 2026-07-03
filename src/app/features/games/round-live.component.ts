@@ -50,6 +50,27 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
     preSelectedPlayerId: string;
   } | null = null;
 
+  /**
+   * V25D81.1 BUG #3: dedup set for rival RED_CARD awareness modals. Keyed
+   * by `matchId|minute|playerId` so SSE reconnects don't re-trigger. Lives
+   * independently of {@code autoModalShownEventIds} because the awareness
+   * modal does not pause the round (different lifecycle).
+   */
+  private readonly rivalCardShownEventIds = new Set<string>();
+
+  /**
+   * V25D81.1 BUG #3: separate guard for the rival card awareness modal.
+   * Coexists with {@code isAutoModalOpen} because the two flows can fire
+   * on the same tick (e.g. manager gets injury, rival gets sent off).
+   */
+  private isRivalCardModalOpen = false;
+  private queuedRivalCardModal: {
+    matchId: string;
+    state: MatchState;
+    playerName: string;
+    minute: number;
+  } | null = null;
+
   private vmSubject = new BehaviorSubject<RoundLiveViewModel>({
     gameId: '',
     roundNumber: 1,
@@ -232,6 +253,11 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
         // currentMinute + playerRatings already populated by the SSE
         // tick).
         this.maybeOpenInjuryAutoModal(updatedMatches);
+        // V25D81.1 BUG #3: scan ALL matches (user + rival) for RED_CARD
+        // events on a non-user team and auto-open the awareness modal.
+        // Same pattern as the injury flow but the modal is informational
+        // only — no pre-select, no round pause.
+        this.maybeOpenRivalCardInfoModal(updatedMatches);
       },
       error: (err) => {
         console.error('[ROUND] Error in SSE stream:', err);
@@ -325,6 +351,134 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
         return;
       }
     }
+  }
+
+  /**
+   * V25D81.1 BUG #3: walk the latest per-match state, find RED_CARD
+   * events whose {@code teamId} is NOT the manager team (i.e. the rival
+   * or any team in a non-user match), and auto-open the awareness modal.
+   *
+   * <p>Trigger rules:
+   * <ul>
+   *   <li>Event type === 'RED_CARD' (yellow cards are intentionally
+   *       skipped — not impactful enough to interrupt the manager).</li>
+   *   <li>Event has a {@code teamId} AND that teamId is NOT the user
+   *       team. A red card on the manager team is irrelevant for the
+   *       awareness flow (the manager already sees their own match's
+   *       timeline; auto-sub flow is owned by maybeOpenInjuryAutoModal).</li>
+   *   <li>Match status is RUNNING or PAUSED (no awareness for finished
+   *       / cancelled matches).</li>
+   *   <li>Event hasn't been shown before (tracked via
+   *       {@code rivalCardShownEventIds} so SSE reconnects don't
+   *       re-trigger).</li>
+   * </ul>
+   *
+   * <p>Concurrency: shared pattern with maybeOpenInjuryAutoModal — if the
+   * previous rival card modal is still open, the next matching RED_CARD
+   * is queued (replaces any older queued entry). When the active modal
+   * closes the queued one fires (if any).
+   */
+  private maybeOpenRivalCardInfoModal(matches: RoundMatchVM[]): void {
+    const userTeamId = this.vmSubject.value.matches.find(m => m.isUserMatch)?.match.homeTeamId;
+    const userTeamIdStr = userTeamId ? String(userTeamId) : null;
+    if (!userTeamIdStr) {
+      return;
+    }
+
+    for (const rm of matches) {
+      if (!rm.state || !rm.state.events) {
+        continue;
+      }
+      if (rm.state.status === 'FINISHED' || rm.state.status === 'CANCELLED') {
+        continue;
+      }
+      for (const ev of rm.state.events) {
+        if (!ev || ev.eventType !== 'RED_CARD') {
+          continue;
+        }
+        const eventTeamId = ev.teamId ? String(ev.teamId) : null;
+        // Skip when the event has no team attribution (can't tell if
+        // it's the rival) or when the team IS the manager team (those
+        // red cards aren't "rival" events).
+        if (!eventTeamId || eventTeamId === userTeamIdStr) {
+          continue;
+        }
+        const dedupKey = ev.playerId
+          ? `${rm.state.matchId}|${ev.minute}|${ev.playerId}`
+          : `${rm.state.matchId}|${ev.minute}|${eventTeamId}`;
+        if (this.rivalCardShownEventIds.has(dedupKey)) {
+          continue;
+        }
+        this.rivalCardShownEventIds.add(dedupKey);
+        this.queueOrOpenRivalCardModal({
+          matchId: String(rm.state.matchId),
+          state: rm.state,
+          playerName: ev.playerName || 'Jugador rival',
+          minute: ev.minute
+        });
+        // Only the FIRST new rival red card per tick opens the modal,
+        // same dedup pattern as maybeOpenInjuryAutoModal. Subsequent
+        // rival red cards on the same tick are recorded but the
+        // manager can dismiss or wait for the next tick.
+        return;
+      }
+    }
+  }
+
+  /**
+   * V25D81.1 BUG #3: open the rival card awareness modal now, or queue
+   * it if the previous awareness modal is still on screen. Replaces any
+   * older queued entry.
+   */
+  private queueOrOpenRivalCardModal(payload: {
+    matchId: string;
+    state: MatchState;
+    playerName: string;
+    minute: number;
+  }): void {
+    if (this.isRivalCardModalOpen) {
+      this.queuedRivalCardModal = payload;
+      return;
+    }
+    this.openRivalCardInfoModal(payload);
+  }
+
+  /**
+   * V25D81.1 BUG #3: actually open the rival card awareness dialog with
+   * the player name + minute. Resets {@code isRivalCardModalOpen} when
+   * the dialog closes (whether dismissed or auto-closed) and drains the
+   * queue. Does NOT pause/resume the round — the modal is informational.
+   */
+  private openRivalCardInfoModal(payload: {
+    matchId: string;
+    state: MatchState;
+    playerName: string;
+    minute: number;
+  }): void {
+    this.isRivalCardModalOpen = true;
+    this.modals.openRivalCardInfoModal(
+      payload.matchId,
+      payload.state,
+      { playerName: payload.playerName, minute: payload.minute, cardType: 'RED' }
+    )
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: () => {
+          this.isRivalCardModalOpen = false;
+          const queued = this.queuedRivalCardModal;
+          this.queuedRivalCardModal = null;
+          if (queued) {
+            // Defer to the next macrotask so the dialog close animation
+            // finishes before a new dialog opens.
+            setTimeout(() => this.openRivalCardInfoModal(queued), 0);
+          }
+        },
+        error: (err) => {
+          console.error('[ROUND-LIVE] rival card awareness modal error', err);
+          this.isRivalCardModalOpen = false;
+          this.queuedRivalCardModal = null;
+        }
+      });
   }
 
   /**

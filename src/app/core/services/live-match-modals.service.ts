@@ -14,6 +14,7 @@ import { LineupDTO, PlayerLineupDTO } from '../../shared/models/lineup/lineup.dt
 import { SessionPlayer } from '../../shared/models/player.model';
 import { SubstitutionModalComponent, SubstitutionDialogData } from '../../features/games/components/substitution-modal/substitution-modal.component';
 import { FormationModalComponent, FormationDialogData } from '../../features/games/components/formation-modal/formation-modal.component';
+import { RivalCardInfoComponent, RivalCardInfoDialogData } from '../../features/games/components/rival-card-info/rival-card-info.component';
 import { MatchState } from './match-engine.model';
 
 /**
@@ -218,6 +219,37 @@ export class LiveMatchModalsService {
         );
       })
     );
+  }
+
+  /**
+   * V25D81.1 BUG #3: opens a small awareness dialog when the rival receives
+   * a red card. The dialog carries only display info (player name + minute)
+   * and does NOT trigger any auto-substitution — the manager still has to
+   * explicitly open the substitution modal if they want to react. This is
+   * the "awareness without action" UX path Iván asked for after F0 #3.
+   *
+   * <p>Returns an Observable that completes when the manager closes the
+   * dialog. The component does not pause/resume the round — the modal is
+   * informational and should not interfere with the live ticker.
+   */
+  openRivalCardInfoModal(
+    matchId: string,
+    state: MatchState,
+    info: { playerName: string; minute: number; cardType: 'RED' }
+  ): Observable<unknown> {
+    const data: RivalCardInfoDialogData = {
+      playerName: info.playerName,
+      minute: info.minute,
+      cardType: info.cardType
+    };
+    const dialogRef = this.dialog.open(RivalCardInfoComponent, {
+      data,
+      width: '420px',
+      maxWidth: '95vw',
+      disableClose: false,
+      autoFocus: 'first-tabbable'
+    });
+    return dialogRef.afterClosed();
   }
 
   /** Opens the formation-change modal for the given match/state. */
