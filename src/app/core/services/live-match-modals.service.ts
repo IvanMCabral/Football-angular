@@ -45,10 +45,43 @@ export class LiveMatchModalsService {
   private router = inject(Router);
 
   /**
+   * V25D81-BUG #3: optional overrides for {@link openSubstitutionModal}.
+   * Currently used by the round-live INJURY auto-listener to pre-select
+   * the injured player and surface the reason in the modal header. Both
+   * fields are optional — manual opens pass `undefined` and get the
+   * legacy "click-to-pick" UX.
+   */
+  openSubstitutionOptions?: {
+    /**
+     * sessionPlayerId to pre-select as the OFF player when the modal
+     * opens. The modal auto-fills the OFF field; the manager only picks
+     * the ON (bench) player and confirms. If the id is not in the
+     * starting XI (e.g. already substituted off), the auto-select is a
+     * silent no-op.
+     */
+    preSelectedPlayerId?: string;
+    /**
+     * Why the modal is opening. When set, the modal renders a small
+     * reason banner in the header. Currently only
+     * `INJURY_FORCED_SUBSTITUTION` is emitted by the auto-listener;
+     * manual opens leave this `undefined` (renders the bare title).
+     */
+    reason?: 'INJURY_FORCED_SUBSTITUTION' | 'MANUAL';
+  };
+
+  /**
    * Opens the substitution modal for the given match/state. Returns the
    * subscription so the caller can `takeUntil(destroy$)` if needed.
+   *
+   * <p>V25D81-BUG #3: optional {@link openSubstitutionOptions} parameter
+   * for the INJURY auto-modal flow. Manual opens pass `undefined` and
+   * get the same UX as before (manager picks the OFF player themselves).
    */
-  openSubstitutionModal(matchId: string, state: MatchState): Observable<unknown> {
+  openSubstitutionModal(
+    matchId: string,
+    state: MatchState,
+    options?: LiveMatchModalsService['openSubstitutionOptions']
+  ): Observable<unknown> {
     if (state.status === 'FINISHED' || state.status === 'CANCELLED') {
       this.snackBar.open('El partido ya terminó, no se puede sustituir', 'OK', { duration: 3000 });
       return new Observable(sub => sub.complete());
@@ -135,7 +168,12 @@ export class LiveMatchModalsService {
               playerRatings: (userTeamId === state.homeTeamId)
                   ? (state.homePlayerRatings ?? [])
                   : (state.awayPlayerRatings ?? []),
-              managerSide: (userTeamId === state.homeTeamId) ? 'HOME' : 'AWAY'
+              managerSide: (userTeamId === state.homeTeamId) ? 'HOME' : 'AWAY',
+              // V25D81-BUG #3: auto-modal pre-select + reason from the
+              // round-live INJURY listener. Both optional; manual opens
+              // pass undefined and get the legacy UX.
+              preSelectedPlayerId: options?.preSelectedPlayerId,
+              reason: options?.reason
             };
 
             // LIVE-MATCH-F5.3.3 BUG-015: pause the round BEFORE the dialog

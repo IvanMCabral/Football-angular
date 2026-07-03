@@ -28,6 +28,28 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
 
   private destroy$ = new Subject<void>();
 
+  /**
+   * V25D81-BUG #3: track INJURY events that have already auto-opened
+   * the substitution modal. Keyed by `matchId|minute|playerId` so the
+   * same injury fired twice across SSE reconnects doesn't re-trigger
+   * the modal. Cleared on round restart (the user navigates away and
+   * back, so the component is recreated).
+   */
+  private readonly autoModalShownEventIds = new Set<string>();
+
+  /**
+   * V25D81-BUG #3: guard against overlapping auto-modals. When an INJURY
+   * fires while the previous INJURY modal is still open, the second
+   * event is queued (so the manager sees it next) instead of stacking
+   * multiple dialogs on top of each other.
+   */
+  private isAutoModalOpen = false;
+  private queuedAutoModal: {
+    matchId: string;
+    state: MatchState;
+    preSelectedPlayerId: string;
+  } | null = null;
+
   private vmSubject = new BehaviorSubject<RoundLiveViewModel>({
     gameId: '',
     roundNumber: 1,
@@ -203,6 +225,13 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
         };
 
         this.updateVm(newVm);
+
+        // V25D81-BUG #3: scan for new INJURY events on the manager team
+        // and auto-open the substitution modal. Runs AFTER the VM is
+        // updated so the modal receives the latest matchState (with
+        // currentMinute + playerRatings already populated by the SSE
+        // tick).
+        this.maybeOpenInjuryAutoModal(updatedMatches);
       },
       error: (err) => {
         console.error('[ROUND] Error in SSE stream:', err);
@@ -210,6 +239,147 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
       complete: () => {
       }
     });
+  }
+
+  /**
+   * V25D81-BUG #3: walk the latest per-match state, find INJURY events
+   * that arrived since the last tick on the manager team, and open
+   * the substitution modal pre-populated with the injured player.
+   *
+   * <p>Trigger rules:
+   * <ul>
+   *   <li>Event type === 'INJURY' (the chip-injury timeline event).</li>
+   *   <li>Event has a {@code playerId} (legacy V23 events without
+   *       playerId are skipped — no clean way to pre-select the
+   *       visual pitch dot).</li>
+   *   <li>Event team is the manager team (the modal would auto-suggest
+   *       a swap on the wrong team, which is a no-op anyway).</li>
+   *   <li>Match status is RUNNING or PAUSED (no auto-modal for finished
+   *       / cancelled matches — too late).</li>
+   *   <li>Event hasn't been shown before (tracked via
+   *       {@code autoModalShownEventIds} so SSE reconnects don't
+   *       re-trigger).</li>
+   * </ul>
+   *
+   * <p>Concurrency: if a previous auto-modal is still open, the next
+   * matching INJURY is queued (replaces any older queued entry — the
+   * manager only sees the most recent injury when they finish the
+   * current sub). When the active modal closes, the queued one fires
+   * (if any).
+   */
+  private maybeOpenInjuryAutoModal(matches: RoundMatchVM[]): void {
+    const userTeamId = this.vmSubject.value.matches.find(m => m.isUserMatch)?.match.homeTeamId;
+    const userTeamIdStr = userTeamId ? String(userTeamId) : null;
+    if (!userTeamIdStr) {
+      return;
+    }
+
+    for (const rm of matches) {
+      if (!rm.state || !rm.state.events) {
+        continue;
+      }
+      // Only the user match drives the auto-modal — injuries on the
+      // rival are not actionable.
+      const matchHomeId = String(rm.state.homeTeamId ?? '');
+      const matchAwayId = String(rm.state.awayTeamId ?? '');
+      const isUserMatch = (matchHomeId === userTeamIdStr) || (matchAwayId === userTeamIdStr);
+      if (!isUserMatch) {
+        continue;
+      }
+      // Skip if the match is finished / cancelled (replays of past
+      // matches shouldn't auto-pop the modal).
+      if (rm.state.status === 'FINISHED' || rm.state.status === 'CANCELLED') {
+        continue;
+      }
+
+      for (const ev of rm.state.events) {
+        if (!ev || ev.eventType !== 'INJURY') {
+          continue;
+        }
+        if (!ev.playerId) {
+          // No id → can't pre-select the visual pitch dot. Skip.
+          continue;
+        }
+        const eventTeamId = ev.teamId ? String(ev.teamId) : null;
+        if (eventTeamId !== userTeamIdStr) {
+          // Injury on the rival — not actionable for the manager.
+          continue;
+        }
+        const eventId = `${rm.state.matchId}|${ev.minute}|${ev.playerId}`;
+        if (this.autoModalShownEventIds.has(eventId)) {
+          continue;
+        }
+        // First-time-seen INJURY on the manager team.
+        this.autoModalShownEventIds.add(eventId);
+        this.queueOrOpenAutoModal({
+          matchId: String(rm.state.matchId),
+          state: rm.state,
+          preSelectedPlayerId: ev.playerId
+        });
+        // Only the FIRST new injury on this tick opens a modal — we
+        // don't want to stack 3 dialogs if 3 players got hurt on the
+        // same action. Subsequent injuries are still recorded in
+        // autoModalShownEventIds, so the manager can manually open
+        // the modal via the "Sustituir" button on the next tick if
+        // they need to handle a second injury.
+        return;
+      }
+    }
+  }
+
+  /**
+   * V25D81-BUG #3: open the auto-modal now, or queue it if a previous
+   * one is still on screen. Replaces any older queued entry (the
+   * most recent injury is the most important).
+   */
+  private queueOrOpenAutoModal(payload: {
+    matchId: string;
+    state: MatchState;
+    preSelectedPlayerId: string;
+  }): void {
+    if (this.isAutoModalOpen) {
+      this.queuedAutoModal = payload;
+      return;
+    }
+    this.openInjuryAutoModal(payload);
+  }
+
+  /**
+   * V25D81-BUG #3: actually open the substitution modal with the
+   * INJURY pre-select. Resets {@code isAutoModalOpen} when the modal
+   * closes (whether confirmed or cancelled) and drains the queue.
+   */
+  private openInjuryAutoModal(payload: {
+    matchId: string;
+    state: MatchState;
+    preSelectedPlayerId: string;
+  }): void {
+    this.isAutoModalOpen = true;
+    this.modals.openSubstitutionModal(payload.matchId, payload.state, {
+      preSelectedPlayerId: payload.preSelectedPlayerId,
+      reason: 'INJURY_FORCED_SUBSTITUTION'
+    })
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: () => {
+          // Modal closed (confirmed or cancelled). Reset flag + drain
+          // the queue.
+          this.isAutoModalOpen = false;
+          const queued = this.queuedAutoModal;
+          this.queuedAutoModal = null;
+          if (queued) {
+            // Defer to the next macrotask so the dialog close
+            // animation finishes before a new dialog opens (avoids
+            // a visual stutter on the backdrop).
+            setTimeout(() => this.openInjuryAutoModal(queued), 0);
+          }
+        },
+        error: (err) => {
+          console.error('[ROUND-LIVE] injury auto-modal error', err);
+          this.isAutoModalOpen = false;
+          this.queuedAutoModal = null;
+        }
+      });
   }
 
   pauseAll() {

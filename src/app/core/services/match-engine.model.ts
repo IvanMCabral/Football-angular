@@ -97,6 +97,20 @@ export interface MatchEvent {
            | 'INJURY' | 'CORNER' | 'OFFSIDE' | 'SUBSTITUTION' | 'CARD'
            | 'TACTICAL_CHANGE';
   minute: number;
+  /**
+   * V25D81-BUG #3: sessionPlayerId of the primary player. Backend's
+   * {@code com.footballmanager.domain.model.entity.MatchEvent} carries this
+   * on every V24 event (INJURY, GOAL, RED_CARD, etc.). The frontend
+   * previously only exposed {@code playerName}; the INJURY auto-modal
+   * needs the id to pre-select the dot in the substitution modal's
+   * visual pitch (matching by name is fragile — two players can share
+   * a surname in the seed).
+   *
+   * <p>Optional / undefined for events without an id (legacy V23
+   * synthetic events). Consumers that depend on it (auto-modal
+   * listener) should null-check.
+   */
+  playerId?: string;
   /** Primary player (e.g. the goal scorer, the player who got a card). */
   playerName: string;
   description: string;

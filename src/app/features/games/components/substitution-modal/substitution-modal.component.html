@@ -3,6 +3,15 @@
     <span class="title-icon">🔄</span>
     Sustitución
     <span class="minute-tag">Minuto {{ data.currentMinute }}'</span>
+    <!-- V25D81-BUG #3: surface why the modal auto-opened. The
+         INJURY_FORCED_SUBSTITUTION reason gets a small banner so the
+         manager knows they didn't click "Sustituir" themselves. -->
+    <span *ngIf="data.reason === 'INJURY_FORCED_SUBSTITUTION'"
+          class="reason-badge"
+          data-reason="injury"
+          aria-label="Sustitución forzada por lesión">
+      🚑 Sustitución por lesión
+    </span>
   </h2>
 
   <mat-dialog-content class="sub-modal-content">
