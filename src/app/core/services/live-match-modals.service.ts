@@ -14,6 +14,7 @@ import { LineupDTO, PlayerLineupDTO } from '../../shared/models/lineup/lineup.dt
 import { SessionPlayer } from '../../shared/models/player.model';
 import { SubstitutionModalComponent, SubstitutionDialogData } from '../../features/games/components/substitution-modal/substitution-modal.component';
 import { FormationModalComponent, FormationDialogData } from '../../features/games/components/formation-modal/formation-modal.component';
+import { RivalCardInfoComponent, RivalCardInfoDialogData } from '../../features/games/components/rival-card-info/rival-card-info.component';
 import { MatchState } from './match-engine.model';
 
 /**
@@ -45,10 +46,43 @@ export class LiveMatchModalsService {
   private router = inject(Router);
 
   /**
+   * V25D81-BUG #3: optional overrides for {@link openSubstitutionModal}.
+   * Currently used by the round-live INJURY auto-listener to pre-select
+   * the injured player and surface the reason in the modal header. Both
+   * fields are optional — manual opens pass `undefined` and get the
+   * legacy "click-to-pick" UX.
+   */
+  openSubstitutionOptions?: {
+    /**
+     * sessionPlayerId to pre-select as the OFF player when the modal
+     * opens. The modal auto-fills the OFF field; the manager only picks
+     * the ON (bench) player and confirms. If the id is not in the
+     * starting XI (e.g. already substituted off), the auto-select is a
+     * silent no-op.
+     */
+    preSelectedPlayerId?: string;
+    /**
+     * Why the modal is opening. When set, the modal renders a small
+     * reason banner in the header. Currently only
+     * `INJURY_FORCED_SUBSTITUTION` is emitted by the auto-listener;
+     * manual opens leave this `undefined` (renders the bare title).
+     */
+    reason?: 'INJURY_FORCED_SUBSTITUTION' | 'MANUAL';
+  };
+
+  /**
    * Opens the substitution modal for the given match/state. Returns the
    * subscription so the caller can `takeUntil(destroy$)` if needed.
+   *
+   * <p>V25D81-BUG #3: optional {@link openSubstitutionOptions} parameter
+   * for the INJURY auto-modal flow. Manual opens pass `undefined` and
+   * get the same UX as before (manager picks the OFF player themselves).
    */
-  openSubstitutionModal(matchId: string, state: MatchState): Observable<unknown> {
+  openSubstitutionModal(
+    matchId: string,
+    state: MatchState,
+    options?: LiveMatchModalsService['openSubstitutionOptions']
+  ): Observable<unknown> {
     if (state.status === 'FINISHED' || state.status === 'CANCELLED') {
       this.snackBar.open('El partido ya terminó, no se puede sustituir', 'OK', { duration: 3000 });
       return new Observable(sub => sub.complete());
@@ -135,7 +169,12 @@ export class LiveMatchModalsService {
               playerRatings: (userTeamId === state.homeTeamId)
                   ? (state.homePlayerRatings ?? [])
                   : (state.awayPlayerRatings ?? []),
-              managerSide: (userTeamId === state.homeTeamId) ? 'HOME' : 'AWAY'
+              managerSide: (userTeamId === state.homeTeamId) ? 'HOME' : 'AWAY',
+              // V25D81-BUG #3: auto-modal pre-select + reason from the
+              // round-live INJURY listener. Both optional; manual opens
+              // pass undefined and get the legacy UX.
+              preSelectedPlayerId: options?.preSelectedPlayerId,
+              reason: options?.reason
             };
 
             // LIVE-MATCH-F5.3.3 BUG-015: pause the round BEFORE the dialog
@@ -182,6 +221,37 @@ export class LiveMatchModalsService {
     );
   }
 
+  /**
+   * V25D81.1 BUG #3: opens a small awareness dialog when the rival receives
+   * a red card. The dialog carries only display info (player name + minute)
+   * and does NOT trigger any auto-substitution — the manager still has to
+   * explicitly open the substitution modal if they want to react. This is
+   * the "awareness without action" UX path Iván asked for after F0 #3.
+   *
+   * <p>Returns an Observable that completes when the manager closes the
+   * dialog. The component does not pause/resume the round — the modal is
+   * informational and should not interfere with the live ticker.
+   */
+  openRivalCardInfoModal(
+    matchId: string,
+    state: MatchState,
+    info: { playerName: string; minute: number; cardType: 'RED' }
+  ): Observable<unknown> {
+    const data: RivalCardInfoDialogData = {
+      playerName: info.playerName,
+      minute: info.minute,
+      cardType: info.cardType
+    };
+    const dialogRef = this.dialog.open(RivalCardInfoComponent, {
+      data,
+      width: '420px',
+      maxWidth: '95vw',
+      disableClose: false,
+      autoFocus: 'first-tabbable'
+    });
+    return dialogRef.afterClosed();
+  }
+
   /** Opens the formation-change modal for the given match/state. */
   openFormationModal(matchId: string, state: MatchState): Observable<unknown> {
     if (state.status === 'FINISHED' || state.status === 'CANCELLED') {
@@ -191,18 +261,33 @@ export class LiveMatchModalsService {
     const homeTeamId = state.homeTeamId;
     const currentFormation = state.homeFormation || '4-4-2';
     const careerId = this.getCurrentCareerId();
-    return this.http.get<LineupDTO>(`${environment.apiUrl}/career/lineup/current`).pipe(
-      map((lineup) => {
+    // V25D81-BUG #4: also fetch the squad so the drag-drop modal can
+    // render player names + a bench list. Same pattern as
+    // openSubstitutionModal (lineup + squad forkJoin).
+    return forkJoin({
+      lineup: this.http.get<LineupDTO>(`${environment.apiUrl}/career/lineup/current`),
+      squad: this.teamService.getMyTeamSquad()
+    }).pipe(
+      map(({ lineup, squad }) => {
         const currentSlots = (lineup?.players ?? []).map((p, i) => ({
           sessionPlayerId: p.playerId,
           position: p.position,
           slotIndex: i
         }));
+        // V25D81-BUG #4: startingIds = sessionPlayerIds in the current
+        // lineup. The modal uses this to split the squad into
+        // "on pitch" (in currentSlots) and "bench" (squad minus
+        // starting) when the drag-drop bench column is rendered.
+        const startingIds = new Set<string>(
+          currentSlots.map(s => s.sessionPlayerId).filter(id => !!id)
+        );
         const data: FormationDialogData = {
           matchId,
           currentFormation,
           homeTeamId,
-          currentSlots
+          currentSlots,
+          squad: squad ?? [],
+          startingIds
         };
 
         // LIVE-MATCH-F5.3.3 BUG-015: pause the round BEFORE the dialog
@@ -219,7 +304,7 @@ export class LiveMatchModalsService {
 
         const dialogRef = this.dialog.open(FormationModalComponent, {
           data,
-          width: '520px',
+          width: '720px',           // V25D81-BUG #4: wider for the drag-drop bench column
           maxWidth: '95vw',
           disableClose: false,
           autoFocus: 'first-tabbable'

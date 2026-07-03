@@ -527,4 +527,97 @@ describe('V25D79: visual pitch + stats chips + substitutionsRemaining', () => {
     expect(remainingTag.classList.contains('is-zero'))
       .withContext('is-zero class must be applied when substitutionsRemaining = 0').toBeTrue();
   });
+
+  // ========== V25D81-BUG #3: preSelectedPlayerId auto-select on INJURY ==========
+
+  it('preSelectedPlayerId matching a starter auto-selects that player in ngOnInit', () => {
+    TestBed.resetTestingModule();
+    const preSelectedData: SubstitutionDialogData = {
+      ...SAMPLE_DATA,
+      preSelectedPlayerId: 'p2', // p2 is in the starting XI
+      reason: 'INJURY_FORCED_SUBSTITUTION'
+    };
+    TestBed.configureTestingModule({
+      imports: [SubstitutionModalComponent, NoopAnimationsModule],
+      providers: [
+        { provide: MAT_DIALOG_DATA, useValue: preSelectedData },
+        { provide: MatDialogRef, useValue: dialogRefSpy },
+        { provide: MatSnackBar, useValue: snackBarSpy },
+        { provide: MatchEngineService, useValue: engineServiceSpy },
+        { provide: HttpClient, useValue: jasmine.createSpyObj('HttpClient', ['get', 'post']) }
+      ]
+    });
+    const f = TestBed.createComponent(SubstitutionModalComponent);
+    f.detectChanges(); // triggers ngOnInit
+    const c = f.componentInstance;
+    expect(c.playerOffId)
+      .withContext('playerOffId must be pre-populated from preSelectedPlayerId on ngOnInit')
+      .toBe('p2');
+    expect(c.canConfirm)
+      .withContext('canConfirm must remain false until the ON player is picked')
+      .toBeFalse();
+  });
+
+  it('preSelectedPlayerId NOT in starting XI is a silent no-op (manager picks manually)', () => {
+    TestBed.resetTestingModule();
+    const preSelectedData: SubstitutionDialogData = {
+      ...SAMPLE_DATA,
+      preSelectedPlayerId: 'unknown-pid',
+      reason: 'INJURY_FORCED_SUBSTITUTION'
+    };
+    TestBed.configureTestingModule({
+      imports: [SubstitutionModalComponent, NoopAnimationsModule],
+      providers: [
+        { provide: MAT_DIALOG_DATA, useValue: preSelectedData },
+        { provide: MatDialogRef, useValue: dialogRefSpy },
+        { provide: MatSnackBar, useValue: snackBarSpy },
+        { provide: MatchEngineService, useValue: engineServiceSpy },
+        { provide: HttpClient, useValue: jasmine.createSpyObj('HttpClient', ['get', 'post']) }
+      ]
+    });
+    const f = TestBed.createComponent(SubstitutionModalComponent);
+    f.detectChanges();
+    const c = f.componentInstance;
+    expect(c.playerOffId)
+      .withContext('playerOffId must remain null when preSelectedPlayerId is not in starting XI')
+      .toBeNull();
+  });
+
+  it('manual opens (no preSelectedPlayerId) keep the legacy click-to-pick UX', () => {
+    expect(component.playerOffId)
+      .withContext('manual open must NOT pre-select any OFF player')
+      .toBeNull();
+  });
+
+  it('reason=INJURY_FORCED_SUBSTITUTION renders the reason badge in the title', () => {
+    TestBed.resetTestingModule();
+    const data: SubstitutionDialogData = {
+      ...SAMPLE_DATA,
+      preSelectedPlayerId: 'p1',
+      reason: 'INJURY_FORCED_SUBSTITUTION'
+    };
+    TestBed.configureTestingModule({
+      imports: [SubstitutionModalComponent, NoopAnimationsModule],
+      providers: [
+        { provide: MAT_DIALOG_DATA, useValue: data },
+        { provide: MatDialogRef, useValue: dialogRefSpy },
+        { provide: MatSnackBar, useValue: snackBarSpy },
+        { provide: MatchEngineService, useValue: engineServiceSpy },
+        { provide: HttpClient, useValue: jasmine.createSpyObj('HttpClient', ['get', 'post']) }
+      ]
+    });
+    const f = TestBed.createComponent(SubstitutionModalComponent);
+    f.detectChanges();
+    const reasonBadge = f.nativeElement.querySelector('.reason-badge') as HTMLElement;
+    expect(reasonBadge).not.toBeNull();
+    expect(reasonBadge.getAttribute('data-reason')).toBe('injury');
+    expect(reasonBadge.textContent).toContain('Sustitución por lesión');
+  });
+
+  it('reason=undefined (manual open) does NOT render the reason badge', () => {
+    const reasonBadge = fixture.nativeElement.querySelector('.reason-badge') as HTMLElement;
+    expect(reasonBadge)
+      .withContext('manual open must not render the INJURY reason badge')
+      .toBeNull();
+  });
 });

@@ -56,6 +56,27 @@ export interface SubstitutionDialogData {
    * Defaults to 'HOME' when not provided.
    */
   managerSide?: 'HOME' | 'AWAY';
+  /**
+   * V25D81-BUG #3: when set, the modal auto-selects this sessionPlayerId
+   * as the "OFF" player when it opens. Used by the round-live
+   * auto-modal listener to pre-populate the substitution modal after
+   * an INJURY event arrives for the manager team. The manager only
+   * needs to pick the "ON" bench player and confirm.
+   *
+   * <p>When set, {@link #playerOffId} is populated in {@code ngOnInit}
+   * (see the implementation below). If the id is not in
+   * {@code startingXi} (e.g. the injured player was already
+   * substituted off), the auto-select is a silent no-op and the
+   * manager can still pick manually.
+   */
+  preSelectedPlayerId?: string;
+  /**
+   * V25D81-BUG #3: reason the modal was opened. Surfaced in the modal
+   * header so the manager knows why they're being asked to substitute.
+   * Currently {@code 'INJURY_FORCED_SUBSTITUTION'} is the only trigger
+   * the auto-listener emits. Manual opens leave this undefined.
+   */
+  reason?: 'INJURY_FORCED_SUBSTITUTION' | 'MANUAL';
 }
 
 /**
@@ -275,6 +296,22 @@ interface PitchLine {
       background: #ffebee;
       color: #b71c1c;
     }
+    /* V25D81-BUG #3: reason banner for INJURY_FORCED_SUBSTITUTION auto-opens.
+       Sits next to the minute tag in the modal title. Red theme to match
+       the chip-injury timeline color and signal urgency. */
+    .reason-badge {
+      display: inline-block;
+      margin-left: 0.5rem;
+      padding: 0.15rem 0.6rem;
+      background: #fee2e2;
+      color: #b91c1c;
+      border: 1px solid #fca5a5;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      vertical-align: middle;
+    }
   `],
   changeDetection: ChangeDetectionStrategy.OnPush
 })
@@ -290,6 +327,28 @@ export class SubstitutionModalComponent {
   errorMsg: string = '';
   isSubmitting = false;
   private destroy$ = new Subject<void>();
+
+  /**
+   * V25D81-BUG #3: pre-select the OFF player when the modal opens via
+   * the INJURY auto-listener. Runs once in {@code ngOnInit}; we don't
+   * subscribe to data changes (the modal is created fresh per open).
+   *
+   * <p>If {@code preSelectedPlayerId} is not in {@code startingXi}
+   * (e.g. the injured player was already substituted off by an
+   * earlier prompt), the lookup is a silent no-op and the manager
+   * picks manually — we don't show an error to avoid a noisy UX
+   * edge case during busy seconds.
+   */
+  ngOnInit(): void {
+    if (this.data.preSelectedPlayerId) {
+      const target = this.data.startingXi.find(
+        p => p.sessionPlayerId === this.data.preSelectedPlayerId
+      );
+      if (target) {
+        this.playerOffId = target.sessionPlayerId;
+      }
+    }
+  }
 
   get playerOff(): SubModalPlayer | null {
     return this.data.startingXi.find(p => p.sessionPlayerId === this.playerOffId) ?? null;
