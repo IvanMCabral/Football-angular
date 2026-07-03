@@ -23,41 +23,76 @@
       </mat-form-field>
     </div>
 
-    <!-- Visual pitch: 1 GK at the top, then DEF / MID / ATT lines. -->
-    <!--
-      V25D55-C16 P1.3+4 fixes:
-      - is-gk: was `last && i === 0` — `last` is true ONLY on the last
-        iteration, so `last && i === 0` was always false. Fix: just `i === 0`.
-      - is-mid: was `i === 2 && length === 4` — only matched the MID line of
-        a 4-line formation (e.g. 4-4-2). For 6-line formations like
-        3-5-2-CDM (GK + 3CB + CDM + 2CM + 2WB + 2ST) the lines at i=2,3,4
-        all sit between DEF (i=1) and ATT (i=5) and were left white.
-        Fix: `i > 1 && i < length - 1` (anything between DEF and ATT).
-      - is-mid2: removed. It was only used to distinguish line 2 of 5-line
-        formations (4-2-3-1, 4-1-4-1); the C16 prompt allows dropping it
-        since no visual distinction is required between mid lines.
-      - is-att: was `i === length - 1 && !last` — `!last` is always false on
-        the last iteration (Angular sets `last=true` exactly there). Fix:
-        `i === length - 1` (the ATT line is the last by definition).
-    -->
-    <div class="pitch" role="img" [attr.aria-label]="'Vista previa de la formación ' + selectedFormation()">
-      <div class="pitch-line" *ngFor="let count of formationLines; let i = index">
-        <div class="player-dot"
-             *ngFor="let _ of [].constructor(count); let n = index"
-             [class.is-gk]="i === 0"
-             [class.is-def]="i === 1"
-             [class.is-mid]="i > 1 && i < formationLines.length - 1"
-             [class.is-att]="i === formationLines.length - 1">
-          <span class="dot-label">{{ getDotLabel(i, n, count, false) }}</span>
+    <!-- V25D81-BUG #4: 2-column visual layout — pitch (left) + bench
+         (right). Bench shows squad players NOT in the starting XI.
+         Manager can drag players between pitch slots and the bench
+         to re-arrange positions. The visual pitch renders the
+         currently assigned player name (or role label when empty)
+         inside each dot, and each dot is a drop target. -->
+    <div class="formation-grid">
+      <!-- Visual pitch (manager team starting XI) -->
+      <section class="col col-pitch" data-area="pitch" aria-label="Visual pitch">
+        <h3>Mi XI (arrastra para re-ordenar)</h3>
+        <div class="pitch" role="img"
+             [attr.aria-label]="'Vista previa de la formación ' + selectedFormation()">
+          <div class="pitch-line" *ngFor="let count of formationLines; let lineIdx = index">
+            <div class="player-dot"
+                 *ngFor="let _ of [].constructor(count); let dotIdx = index"
+                 [attr.data-slot-idx]="getSlotIndex(lineIdx, dotIdx)"
+                 [class.is-gk]="lineIdx === 0"
+                 [class.is-def]="lineIdx === 1"
+                 [class.is-mid]="lineIdx > 1 && lineIdx < formationLines.length - 1"
+                 [class.is-att]="lineIdx === formationLines.length - 1"
+                 [class.is-empty]="!playerAtSlot(getSlotIndex(lineIdx, dotIdx))"
+                 [class.is-drag-source]="dragSourceSlotIdx === getSlotIndex(lineIdx, dotIdx)"
+                 [attr.draggable]="true"
+                 (dragstart)="onSlotDragStart($event, getSlotIndex(lineIdx, dotIdx))"
+                 (dragover)="onSlotDragOver($event)"
+                 (drop)="onSlotDrop($event, getSlotIndex(lineIdx, dotIdx))"
+                 (dragend)="onSlotDragEnd()">
+              <ng-container *ngIf="playerAtSlot(getSlotIndex(lineIdx, dotIdx)) as p; else emptyDot">
+                <span class="dot-player-name"
+                      [title]="p.name + ' (' + p.position + ')'">
+                  {{ p.name }}
+                </span>
+              </ng-container>
+              <ng-template #emptyDot>
+                <span class="dot-label">{{ getDotLabel(lineIdx, dotIdx, count, false) }}</span>
+              </ng-template>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
+        <p class="hint">
+          <mat-icon>info</mat-icon>
+          Arrastra un jugador a otro slot para intercambiarlos. Arrastra al banquillo para sacarlo.
+        </p>
+      </section>
 
-    <p class="hint">
-      <mat-icon>info</mat-icon>
-      La formación se aplica al XI actual. Los jugadores se reordenan automáticamente
-      según la nueva formación (sin arrastrar y soltar en este sprint).
-    </p>
+      <!-- Bench (squad players not in the XI) -->
+      <section class="col col-bench" data-area="bench" aria-label="Banquillo">
+        <h3>Banquillo</h3>
+        <div class="bench-list">
+          <div *ngFor="let p of benchPlayers"
+               class="bench-player"
+               [attr.data-player-id]="p.sessionPlayerId"
+               [attr.draggable]="true"
+               (dragstart)="onBenchDragStart($event, p.sessionPlayerId)"
+               (dragend)="onSlotDragEnd()"
+               [title]="p.name + ' (' + p.position + ')'">
+            <span class="bench-player-name">{{ p.name }}</span>
+            <span class="bench-player-pos">{{ p.position }}</span>
+          </div>
+          <div *ngIf="benchPlayers.length === 0" class="bench-empty">
+            <mat-icon>info</mat-icon>
+            <span>Todos los jugadores están en el XI.</span>
+          </div>
+        </div>
+        <p class="hint">
+          <mat-icon>info</mat-icon>
+          Arrastra desde aquí al campo para sumar al XI.
+        </p>
+      </section>
+    </div>
 
     <div *ngIf="isSubmitting" class="submit-overlay">
       <mat-spinner diameter="36"></mat-spinner>
@@ -70,7 +105,7 @@
     <button mat-flat-button
             color="primary"
             (click)="confirm()"
-            [disabled]="isSubmitting || selectedFormation() === data.currentFormation">
+            [disabled]="isSubmitting || (!slotsDifferFromInitialPublic() && selectedFormation() === data.currentFormation)">
       Confirmar
     </button>
   </mat-dialog-actions>

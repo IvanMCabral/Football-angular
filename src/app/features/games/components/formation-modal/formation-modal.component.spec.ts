@@ -36,7 +36,20 @@ const SAMPLE_DATA: FormationDialogData = {
     { sessionPlayerId: 'p2', position: 'DEF',  slotIndex: 1 },
     { sessionPlayerId: 'p3', position: 'MID',  slotIndex: 2 },
     { sessionPlayerId: 'p4', position: 'ATT',  slotIndex: 3 }
-  ]
+  ],
+  // V25D81-BUG #4: 4 starters (p1-p4) + 3 bench (b1-b3) so the
+  // bench column has players to render. Without this, the bench
+  // is empty and the drag-drop UX is untestable.
+  squad: [
+    { sessionPlayerId: 'p1', name: 'P1', position: 'GK',  attack: 50, defense: 50, technique: 50, speed: 50, stamina: 50, mentality: 50 },
+    { sessionPlayerId: 'p2', name: 'P2', position: 'DEF', attack: 60, defense: 80, technique: 60, speed: 60, stamina: 70, mentality: 65 },
+    { sessionPlayerId: 'p3', name: 'P3', position: 'MID', attack: 65, defense: 65, technique: 75, speed: 70, stamina: 70, mentality: 70 },
+    { sessionPlayerId: 'p4', name: 'P4', position: 'ATT', attack: 85, defense: 50, technique: 70, speed: 80, stamina: 70, mentality: 70 },
+    { sessionPlayerId: 'b1', name: 'B1', position: 'DEF', attack: 55, defense: 75, technique: 60, speed: 60, stamina: 65, mentality: 60 },
+    { sessionPlayerId: 'b2', name: 'B2', position: 'MID', attack: 65, defense: 60, technique: 70, speed: 70, stamina: 70, mentality: 65 },
+    { sessionPlayerId: 'b3', name: 'B3', position: 'ATT', attack: 75, defense: 50, technique: 65, speed: 75, stamina: 70, mentality: 65 }
+  ] as any,
+  startingIds: new Set(['p1', 'p2', 'p3', 'p4'])
 };
 
 const ALL_FORMATIONS = [
@@ -185,12 +198,31 @@ describe('FormationModalComponent — LIVE-MATCH-F3-UI-LIVE FE5', () => {
     );
   });
 
-  it('confirm with a different formation calls changeFormation with current slots', () => {
+  it('confirm with a different formation calls changeFormation with the new slot list', () => {
+    // V25D81-BUG #4: pre-F5 the modal sent the same currentSlots
+    // regardless of the new formation. With the drag-drop fix, the
+    // modal sends the full slot list for the new formation (11
+    // entries for 4-3-3 with positions LB/CB/CB/RB/CM/CM/CM/LW/ST/RW
+    // + the GK at index 0). The backend's auto-fill re-derives the
+    // roster from these positions.
     engineServiceSpy.changeFormation.and.returnValue(of({ success: true, minuteApplied: 35 }));
     component.onFormationChange('4-3-3');
     component.confirm();
     expect(engineServiceSpy.changeFormation).toHaveBeenCalledOnceWith(
-      'm1', SAMPLE_DATA.currentSlots
+      'm1',
+      jasmine.arrayContaining([
+        jasmine.objectContaining({ slotIndex: 0, position: 'GK' }),
+        jasmine.objectContaining({ slotIndex: 1, position: 'LB' }),
+        jasmine.objectContaining({ slotIndex: 2, position: 'CB' }),
+        jasmine.objectContaining({ slotIndex: 3, position: 'CB' }),
+        jasmine.objectContaining({ slotIndex: 4, position: 'RB' }),
+        jasmine.objectContaining({ slotIndex: 5, position: 'CM' }),
+        jasmine.objectContaining({ slotIndex: 6, position: 'CM' }),
+        jasmine.objectContaining({ slotIndex: 7, position: 'CM' }),
+        jasmine.objectContaining({ slotIndex: 8, position: 'LW' }),
+        jasmine.objectContaining({ slotIndex: 9, position: 'ST' }),
+        jasmine.objectContaining({ slotIndex: 10, position: 'RW' })
+      ])
     );
   });
 
@@ -290,7 +322,7 @@ describe('FormationModalComponent — LIVE-MATCH-F3-UI-LIVE FE5', () => {
     }
   });
 
-it('V25D55-C16 P1.3+4: 3-5-2-CDM (6 lines) — every MID line gets is-mid (CDM + 2CM + 2WB)', () => {
+  it('V25D55-C16 P1.3+4: 3-5-2-CDM (6 lines) — every MID line gets is-mid (CDM + 2CM + 2WB)', () => {
     // 3-5-2-CDM shape: GK(1) + 3CB(3) + CDM(1) + 2CM(2) + 2WB(2) + 2ST(2) = 11
     // Cumulative offsets: line 0 → dots[0], line 1 → dots[1..3], line 2 →
     // dots[4], line 3 → dots[5..6], line 4 → dots[7..8], line 5 → dots[9..10].
@@ -358,7 +390,174 @@ it('V25D55-C16 P1.3+4: 3-5-2-CDM (6 lines) — every MID line gets is-mid (CDM +
     // Line 4: 1 ATT (dot 10)
     expect(dots[10].classList.contains('is-att')).toBeTrue();
   });
+
+  // ========== V25D81-BUG #4: drag-drop re-arrangement ==========
+
+  it('initial slotAssignments mirror the currentSlots from the dialog data', () => {
+    expect(component.slotAssignments.get(0)).toBe('p1');
+    expect(component.slotAssignments.get(1)).toBe('p2');
+    expect(component.slotAssignments.get(2)).toBe('p3');
+    expect(component.slotAssignments.get(3)).toBe('p4');
+  });
+
+  it('benchPlayers excludes the 4 starting XI players (3 bench: b1, b2, b3)', () => {
+    const benchIds = component.benchPlayers.map(p => p.sessionPlayerId);
+    expect(benchIds).toEqual(['b1', 'b2', 'b3']);
+  });
+
+  it('playerAtSlot returns the SessionPlayer for an assigned slot, null for empty', () => {
+    const p1 = component.playerAtSlot(0);
+    expect(p1).not.toBeNull();
+    expect(p1?.sessionPlayerId).toBe('p1');
+    expect(p1?.name).toBe('P1');
+    // Slot 99 doesn't exist in the assignment map.
+    expect(component.playerAtSlot(99)).toBeNull();
+  });
+
+  it('getSlotIndex converts (lineIdx, dotIdx) to flat index for 4-4-2', () => {
+    // 4-4-2 lines: [1 GK, 4 DEF, 4 MID, 2 ATT]
+    expect(component.getSlotIndex(0, 0)).toBe(0);   // GK
+    expect(component.getSlotIndex(1, 0)).toBe(1);   // DEF line start
+    expect(component.getSlotIndex(1, 3)).toBe(4);   // DEF line end
+    expect(component.getSlotIndex(2, 0)).toBe(5);   // MID line start
+    expect(component.getSlotIndex(3, 1)).toBe(10);  // last ATT
+  });
+
+  it('onSlotDrop swaps two players between slots (slot-to-slot)', () => {
+    // Simulate dragging p1 (slot 0) onto p2 (slot 1).
+    const ev = makeDragEvent('slot:0');
+    component.onSlotDragStart(ev as any, 0);
+    component.onSlotDrop(ev as any, 1);
+    // After swap: slot 0 = p2, slot 1 = p1.
+    expect(component.slotAssignments.get(0)).toBe('p2');
+    expect(component.slotAssignments.get(1)).toBe('p1');
+    // Other slots unchanged.
+    expect(component.slotAssignments.get(2)).toBe('p3');
+    expect(component.slotAssignments.get(3)).toBe('p4');
+  });
+
+  it('onSlotDrop is a no-op when source equals target (drop on self)', () => {
+    const ev = makeDragEvent('slot:0');
+    component.onSlotDragStart(ev as any, 0);
+    component.onSlotDrop(ev as any, 0);
+    expect(component.slotAssignments.get(0)).toBe('p1');
+  });
+
+  it('onBenchDragStart + onSlotDrop moves a bench player into a slot', () => {
+    // Drag b1 (bench) into slot 0 (currently p1). The displaced
+    // p1 is no longer in slotAssignments (so it falls into the
+    // bench list automatically).
+    const ev = makeDragEvent('bench:b1');
+    component.onBenchDragStart(ev as any, 'b1');
+    component.onSlotDrop(ev as any, 0);
+    expect(component.slotAssignments.get(0)).toBe('b1');
+    // The bench list now contains the displaced p1 (plus the other
+    // bench players b2, b3).
+    const benchIds = component.benchPlayers.map(p => p.sessionPlayerId);
+    expect(benchIds).toContain('p1');
+    expect(benchIds).not.toContain('b1');
+    expect(benchIds).toContain('b2');
+    expect(benchIds).toContain('b3');
+  });
+
+  it('onFormationChange re-flows slotAssignments for a wider formation', () => {
+    // 4-3-3 has 11 slots (1+4+3+3) but the SAMPLE_DATA only fills 4.
+    // After onFormationChange, the new slots 4-10 should be null.
+    component.onFormationChange('4-3-3');
+    // 4-3-3 lines: [1 GK, 4 DEF, 3 MID, 3 ATT] = 11 slots.
+    expect(component.slotAssignments.size).toBe(11);
+    expect(component.slotAssignments.get(0)).toBe('p1'); // preserved
+    expect(component.slotAssignments.get(1)).toBe('p2'); // preserved
+    expect(component.slotAssignments.get(2)).toBe('p3'); // preserved
+    expect(component.slotAssignments.get(3)).toBe('p4'); // preserved
+    expect(component.slotAssignments.get(4)).toBeNull(); // new empty
+    expect(component.slotAssignments.get(10)).toBeNull(); // new empty
+  });
+
+  it('onFormationChange preserves all 11 assignments when formations have the same slot count (4-4-2 → 4-3-3 → 4-2-3-1 all have 11 slots)', () => {
+    // All 12 formations in the dropdown have exactly 11 slots
+    // (1 GK + 10 outfield). So in practice, a manager re-arranging
+    // formations never LOSES assignments via trim. This test pins
+    // that invariant: if a future formation is added with a
+    // different slot count, this test will need an update.
+    expect(component.slotAssignments.size).toBe(4); // p1..p4 from SAMPLE_DATA
+    component.onFormationChange('4-3-3');
+    expect(component.slotAssignments.size).toBe(11);
+    // All 4 original assignments preserved at their flat indices.
+    expect(component.slotAssignments.get(0)).toBe('p1');
+    expect(component.slotAssignments.get(1)).toBe('p2');
+    expect(component.slotAssignments.get(2)).toBe('p3');
+    expect(component.slotAssignments.get(3)).toBe('p4');
+    component.onFormationChange('4-2-3-1');
+    expect(component.slotAssignments.size).toBe(11);
+    expect(component.slotAssignments.get(0)).toBe('p1');
+    expect(component.slotAssignments.get(1)).toBe('p2');
+    expect(component.slotAssignments.get(2)).toBe('p3');
+    expect(component.slotAssignments.get(3)).toBe('p4');
+  });
+
+  it('slotsDifferFromInitial returns false when nothing changed', () => {
+    expect((component as any).slotsDifferFromInitial()).toBeFalse();
+  });
+
+  it('slotsDifferFromInitial returns true after a drag-drop swap', () => {
+    const ev = makeDragEvent('slot:0');
+    component.onSlotDragStart(ev as any, 0);
+    component.onSlotDrop(ev as any, 1);
+    expect((component as any).slotsDifferFromInitial()).toBeTrue();
+  });
+
+  it('slotsDifferFromInitial returns true when a bench player is moved to a slot', () => {
+    const ev = makeDragEvent('bench:b1');
+    component.onBenchDragStart(ev as any, 'b1');
+    component.onSlotDrop(ev as any, 0);
+    expect((component as any).slotsDifferFromInitial()).toBeTrue();
+  });
+
+  it('confirm sends the post-drag slot list to the backend', () => {
+    // Setup: drag b1 into slot 0, displacing p1.
+    const ev = makeDragEvent('bench:b1');
+    component.onBenchDragStart(ev as any, 'b1');
+    component.onSlotDrop(ev as any, 0);
+    engineServiceSpy.changeFormation.and.returnValue(of({ success: true, minuteApplied: 35 }));
+    component.confirm();
+    expect(engineServiceSpy.changeFormation).toHaveBeenCalledOnceWith(
+      'm1',
+      jasmine.arrayContaining([
+        jasmine.objectContaining({ slotIndex: 0, sessionPlayerId: 'b1' }),
+        jasmine.objectContaining({ slotIndex: 1, sessionPlayerId: 'p2' }),
+        jasmine.objectContaining({ slotIndex: 2, sessionPlayerId: 'p3' }),
+        jasmine.objectContaining({ slotIndex: 3, sessionPlayerId: 'p4' })
+      ])
+    );
+  });
+
+  it('onSlotDragEnd clears the drag source tracking (cleanup on release outside drop target)', () => {
+    component.dragSourceSlotIdx = 0;
+    component.dragSourceIsBench = false;
+    component.onSlotDragEnd();
+    expect(component.dragSourceSlotIdx).toBeNull();
+    expect(component.dragSourceIsBench).toBeFalse();
+  });
 });
+
+// Helper: builds a synthetic DragEvent with the given dataTransfer
+// payload. jsdom doesn't fire real drag events, so the modal handlers
+// operate on the DragEvent-shaped object directly.
+function makeDragEvent(plainText: string): Partial<DragEvent> {
+  return {
+    preventDefault: () => undefined,
+    dataTransfer: {
+      setData: () => undefined,
+      getData: (_format: string) => plainText,
+      effectAllowed: 'move',
+      dropEffect: 'move',
+      files: [] as any,
+      items: [] as any,
+      types: []
+    } as unknown as DataTransfer
+  };
+};
 
 /**
  * V25D56 (Sprint C17) — formation-modal responsive breakpoints.

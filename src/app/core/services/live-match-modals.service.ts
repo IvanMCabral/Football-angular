@@ -229,18 +229,33 @@ export class LiveMatchModalsService {
     const homeTeamId = state.homeTeamId;
     const currentFormation = state.homeFormation || '4-4-2';
     const careerId = this.getCurrentCareerId();
-    return this.http.get<LineupDTO>(`${environment.apiUrl}/career/lineup/current`).pipe(
-      map((lineup) => {
+    // V25D81-BUG #4: also fetch the squad so the drag-drop modal can
+    // render player names + a bench list. Same pattern as
+    // openSubstitutionModal (lineup + squad forkJoin).
+    return forkJoin({
+      lineup: this.http.get<LineupDTO>(`${environment.apiUrl}/career/lineup/current`),
+      squad: this.teamService.getMyTeamSquad()
+    }).pipe(
+      map(({ lineup, squad }) => {
         const currentSlots = (lineup?.players ?? []).map((p, i) => ({
           sessionPlayerId: p.playerId,
           position: p.position,
           slotIndex: i
         }));
+        // V25D81-BUG #4: startingIds = sessionPlayerIds in the current
+        // lineup. The modal uses this to split the squad into
+        // "on pitch" (in currentSlots) and "bench" (squad minus
+        // starting) when the drag-drop bench column is rendered.
+        const startingIds = new Set<string>(
+          currentSlots.map(s => s.sessionPlayerId).filter(id => !!id)
+        );
         const data: FormationDialogData = {
           matchId,
           currentFormation,
           homeTeamId,
-          currentSlots
+          currentSlots,
+          squad: squad ?? [],
+          startingIds
         };
 
         // LIVE-MATCH-F5.3.3 BUG-015: pause the round BEFORE the dialog
@@ -257,7 +272,7 @@ export class LiveMatchModalsService {
 
         const dialogRef = this.dialog.open(FormationModalComponent, {
           data,
-          width: '520px',
+          width: '720px',           // V25D81-BUG #4: wider for the drag-drop bench column
           maxWidth: '95vw',
           disableClose: false,
           autoFocus: 'first-tabbable'
