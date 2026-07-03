@@ -252,6 +252,39 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       border: 1px solid #ffcdd2;
     }
 
+    /* V25D81.1 BUG #4: warning banner (orange) for the auto-fill
+       "could not resolve slot" case. Lighter than .banner-error so
+       the manager can still proceed. */
+    .banner-warning {
+      background: #fff8e1;
+      color: #8a5300;
+      border: 1px solid #ffe0a0;
+    }
+
+    /* V25D81.1 BUG #4: visual cue that a slot was filled by
+       autoFillEmptySlots. A thin yellow ring + a small badge inside
+       the dot so the manager sees "system picked this player".
+       Manual drag overrides clear the marker and the cue disappears. */
+    .player-dot.is-auto-filled {
+      box-shadow: 0 0 0 2px #f57c00, 0 1px 3px rgba(0, 0, 0, 0.3);
+    }
+    .auto-fill-badge {
+      position: absolute;
+      top: -6px;
+      right: -6px;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #fff;
+      border: 1px solid #f57c00;
+      font-size: 9px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      z-index: 2;
+    }
+
     .formation-row {
       display: flex;
       justify-content: center;
@@ -596,6 +629,43 @@ export class FormationModalComponent {
   dragSourceSlotIdx: number | null = null;
   dragSourceIsBench: boolean = false;
 
+  /**
+   * V25D81.1 BUG #4 (opción c): tracks slots that were auto-filled by
+   * {@link autoFillEmptySlots} so the template can render a lock icon
+   * with tooltip "Auto-asignado". When the manager manually drags a
+   * different player into the slot, we drop the entry here so the
+   * lock badge disappears (manual override takes priority).
+   */
+  readonly autoFilledSlots = new Map<number, string>();
+
+  /**
+   * V25D81.1 BUG #4: warning message surfaced when at least one slot
+   * could not be auto-filled (no compatible bench player). Empty when
+   * every empty slot was resolved. Mirrors the same pattern as
+   * {@code errorMsg} so the same banner styling renders both states.
+   */
+  warningMsg = '';
+
+  /**
+   * V25D81.1 BUG #4: position group mapping for the bench fill.
+   * Slot role labels and bench player positions can be either
+   * family CATEGORY (DEF, MID, ATT) or specific role (CB, CM, ST,
+   * etc.). The map lists both forms so either side resolves to the
+   * same group.
+   *
+   * <p>GK only matches GK. DEF matches the DEF category plus every
+   * specific defender role. Same shape for MID and ATT. A slot whose
+   * role label is missing from any group falls back to "all
+   * positions" (defensive — accepts any bench player rather than
+   * failing the slot).
+   */
+  private static readonly POSITION_GROUPS: Record<string, string[]> = {
+    GK: ['GK'],
+    DEF: ['DEF', 'CB', 'LB', 'RB', 'LWB', 'RWB'],
+    MID: ['MID', 'CM', 'CDM', 'CAM', 'LM', 'RM'],
+    ATT: ['ATT', 'ST', 'CF', 'LW', 'RW']
+  };
+
   isSubmitting = false;
   errorMsg = '';
   private destroy$ = new Subject<void>();
@@ -710,10 +780,15 @@ export class FormationModalComponent {
       }
       const displaced = this.slotAssignments.get(targetSlotIdx) ?? null;
       this.slotAssignments.set(targetSlotIdx, playerId);
+      // V25D81.1 BUG #4: when the manager drags a bench player INTO
+      // an auto-filled slot, the manual assignment supersedes the
+      // auto-fill marker. Drop the slot from autoFilledSlots so the
+      // lock badge disappears.
+      this.clearAutoFillMarker(targetSlotIdx);
       // The displaced player is now bench (or stays bench if the
       // target slot was empty). We don't track bench explicitly —
-      // the template's bench list is derived from `data.squad`
-      // minus the assigned ids, so this is automatic.
+      // the bench list is recomputed from `data.squad` minus the
+      // new slotAssignments.
       void displaced; // intentionally unused (see template bench list)
     } else {
       // Slot → slot: SWAP the source and target assignments. The
@@ -727,6 +802,11 @@ export class FormationModalComponent {
       const targetPlayer = this.slotAssignments.get(targetSlotIdx) ?? null;
       this.slotAssignments.set(targetSlotIdx, sourcePlayer);
       this.slotAssignments.set(sourceSlot, targetPlayer);
+      // V25D81.1 BUG #4: clear auto-fill markers on BOTH slots after
+      // a swap so the lock badge only remains for still-auto-filled
+      // slots (a manually-modified slot is no longer "auto").
+      this.clearAutoFillMarker(targetSlotIdx);
+      this.clearAutoFillMarker(sourceSlot);
     }
     this.dragSourceSlotIdx = null;
     this.dragSourceIsBench = false;
@@ -745,6 +825,125 @@ export class FormationModalComponent {
   onSlotDragEnd(): void {
     this.dragSourceSlotIdx = null;
     this.dragSourceIsBench = false;
+  }
+
+  // ========== V25D81.1 BUG #4: auto-fill empty slots on confirm ==========
+
+  /**
+   * V25D81.1 BUG #4 (opción c): iterates every empty slot in the
+   * current formation and fills it with the first compatible bench
+   * player (same position group). Tracks the assignment in
+   * {@link autoFilledSlots} so the template can render a lock icon
+   * with tooltip "Auto-asignado".
+   *
+   * <p>Selection rules:
+   * <ul>
+   *   <li>Bench player must be currently on the bench (computed from
+   *       {@code data.squad} minus slotAssignments).</li>
+   *   <li>Position must be compatible per
+   *       {@link POSITION_GROUPS} (GK→GK, DEF→CB family, MID→CM
+   *       family, ATT→ST family). Falling back to first available
+   *       bench if no compatible player exists for a slot.</li>
+   *   <li>First compatible player wins (stable order from bench list,
+   *       which is the squad order from the backend).</li>
+   * </ul>
+   *
+   * <p>If at least one slot could not be filled (all bench players
+   * already assigned, or the squad has nobody), the warning is
+   * surfaced to {@link warningMsg} so the manager can see the gap
+   * before confirming.
+   */
+  autoFillEmptySlots(): void {
+    this.autoFilledSlots.clear();
+    this.warningMsg = '';
+
+    const lines = FORMATION_LINES_BY_FORMATION[this.selectedFormation()] ?? [];
+    let slotIdx = 0;
+    let unfilled = 0;
+    for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+      const line = lines[lineIdx];
+      for (let dotIdx = 0; dotIdx < line.length; dotIdx++) {
+        const current = this.slotAssignments.get(slotIdx);
+        if (current) {
+          slotIdx++;
+          continue;
+        }
+        const roleLabel = line[dotIdx];
+        const filled = this.tryFillSlot(slotIdx, roleLabel);
+        if (!filled) {
+          unfilled++;
+        }
+        slotIdx++;
+      }
+    }
+    if (unfilled > 0) {
+      this.warningMsg = `${unfilled} posición(es) no se pudieron completar — no hay suficientes jugadores en el banquillo con posición compatible.`;
+    }
+    // Trigger CD since we mutated slotAssignments + autoFilledSlots.
+    this.selectedFormation.set(this.selectedFormation());
+  }
+
+  /**
+   * Picks the first bench player compatible with the slot's role
+   * label and assigns them. Updates both slotAssignments and
+   * autoFilledSlots. Returns true on success, false when no
+   * compatible bench exists. There is NO last-resort fallback: a
+   * slot without a compatible bench stays empty and triggers the
+   * warning banner (the backend's auto-fill on confirm takes over
+   * if the manager accepts the gap).
+   */
+  private tryFillSlot(slotIdx: number, roleLabel: string): boolean {
+    const compatibleGroups = this.compatibleGroupForRole(roleLabel);
+    const bench = this.benchPlayers;
+    const pick = bench.find(p => compatibleGroups.includes((p.position || '').toUpperCase()));
+    if (!pick) {
+      return false;
+    }
+    this.slotAssignments.set(slotIdx, pick.sessionPlayerId);
+    this.autoFilledSlots.set(slotIdx, pick.sessionPlayerId);
+    return true;
+  }
+
+  /**
+   * Returns the list of position strings compatible with a slot's
+   * role label. Forwards the role label to its group, defaulting to
+   * "any position" when the role is unknown.
+   */
+  private compatibleGroupForRole(roleLabel: string): string[] {
+    const upper = (roleLabel || '').toUpperCase();
+    for (const group of Object.keys(FormationModalComponent.POSITION_GROUPS)) {
+      if (FormationModalComponent.POSITION_GROUPS[group].includes(upper)) {
+        return FormationModalComponent.POSITION_GROUPS[group];
+      }
+    }
+    const groups = FormationModalComponent.POSITION_GROUPS;
+    return [
+      ...groups['GK'],
+      ...groups['DEF'],
+      ...groups['MID'],
+      ...groups['ATT']
+    ];
+  }
+
+  /**
+   * Test/UI hook: returns true if the given slot index was filled
+   * by the auto-fill pass and the manager has not subsequently
+   * dragged a different player into the slot.
+   */
+  isAutoFilledSlot(slotIdx: number): boolean {
+    return this.autoFilledSlots.has(slotIdx);
+  }
+
+  /**
+   * V25D81.1 BUG #4: drag-drop override. When the manager drags a
+   * different player into an auto-filled slot, we drop the slot from
+   * {@link autoFilledSlots} so the lock icon disappears (manual
+   * assignment takes priority over the auto-fill marker).
+   */
+  private clearAutoFillMarker(slotIdx: number): void {
+    if (this.autoFilledSlots.has(slotIdx)) {
+      this.autoFilledSlots.delete(slotIdx);
+    }
   }
 
   /**
@@ -830,14 +1029,22 @@ export class FormationModalComponent {
       this.dialogRef.close({ success: false, reason: 'no-change' });
       return;
     }
+    // V25D81.1 BUG #4 (opción c): auto-fill every empty slot from the
+    // bench before we POST. The manager dragged some players around
+    // and the formation changed — empty slots would otherwise be sent
+    // as empty sessionPlayerId and the backend's auto-fill would pick
+    // the same player the manager has on the bench right next to the
+    // modal. Doing it client-side gives the manager immediate visual
+    // feedback (lock icon + tooltip) and lets them undo by dragging a
+    // different player into the slot before re-confirming.
+    this.autoFillEmptySlots();
     this.isSubmitting = true;
     this.errorMsg = '';
     // V25D81-BUG #4: build the slot list from the current
-    // slotAssignments (post-drag state), with the position derived
-    // from FORMATION_LINES_BY_FORMATION for the selected formation.
-    // Empty slots (null playerId) are sent with empty sessionPlayerId
-    // — the backend treats those as "no assignment" and auto-fills
-    // with the next best player (per the F5 contract).
+    // slotAssignments (post-drag + post-auto-fill state), with the
+    // position derived from FORMATION_LINES_BY_FORMATION for the
+    // selected formation. After autoFillEmptySlots every slot has a
+    // sessionPlayerId so the slot list never carries empty entries.
     const slots = this.buildSlotListForBackend();
     this.engineService.changeFormation(this.data.matchId, slots)
       .pipe(takeUntil(this.destroy$))

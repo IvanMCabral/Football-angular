@@ -11,6 +11,15 @@
       <span>{{ errorMsg }}</span>
     </div>
 
+    <!-- V25D81.1 BUG #4: warning banner shown when autoFillEmptySlots
+         could not fill at least one slot (no compatible bench). Lighter
+         styling than the error banner (orange vs red) so the manager
+         can still proceed if they accept the gap. -->
+    <div *ngIf="warningMsg && !errorMsg" class="banner banner-warning" role="status" data-testid="autofill-warning">
+      <mat-icon>warning</mat-icon>
+      <span>{{ warningMsg }}</span>
+    </div>
+
     <div class="formation-row">
       <mat-form-field appearance="outline" class="formation-select">
         <mat-label>Formación</mat-label>
@@ -45,6 +54,8 @@
                  [class.is-att]="lineIdx === formationLines.length - 1"
                  [class.is-empty]="!playerAtSlot(getSlotIndex(lineIdx, dotIdx))"
                  [class.is-drag-source]="dragSourceSlotIdx === getSlotIndex(lineIdx, dotIdx)"
+                 [class.is-auto-filled]="isAutoFilledSlot(getSlotIndex(lineIdx, dotIdx))"
+                 [attr.data-auto-filled]="isAutoFilledSlot(getSlotIndex(lineIdx, dotIdx)) ? 'true' : 'false'"
                  [attr.draggable]="true"
                  (dragstart)="onSlotDragStart($event, getSlotIndex(lineIdx, dotIdx))"
                  (dragover)="onSlotDragOver($event)"
@@ -52,8 +63,20 @@
                  (dragend)="onSlotDragEnd()">
               <ng-container *ngIf="playerAtSlot(getSlotIndex(lineIdx, dotIdx)) as p; else emptyDot">
                 <span class="dot-player-name"
-                      [title]="p.name + ' (' + p.position + ')'">
+                      [title]="(isAutoFilledSlot(getSlotIndex(lineIdx, dotIdx)) ? '🔒 Auto-asignado · ' : '') + p.name + ' (' + p.position + ')'">
                   {{ p.name }}
+                </span>
+                <!-- V25D81.1 BUG #4: lock badge for auto-filled slots.
+                     The icon signals "system picked this player", the
+                     wrapper carries the tooltip via the parent title
+                     attribute. Manual drag overrides clear the marker
+                     and the badge disappears. -->
+                <span *ngIf="isAutoFilledSlot(getSlotIndex(lineIdx, dotIdx))"
+                      class="auto-fill-badge"
+                      aria-label="Auto-asignado"
+                      data-testid="auto-fill-badge"
+                      [title]="'🔒 Auto-asignado — arrastra otro jugador para sobrescribir'">
+                  🔒
                 </span>
               </ng-container>
               <ng-template #emptyDot>
