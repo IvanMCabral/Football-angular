@@ -1,4 +1,17 @@
 <div class="container">
+  <!-- V25D83.1 sprint 2 ajuste (pre-push): full-screen spinner overlay
+       mientras el squad data está (re-)cargándose. Se dispara en initial
+       mount y después de un refetch (lineup-confirm, squad-editor close,
+       continue-to-new-season). Cubre toda la grid con un backdrop
+       semi-transparente para evitar que el usuario vea la grid vacía
+       durante el HTTP in-flight. -->
+  <div *ngIf="squadLoading$ | async" class="squad-loading-overlay" data-testid="squad-loading-overlay" role="status" aria-live="polite">
+    <div class="squad-loading-content">
+      <div class="spinner spinner-lg"></div>
+      <p class="squad-loading-text">Cargando plantilla...</p>
+    </div>
+  </div>
+
   <!-- HEADER: Título y estadísticas en una fila -->
   <div class="page-header">
     <div class="header-left">

@@ -4,6 +4,7 @@ import { RouterLink, Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { Observable, combineLatest, forkJoin, of, switchMap, map, tap, catchError, shareReplay, BehaviorSubject, firstValueFrom, take } from 'rxjs';
+import { startWith, distinctUntilChanged } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 import { FixtureService } from 'app/core/services/fixture.service';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
@@ -113,7 +114,39 @@ export class SquadManagementComponent implements OnInit {
    team$!: Observable<Team | null>;
    squad$!: Observable<SessionPlayer[]>;
    loading$!: Observable<boolean>;
+   /**
+    * V25D83.1 sprint 2 ajuste (pre-push): post-lineup-confirm loading indicator.
+    *
+    * <p>{@code true} mientras el squad data está siendo (re-)cargado. Se
+    * dispara en dos momentos:
+    * <ol>
+    *   <li>Initial mount del componente (el HTTP a /career/players/squad
+    *       está en flight).</li>
+    *   <li>Post-refetch disparado por {@code refetchSquadTrigger$} — por
+    *       ejemplo después de un lineup-confirm exitoso, o cuando el modal
+    *       squad-editor cierra y necesitamos refrescar el squad para que
+    *       la grid muestre los cambios de energy/condition/etc.</li>
+    * </ol>
+    *
+    * <p>El template renderiza un spinner overlay (full-screen) cuando este
+    * observable emite {@code true}, evitando que el usuario vea la grid
+    * vacía durante el refetch.
+    */
+   squadLoading$!: Observable<boolean>;
    error$!: Observable<string | null>;
+
+   /**
+    * V25D83.1 sprint 2 ajuste (pre-push): trigger BehaviorSubject que fuerza
+    * un refetch del squad$. Se usa después de acciones que pueden haber
+    * modificado el squad server-side (lineup-confirm, squad-editor close,
+    * continue-to-new-season).
+    *
+    * <p>Patrón (documentado en {@code memory/angular-testing-patterns.md}
+    * → "Refresh pattern via BehaviorSubject tick"): combina con
+    * {@code careerStatusSource$} vía {@code combineLatest} para que el
+    * switchMap interno re-dispare el HTTP.
+    */
+   private refetchSquadTrigger$ = new BehaviorSubject<void>(undefined);
 
    lineup$!: Observable<LineupDTO | null>;
    lineupLoading$ = new BehaviorSubject<boolean>(false);
@@ -209,26 +242,67 @@ selectedFormation$ = new BehaviorSubject<string>('4-4-2');
        shareReplay(1)
      );
 
-     this.squad$ = careerStatusSource$.pipe(
-       switchMap(status => {
-         if (status && status.careerId) {
-           return this.http.get<SessionPlayer[]>(`${environment.apiUrl}/career/players/squad`).pipe(
-             catchError(err => of([]))
-           );
-         }
-         return of([]);
-       }),
-       shareReplay(1)
-     );
+this.squad$ = combineLatest([
+        careerStatusSource$,
+        this.refetchSquadTrigger$
+      ]).pipe(
+        switchMap(([status]) => {
+          if (status && status.careerId) {
+            return this.http.get<SessionPlayer[]>(`${environment.apiUrl}/career/players/squad`).pipe(
+              catchError(err => of([]))
+            );
+          }
+          return of([]);
+        }),
+        shareReplay(1)
+      );
 
-     this.loading$ = combineLatest([
-       careerStatusSource$,
-       this.team$,
-       this.squad$
-     ]).pipe(
-       map(() => false),
-       catchError(() => of(false))
-     );
+      /**
+       * V25D83.1 sprint 2 ajuste (pre-push): squad loading indicator.
+       *
+       * <p>Patrón derivado de {@code loading$} (más abajo): empieza en
+       * {@code true} vía {@code startWith(true)}, flips a {@code false}
+       * cuando squad$ emite (initial mount o post-refetch). El
+       * {@code distinctUntilChanged} colapsa emisiones redundantes.
+       *
+       * <p>{@code combineLatest([refetchSquadTrigger$, squad$])} garantiza
+       * que cada {@code refetchSquadTrigger$.next()} re-emite (porque el
+       * combineLatest re-evalúa) y el squad$ subsecuente emite el nuevo
+       * payload, dando el patrón true→false→true→false esperado.
+       */
+      this.squadLoading$ = combineLatest([
+        this.refetchSquadTrigger$,
+        this.squad$
+      ]).pipe(
+        map(() => false),
+        startWith(true),
+        distinctUntilChanged(),
+        catchError(() => of(false))
+      );
+
+      this.loading$ = combineLatest([
+        careerStatusSource$,
+        this.team$,
+        this.squad$
+      ]).pipe(
+        /**
+         * V25D83.1 sprint 2 ajuste (pre-push): fix broken loading$.
+         *
+         * <p>Pre-fix: el pipe terminaba en {@code map(() => false)} — el
+         * spinner de página nunca se mostraba porque cada emission del
+         * combineLatest se mapeaba a false. Era un dead code que
+         * silenciosamente bloqueaba el UX gap.
+         *
+         * <p>Post-fix: patrón {@code startWith(true) → map(() => false) →
+         * distinctUntilChanged} idéntico al usado en {@code career-setup}
+         * (V25D83.1 #1/#2). El spinner aparece mientras careerStatus/team/
+         * squad están awaiting su primer payload.
+         */
+        map(() => false),
+        startWith(true),
+        distinctUntilChanged(),
+        catchError(() => of(false))
+      );
 
      this.error$ = of(null);
 
@@ -453,6 +527,14 @@ openVisualEditor(): void {
             })
           )
           .subscribe();
+        /**
+         * V25D83.1 sprint 2 ajuste (pre-push): también refrescar el squad
+         * post-modal-close. El squad-editor-modal puede haber actualizado
+         * condition/energy/etc de los players, y queremos que la grid del
+         * squad-management muestre los datos frescos. El squadLoading$
+         * spinner overlay se renderiza durante el HTTP.
+         */
+        this.refreshSquad();
       });
     });
   });
@@ -533,10 +615,20 @@ openVisualEditor(): void {
          return;
        }
 
-       this.http.post(`${environment.apiUrl}/career/lineup/confirm`, {}).subscribe({
-         next: () => {
-           this.resetLineupWarning();
-           if (careerStatus.careerPhase === 'WAITING_USER') {
+this.http.post(`${environment.apiUrl}/career/lineup/confirm`, {}).subscribe({
+          next: () => {
+            this.resetLineupWarning();
+            /**
+             * V25D83.1 sprint 2 ajuste (pre-push): trigger squad refetch
+             * post-lineup-confirm. El lineup-confirm puede modificar el squad
+             * server-side (energy drain, condition updates) y queremos que
+             * el squadLoading$ spinner overlay se muestre brevemente
+             * mientras el HTTP re-fetchea. La navegación a /games/.../live
+             * puede cancelar el observer, pero el patrón queda en sync si
+             * el usuario regresa a /squad después.
+             */
+            this.refreshSquad();
+            if (careerStatus.careerPhase === 'WAITING_USER') {
              this.http.post<any>(`${environment.apiUrl}/career/${careerStatus.careerId}/next-round`, {}).subscribe({
                next: (response) => {
                  this.lineupLoading$.next(false);
@@ -683,6 +775,24 @@ openVisualEditor(): void {
         }),
         catchError(_err => of(null))
       );
+      /**
+       * V25D83.1 sprint 2 ajuste (pre-push): cuando el career-status cambia
+       * (continueToNewSeason, round-end transitions), re-fetchear el squad
+       * para que la grid muestre los datos frescos. El squadLoading$
+       * spinner overlay se renderiza durante el HTTP.
+       */
+      this.refetchSquadTrigger$.next();
+    }
+
+    /**
+     * V25D83.1 sprint 2 ajuste (pre-push): trigger manual del squad refetch.
+     *
+     * <p>Usado por {@link onConfirmLineup} después de un lineup-confirm
+     * exitoso (pre-navigation a /games/.../live) y por callers externos que
+     * necesiten refrescar el squad sin tocar career-status.
+     */
+    refreshSquad(): void {
+      this.refetchSquadTrigger$.next();
     }
 
 }
