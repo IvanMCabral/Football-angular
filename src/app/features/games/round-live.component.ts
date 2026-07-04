@@ -85,6 +85,30 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
 
   vm$: Observable<RoundLiveViewModel>;
 
+  /**
+   * V25D83 sprint: initial-round-load indicator. True while the
+   * {@code combineLatest([routeParams$, teams$, careerStatus$, fixtures$])}
+   * chain in the constructor is still resolving (i.e. the manager hit
+   * /games/:gameId/round/:round and the round has not yet rendered).
+   *
+   * <p>Before this fix the round-live page rendered an empty
+   * {@code .round-live-container} immediately because the
+   * {@code vmSubject} initialized with an empty matches array — the user
+   * saw a blank screen with no feedback while the four HTTP fetches
+   * raced in. We now expose this flag (driven by a BehaviorSubject that
+   * the constructor flips to {@code false} on the first combineLatest
+   * emission, success or error) and the template renders a centered
+   * spinner until it clears.
+   *
+   * <p>Distinct from {@code vm.errorMsg}: errorMsg is set when the chain
+   * emitted with a non-recoverable state (e.g. "No hay partidos para la
+   * fecha N"). {@code loading$} tracks the network fetch itself, not the
+   * result. After loading$ clears, the existing
+   * {@code <div *ngIf="vm.errorMsg">} guard takes over.
+   */
+  private loadingSubject = new BehaviorSubject<boolean>(true);
+  loading$: Observable<boolean> = this.loadingSubject.asObservable();
+
   constructor() {
     this.vm$ = this.vmSubject.asObservable();
 
@@ -120,6 +144,12 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
     combineLatest([routeParams$, teams$, careerStatus$, fixtures$]).pipe(
       takeUntil(this.destroy$),
       tap(([params, teamMap, careerStatus, fixturesData]) => {
+        // V25D83 sprint: clear the initial-load spinner on the first
+        // emission (success path). Done before the early-return redirects
+        // so the manager doesn't see the spinner stick if we navigate
+        // them to the champion screen.
+        this.loadingSubject.next(false);
+
         if (careerStatus.careerPhase === 'FINISHED') {
           this.router.navigate([`/games/${params.gameId}/champion`]);
           return;
@@ -187,6 +217,11 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
       }),
       catchError(err => {
         console.error('[ROUND] Error:', err);
+        // V25D83 sprint: clear the spinner even on error so the empty/error
+        // state becomes visible instead of a stuck spinner. The existing
+        // vm.errorMsg / router.navigate fallbacks render the actual error
+        // path.
+        this.loadingSubject.next(false);
         return of(null);
       })
     ).subscribe();

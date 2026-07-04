@@ -32,7 +32,7 @@ import { ActivatedRoute, provideRouter, Router } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { BehaviorSubject, of, Subject, Observable } from 'rxjs';
+import { BehaviorSubject, of, Subject, Observable, throwError } from 'rxjs';
 import { RoundLiveComponent } from './round-live.component';
 import { CareerService } from '../../core/services/career.service';
 import { MatchEngineService } from '../../core/services/match-engine.service';
@@ -590,6 +590,101 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
       (component as any).startRoundEngine(SAMPLE_GAME_ID, (component as any).vmSubject.value.matches);
       roundStateSubject.next(makeRoundState([makeMatchState({ status: 'NOT_STARTED', currentMinute: 0 })]));
       expect((component as any).vmSubject.value.anyStarted).toBeFalse();
+    });
+  });
+
+  // ========== V25D83 sprint: initial-load spinner (loading$) ==========
+
+  /**
+   * V25D83 sprint: the constructor's combineLatest (routeParams + teams +
+   * careerStatus + fixtures) used to render an empty round-live-container
+   * immediately because the vmSubject initial value was empty. The user
+   * saw a blank page until all four HTTP fetches resolved. We added a
+   * {@code loading$} BehaviorSubject that flips to false on the first
+   * combineLatest emission (success or error) so the template can render
+   * a centered spinner while loading.
+   *
+   * <p>Tests cover:
+   * <ol>
+   *   <li>{@code loading$} starts at {@code true} on subscription (initial
+   *       BehaviorSubject value), then flips to {@code false} when the
+   *       constructor's combineLatest chain emits.</li>
+   *   <li>{@code loading$} flips to {@code false} on the error path too
+   *       (the catchError in the constructor chain clears it so the
+   *       empty/error state becomes visible).</li>
+   * </ol>
+   *
+   * <p>Implementation note: we use {@code Subject} (not {@code BehaviorSubject})
+   * for the service spies so the combineLatest chain does NOT emit during
+   * the constructor — we control the emissions from the test body and
+   * can observe the {@code loading$} transitions in order.
+   */
+  describe('V25D83 sprint: loading$ (initial-load spinner)', () => {
+    it('V25D83 #1: loading$ starts true and flips to false after combineLatest emits', (done: DoneFn) => {
+      // Cold subjects so combineLatest blocks until we push.
+      const teamsSub = new Subject<any[]>();
+      const statusSub = new Subject<any>();
+      const fixturesSub = new Subject<any>();
+      careerServiceSpy.getCareerTeams.and.returnValue(teamsSub);
+      careerServiceSpy.getCareerStatus.and.returnValue(statusSub);
+      careerServiceSpy.getFixturesByRoundWithBye.and.returnValue(fixturesSub);
+
+      // Recreate the fixture so the constructor re-runs with the new spies.
+      fixture = TestBed.createComponent(RoundLiveComponent);
+      component = fixture.componentInstance;
+
+      // The chain has not emitted yet (Subjects are cold), so loading$
+      // must still be at its initial value: true.
+      const emissions: boolean[] = [];
+      const sub = component.loading$.subscribe(v => emissions.push(v));
+      expect(emissions[0]).toBeTrue();
+
+      // Now release the chain — all three sources emit and combineLatest fires.
+      teamsSub.next([]);
+      statusSub.next({
+        careerPhase: 'IN_PROGRESS',
+        totalRounds: 38,
+        userSessionTeamId: SAMPLE_HOME_TEAM_ID
+      });
+      fixturesSub.next({ matches: [], byeTeam: null });
+
+      fixture.whenStable().then(() => {
+        expect(emissions[emissions.length - 1]).toBeFalse();
+        sub.unsubscribe();
+        done();
+      });
+    });
+
+    it('V25D83 #2: loading$ flips to false on the error path (catchError)', (done: DoneFn) => {
+      // Use cold Subjects so the constructor's combineLatest chain does
+      // not emit during construction (loading$ stays at its initial value
+      // `true`). We then manually fire an error on the status subject to
+      // verify catchError clears loading$ on the error path.
+      const teamsSub = new Subject<any[]>();
+      const statusSub = new Subject<any>();
+      const fixturesSub = new Subject<any>();
+      careerServiceSpy.getCareerTeams.and.returnValue(teamsSub);
+      careerServiceSpy.getCareerStatus.and.returnValue(statusSub);
+      careerServiceSpy.getFixturesByRoundWithBye.and.returnValue(fixturesSub);
+
+      fixture = TestBed.createComponent(RoundLiveComponent);
+      component = fixture.componentInstance;
+
+      const emissions: boolean[] = [];
+      const sub = component.loading$.subscribe(v => emissions.push(v));
+      // Initial state: combineLatest has not emitted (cold Subjects),
+      // so loading$ is still `true`.
+      expect(emissions[0]).toBeTrue();
+
+      // Trigger the error path. Subject.error propagates through
+      // combineLatest into the catchError, which clears loading$.
+      statusSub.error(new Error('boom'));
+
+      fixture.whenStable().then(() => {
+        expect(emissions[emissions.length - 1]).toBeFalse();
+        sub.unsubscribe();
+        done();
+      });
     });
   });
 });

@@ -1,4 +1,13 @@
 <div class="round-live-container" *ngIf="vm$ | async as vm">
+  <!-- V25D83 sprint: page-level spinner while the initial route data
+       (route params + teams + career status + fixtures) is still
+       resolving. Replaces the silent empty-container UX gap. The
+       loadingSubject flips to false on first emission (success or error)
+       in round-live.component.ts. -->
+  <div *ngIf="loading$ | async" class="loading-state" data-testid="round-live-loading">
+    <div class="spinner"></div>
+    <p>Cargando fecha...</p>
+  </div>
 
   <div class="header">
     <h2>Fecha {{ vm.roundNumber }} - En Vivo</h2>
