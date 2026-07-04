@@ -381,4 +381,155 @@ describe('CareerSetupComponent — V25D78-C48.1 setup-flow UX gap fix', () => {
       expect(expectedTemplateFragment).toContain("['PRIMERA', 'SEGUNDA', 'TERCERA'][divIndex]");
     });
   });
+
+  /**
+   * V25D82 sprint 2 UX fix: auto-select the first available league on
+   * {@code ngOnInit} so the team dropdown is populated WITHOUT requiring
+   * the user to click the league dropdown first.
+   *
+   * <p>Before this fix {@code ngOnInit()} was empty: leagues were
+   * fetched (via the {@code leagues$} observable wired in the
+   * constructor), but the manager had to manually open the dropdown
+   * and click a league for {@code teamsWithOVR$} to start emitting.
+   * That gap confused users hitting {@code /career/setup} for the
+   * first time.
+   *
+   * <p>Tests cover:
+   * <ol>
+   *   <li>Auto-select: with leagues=[La Liga], {@code ngOnInit} sets
+   *       {@code selectedLeagueId} AND triggers the GET to
+   *       {@code /world/leagues/:id/teams-with-ovr} so teams populate.</li>
+   *   <li>No override: if the user already selected a league (e.g. via
+   *       {@code [(ngModel)]} binding before {@code ngOnInit} fires),
+   *       {@code ngOnInit} must NOT clobber their choice.</li>
+   *   <li>Empty leagues: if {@code leagues$} emits an empty array
+   *       (new user, world not seeded), {@code ngOnInit} is a no-op —
+   *       no crash, no spurious GET to {@code /teams-with-ovr}.</li>
+   * </ol>
+   */
+  describe('V25D82 sprint 2 UX fix: ngOnInit auto-selects first league', () => {
+    const LA_LIGA_2 = {
+      realLeagueId: 'real-liga-2',
+      name: 'La Liga 2024/25',
+      country: 'Spain'
+    };
+    const PREMIER = {
+      realLeagueId: 'real-premier-1',
+      name: 'Premier League 2024/25',
+      country: 'England'
+    };
+
+    /**
+     * Helper: capture every URL passed to {@code HttpClient.get} so tests
+     * can assert on what was fetched without coupling to call ordering.
+     */
+    function captureGetUrls(): string[] {
+      const urls: string[] = [];
+      httpSpy.get.and.callFake(((url: string) => {
+        urls.push(url);
+        // route by URL substring so leagues vs teams-with-ovr can be told apart
+        if (url.includes('/teams-with-ovr')) return of([]);
+        return of([LA_LIGA_2]);
+      }) as any);
+      return urls;
+    }
+
+    it('V25D82 #1: ngOnInit auto-selects first league AND fetches its teams (UX gap fix)', (done: DoneFn) => {
+      // Setup: GET /world/leagues returns [La Liga] (pre-seeded user).
+      const urls = captureGetUrls();
+      // The teams-with-ovr GET (auto-triggered by the auto-select path)
+      // must return some teams so the assertion that selectedLeagueId is
+      // populated is independent of the teams payload.
+      httpSpy.get.and.callFake(((url: string) => {
+        urls.push(url);
+        if (url.includes('/teams-with-ovr')) {
+          return of([
+            { worldTeamId: 'team-real-madrid', name: 'Real Madrid', country: 'ES', formation: '4-3-3', ovr: 88, playerCount: 25 }
+          ]);
+        }
+        return of([LA_LIGA_2]);
+      }) as any);
+
+      // Sanity: before ngOnInit runs (fixture.detectChanges triggers it),
+      // no league is selected.
+      expect(component.selectedLeagueId).toBeNull(
+        'precondition: no league selected before ngOnInit');
+
+      fixture.detectChanges();
+
+      fixture.whenStable().then(() => {
+        // selectedLeagueId must be populated with the first league's id.
+        expect(component.selectedLeagueId).toBe(
+          LA_LIGA_2.realLeagueId,
+          'ngOnInit must auto-select the first league (realLeagueId, not id)');
+
+        // The auto-select path must have triggered the GET to
+        // /world/leagues/:id/teams-with-ovr (this is the UX gap fix —
+        // before, this GET never fired until the user clicked a league).
+        const teamsFetched = urls.some(u => u.includes('/world/leagues/') && u.includes('/teams-with-ovr'));
+        expect(teamsFetched).toBeTrue(); // ngOnInit auto-select must trigger GET /teams-with-ovr (UX gap fix)
+
+        done();
+      });
+    });
+
+    it('V25D82 #2: ngOnInit does NOT override user-selected league', (done: DoneFn) => {
+      // Setup: pre-select a league BEFORE ngOnInit runs. This simulates
+      // the dropdown's [(ngModel)] binding having fired before the
+      // component hook (e.g. fast mount + browser autofill race).
+      captureGetUrls();
+      component.selectedLeagueId = PREMIER.realLeagueId;
+      // Note: the setter also resets selectedTeamId / selectedTeamsPerDivision
+      // and pushes leagueChangeSubject — that is fine, the test only cares
+      // that ngOnInit does not clobber PREMIER.
+
+      fixture.detectChanges();
+
+      fixture.whenStable().then(() => {
+        // The pre-selected league must remain — ngOnInit must not override.
+        expect(component.selectedLeagueId).toBe(
+          PREMIER.realLeagueId,
+          'ngOnInit must respect a pre-selected league (no override)');
+
+        // No /teams-with-ovr fetch should have been triggered FOR LA_LIGA_2
+        // by ngOnInit. (There might still be fetches for PREMIER — those
+        // came from the setter, not ngOnInit.) The point of the assertion
+        // is that LA_LIGA_2 was NOT auto-picked.
+        // We assert by re-reading the captured urls array — but we already
+        // consumed it via .some() in test #1, so re-spy here.
+        // Simpler: the assertion on selectedLeagueId above is sufficient
+        // — if ngOnInit had overridden, it would be LA_LIGA_2.
+
+        done();
+      });
+    });
+
+    it('V25D82 #3: ngOnInit handles empty leagues array gracefully (no crash, no teams fetch)', (done: DoneFn) => {
+      // Setup: new user, world not seeded — GET /world/leagues returns [].
+      const urls = captureGetUrls();
+      httpSpy.get.and.callFake(((url: string) => {
+        urls.push(url);
+        // Both branches return []: no leagues + no teams.
+        return of([]);
+      }) as any);
+
+      fixture.detectChanges();
+
+      fixture.whenStable().then(() => {
+        // The component must not crash.
+        expect(component).toBeTruthy('component must initialize even when leagues$ emits []');
+
+        // No league should be selected (empty array).
+        expect(component.selectedLeagueId).toBeNull(
+          'ngOnInit must NOT auto-select when leagues is empty (preserve "no league picked" state)');
+
+        // No /teams-with-ovr GET should have fired — without a league,
+        // there's nothing to fetch teams for.
+        const teamsFetched = urls.some(u => u.includes('/teams-with-ovr'));
+        expect(teamsFetched).toBeFalse(); // ngOnInit must NOT fetch /teams-with-ovr when leagues is empty
+
+        done();
+      });
+    });
+  });
 });

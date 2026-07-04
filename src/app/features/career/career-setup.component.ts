@@ -6,7 +6,7 @@ import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../core/services/auth.service';
 import { environment } from '../../environments/environment';
 import { Observable, BehaviorSubject, combineLatest, firstValueFrom } from 'rxjs';
-import { map, switchMap, catchError, tap } from 'rxjs/operators';
+import { map, switchMap, catchError, take, tap } from 'rxjs/operators';
 import { of } from 'rxjs';
 
 interface League {
@@ -162,7 +162,38 @@ export class CareerSetupComponent implements OnInit {
     this.loading$ = this.leagues$.pipe(map(leagues => leagues === null));
   }
 
-  ngOnInit(): void {}
+  /**
+   * V25D82 sprint 2 UX fix: auto-select the first available league so the
+   * `teamsWithOVR$` observable emits on mount and the team dropdown is
+   * populated without requiring the user to click the league dropdown first.
+   *
+   * <p>Behavior:
+   * <ul>
+   *   <li>If {@code leagues$} emits a non-empty array AND the user has NOT
+   *       already selected a league (selectedLeagueId is null), the first
+   *       league is auto-selected and {@link onLeagueChange} fires to push
+   *       the selection through {@code leagueChangeSubject} (which drives
+   *       {@code teamsWithOVR$}).</li>
+   *   <li>If the user has already picked a league (e.g. via the dropdown
+   *       before this hook fires in tests / fast mounts), we do NOT
+   *       override their selection.</li>
+   *   <li>If {@code leagues$} emits an empty array (new user, world not
+   *       seeded), nothing happens — the seed-world CTA already handles
+   *       that case.</li>
+   * </ul>
+   *
+   * <p>{@code take(1)} makes this a one-shot — we only want to react to
+   * the first emission. Subsequent emissions (e.g. after seed-world) are
+   * handled by the dropdown's own {@code (ngModelChange)} flow.
+   */
+  ngOnInit(): void {
+    this.leagues$.pipe(take(1)).subscribe(leagues => {
+      if (leagues && leagues.length > 0 && !this.selectedLeagueId) {
+        this.selectedLeagueId = leagues[0].realLeagueId;
+        this.onLeagueChange(); // dispara leagueChangeSubject para cargar teams
+      }
+    });
+  }
 
   getDivisionName(number: number): string {
     switch (number) {
