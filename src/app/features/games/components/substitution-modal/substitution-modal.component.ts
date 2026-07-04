@@ -536,6 +536,7 @@ export class SubstitutionModalComponent {
    * tick).
    */
   trackByDot = (_idx: number, p: SubModalPlayer) => p.sessionPlayerId;
+  trackByLine = (_idx: number, line: PitchLine) => line.category;
 
   ngOnDestroy(): void {
     this.destroy$.next();

@@ -37,7 +37,7 @@
         <h3>Selecciona el jugador que sale (click)</h3>
         <div class="v25d79-pitch" role="img" [attr.aria-label]="'Visual pitch formation ' + (data.formation || '4-4-2')">
           <div class="v25d79-pitch-line"
-               *ngFor="let line of pitchLines; trackBy: trackByDot"
+               *ngFor="let line of pitchLines; trackBy: trackByLine"
                [attr.data-category]="line.category">
             <div class="v25d79-pitch-dot"
                  *ngFor="let p of line.players; trackBy: trackByDot"
