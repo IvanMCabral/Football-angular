@@ -366,6 +366,71 @@ describe('CareerSetupComponent — V25D78-C48.1 setup-flow UX gap fix', () => {
       });
     });
   });
+
+  /**
+   * V25D83.1 sprint 2 ajuste (pre-push): cache de leagues$ con shareReplay(1).
+   *
+   * <p>Pre-fix: leagues$ terminaba en switchMap (cold). Cada nuevo
+   * subscriber disparaba un nuevo GET /world/leagues. El template usa
+   * `(leagues$ | async)` en 3 sitios (seed-flow, select de Liga, y el
+   * `take(1)` de ngOnInit), generando hasta 3 HTTP requests paralelos
+   * para la misma data.
+   *
+   * <p>Post-fix: shareReplay({ bufferSize: 1, refCount: false }) cachea la
+   * primera emission y la re-emite a subscribers sin refetch.
+   *
+   * <p>Test: con un httpSpy que cuente las llamadas a /world/leagues,
+   * suscribimos leagues$ 3 veces (simulando los 3 callers del template)
+   * y verificamos que solo se haga 1 HTTP request.
+   */
+  describe('V25D83.1 sprint 2 ajuste: leagues$ shareReplay(1) cache', () => {
+    it('V25D83.1 #1: multiple subscribers to leagues$ only fire ONE HTTP request (shareReplay cache OK)', (done: DoneFn) => {
+      // Count only calls to /world/leagues (not /teams-with-ovr / division-preview / etc.)
+      let leaguesCallCount = 0;
+      httpSpy.get.and.callFake(((url: string) => {
+        if (url.includes('/world/leagues') && !url.includes('/teams-with-ovr') && !url.includes('/division-preview')) {
+          leaguesCallCount++;
+        }
+        return of([LA_LIGA]);
+      }) as any);
+
+      fixture.detectChanges();
+
+      // Three independent subscribers to leagues$ — mirrors the template's
+      // 3 callers (seed-flow at line 21, select at line 46, ngOnInit take(1)
+      // at line 248). Without shareReplay, this would fire 3 HTTP requests.
+      const emissions1: any[] = [];
+      const emissions2: any[] = [];
+      const emissions3: any[] = [];
+      const sub1 = component.leagues$.subscribe(v => emissions1.push(v));
+      const sub2 = component.leagues$.subscribe(v => emissions2.push(v));
+      const sub3 = component.leagues$.subscribe(v => emissions3.push(v));
+
+      fixture.whenStable().then(() => {
+        sub1.unsubscribe();
+        sub2.unsubscribe();
+        sub3.unsubscribe();
+
+        // CRITICAL assertion: only ONE HTTP request was made to /world/leagues
+        // despite 3 concurrent subscribers. This is the shareReplay cache win.
+        expect(leaguesCallCount).toBe(
+          1,
+          `expected exactly 1 GET /world/leagues call (shareReplay cache), got ${leaguesCallCount}. ` +
+          `Without shareReplay, each subscriber fires its own HTTP request.`
+        );
+
+        // All three subscribers received the SAME payload (the cached emission).
+        // leagues$ emits League[] (an array), so emissions1[0] is [LA_LIGA], not LA_LIGA.
+        expect(emissions1.length).toBeGreaterThanOrEqual(1);
+        expect(emissions2.length).toBeGreaterThanOrEqual(1);
+        expect(emissions3.length).toBeGreaterThanOrEqual(1);
+        expect(emissions1[0]).toEqual([LA_LIGA]);
+        expect(emissions2[0]).toEqual([LA_LIGA]);
+        expect(emissions3[0]).toEqual([LA_LIGA]);
+        done();
+      });
+    });
+  });
   describe('V25D78-C55.2 phase 4 UI (a) + (a2): division tier badges', () => {
     const TEAMS_WITH_OVR = [
       { worldTeamId: 'team-real-madrid', name: 'Real Madrid', country: 'ES', formation: '4-3-3', ovr: 88, playerCount: 25 },

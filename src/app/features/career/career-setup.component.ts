@@ -6,7 +6,7 @@ import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../core/services/auth.service';
 import { environment } from '../../environments/environment';
 import { Observable, BehaviorSubject, combineLatest, firstValueFrom, concat } from 'rxjs';
-import { map, switchMap, catchError, take, tap, startWith, distinctUntilChanged } from 'rxjs/operators';
+import { map, switchMap, catchError, take, tap, startWith, distinctUntilChanged, shareReplay } from 'rxjs/operators';
 import { of } from 'rxjs';
 
 interface League {
@@ -106,6 +106,24 @@ export class CareerSetupComponent implements OnInit {
     private router: Router,
     private authService: AuthService
   ) {
+    /**
+     * V25D83.1 sprint 2 ajuste (pre-push): cachear la primera emission de
+     * leagues$ con {@code shareReplay(1)} para evitar HTTP requests duplicados.
+     *
+     * <p>Pre-fix: cada nuevo subscriber a {@code leagues$} disparaba un nuevo
+     * GET /world/leagues porque el pipe terminaba en un switchMap cold.
+     * En el template, el `(leagues$ | async)` dentro del seed-flow (line 21)
+     * Y el `(leagues$ | async)` dentro del select de Liga (line 46) creaban
+     * DOS suscripciones independientes, ambas con su propio HTTP request.
+     * Cuando Iván abría el dropdown, ya teníamos 2-3 requests en flight para
+     * la misma data (más el `take(1)` de ngOnInit que dispara otra).
+     *
+     * <p>Post-fix: {@code shareReplay({ bufferSize: 1, refCount: false })} cachea
+     * la primera emission exitosa y la re-emite a todos los subscribers
+     * sin refetch. {@code refCount: false} mantiene el source vivo aunque no
+     * haya subscribers (para que el `take(1)` de ngOnInit no desuscriba el
+     * cache antes de que los async pipes se suscriban).
+     */
     this.leagues$ = combineLatest([
       this.authService.getUserInfo(),
       this.refreshLeaguesTrigger
@@ -116,7 +134,8 @@ export class CareerSetupComponent implements OnInit {
       catchError(err => {
         this.error$.next('Error al cargar ligas');
         return of([]);
-      })
+      }),
+      shareReplay({ bufferSize: 1, refCount: false })
     );
 
     this.teamsWithOVR$ = this.leagueChangeSubject.pipe(
