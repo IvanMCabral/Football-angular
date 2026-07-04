@@ -4,6 +4,18 @@
     <h2>Fecha {{ vm.roundNumber }} - En Vivo</h2>
     <span *ngIf="vm.byeTeam" class="bye-badge">BYE: {{ vm.byeTeam }}</span>
     <div class="controls">
+      <!-- V25D82 sprint 2 UX fix: explicit "Iniciar Todos" trigger. Shown only
+           when no match has started yet AND the round is not paused AND not
+           all finished. Once the SSE flips anyStarted=true the button hides
+           automatically (no manual cleanup needed). -->
+      <button
+        *ngIf="!vm.allFinished && !vm.isRoundPaused && !vm.anyStarted"
+        (click)="iniciarTodos()"
+        class="btn btn-start"
+        data-testid="iniciar-todos-button"
+      >
+        ▶️ Iniciar Todos
+      </button>
       <button *ngIf="!vm.allFinished && !vm.isRoundPaused" (click)="pauseAll()" class="btn btn-pause">⏸️ Pausar Todos</button>
       <button *ngIf="!vm.allFinished && vm.isRoundPaused" (click)="resumeAll()" class="btn btn-resume">▶️ Reanudar Todos</button>
       <a [routerLink]="['/games', vm.gameId]" class="btn btn-back">Volver</a>

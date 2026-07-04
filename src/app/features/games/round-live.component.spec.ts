@@ -152,7 +152,8 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
       allFinished: false,
       errorMsg: '',
       isRoundPaused: false,
-      byeTeam: null
+      byeTeam: null,
+      anyStarted: false // V25D82 sprint 2 UX fix: false by default in test fixtures
     };
     (component as any).vmSubject.next(vm);
   }
@@ -424,6 +425,171 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
       expect(queuedCall.args[2].playerName).toBe('Pepe');
       expect(queuedCall.args[2].minute).toBe(75);
       done();
+    });
+  });
+
+  // ========== V25D82 sprint 2 UX fix: "Iniciar Todos" button + anyStarted flag ==========
+
+  /**
+   * V25D82 sprint 2: explicit "Iniciar Todos" trigger for the round-live
+   * header. This is the manager's fallback when the auto-start in
+   * {@code startRoundEngine} did not visibly transition the matches to
+   * RUNNING. The button calls
+   * {@code engineService.startRound(roundId, matches)} with the list of
+   * NOT_STARTED (or no-state) matches from the current VM.
+   *
+   * <p>Tests cover:
+   * <ol>
+   *   <li>{@code iniciarTodos} calls {@code startRound} with the filtered
+   *       NOT_STARTED matches, using the {@code gameId} as the roundId.</li>
+   *   <li>{@code iniciarTodos} is a no-op when all matches already started
+   *       (no spurious backend call).</li>
+   *   <li>{@code iniciarTodos} handles the empty-matches case gracefully
+   *       (no crash, no backend call).</li>
+   *   <li>The {@code anyStarted} flag is computed correctly in the SSE
+   *       handler: true when any match is IN_PROGRESS/PAUSED/FINISHED/
+   *       CANCELLED, false when all are NOT_STARTED.</li>
+   * </ol>
+   */
+  describe('V25D82 sprint 2 UX fix: iniciarTodos + anyStarted flag', () => {
+    it('V25D82 #1: iniciarTodos calls engineService.startRound with NOT_STARTED matches (roundId = gameId)', () => {
+      // Reset spy call count so we can assert the call was made by iniciarTodos
+      // (not by the constructor's auto-startRoundEngine).
+      engineServiceSpy.startRound.calls.reset();
+
+      // Build a VM with TWO matches: one NOT_STARTED, one without state yet
+      // (the "no state" branch is also covered by the filter).
+      const notStartedMatch: RoundMatchVM = {
+        match: makeMatch('SCHEDULED'),
+        state: makeMatchState({ status: 'NOT_STARTED', currentMinute: 0 }),
+        isUserMatch: true
+      };
+      const noStateMatch: RoundMatchVM = {
+        match: { ...makeMatch('SCHEDULED'), id: 'match-no-state' },
+        // state intentionally omitted
+        isUserMatch: false
+      };
+      setVm([notStartedMatch, noStateMatch]);
+
+      // Invoke the method.
+      component.iniciarTodos();
+
+      // The backend POST must have been made with both matches.
+      expect(engineServiceSpy.startRound).toHaveBeenCalledTimes(1);
+
+      const [roundIdArg, matchesArg] = engineServiceSpy.startRound.calls.mostRecent().args;
+      // roundId must reuse gameId (the existing startRoundEngine convention).
+      expect(roundIdArg).toBe(SAMPLE_GAME_ID);
+      // Both NOT_STARTED + no-state matches must be in the payload, in order.
+      expect(matchesArg.length).toBe(2);
+      expect(matchesArg[0].matchId).toBe(SAMPLE_MATCH_ID);
+      expect(matchesArg[0].homeTeamId).toBe(SAMPLE_HOME_TEAM_ID);
+      expect(matchesArg[0].awayTeamId).toBe(SAMPLE_AWAY_TEAM_ID);
+      expect(matchesArg[1].matchId).toBe('match-no-state');
+    });
+
+    it('V25D82 #2: iniciarTodos is a no-op when all matches already started (no backend call)', () => {
+      engineServiceSpy.startRound.calls.reset();
+
+      // All matches are RUNNING — nothing left to start.
+      const runningMatch: RoundMatchVM = {
+        match: makeMatch('SCHEDULED'),
+        state: makeMatchState({ status: 'RUNNING', currentMinute: 30 }),
+        isUserMatch: true
+      };
+      setVm([runningMatch]);
+
+      component.iniciarTodos();
+
+      // No backend POST should have fired.
+      expect(engineServiceSpy.startRound).not.toHaveBeenCalled();
+    });
+
+    it('V25D82 #3: iniciarTodos handles empty matches list gracefully (no crash, no backend call)', () => {
+      engineServiceSpy.startRound.calls.reset();
+
+      // No matches in the VM at all.
+      setVm([]);
+
+      // Must not throw.
+      expect(() => component.iniciarTodos()).not.toThrow();
+
+      // No backend POST.
+      expect(engineServiceSpy.startRound).not.toHaveBeenCalled();
+    });
+
+    it('V25D82 #4: anyStarted flag is true when any match is RUNNING/HALF_TIME/PAUSED/FINISHED/CANCELLED (SSE-driven)', () => {
+      // Build a VM with one NOT_STARTED match, then push an SSE update that
+      // flips it to RUNNING. anyStarted MUST become true. Note: MatchState
+      // uses 'RUNNING' (the live status), not 'IN_PROGRESS' (which is the
+      // RoundState.status value).
+      const match: RoundMatchVM = {
+        match: makeMatch('SCHEDULED'),
+        state: makeMatchState({ status: 'NOT_STARTED', currentMinute: 0 }),
+        isUserMatch: true
+      };
+      setVm([match]);
+
+      // Sanity: initially false (matches NOT_STARTED).
+      expect((component as any).vmSubject.value.anyStarted).toBeFalse();
+
+      // Trigger the SSE update path.
+      (component as any).startRoundEngine(SAMPLE_GAME_ID, (component as any).vmSubject.value.matches);
+      roundStateSubject.next(makeRoundState([makeMatchState({ status: 'RUNNING', currentMinute: 5 })]));
+
+      // anyStarted MUST flip to true.
+      expect((component as any).vmSubject.value.anyStarted).toBeTrue();
+
+      // Also true for HALF_TIME (the match has started even though the
+      // players are resting — the round is no longer NOT_STARTED).
+      setVm([{
+        match: makeMatch('SCHEDULED'),
+        state: makeMatchState({ status: 'NOT_STARTED', currentMinute: 0 }),
+        isUserMatch: true
+      }]);
+      (component as any).startRoundEngine(SAMPLE_GAME_ID, (component as any).vmSubject.value.matches);
+      roundStateSubject.next(makeRoundState([makeMatchState({ status: 'HALF_TIME', currentMinute: 45 })]));
+      expect((component as any).vmSubject.value.anyStarted).toBeTrue();
+
+      // Also true for FINISHED.
+      setVm([{
+        match: makeMatch('SCHEDULED'),
+        state: makeMatchState({ status: 'FINISHED' }),
+        isUserMatch: true
+      }]);
+      (component as any).startRoundEngine(SAMPLE_GAME_ID, (component as any).vmSubject.value.matches);
+      roundStateSubject.next(makeRoundState([makeMatchState({ status: 'FINISHED' })]));
+      expect((component as any).vmSubject.value.anyStarted).toBeTrue();
+
+      // And true for PAUSED.
+      setVm([{
+        match: makeMatch('SCHEDULED'),
+        state: makeMatchState({ status: 'PAUSED' }),
+        isUserMatch: true
+      }]);
+      (component as any).startRoundEngine(SAMPLE_GAME_ID, (component as any).vmSubject.value.matches);
+      roundStateSubject.next(makeRoundState([makeMatchState({ status: 'PAUSED' })]));
+      expect((component as any).vmSubject.value.anyStarted).toBeTrue();
+
+      // And true for CANCELLED.
+      setVm([{
+        match: makeMatch('SCHEDULED'),
+        state: makeMatchState({ status: 'CANCELLED' }),
+        isUserMatch: true
+      }]);
+      (component as any).startRoundEngine(SAMPLE_GAME_ID, (component as any).vmSubject.value.matches);
+      roundStateSubject.next(makeRoundState([makeMatchState({ status: 'CANCELLED' })], 'COMPLETED'));
+      expect((component as any).vmSubject.value.anyStarted).toBeTrue();
+
+      // And FALSE for NOT_STARTED (regression — must NOT mark started).
+      setVm([{
+        match: makeMatch('SCHEDULED'),
+        state: makeMatchState({ status: 'NOT_STARTED', currentMinute: 0 }),
+        isUserMatch: true
+      }]);
+      (component as any).startRoundEngine(SAMPLE_GAME_ID, (component as any).vmSubject.value.matches);
+      roundStateSubject.next(makeRoundState([makeMatchState({ status: 'NOT_STARTED', currentMinute: 0 })]));
+      expect((component as any).vmSubject.value.anyStarted).toBeFalse();
     });
   });
 });

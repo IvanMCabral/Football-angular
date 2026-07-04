@@ -40,6 +40,15 @@
   color: white;
 }
 
+/* V25D82 sprint 2 UX fix: green "Iniciar Todos" button mirrors btn-resume
+   visually but anchors the explicit-start action. Uses a slightly darker
+   green so the manager can distinguish "start fresh" from "resume from
+   pause" at a glance. */
+.btn-start {
+  background: #2e7d32;
+  color: white;
+}
+
 .btn-back {
   background: #6c757d;
   color: white;

@@ -22,4 +22,15 @@ export interface RoundLiveViewModel {
   errorMsg: string;
   isRoundPaused: boolean;
   byeTeam: string | null; // UX-6: BYE indicator
+  /**
+   * V25D82 sprint 2 UX fix: true if at least one match has transitioned
+*   past NOT_STARTED (status is RUNNING, HALF_TIME, PAUSED, FINISHED, or
+   *   CANCELLED — note: MatchState uses 'RUNNING', not 'IN_PROGRESS',
+   *   which is the RoundState.status value). Drives the visibility of
+   *   the "Iniciar Todos" button — the button only makes sense when NO
+   *   match has started yet AND the round is not paused AND not all
+   *   finished. Mirrors the same field in the .ts component and is
+   *   exposed via the template binding {@code vm.anyStarted}.
+   */
+  anyStarted: boolean;
 }

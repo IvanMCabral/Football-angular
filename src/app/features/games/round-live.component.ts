@@ -79,7 +79,8 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
     allFinished: false,
     errorMsg: '',
     isRoundPaused: false,
-    byeTeam: null // UX-6: BYE indicator
+    byeTeam: null, // UX-6: BYE indicator
+    anyStarted: false // V25D82 sprint 2 UX fix: drives "Iniciar Todos" button visibility
   });
 
   vm$: Observable<RoundLiveViewModel>;
@@ -142,7 +143,8 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
             allFinished: false,
             errorMsg: `No hay partidos para la fecha ${params.roundNumber}`,
             isRoundPaused: false,
-            byeTeam
+            byeTeam,
+            anyStarted: false
           });
           return;
         }
@@ -177,7 +179,8 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
           allFinished: false,
           errorMsg: '',
           isRoundPaused: false,
-          byeTeam
+          byeTeam,
+          anyStarted: false
         });
 
         this.startRoundEngine(params.gameId, matches);
@@ -242,7 +245,19 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
             m.state?.status === 'CANCELLED' ||
             roundState.status === 'COMPLETED'
           ),
-          isRoundPaused: updatedMatches.some(m => m.state?.status === 'PAUSED')
+          isRoundPaused: updatedMatches.some(m => m.state?.status === 'PAUSED'),
+          // V25D82 sprint 2 UX fix: true if at least one match has
+          // transitioned past NOT_STARTED. Drives the "Iniciar Todos"
+          // button visibility (button hides once the round has started
+          // ticking). Note: MatchState.status uses 'RUNNING' (not
+          // 'IN_PROGRESS' — that's the RoundState.status value).
+          anyStarted: updatedMatches.some(m =>
+            m.state?.status === 'RUNNING' ||
+            m.state?.status === 'HALF_TIME' ||
+            m.state?.status === 'PAUSED' ||
+            m.state?.status === 'FINISHED' ||
+            m.state?.status === 'CANCELLED'
+          )
         };
 
         this.updateVm(newVm);
@@ -560,6 +575,59 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
       }
     });
     this.updateVm({ ...vm, isRoundPaused: false });
+  }
+
+  /**
+   * V25D82 sprint 2 UX fix: explicit "Iniciar Todos" trigger for the
+   * round-live header. Used as a fallback when the auto-start in
+   * {@code startRoundEngine} did not visibly transition the matches
+   * (e.g. backend POST succeeded but the SSE is silent, or the
+   * auto-start was never wired for the current navigation path).
+   *
+   * <p>Behavior:
+   * <ul>
+   *   <li>Filters VM matches to those without state OR with state.status
+   *       {@code NOT_STARTED}. Matches already RUNNING / FINISHED / etc.
+   *       are skipped — re-sending them would be wasteful (and could
+   *       trip backend idempotency checks depending on the route).</li>
+   *   <li>If the filtered list is empty (every match already started),
+   *       the method is a no-op and does not hit the backend.</li>
+   *   <li>Otherwise, calls {@code engineService.startRound(roundId,
+   *       matches)} with the filtered list. The roundId reuses the
+   *       existing {@code gameId} convention from {@code startRoundEngine}
+   *       (career-scoped identifier for this round in the backend).</li>
+   * </ul>
+   *
+   * <p>Logs the response on success and the error on failure. The SSE
+   * stream (already open from {@code startRoundEngine}) will pick up
+   * the resulting match state transitions and the {@code anyStarted}
+   * flag will flip to {@code true}, hiding this button automatically.
+   */
+  iniciarTodos(): void {
+    const vm = this.vmSubject.value;
+    const pending = vm.matches
+      .filter(rm => !rm.state || rm.state?.status === 'NOT_STARTED')
+      .map(rm => ({
+        matchId: String(rm.match.id),
+        homeTeamId: String(rm.match.homeTeamId),
+        awayTeamId: String(rm.match.awayTeamId)
+      }));
+
+    if (pending.length === 0) {
+      // No NOT_STARTED matches left — button should already be hidden via
+      // the *ngIf="!vm.anyStarted" guard, but guard defensively here.
+      return;
+    }
+
+    const roundId = vm.gameId;
+    this.engineService.startRound(roundId, pending).subscribe({
+      next: (state) => {
+        console.log('[ROUND-LIVE] all matches started via Iniciar Todos', state);
+      },
+      error: (err) => {
+        console.error('[ROUND-LIVE] Iniciar Todos failed', err);
+      }
+    });
   }
 
   changeTactic(match: Match, team: 'HOME' | 'AWAY', tactic: 'ATTACK' | 'DEFEND' | 'BALANCED') {
