@@ -163,23 +163,31 @@ export class CareerSetupComponent implements OnInit {
   }
 
   /**
-   * V25D82 sprint 2 UX fix: auto-select the first available league so the
-   * `teamsWithOVR$` observable emits on mount and the team dropdown is
-   * populated without requiring the user to click the league dropdown first.
+   * V25D82.2 sprint UX fix: pre-load teams without auto-selecting a league.
+   *
+   * <p>Background: with only one league available (e.g. LaLiga after the
+   * C55.1 seed), the user can't easily tell the dropdown has an option to
+   * pick — it looks like the setup page is stuck. The previous V25D82 fix
+   * tried auto-selecting the first league, but Iván preferred to keep
+   * manual control. This version triggers the {@code leagueChangeSubject}
+   * with the first league's id so the {@code teamsWithOVR$} observable
+   * emits, populating the team dropdown, WITHOUT changing
+   * {@code selectedLeagueId}. The user still has to pick the league
+   * explicitly in the dropdown before {@code startCareer()} is allowed.
    *
    * <p>Behavior:
    * <ul>
-   *   <li>If {@code leagues$} emits a non-empty array AND the user has NOT
-   *       already selected a league (selectedLeagueId is null), the first
-   *       league is auto-selected and {@link onLeagueChange} fires to push
-   *       the selection through {@code leagueChangeSubject} (which drives
-   *       {@code teamsWithOVR$}).</li>
-   *   <li>If the user has already picked a league (e.g. via the dropdown
-   *       before this hook fires in tests / fast mounts), we do NOT
-   *       override their selection.</li>
+   *   <li>If {@code leagues$} emits a non-empty array, fire
+   *       {@code leagueChangeSubject.next(leagues[0].realLeagueId)} so the
+   *       team dropdown is populated. Do NOT touch
+   *       {@code selectedLeagueId}.</li>
    *   <li>If {@code leagues$} emits an empty array (new user, world not
    *       seeded), nothing happens — the seed-world CTA already handles
    *       that case.</li>
+   *   <li>If the user picks a different league manually, the dropdown's
+   *       own {@code (ngModelChange)} flow via {@link onLeagueChange}
+   *       re-fires {@code leagueChangeSubject} with the new id, and the
+   *       team dropdown re-emits.</li>
    * </ul>
    *
    * <p>{@code take(1)} makes this a one-shot — we only want to react to
@@ -188,9 +196,10 @@ export class CareerSetupComponent implements OnInit {
    */
   ngOnInit(): void {
     this.leagues$.pipe(take(1)).subscribe(leagues => {
-      if (leagues && leagues.length > 0 && !this.selectedLeagueId) {
-        this.selectedLeagueId = leagues[0].realLeagueId;
-        this.onLeagueChange(); // dispara leagueChangeSubject para cargar teams
+      if (leagues && leagues.length > 0) {
+        // V25D82.2: pre-load teams but do NOT auto-select the league.
+        // selectedLeagueId stays null until the user picks from the dropdown.
+        this.leagueChangeSubject.next(leagues[0].realLeagueId);
       }
     });
   }
