@@ -453,10 +453,6 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
    */
   describe('V25D82 sprint 2 UX fix: iniciarTodos + anyStarted flag', () => {
     it('V25D82 #1: iniciarTodos calls engineService.startRound with NOT_STARTED matches (roundId = gameId)', () => {
-      // Reset spy call count so we can assert the call was made by iniciarTodos
-      // (not by the constructor's auto-startRoundEngine).
-      engineServiceSpy.startRound.calls.reset();
-
       // Build a VM with TWO matches: one NOT_STARTED, one without state yet
       // (the "no state" branch is also covered by the filter).
       const notStartedMatch: RoundMatchVM = {
@@ -470,6 +466,14 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
         isUserMatch: false
       };
       setVm([notStartedMatch, noStateMatch]);
+
+      // V25D84 sprint: setVm() above triggers the auto-start
+      // subscription (vm$.pipe(take(1))), which calls
+      // engineService.startRound as part of the round auto-init. Reset
+      // the spy here so the assertion below counts ONLY the
+      // iniciarTodos() call (mirrors what the test already did for
+      // the constructor's startRoundEngine call).
+      engineServiceSpy.startRound.calls.reset();
 
       // Invoke the method.
       component.iniciarTodos();
@@ -685,6 +689,208 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
         sub.unsubscribe();
         done();
       });
+    });
+  });
+
+  // ========== V25D84 sprint: auto-start round on first vm$ emission ==========
+
+  /**
+   * V25D84 sprint: round-live should auto-start the round as soon as
+   * the first vm$ emission shows NOT_STARTED matches, so the manager
+   * doesn't have to click the "Iniciar Todos" button every time. The
+   * button remains as a manual fallback for refresh / failed-auto-start
+   * cases.
+   *
+   * <p>The auto-start is implemented as a
+   * {@code vm$.pipe(take(1)).subscribe(...)} in the constructor, with
+   * an {@code autoStartTriggered} flag to prevent a duplicate POST when
+   * {@link startRoundEngine} also runs (it must, to wire the SSE
+   * stream).
+   *
+   * <p>Tests cover:
+   * <ol>
+   *   <li>Auto-start fires on first vm$ emission with NOT_STARTED
+   *       matches (calls {@code engineService.startRound} with the
+   *       pending list).</li>
+   *   <li>Auto-start is a no-op when the VM is empty ({@code matches.length === 0}).</li>
+   *   <li>Auto-start is a no-op when the VM has {@code errorMsg} set
+   *       (round can't be played).</li>
+   *   <li>Auto-start is a no-op when all matches already started
+   *       (refresh case — backend round is RUNNING).</li>
+   *   <li>{@code startRoundEngine} skips its own POST when
+   *       {@code autoStartTriggered} is true (no duplicate POST).</li>
+   *   <li>The take(1) subscription fires only once even when multiple
+   *       vm$ emissions arrive (SSE updates don't re-trigger
+   *       auto-start).</li>
+   *   <li>The "Iniciar Todos" button fallback still works after the
+   *       auto-start fired — the manager can re-trigger if needed.</li>
+   * </ol>
+   */
+  describe('V25D84 sprint: round auto-start on first vm$ emission', () => {
+    it('V25D84 #1: auto-start fires when first vm$ has NOT_STARTED matches (calls engineService.startRound)', () => {
+      // Spy on engineService.startRound calls. Note: the constructor's
+      // startRoundEngine call would normally happen too, but in this
+      // test the cold Subject spies for career service prevent
+      // combineLatest from emitting — so startRoundEngine never runs.
+      // We just need to verify the auto-start subscription (which fires
+      // when we manually push vmSubject.next via setVm) calls startRound.
+      engineServiceSpy.startRound.calls.reset();
+
+      // Build VM with one NOT_STARTED match + one without state.
+      const notStartedMatch: RoundMatchVM = {
+        match: makeMatch('SCHEDULED'),
+        state: makeMatchState({ status: 'NOT_STARTED', currentMinute: 0 }),
+        isUserMatch: true
+      };
+      const noStateMatch: RoundMatchVM = {
+        match: { ...makeMatch('SCHEDULED'), id: 'match-no-state-2' },
+        // state intentionally omitted — also a candidate for auto-start
+        isUserMatch: false
+      };
+      setVm([notStartedMatch, noStateMatch]);
+
+      // Auto-start must have called engineService.startRound with
+      // roundId = gameId and matches = both NOT_STARTED + no-state.
+      expect(engineServiceSpy.startRound).toHaveBeenCalledTimes(1);
+
+      const [roundIdArg, matchesArg] = engineServiceSpy.startRound.calls.mostRecent().args;
+      expect(roundIdArg).toBe(SAMPLE_GAME_ID);
+      expect(matchesArg.length).toBe(2);
+      expect(matchesArg[0].matchId).toBe(SAMPLE_MATCH_ID);
+      expect(matchesArg[1].matchId).toBe('match-no-state-2');
+    });
+
+    it('V25D84 #2: auto-start no-ops on empty matches VM (no backend POST)', () => {
+      engineServiceSpy.startRound.calls.reset();
+
+      // VM has no matches at all — round can't be started.
+      setVm([]);
+
+      // No POST should have fired.
+      expect(engineServiceSpy.startRound).not.toHaveBeenCalled();
+    });
+
+    it('V25D84 #3: auto-start no-ops when VM has errorMsg set (e.g. "No hay partidos para la fecha N")', () => {
+      engineServiceSpy.startRound.calls.reset();
+
+      // Build VM with an error message AND matches (covers the
+      // errorMsg short-circuit regardless of matches content).
+      const vm: RoundLiveViewModel = {
+        gameId: SAMPLE_GAME_ID,
+        roundNumber: 3,
+        matches: [{ match: makeMatch('SCHEDULED'), isUserMatch: true }],
+        teamNameMap: {},
+        allFinished: false,
+        errorMsg: 'No hay partidos para la fecha 3',
+        isRoundPaused: false,
+        byeTeam: null,
+        anyStarted: false
+      };
+      (component as any).vmSubject.next(vm);
+
+      // No POST should have fired — errorMsg short-circuits the
+      // auto-start.
+      expect(engineServiceSpy.startRound).not.toHaveBeenCalled();
+    });
+
+    it('V25D84 #4: auto-start no-ops when all matches already started (refresh case)', () => {
+      engineServiceSpy.startRound.calls.reset();
+
+      // All matches RUNNING — backend round is already ticking. This
+      // simulates a refresh where the manager re-mounted round-live
+      // after the round started.
+      const runningMatch: RoundMatchVM = {
+        match: makeMatch('SCHEDULED'),
+        state: makeMatchState({ status: 'RUNNING', currentMinute: 15 }),
+        isUserMatch: true
+      };
+      setVm([runningMatch]);
+
+      // No POST should have fired — pending list is empty.
+      expect(engineServiceSpy.startRound).not.toHaveBeenCalled();
+    });
+
+    it('V25D84 #5: startRoundEngine skips duplicate POST when autoStartTriggered=true', () => {
+      // First: fire the auto-start via setVm.
+      const notStartedMatch: RoundMatchVM = {
+        match: makeMatch('SCHEDULED'),
+        state: makeMatchState({ status: 'NOT_STARTED', currentMinute: 0 }),
+        isUserMatch: true
+      };
+      setVm([notStartedMatch]);
+
+      // After setVm, auto-start fired once. Reset and call
+      // startRoundEngine directly (simulating the combineLatest tap
+      // path).
+      engineServiceSpy.startRound.calls.reset();
+
+      (component as any).startRoundEngine(SAMPLE_GAME_ID, (component as any).vmSubject.value.matches);
+
+      // startRoundEngine must NOT have re-POSTed — autoStartTriggered
+      // was already true. The SSE stream still opens via switchMap.
+      expect(engineServiceSpy.startRound).not.toHaveBeenCalled();
+    });
+
+    it('V25D84 #6: auto-start fires only once per component instance (take(1) guard)', () => {
+      engineServiceSpy.startRound.calls.reset();
+
+      // First emission: NOT_STARTED matches — should fire auto-start.
+      const notStartedMatch: RoundMatchVM = {
+        match: makeMatch('SCHEDULED'),
+        state: makeMatchState({ status: 'NOT_STARTED', currentMinute: 0 }),
+        isUserMatch: true
+      };
+      setVm([notStartedMatch]);
+      expect(engineServiceSpy.startRound).toHaveBeenCalledTimes(1);
+
+      // Second emission: simulate an SSE update that flips the match
+      // to RUNNING. The take(1) subscription must NOT re-fire — once
+      // is enough.
+      engineServiceSpy.startRound.calls.reset();
+      (component as any).vmSubject.next({
+        gameId: SAMPLE_GAME_ID,
+        roundNumber: 3,
+        matches: [{
+          match: makeMatch('SCHEDULED'),
+          state: makeMatchState({ status: 'RUNNING', currentMinute: 5 }),
+          isUserMatch: true
+        }],
+        teamNameMap: {},
+        allFinished: false,
+        errorMsg: '',
+        isRoundPaused: false,
+        byeTeam: null,
+        anyStarted: true
+      });
+
+      // No additional POST — take(1) fired on the first emission only.
+      expect(engineServiceSpy.startRound).not.toHaveBeenCalled();
+    });
+
+    it('V25D84 #7: Iniciar Todos button still works as fallback after auto-start fires', () => {
+      // Fire the auto-start via setVm.
+      const notStartedMatch: RoundMatchVM = {
+        match: makeMatch('SCHEDULED'),
+        state: makeMatchState({ status: 'NOT_STARTED', currentMinute: 0 }),
+        isUserMatch: true
+      };
+      setVm([notStartedMatch]);
+
+      // Reset so the assertion counts only the iniciarTodos call.
+      engineServiceSpy.startRound.calls.reset();
+
+      // Click "Iniciar Todos" — even though auto-start already fired,
+      // the button can still re-trigger (e.g. backend rejected the
+      // auto-start and manager wants to retry).
+      component.iniciarTodos();
+
+      // The button must still call startRound (no-op guard from the
+      // autoStartTriggered flag does NOT block iniciarTodos).
+      expect(engineServiceSpy.startRound).toHaveBeenCalledTimes(1);
+      const [roundIdArg, matchesArg] = engineServiceSpy.startRound.calls.mostRecent().args;
+      expect(roundIdArg).toBe(SAMPLE_GAME_ID);
+      expect(matchesArg.length).toBe(1);
+      expect(matchesArg[0].matchId).toBe(SAMPLE_MATCH_ID);
     });
   });
 });

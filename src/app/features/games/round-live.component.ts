@@ -6,11 +6,11 @@ import { CareerService } from '../../core/services/career.service';
 import { LiveMatchModalsService } from '../../core/services/live-match-modals.service';
 import { Match } from '../../shared/models/match.model';
 import { BehaviorSubject, Observable, combineLatest, of } from 'rxjs';
-import { map, switchMap, tap, takeUntil, catchError, shareReplay } from 'rxjs/operators';
+import { filter, map, switchMap, tap, take, takeUntil, catchError, shareReplay } from 'rxjs/operators';
 import { Subject } from 'rxjs';
 import { MatchCardComponent } from '../../shared/components/match-card/match-card.component';
 import { RoundLiveViewModel, RoundMatchVM } from './models/round-live.model';
-import { MatchState } from '../../core/services/match-engine.model';
+import { MatchState, RoundState } from '../../core/services/match-engine.model';
 
 @Component({
   selector: 'app-round-live',
@@ -71,6 +71,24 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
     minute: number;
   } | null = null;
 
+  /**
+   * V25D84 sprint: guard for the auto-start subscription so the
+   * backend POST to {@code POST /api/v1/match-engine/rounds/start}
+   * fires exactly once per component instance. Set to {@code true}
+   * the moment the take(1) subscription observes the first vm$
+   * emission that has NOT_STARTED matches — subsequent calls to
+   * {@link tryAutoStartRound} short-circuit.
+   *
+   * <p>Why a flag (instead of just {@code take(1)}): the existing
+   * {@link startRoundEngine} still calls {@code engineService.startRound}
+   * (it has to, to wire the SSE stream post-POST). The flag prevents
+   * the auto-start subscription AND {@code startRoundEngine} from
+   * racing on a duplicate POST. {@code startRoundEngine} reads the
+   * flag and skips its own POST when the auto-start already covered
+   * the same round.
+   */
+  private autoStartTriggered = false;
+
   private vmSubject = new BehaviorSubject<RoundLiveViewModel>({
     gameId: '',
     roundNumber: 1,
@@ -111,6 +129,39 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
 
   constructor() {
     this.vm$ = this.vmSubject.asObservable();
+
+    // V25D84 sprint: auto-start the round as soon as the first vm$
+    // emission shows NOT_STARTED matches. This replaces the previous
+    // UX where the manager had to click the "Iniciar Todos" button on
+    // every round-live mount — under normal flow (no refresh, no SSE
+    // gap) the round starts itself and the button stays hidden as a
+    // fallback for refresh / failed-auto-start recovery.
+    //
+    // <p>Implementation:
+    // <ul>
+    //   <li>{@code take(1)} so the subscription fires exactly once per
+    //       component instance — we only want the FIRST emission, the
+    //       rest is driven by SSE via {@link startRoundEngine}.</li>
+    //   <li>{@code filter} skips the BehaviorSubject's initial empty-VM
+    //       replay (which fires synchronously to new subscribers and
+    //       would otherwise burn the take(1) before the real VM from
+    //       combineLatest arrives).</li>
+    //   <li>Filter accepts VMs that have matches OR an error message —
+    //       both are real states worth observing (the errorMsg branch
+    //       is the no-op path inside tryAutoStartRound).</li>
+    //   <li>Delegate the actual startRound call to {@link tryAutoStartRound}
+    //       so the flag logic is testable in isolation.</li>
+    // </ul>
+    //
+    // <p>Order matters: this subscription must be set up BEFORE the
+    // {@code combineLatest} tap below — the tap eventually calls
+    // {@code vmSubject.next(...)} which fires synchronously to all
+    // subscribers, and we want this listener registered first.
+    this.vm$.pipe(
+      takeUntil(this.destroy$),
+      filter(vm => vm.matches.length > 0 || !!vm.errorMsg),
+      take(1)
+    ).subscribe(vm => this.tryAutoStartRound(vm));
 
     const routeParams$ = this.route.paramMap.pipe(
       map(params => ({
@@ -247,7 +298,30 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
       awayTeamId: String(rm.match.awayTeamId)
     }));
 
-    this.engineService.startRound(roundId, matchData).pipe(
+    // V25D84 sprint: the auto-start subscription above already calls
+    // engineService.startRound once vm$ first emits with NOT_STARTED
+    // matches. To avoid a duplicate POST to /match-engine/rounds/start
+    // (which the backend may treat as a re-init, depending on the
+    // RoundEngine implementation), we short-circuit here when the
+    // auto-start already covered this round and skip directly to
+    // opening the SSE stream.
+    //
+    // <p>If the auto-start did NOT fire (e.g. the VM emitted with all
+    // matches already FINISHED, or with an error message), fall back
+    // to the original startRound POST so the SSE still has a round to
+    // subscribe to.
+    //
+    // <p>The union type is annotated explicitly because {@code of(null)}
+    // and {@code engineService.startRound(...)} (which returns
+    // {@code Observable<RoundState>}) produce incompatible types at the
+    // TS level — TS infers {@code Observable<null> | Observable<RoundState>}
+    // which has no common subscribe signature without the explicit
+    // {@code Observable<RoundState | null>} annotation.
+    const startRound$: Observable<RoundState | null> = this.autoStartTriggered
+      ? of(null)
+      : this.engineService.startRound(roundId, matchData);
+
+    startRound$.pipe(
       switchMap(() => this.engineService.streamRoundState(roundId)),
       takeUntil(this.destroy$)
     ).subscribe({
@@ -661,6 +735,79 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         console.error('[ROUND-LIVE] Iniciar Todos failed', err);
+      }
+    });
+  }
+
+  /**
+   * V25D84 sprint: auto-start the round once the first vm$ emission
+   * has NOT_STARTED matches. Triggered by the take(1) subscription
+   * in the constructor — the explicit "Iniciar Todos" button in the
+   * header remains as a manual fallback for refresh / recovery cases
+   * where the auto-start POST was rejected by the backend.
+   *
+   * <p>Behavior:
+   * <ul>
+   *   <li>Sets {@code autoStartTriggered} to {@code true} immediately
+   *       so duplicate calls (e.g. from {@link startRoundEngine}) can
+   *       short-circuit and skip their own POST.</li>
+   *   <li>No-ops on error/empty VMs (the round can't be started
+   *       without matches).</li>
+   *   <li>No-ops when no match has status {@code NOT_STARTED} — the
+   *       round already started ticking (covers the refresh case
+   *       where the backend round is RUNNING but the frontend VM was
+   *       rebuilt from scratch).</li>
+   *   <li>Otherwise POSTs to {@code /match-engine/rounds/start} with
+   *       the pending matches. The SSE stream (opened by
+   *       {@link startRoundEngine} after this method runs) will pick
+   *       up the resulting state transitions and flip
+   *       {@code vm.anyStarted} to {@code true}, hiding the fallback
+   *       button automatically.</li>
+   * </ul>
+   *
+   * <p>This is the primary auto-start path in V25D84. The
+   * {@link iniciarTodos} method is its manual twin.
+   */
+  private tryAutoStartRound(vm: RoundLiveViewModel): void {
+    if (this.autoStartTriggered) {
+      // Defensive: take(1) should already guarantee single-fire, but
+      // explicit guard so future refactors (e.g. lifting the take(1))
+      // don't accidentally POST twice.
+      return;
+    }
+    this.autoStartTriggered = true;
+
+    if (vm.errorMsg || vm.matches.length === 0) {
+      // Nothing to start — round can't be played (error or empty).
+      return;
+    }
+
+    const pending = vm.matches
+      .filter(rm => !rm.state || rm.state?.status === 'NOT_STARTED')
+      .map(rm => ({
+        matchId: String(rm.match.id),
+        homeTeamId: String(rm.match.homeTeamId),
+        awayTeamId: String(rm.match.awayTeamId)
+      }));
+
+    if (pending.length === 0) {
+      // All matches already started (e.g. user refreshed an in-flight
+      // round). Nothing to POST — the SSE stream from
+      // startRoundEngine will catch up via polling/SSE reconnect.
+      console.log('[ROUND-LIVE] V25D84 auto-start skipped: no NOT_STARTED matches in VM');
+      return;
+    }
+
+    console.log('[ROUND-LIVE] V25D84 auto-starting', pending.length, 'matches');
+    this.engineService.startRound(vm.gameId, pending).subscribe({
+      next: (state) => {
+        console.log('[ROUND-LIVE] V25D84 auto-start success', state);
+      },
+      error: (err) => {
+        // V25D84: a failed auto-start leaves the round stuck on
+        // NOT_STARTED. The "Iniciar Todos" button stays visible (no
+        // anyStarted flip) and the manager can re-trigger manually.
+        console.error('[ROUND-LIVE] V25D84 auto-start failed (user can retry via Iniciar Todos button)', err);
       }
     });
   }

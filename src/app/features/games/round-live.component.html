@@ -13,10 +13,14 @@
     <h2>Fecha {{ vm.roundNumber }} - En Vivo</h2>
     <span *ngIf="vm.byeTeam" class="bye-badge">BYE: {{ vm.byeTeam }}</span>
     <div class="controls">
-      <!-- V25D82 sprint 2 UX fix: explicit "Iniciar Todos" trigger. Shown only
-           when no match has started yet AND the round is not paused AND not
-           all finished. Once the SSE flips anyStarted=true the button hides
-           automatically (no manual cleanup needed). -->
+      <!-- V25D82 sprint 2 UX fix + V25D84 fallback: explicit "Iniciar Todos"
+           trigger. Shown only when no match has started yet AND the round is
+           not paused AND not all finished. Once the SSE flips anyStarted=true
+           the button hides automatically (no manual cleanup needed).
+           V25D84: under normal flow this button is hidden immediately because
+           the constructor's vm$.pipe(take(1)) auto-start subscription fires
+           before this template renders. The button is the manual fallback
+           for refresh / failed-auto-start recovery. -->
       <button
         *ngIf="!vm.allFinished && !vm.isRoundPaused && !vm.anyStarted"
         (click)="iniciarTodos()"
