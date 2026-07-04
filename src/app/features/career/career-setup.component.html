@@ -3,7 +3,7 @@
     <h1>🎮 SELECCIONA TUS OPCIONES DE PARTIDA</h1>
     <p class="subtitle">Configura tu nueva carrera y comienza tu camino a la gloria</p>
 
-    <div *ngIf="loading$ | async" class="loading-state">
+    <div *ngIf="loading$ | async" class="loading-state" data-testid="career-setup-loading">
       <div class="spinner"></div>
       <p>Cargando datos...</p>
     </div>
@@ -107,7 +107,16 @@
       <!-- Equipo (única división) -->
       <div class="form-group" *ngIf="selectedLeagueId && !selectedTeamsPerDivision">
         <label>🏆 Equipo</label>
+        <!-- V25D83 sprint: inline spinner while the /teams-with-ovr HTTP is
+             in flight. Before this fix, the dropdown would briefly appear
+             empty between league-selection and HTTP completion, leaving the
+             user wondering if the league actually had teams. -->
+        <div *ngIf="loadingTeams$ | async" class="inline-loading" data-testid="teams-loading">
+          <div class="spinner spinner-sm"></div>
+          <span>Cargando equipos...</span>
+        </div>
         <select
+          *ngIf="!(loadingTeams$ | async)"
           [(ngModel)]="selectedTeamId"
           class="form-select"
           [disabled]="!selectedLeagueId"
@@ -126,9 +135,15 @@
       <!-- Equipo (múltiples divisiones) -->
       <div class="form-group" *ngIf="selectedLeagueId && selectedTeamsPerDivision && (divisionPreviews$ | async) as divisions">
         <label>🏆 Equipo</label>
-        <select 
-          [(ngModel)]="selectedTeamId" 
-          class="form-select" 
+        <!-- V25D83 sprint: same inline spinner for the multi-division path. -->
+        <div *ngIf="loadingTeams$ | async" class="inline-loading" data-testid="teams-loading">
+          <div class="spinner spinner-sm"></div>
+          <span>Cargando equipos...</span>
+        </div>
+        <select
+          *ngIf="!(loadingTeams$ | async)"
+          [(ngModel)]="selectedTeamId"
+          class="form-select"
           [disabled]="!selectedLeagueId"
         >
           <option [value]="null">Selecciona un equipo...</option>

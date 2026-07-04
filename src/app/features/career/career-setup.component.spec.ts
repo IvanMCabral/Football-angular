@@ -21,7 +21,7 @@ import { Component, NO_ERRORS_SCHEMA } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { of, throwError, BehaviorSubject, Subject } from 'rxjs';
 import { CareerSetupComponent } from './career-setup.component';
 import { AuthService } from '../../core/services/auth.service';
 
@@ -227,18 +227,145 @@ describe('CareerSetupComponent — V25D78-C48.1 setup-flow UX gap fix', () => {
   });
 
   /**
-   * V25D78-C55.2 phase 4 UI (a) + (a2): division tier badges surface the
-   * C55.2 multi-division concept to the user during /career/setup.
+   * V25D83 sprint: loading-state UX gap fix.
    *
-   * <p>(a): the single-division team selector MUST render a "- PRIMERA"
-   * suffix on every team option (since all teams play in PRIMERA when no
-   * subdivision is requested), plus a visible "PRIMERA" tier badge in the
-   * helper hint.
+   * <p>Before this fix {@code loading$} was derived from
+   * {@code leagues$.pipe(map(leagues => leagues === null))} which was
+   * always {@code false} (the source emits {@code League[]}, never
+   * {@code null}). The page-level spinner in the template therefore
+   * never rendered, leaving a blank screen during the initial
+   * {@code GET /world/leagues} HTTP.
    *
-   * <p>(a2): the multi-division preview cards MUST render a tier badge
-   * (PRIMERA / SEGUNDA / TERCERA) per card, keyed off the card's 0-indexed
-   * position in the divisions array.
+   * <p>Tests cover:
+   * <ol>
+   *   <li>{@code loading$} starts at {@code true} on subscription and
+   *       flips to {@code false} once {@code leagues$} emits (success).</li>
+   *   <li>The page-level spinner renders when {@code loading$} is true
+   *       (verified by {@code data-testid} presence).</li>
+   *   <li>After leagues emit, the spinner disappears and the seed/CTA
+   *       renders (regression — existing tests cover this; the new
+   *       assertion is that the spinner does NOT survive past the
+   *       first emission).</li>
+   *   <li>{@code loadingTeams$} flips true on league-selection before
+   *       {@code teamsWithOVR$} emits (the new "Cargando equipos..."
+   *       inline spinner).</li>
+   * </ol>
    */
+  describe('V25D83 sprint: loading-state UX gap fix', () => {
+    it('V25D83 #1: loading$ starts true and flips to false on first leagues$ emission (data flow)', (done: DoneFn) => {
+      httpSpy.get.and.returnValue(of([LA_LIGA]));
+      fixture.detectChanges();
+
+      // Subscribe immediately to capture the initial true emission.
+      const emissions: boolean[] = [];
+      const sub = component.loading$.subscribe(v => emissions.push(v));
+
+      fixture.whenStable().then(() => {
+        sub.unsubscribe();
+        // First emission MUST be true (the startWith seed), subsequent
+        // emissions after leagues$ resolves MUST settle on false.
+        expect(emissions.length).toBeGreaterThanOrEqual(2);
+        expect(emissions[0]).toBeTrue();
+        expect(emissions[emissions.length - 1]).toBeFalse();
+        done();
+      });
+    });
+
+    it('V25D83 #2: page-level spinner renders during initial load and disappears after (template)', (done: DoneFn) => {
+      // Use a Subject (cold — no initial value) so the /world/leagues
+      // HTTP blocks until we explicitly emit. This lets us observe the
+      // loading-state DOM (spinner visible) before the chain resolves.
+      const leaguesSubject = new Subject<any[]>();
+      httpSpy.get.and.returnValue(leaguesSubject);
+      fixture.detectChanges();
+
+      // Capture the initial DOM state — before we resolve leagues$.
+      const initialSpinner = fixture.nativeElement.querySelector(
+        '[data-testid="career-setup-loading"]');
+      expect(initialSpinner).not.toBeNull();
+
+      // Now release the leagues fetch — spinner MUST disappear.
+      leaguesSubject.next([LA_LIGA]);
+      fixture.detectChanges();
+
+      fixture.whenStable().then(() => {
+        fixture.detectChanges();
+        const finalSpinner = fixture.nativeElement.querySelector(
+          '[data-testid="career-setup-loading"]');
+        expect(finalSpinner).toBeNull();
+        done();
+      });
+    });
+
+    it('V25D83 #3: loadingTeams$ flips true on league-selection (UX gap)', (done: DoneFn) => {
+      // Use Subject (cold) for the teams HTTP so the chain blocks until
+      // we explicitly push. This lets us observe the loading transition
+      // cleanly: a fresh league-selection fires concat(of([]), HTTP) and
+      // the HTTP stays open, so loadingTeams$ MUST settle on true.
+      const TEAMS_SUBJECT = new Subject<any[]>();
+      httpSpy.get.and.callFake(((url: string) => {
+        if (url.includes('/teams-with-ovr')) return TEAMS_SUBJECT;
+        return of([LA_LIGA]);
+      }) as any);
+      fixture.detectChanges();
+
+      // Subscribe to capture the transition. By the time we subscribe,
+      // the V25D82.2 preload (ngOnInit) has already fired and the chain
+      // is awaiting the (cold) HTTP — loadingTeams$ is true.
+      const emissions: boolean[] = [];
+      const sub = component.loadingTeams$.subscribe(v => emissions.push(v));
+
+      // User picks a DIFFERENT league — this re-triggers leagueChangeSubject
+      // and switchMap returns a fresh concat(of([]), HTTP) pipeline. The
+      // HTTP is cold (TEAMS_SUBJECT) so it blocks, leaving loadingTeams$
+      // at true (teams is [] from the concat-of seed, leagueId is set).
+      component.selectedLeagueId = 'different-league-id';
+      component.onLeagueChange();
+
+      fixture.whenStable().then(() => {
+        expect(emissions[emissions.length - 1]).toBeTrue();
+        sub.unsubscribe();
+        done();
+      });
+    });
+
+    it('V25D83 #4: loadingTeams$ flips false after teamsWithOVR$ emits the real payload', (done: DoneFn) => {
+      // Cold subject for the teams HTTP — blocks until we push. We then
+      // push a non-empty teams array and verify loadingTeams$ flips false.
+      const TEAMS_SUBJECT = new Subject<any[]>();
+      httpSpy.get.and.callFake(((url: string) => {
+        if (url.includes('/teams-with-ovr')) return TEAMS_SUBJECT;
+        return of([LA_LIGA]);
+      }) as any);
+      fixture.detectChanges();
+
+      // Pick LA_LIGA — fires the V25D82.2 preload path. The chain is
+      // awaiting TEAMS_SUBJECT (still cold → empty emission via the
+      // concat-of seed, so loadingTeams$ is true).
+      component.selectedLeagueId = LA_LIGA.realLeagueId;
+      component.onLeagueChange();
+
+      // Subscribe AFTER the league-change so we capture the transition.
+      const emissions: boolean[] = [];
+      const sub = component.loadingTeams$.subscribe(v => emissions.push(v));
+
+      fixture.whenStable().then(() => {
+        // Currently loading (teams is empty, league is set).
+        expect(emissions[emissions.length - 1]).toBeTrue();
+
+        // Emit the real teams — loading MUST flip false.
+        TEAMS_SUBJECT.next([
+          { worldTeamId: 'team-rm', name: 'Real Madrid', country: 'ES', formation: '4-3-3', ovr: 88, playerCount: 25 }
+        ]);
+
+        fixture.whenStable().then(() => {
+          expect(emissions[emissions.length - 1]).toBeFalse();
+          sub.unsubscribe();
+          done();
+        });
+      });
+    });
+  });
   describe('V25D78-C55.2 phase 4 UI (a) + (a2): division tier badges', () => {
     const TEAMS_WITH_OVR = [
       { worldTeamId: 'team-real-madrid', name: 'Real Madrid', country: 'ES', formation: '4-3-3', ovr: 88, playerCount: 25 },

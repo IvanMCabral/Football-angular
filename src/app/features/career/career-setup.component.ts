@@ -5,8 +5,8 @@ import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../core/services/auth.service';
 import { environment } from '../../environments/environment';
-import { Observable, BehaviorSubject, combineLatest, firstValueFrom } from 'rxjs';
-import { map, switchMap, catchError, take, tap } from 'rxjs/operators';
+import { Observable, BehaviorSubject, combineLatest, firstValueFrom, concat } from 'rxjs';
+import { map, switchMap, catchError, take, tap, startWith, distinctUntilChanged } from 'rxjs/operators';
 import { of } from 'rxjs';
 
 interface League {
@@ -44,6 +44,19 @@ export class CareerSetupComponent implements OnInit {
   availableTeamsPerDivision$: Observable<number[]>;
   totalTeamsInLeague$: Observable<number>;
   loading$: Observable<boolean>;
+  /**
+   * V25D83 sprint: teams-loading indicator. True while a league is selected
+   * but {@code teamsWithOVR$} hasn't emitted its payload yet. Lets the UI
+   * show an inline spinner in the team dropdown (or the divisions-preview
+   * grid) while the /world/leagues/:id/teams-with-ovr HTTP is in flight.
+   *
+   * <p>Heuristic: we derive this from {@code combineLatest([leagueId,
+   * teams])} where {@code leagueId} comes from {@code leagueChangeSubject}
+   * and {@code teams} from {@code teamsWithOVR$}. Loading is when a
+   * league is selected AND the teams array is empty. Empty teams with no
+   * league selected is the initial state (no spinner).
+   */
+  loadingTeams$: Observable<boolean>;
   error$ = new BehaviorSubject<string | null>(null);
 
   // V25D78-C48.1: setup-flow UX gap fix. `seedingWorld` is true while POST
@@ -111,14 +124,25 @@ export class CareerSetupComponent implements OnInit {
         if (!leagueId) {
           return of([]);
         }
-        return this.authService.getUserInfo().pipe(
-          switchMap(userInfo => 
-            this.http.get<TeamWithOVR[]>(`${environment.apiUrl}/world/leagues/${leagueId}/teams-with-ovr?userId=${userInfo.id}`)
-          ),
-          catchError(err => {
-            this.error$.next('Error al cargar equipos');
-            return of([]);
-          })
+        // V25D83 sprint: prepend an immediate empty-array emission so the
+        // loadingTeams$ derived observable flips to `true` synchronously
+        // on league-change (without waiting for the HTTP response). Before
+        // this fix, switching leagues kept the OLD teams in the async
+        // pipe until the new HTTP resolved, so loadingTeams$ would never
+        // see "empty teams + selected league" and the spinner would be
+        // skipped on the switch. Concat emits the seed `[]` first, then
+        // subscribes to the HTTP chain.
+        return concat(
+          of([] as TeamWithOVR[]),
+          this.authService.getUserInfo().pipe(
+            switchMap(userInfo =>
+              this.http.get<TeamWithOVR[]>(`${environment.apiUrl}/world/leagues/${leagueId}/teams-with-ovr?userId=${userInfo.id}`)
+            ),
+            catchError(err => {
+              this.error$.next('Error al cargar equipos');
+              return of([] as TeamWithOVR[]);
+            })
+          )
         );
       })
     );
@@ -159,7 +183,33 @@ export class CareerSetupComponent implements OnInit {
       map(teams => teams.length)
     );
 
-    this.loading$ = this.leagues$.pipe(map(leagues => leagues === null));
+    /**
+     * V25D83 sprint: replace the broken `leagues === null` mapping (the
+     * leagues$ source emits `League[]`, never `null`, so loading$ was
+     * permanently `false` and the page-level spinner never rendered).
+     * The new derivation emits `true` on subscription and flips to `false`
+     * as soon as leagues$ emits its first value (success or empty). The
+     * downstream `distinctUntilChanged()` collapses no-op emissions.
+     */
+    this.loading$ = this.leagues$.pipe(
+      map(() => false),
+      startWith(true),
+      distinctUntilChanged()
+    );
+
+    /**
+     * V25D83 sprint: teams-loading indicator. True while a league is
+     * selected AND teamsWithOVR$ has not yet delivered a non-empty payload.
+     * See the {@code loadingTeams$} JSDoc above for the heuristic and the
+     * empty-league edge case.
+     */
+    this.loadingTeams$ = combineLatest([
+      this.leagueChangeSubject,
+      this.teamsWithOVR$
+    ]).pipe(
+      map(([leagueId, teams]) => leagueId !== null && teams.length === 0),
+      distinctUntilChanged()
+    );
   }
 
   /**
