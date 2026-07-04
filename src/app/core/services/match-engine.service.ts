@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, Observable, Subject } from 'rxjs';
 import { map, switchMap } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
+import { AuthService } from './auth.service';
 import {
   MatchState,
   MatchCommand,
@@ -42,6 +43,7 @@ const RECONNECT_JITTER = 0.2;
 export class MatchEngineService {
   private http = inject(HttpClient);
   private ngZone = inject(NgZone);
+  private authService = inject(AuthService);
   private apiUrl = `${environment.apiUrl}/match-engine`;
 
   /**
@@ -259,6 +261,15 @@ export class MatchEngineService {
    * is set to {@code RECONNECTING} (and the backoff timer is armed); after
    * {@link RECONNECT_MAX_ATTEMPTS} failed attempts the entry becomes
    * {@code CLOSED}.
+   *
+   * <p>V25D85-SSE-AUTH: switched the transport from {@code EventSource} to
+   * {@code fetch + ReadableStream} so the {@code Authorization} header (and
+   * any other custom header the auth pipeline wants) can be attached. The
+   * {@code EventSource} browser API does NOT support custom request
+   * headers, which broke the SSE link end-to-end once the backend hardened
+   * the stream endpoint behind JWT. Behavior is otherwise unchanged: same
+   * exponential backoff with jitter, same {@code DEGRADED} timer, same
+   * health map, same completion predicate.
    */
   private createSseStream<T>(
     url: string,
@@ -266,12 +277,13 @@ export class MatchEngineService {
     isComplete: (payload: T) => boolean
   ): Observable<T> {
     return new Observable<T>(observer => {
-      let es: EventSource | null = null;
       let attempt = 0;
       let backoffTimer: ReturnType<typeof setTimeout> | null = null;
       let lastEventAt = 0;
       let degradedTimer: ReturnType<typeof setTimeout> | null = null;
       let closed = false;
+      let controller: AbortController | null = null;
+      let connected = false;
 
       const setHealth = (h: StreamHealth) => {
         this.streamHealthByUrl.set(url, h);
@@ -289,70 +301,116 @@ export class MatchEngineService {
         clearDegradedTimer();
         degradedTimer = setTimeout(() => {
           // Only flag DEGRADED if the connection is supposed to be open.
-          if (es && es.readyState === EventSource.OPEN) {
-            console.warn(`[SSE-${label}] [LIVE-MATCH-F3] DEGRADED — no event in ${DEGRADED_GAP_MS}ms`);
+          if (connected && !closed) {
+            console.warn(`[SSE-${label}] [V25D85-SSE] DEGRADED — no event in ${DEGRADED_GAP_MS}ms`);
             setHealth('DEGRADED');
           }
         }, DEGRADED_GAP_MS);
       };
 
-      const open = () => {
+      const open = async () => {
         if (closed) {
           return;
         }
-        try {
-          es = new EventSource(url);
-        } catch (err) {
-          console.error(`[SSE-${label}] [LIVE-MATCH-F3] EventSource ctor failed:`, err);
-          scheduleReconnect();
-          return;
+
+        // V25D85-SSE-AUTH: build headers including the Bearer token so the
+        // backend can authenticate the stream. Token is read fresh on every
+        // (re)connect so token refresh / logout are picked up.
+        const token = this.authService.getToken();
+        const headers: Record<string, string> = {
+          'Accept': 'text/event-stream',
+          'Cache-Control': 'no-cache'
+        };
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
         }
 
-        es.onopen = () => {
-          console.log(`[SSE-${label}] ✅ Connection opened (${url})`);
+        controller = new AbortController();
+
+        try {
+          const response = await fetch(url, {
+            method: 'GET',
+            headers,
+            signal: controller.signal
+          });
+
+          if (!response.ok || !response.body) {
+            throw new Error(`SSE HTTP ${response.status}`);
+          }
+
+          // Connection opened successfully.
+          connected = true;
+          console.log(`[SSE-${label}] [V25D85-SSE] Connection opened (${url})`);
           attempt = 0;
           setHealth('HEALTHY');
           armDegradedTimer();
-        };
 
-        es.onmessage = (event) => {
-          lastEventAt = Date.now();
-          // Any new message means we are no longer DEGRADED (until the next gap).
-          if (this.streamHealthByUrl.get(url) === 'DEGRADED') {
-            setHealth('HEALTHY');
-          }
-          armDegradedTimer();
-          try {
-            const payload = JSON.parse(event.data) as T;
-            this.ngZone.run(() => {
-              observer.next(payload);
-              if (isComplete(payload)) {
-                console.log(`[SSE-${label}] 🏁 Complete payload received, closing`);
-                closed = true;
-                clearDegradedTimer();
-                setHealth('CLOSED');
-                es?.close();
-                observer.complete();
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = '';
+
+          // Drain SSE chunks: events are separated by a blank line ("\n\n");
+          // each line inside an event begins with a field name (we only care
+          // about "data:"). Partial trailing fragments stay in the buffer.
+          const pump = (): Promise<void> =>
+            reader.read().then(({ done, value }) => {
+              if (done) {
+                if (!closed) {
+                  // Server closed the stream without us completing it —
+                  // treat as a transient drop and reconnect.
+                  console.warn(`[SSE-${label}] [V25D85-SSE] Stream ended by server, reconnecting`);
+                  connected = false;
+                  scheduleReconnect();
+                }
+                return;
               }
-            });
-          } catch (error) {
-            console.error(`[SSE-${label}] ❌ Error parsing SSE data:`, error);
-          }
-        };
 
-        es.onerror = (event) => {
-          const readyState = es?.readyState;
-          console.warn(`[SSE-${label}] [LIVE-MATCH-F3] SSE error, readyState=${readyState}`);
-          if (readyState === EventSource.CLOSED) {
-            // EventSource has given up (network gone). Schedule a manual reconnect.
-            es?.close();
-            es = null;
-            scheduleReconnect();
-          } else {
-            // CONNECTING — EventSource is retrying itself; do nothing but log.
-            setHealth('RECONNECTING');
+              lastEventAt = Date.now();
+              if (this.streamHealthByUrl.get(url) === 'DEGRADED') {
+                setHealth('HEALTHY');
+              }
+              armDegradedTimer();
+
+              buffer += decoder.decode(value, { stream: true });
+              const events = buffer.split('\n\n');
+              buffer = events.pop() ?? '';
+
+              for (const event of events) {
+                const dataLine = event.split('\n').find(line => line.startsWith('data: '));
+                if (!dataLine) continue;
+                try {
+                  const payload = JSON.parse(dataLine.substring('data: '.length)) as T;
+                  this.ngZone.run(() => {
+                    observer.next(payload);
+                    if (isComplete(payload)) {
+                      console.log(`[SSE-${label}] 🏁 Complete payload received, closing`);
+                      closed = true;
+                      connected = false;
+                      clearDegradedTimer();
+                      setHealth('CLOSED');
+                      try { controller?.abort(); } catch { /* already aborted */ }
+                      observer.complete();
+                    }
+                  });
+                } catch (error) {
+                  console.error(`[SSE-${label}] ❌ Error parsing SSE data:`, error);
+                }
+              }
+
+              return pump();
+            });
+
+          await pump();
+        } catch (err: any) {
+          // Unsubscribe-driven abort: stay quiet, do not reschedule.
+          if (err?.name === 'AbortError' || closed) {
+            connected = false;
+            return;
           }
-        };
+          console.warn(`[SSE-${label}] [V25D85-SSE] fetch error:`, err);
+          connected = false;
+          scheduleReconnect();
+        }
       };
 
       const scheduleReconnect = () => {
@@ -360,7 +418,7 @@ export class MatchEngineService {
           return;
         }
         if (attempt >= RECONNECT_MAX_ATTEMPTS) {
-          console.error(`[SSE-${label}] [LIVE-MATCH-F3] CLOSED — gave up after ${attempt} attempts`);
+          console.error(`[SSE-${label}] [V25D85-SSE] CLOSED — gave up after ${attempt} attempts`);
           setHealth('CLOSED');
           return;
         }
@@ -368,7 +426,7 @@ export class MatchEngineService {
         const jitter = baseDelay * RECONNECT_JITTER * (Math.random() * 2 - 1);
         const delay = Math.max(250, Math.round(baseDelay + jitter));
         attempt++;
-        console.log(`[SSE-${label}] [LIVE-MATCH-F3] RECONNECTING in ${delay}ms (attempt ${attempt}/${RECONNECT_MAX_ATTEMPTS})`);
+        console.log(`[SSE-${label}] [V25D85-SSE] RECONNECTING in ${delay}ms (attempt ${attempt}/${RECONNECT_MAX_ATTEMPTS})`);
         setHealth('RECONNECTING');
         backoffTimer = setTimeout(() => {
           backoffTimer = null;
@@ -376,16 +434,22 @@ export class MatchEngineService {
         }, delay);
       };
 
-      open();
+      // Kick off the connection outside of Angular zone: the SSE pump already
+      // re-enters the zone per message via ngZone.run, so we don't need the
+      // fetch promise itself to be in-zone.
+      this.ngZone.runOutsideAngular(() => {
+        open();
+      });
 
       return () => {
         closed = true;
+        connected = false;
         clearDegradedTimer();
         if (backoffTimer != null) {
           clearTimeout(backoffTimer);
         }
-        if (es) {
-          es.close();
+        if (controller != null) {
+          try { controller.abort(); } catch { /* already aborted */ }
         }
         // Reset health to CLOSED only if WE owned it; if another stream
         // superseded us, keep the latest health.

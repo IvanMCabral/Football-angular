@@ -6,8 +6,9 @@
  * test target in `angular.json`. This spec validates:
  * <ul>
  *   <li>Initial streamHealth$ is CLOSED.</li>
- *   <li>After onopen + first message the health becomes HEALTHY.</li>
- *   <li>After a closed-error, the service schedules a backoff reconnect and
+ *   <li>After the fetch resolves and the first message arrives, the health
+ *       becomes HEALTHY.</li>
+ *   <li>After a stream drop, the service schedules a backoff reconnect and
  *       transitions to RECONNECTING.</li>
  *   <li>After {@link RECONNECT_MAX_ATTEMPTS} failed attempts the health is
  *       CLOSED.</li>
@@ -15,9 +16,18 @@
  *   <li>A payload with {@code status=FINISHED} completes the stream.</li>
  * </ul>
  *
+ * <p>V25D85-SSE-AUTH: the underlying transport switched from
+ * {@code EventSource} (which does NOT support custom request headers) to
+ * {@code fetch + ReadableStream}, so the Authorization header can flow to
+ * the backend. Tests use a tiny fetch mock that captures the request
+ * options (URL + headers + AbortController signal) and exposes a scriptable
+ * reader so we can drive events deterministically.
+ *
  * <p>Timer-based tests use `jasmine.clock()` to mock `setTimeout` instead of
  * `fakeAsync(tick(...))` — this avoids the ProxyZone bootstrapping pain and
- * keeps the spec independent of zone.js internals.
+ * keeps the spec independent of zone.js internals. Microtask flushing uses
+ * a handful of `await Promise.resolve()` calls between the synchronous
+ * trigger and the assertion.
  *
  * <p>LIVE-MATCH-F5.3.4: extends the spec with BUG-015 pause/resume plumbing
  * (helper roundId lookup + per-round pause/resume with 5-minute cache).
@@ -27,48 +37,187 @@ import { TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
 import { of } from 'rxjs';
 import { MatchEngineService } from './match-engine.service';
+import { AuthService } from './auth.service';
 import { MatchState, StreamHealth } from './match-engine.model';
 
-// ---------- EventSource mock ----------
+// ---------- fetch + ReadableStream mock (V25D85-SSE-AUTH) ----------
 
-class MockEventSource {
-  static readonly CONNECTING = 0;
-  static readonly OPEN = 1;
-  static readonly CLOSED = 2;
+interface QueuedReader {
+  resolve: (r: { done: boolean; value?: Uint8Array }) => void;
+}
 
-  url: string;
-  readyState: number = MockEventSource.CONNECTING;
-  onopen: ((e: Event) => void) | null = null;
-  onmessage: ((e: MessageEvent) => void) | null = null;
-  onerror: ((e: Event) => void) | null = null;
+/**
+ * Mock instance for one fetch() call. Captures URL + headers + signal so the
+ * test can verify the Authorization header is wired through and the abort
+ * signal is plumbed. Exposes `emit`, `endStream` and `respondError` to drive
+ * the consumer's behavior.
+ */
+class MockFetchSse {
+  static instances: MockFetchSse[] = [];
+  static reset() { MockFetchSse.instances = []; }
 
-  // Test helpers
-  static instances: MockEventSource[] = [];
-  static reset() { MockEventSource.instances = []; }
+  readonly url: string;
+  readonly headers: Record<string, string>;
+  /** AbortSignal from the request options — the SERVICE controls it via abort(). */
+  readonly signal: AbortSignal;
 
-  constructor(url: string) {
+  /** Resolved by the test once `respondOk`/`respondError` is called. */
+  private resolveFetch!: (resp: unknown) => void;
+  /** Rejected by the test if `respondReject` is called. */
+  private rejectFetch!: (err: unknown) => void;
+  /** Whether the fetch promise has been resolved already. */
+  private fetchResolved = false;
+
+  /**
+   * Queued reader callbacks. The reader pulls chunks via pump(); chunks are
+   * added to the queue by emit / endStream. The reader read() resolves as
+   * soon as a chunk is queued.
+   */
+  private readerQueue: { done: boolean; value?: Uint8Array }[] = [];
+  private readerWaiters: QueuedReader[] = [];
+
+  /** Whether `endStream` was already called (so subsequent reads return done). */
+  private streamEnded = false;
+
+  constructor(url: string, options: RequestInit | undefined) {
     this.url = url;
-    MockEventSource.instances.push(this);
+    this.headers = MockFetchSse.toHeaderMap(options?.headers);
+    // IMPORTANT: use the SIGNAL the SERVICE passed in (via options.signal).
+    // When the service calls `controller.abort()` on its own AbortController,
+    // the same signal will flip to `aborted = true` here — that's how the
+    // test verifies cleanup.
+    const optSignal = (options?.signal ?? null) as AbortSignal | null;
+    if (optSignal) {
+      this.signal = optSignal;
+    } else {
+      // No signal provided: emit a never-aborted stand-in so the property is
+      // always defined. Tests can still poke at it.
+      this.signal = new AbortController().signal;
+    }
+    MockFetchSse.instances.push(this);
   }
 
-  close() {
-    this.readyState = MockEventSource.CLOSED;
+  static toHeaderMap(raw: HeadersInit | undefined): Record<string, string> {
+    if (!raw) return {};
+    if (typeof Headers !== 'undefined' && raw instanceof Headers) {
+      const out: Record<string, string> = {};
+      raw.forEach((v, k) => { out[k] = v; });
+      return out;
+    }
+    if (Array.isArray(raw)) {
+      const out: Record<string, string> = {};
+      for (const [k, v] of raw) { out[k] = v; }
+      return out;
+    }
+    return { ...(raw as Record<string, string>) };
   }
 
-  // Helpers used by the test code
-  fireOpen()  { this.readyState = MockEventSource.OPEN; this.onopen?.(new Event('open')); }
-  fireMessage(data: unknown) {
-    this.onmessage?.(new MessageEvent('message', { data: JSON.stringify(data) }));
+  /** Called once when fetch() is invoked. Returns the fetch promise. */
+  startFetch(): Promise<unknown> {
+    return new Promise((resolve, reject) => {
+      this.resolveFetch = resolve;
+      this.rejectFetch = reject;
+    });
   }
-  fireErrorAndClose() {
-    this.readyState = MockEventSource.CLOSED;
-    this.onerror?.(new Event('error'));
+
+  /** Resolve the fetch promise with a 200 OK + scriptable reader body. */
+  respondOk(): void {
+    if (this.fetchResolved) return;
+    this.fetchResolved = true;
+    const reader = this.makeReader();
+    this.resolveFetch({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      headers: new Headers(),
+      body: { getReader: () => reader }
+    });
+  }
+
+  /** Resolve the fetch promise with a non-2xx response (used to trigger reconnect). */
+  respondHttpError(status: number): void {
+    if (this.fetchResolved) return;
+    this.fetchResolved = true;
+    this.resolveFetch({ ok: false, status, statusText: 'ERR', headers: new Headers(), body: null });
+  }
+
+  /** Reject the fetch promise with a network error. */
+  respondReject(message: string): void {
+    if (this.fetchResolved) return;
+    this.fetchResolved = true;
+    this.rejectFetch(new Error(message));
+  }
+
+  /** Push one SSE data event into the open stream. */
+  emit(payload: unknown): void {
+    const data = `data: ${JSON.stringify(payload)}\n\n`;
+    this.readerQueue.push({ done: false, value: new TextEncoder().encode(data) });
+    this.drainReader();
+  }
+
+  /** Push a raw SSE chunk (already in wire format) into the open stream. */
+  emitRaw(raw: string): void {
+    this.readerQueue.push({ done: false, value: new TextEncoder().encode(raw) });
+    this.drainReader();
+  }
+
+  /** Close the response stream cleanly (signal `done: true`). */
+  endStream(): void {
+    this.streamEnded = true;
+    if (this.readerQueue.length === 0) {
+      this.readerQueue.push({ done: true });
+    }
+    this.drainReader();
+  }
+
+  private makeReader(): {
+    read: () => Promise<{ done: boolean; value?: Uint8Array }>;
+  } {
+    return {
+      read: () => new Promise<{ done: boolean; value?: Uint8Array }>((resolve) => {
+        if (this.readerQueue.length > 0) {
+          resolve(this.readerQueue.shift()!);
+          return;
+        }
+        if (this.streamEnded) {
+          resolve({ done: true });
+          return;
+        }
+        this.readerWaiters.push({ resolve });
+      })
+    };
+  }
+
+  private drainReader(): void {
+    while (this.readerWaiters.length > 0 && this.readerQueue.length > 0) {
+      const next = this.readerQueue.shift()!;
+      const waiter = this.readerWaiters.shift()!;
+      waiter.resolve(next);
+    }
   }
 }
 
-describe('MatchEngineService — LIVE-MATCH-F3-UI-LIVE FE1 (SSE backoff + health)', () => {
+/**
+ * Install a fake `globalThis.fetch`. Each call captures the options
+ * (URL + headers + signal) in a `MockFetchSse` and exposes the response
+ * once the test calls `respondOk` / `respondError` / `respondReject`.
+ */
+function installMockFetch(): () => void {
+  const originalFetch = (globalThis as any).fetch;
+  (globalThis as any).fetch = (url: string, options?: RequestInit) => {
+    const mock = new MockFetchSse(url, options);
+    return mock.startFetch();
+  };
+  return () => {
+    (globalThis as any).fetch = originalFetch;
+  };
+}
+
+describe('MatchEngineService — LIVE-MATCH-F3-UI-LIVE FE1 + V25D85-SSE-AUTH', () => {
   let service: MatchEngineService;
   let httpSpy: jasmine.SpyObj<HttpClient>;
+  let authServiceStub: { getToken: () => string | null };
+  let restoreFetch: () => void;
 
   const fakeState: MatchState = {
     matchId: 'm1',
@@ -91,116 +240,208 @@ describe('MatchEngineService — LIVE-MATCH-F3-UI-LIVE FE1 (SSE backoff + health
     players: []
   };
 
+  /** Flush a few microtasks so the awaited fetch() chain settles. */
+  async function flushMicrotasks(n = 10): Promise<void> {
+    for (let i = 0; i < n; i++) {
+      await Promise.resolve();
+    }
+  }
+
   beforeEach(() => {
-    (globalThis as any).EventSource = MockEventSource;
-    MockEventSource.reset();
+    MockFetchSse.reset();
+    authServiceStub = { getToken: () => 'test-jwt-token' };
     httpSpy = jasmine.createSpyObj('HttpClient', ['post', 'get']);
     TestBed.configureTestingModule({
       providers: [
         MatchEngineService,
-        { provide: HttpClient, useValue: httpSpy }
+        { provide: HttpClient, useValue: httpSpy },
+        { provide: AuthService, useValue: authServiceStub }
       ]
     });
     service = TestBed.inject(MatchEngineService);
+    restoreFetch = installMockFetch();
   });
 
   afterEach(() => {
-    // Drain any leftover timers from a fakeAsync test by clearing
-    // jasmine.clock if it was installed. (jasmine 5+ removed the
-    // .installed getter, so we just attempt uninstall unconditionally
-    // and swallow the "not installed" error.)
     try { jasmine.clock().uninstall(); } catch (_e) { /* not installed */ }
+    restoreFetch();
   });
 
   it('initial health is CLOSED', () => {
     expect(service.streamHealth$.value).toBe('CLOSED');
   });
 
-  it('emits HEALTHY after onopen and after each message', () => {
+  it('emits HEALTHY after the fetch resolves and after each message', async () => {
     const health: StreamHealth[] = [];
     const sub = service.streamHealth$.subscribe(h => health.push(h));
-    const stream$ = service.streamMatchState('m1');
     const received: MatchState[] = [];
-    stream$.subscribe(s => received.push(s));
+    service.streamMatchState('m1').subscribe(s => received.push(s));
 
-    // open + first message
-    const es = MockEventSource.instances[0];
-    es.fireOpen();
+    await flushMicrotasks();
+    expect(MockFetchSse.instances.length).toBe(1);
+
+    MockFetchSse.instances[0].respondOk();
+    await flushMicrotasks();
+    MockFetchSse.instances[0].emit(fakeState);
+    await flushMicrotasks();
+
     expect(service.streamHealth$.value).toBe('HEALTHY');
-    es.fireMessage(fakeState);
     expect(received.length).toBe(1);
     sub.unsubscribe();
   });
 
-  it('switches to RECONNECTING after a CLOSE error and schedules a backoff reconnect', () => {
+  it('switches to RECONNECTING after a stream drop and schedules a backoff reconnect', async () => {
     jasmine.clock().install();
     const received: MatchState[] = [];
     service.streamMatchState('m1').subscribe(s => received.push(s));
 
-    const es1 = MockEventSource.instances[0];
-    es1.fireOpen();
-    es1.fireMessage(fakeState);
+    await flushMicrotasks();
+    MockFetchSse.instances[0].respondOk();
+    await flushMicrotasks();
+    MockFetchSse.instances[0].emit(fakeState);
+    await flushMicrotasks();
     expect(service.streamHealth$.value).toBe('HEALTHY');
 
-    // Force a closed state (network dropped) — service schedules a backoff
-    es1.fireErrorAndClose();
+    // Drop the stream — service should reconnect.
+    MockFetchSse.instances[0].endStream();
+    await flushMicrotasks();
     expect(service.streamHealth$.value).toBe('RECONNECTING');
 
-    // Advance just under the 1s backoff (with jitter), nothing happens
+    // Advance just under the 1s backoff, nothing happens.
     jasmine.clock().tick(800);
-    expect(MockEventSource.instances.length).toBe(1);
+    expect(MockFetchSse.instances.length).toBe(1);
 
-    // Advance past the backoff (give 500ms leeway for jitter)
+    // Advance past the backoff.
     jasmine.clock().tick(500);
-    expect(MockEventSource.instances.length).toBe(2);
+    expect(MockFetchSse.instances.length).toBe(2);
 
-    // Open the new connection → HEALTHY
-    const es2 = MockEventSource.instances[1];
-    es2.fireOpen();
+    // Open the new connection → HEALTHY.
+    await flushMicrotasks();
+    MockFetchSse.instances[1].respondOk();
+    await flushMicrotasks();
+    MockFetchSse.instances[1].emit(fakeState);
+    await flushMicrotasks();
     expect(service.streamHealth$.value).toBe('HEALTHY');
   });
 
-  it('caps the backoff at RECONNECT_MAX_ATTEMPTS and transitions to CLOSED', () => {
+  it('caps the backoff at RECONNECT_MAX_ATTEMPTS and transitions to CLOSED', async () => {
     jasmine.clock().install();
     service.streamMatchState('m1').subscribe();
 
-    // Open and immediately close to trigger 5 reconnect attempts.
-    // The first ES instance is created in subscribe() above. Subsequent
-    // attempts are created by the backoff timer.
-    const initialCount = MockEventSource.instances.length;
     for (let i = 0; i < 5; i++) {
-      const es = MockEventSource.instances[initialCount + i];
-      if (!es) { break; }
-      es.fireOpen();
-      es.fireErrorAndClose();
-      // Advance well past each backoff to allow reconnect attempt
+      await flushMicrotasks();
+      const inst = MockFetchSse.instances[i];
+      if (!inst) { break; }
+      inst.endStream();
+      await flushMicrotasks();
       jasmine.clock().tick(35_000);
     }
 
-    // After 5 attempts, next error should transition to CLOSED
+    await flushMicrotasks();
     expect(service.streamHealth$.value).toBe('CLOSED');
   });
 
-  it('emits DEGRADED when no event arrives within the gap window', () => {
+  it('emits DEGRADED when no event arrives within the gap window', async () => {
     jasmine.clock().install();
     service.streamMatchState('m1').subscribe();
-    const es = MockEventSource.instances[0];
-    es.fireOpen();
-    es.fireMessage(fakeState);
+    await flushMicrotasks();
+    MockFetchSse.instances[0].respondOk();
+    await flushMicrotasks();
+    MockFetchSse.instances[0].emit(fakeState);
+    await flushMicrotasks();
     expect(service.streamHealth$.value).toBe('HEALTHY');
 
-    // Wait > DEGRADED_GAP_MS (5000) without firing another message
     jasmine.clock().tick(5_500);
     expect(service.streamHealth$.value).toBe('DEGRADED');
   });
 
-  it('completes the stream when the payload is FINISHED', () => {
+  it('completes the stream when the payload is FINISHED', async () => {
     let completed = false;
     service.streamMatchState('m1').subscribe({ complete: () => completed = true });
-    const es = MockEventSource.instances[0];
-    es.fireOpen();
-    es.fireMessage({ ...fakeState, status: 'FINISHED' });
+    await flushMicrotasks();
+    MockFetchSse.instances[0].respondOk();
+    await flushMicrotasks();
+    MockFetchSse.instances[0].emit({ ...fakeState, status: 'FINISHED' });
+    await flushMicrotasks();
     expect(completed).toBe(true);
+  });
+
+  // ========== V25D85-SSE-AUTH: new tests for the fetch-based transport ==========
+
+  it('V25D85-SSE-AUTH: streamRoundState sends Authorization Bearer header on fetch', async () => {
+    service.streamRoundState('r1').subscribe();
+    await flushMicrotasks();
+    expect(MockFetchSse.instances.length).toBe(1);
+    const inst = MockFetchSse.instances[0];
+    expect(inst.url).toContain('/rounds/r1/stream');
+    expect(inst.headers['Authorization']).toBe('Bearer test-jwt-token');
+    expect(inst.headers['Accept']).toBe('text/event-stream');
+    // Simulate completion so the backoff timer doesn't leak.
+    inst.respondHttpError(500);
+    await flushMicrotasks();
+  });
+
+  it('V25D85-SSE-AUTH: does NOT attach Authorization header when no token is present', async () => {
+    authServiceStub.getToken = () => null;
+    service.streamRoundState('r2').subscribe();
+    await flushMicrotasks();
+    const inst = MockFetchSse.instances[0];
+    expect(inst.headers['Authorization']).toBeUndefined();
+    expect(inst.headers['Accept']).toBe('text/event-stream');
+    inst.respondHttpError(500);
+    await flushMicrotasks();
+  });
+
+  it('V25D85-SSE-AUTH: parses SSE data events into JSON payloads', async () => {
+    const received: unknown[] = [];
+    service.streamRoundState('r3').subscribe(p => received.push(p));
+    await flushMicrotasks();
+    MockFetchSse.instances[0].respondOk();
+    await flushMicrotasks();
+    MockFetchSse.instances[0].emit({ matchId: 'a', currentMinute: 5 });
+    MockFetchSse.instances[0].emit({ matchId: 'b', currentMinute: 6 });
+    await flushMicrotasks();
+    expect(received.length).toBe(2);
+    expect((received[0] as { matchId: string }).matchId).toBe('a');
+    expect((received[1] as { currentMinute: number }).currentMinute).toBe(6);
+  });
+
+  it('V25D85-SSE-AUTH: handles partial SSE chunks split across reads', async () => {
+    const received: unknown[] = [];
+    service.streamRoundState('r4').subscribe(p => received.push(p));
+    await flushMicrotasks();
+    MockFetchSse.instances[0].respondOk();
+    await flushMicrotasks();
+    // Push a single wire-format chunk with TWO events back-to-back.
+    const combined = `data: ${JSON.stringify({ matchId: 'x', currentMinute: 1 })}\n\ndata: ${JSON.stringify({ matchId: 'y', currentMinute: 2 })}\n\n`;
+    MockFetchSse.instances[0].emitRaw(combined);
+    await flushMicrotasks();
+    expect(received.length).toBe(2);
+    expect((received[0] as { matchId: string }).matchId).toBe('x');
+    expect((received[1] as { matchId: string }).matchId).toBe('y');
+  });
+
+  it('V25D85-SSE-AUTH: signals abort on the request signal when unsubscribed', async () => {
+    const sub = service.streamRoundState('r5').subscribe();
+    await flushMicrotasks();
+    MockFetchSse.instances[0].respondOk();
+    await flushMicrotasks();
+    const inst = MockFetchSse.instances[0];
+    // The service creates its own AbortController; the mock holds the SAME
+    // signal in `inst.signal` (passed via fetch options). Verify the signal
+    // is aborted after the consumer unsubscribes.
+    expect(inst.signal.aborted).toBe(false);
+    sub.unsubscribe();
+    expect(inst.signal.aborted).toBe(true);
+  });
+
+  it('V25D85-SSE-AUTH: triggers RECONNECTING when fetch returns non-2xx (e.g. 401)', async () => {
+    jasmine.clock().install();
+    service.streamRoundState('r6').subscribe();
+    await flushMicrotasks();
+    MockFetchSse.instances[0].respondHttpError(401);
+    await flushMicrotasks();
+    expect(service.streamHealth$.value).toBe('RECONNECTING');
   });
 });
 
@@ -209,13 +450,16 @@ describe('MatchEngineService — LIVE-MATCH-F3-UI-LIVE FE1 (SSE backoff + health
 describe('MatchEngineService — LIVE-MATCH-F5.3 BUG-015 (pause/resume per round)', () => {
   let service: MatchEngineService;
   let httpSpy: jasmine.SpyObj<HttpClient>;
+  let authServiceStub: { getToken: () => string | null };
 
   beforeEach(() => {
     httpSpy = jasmine.createSpyObj('HttpClient', ['post', 'get']);
+    authServiceStub = { getToken: () => 'test-jwt-token' };
     TestBed.configureTestingModule({
       providers: [
         MatchEngineService,
-        { provide: HttpClient, useValue: httpSpy }
+        { provide: HttpClient, useValue: httpSpy },
+        { provide: AuthService, useValue: authServiceStub }
       ]
     });
     service = TestBed.inject(MatchEngineService);
