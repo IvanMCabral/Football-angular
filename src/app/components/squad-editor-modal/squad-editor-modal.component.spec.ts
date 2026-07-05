@@ -2257,6 +2257,150 @@ describe('SquadEditorModalComponent — V25D91-FRONT-F1 marker cards (name + rol
 });
 
 /**
+ * V25D91.6-FRONT F6 P0 regression: role-match by family.
+ *
+ * <p>Pre-V25D91.6 the component used `player.position === posRole` for the
+ * role-match fallback. That failed because formations return SPECIFIC roles
+ * (CB/LB/RB/CM/ST) while the squad returns GENERIC roles (GK/DEF/MID/ATT/
+ * WINGER). Only GK matched exactly, so only 1 marker rendered after a
+ * formation change.
+ *
+ * <p>V25D91.6 introduces {@link SquadEditorModalComponent.rolesMatch}
+ * which compares by family (GK/DEF/MID/ATT) — so a player with position
+ * "DEF" matches a formation slot with role "CB", etc. WINGER falls into
+ * ATT family (lateral attacker).
+ *
+ * <p>Strategy: pure unit tests on the helper method. The full
+ * formation-change flow is covered by R1-R6 (V25D91.5) and the V25D91.6
+ * integration smoke (Playwright self-test in workspace).
+ */
+describe('SquadEditorModalComponent — V25D91.6-FRONT F6 P0 role-match by family', () => {
+  let component: SquadEditorModalComponent;
+  let fixture: ComponentFixture<SquadEditorModalComponent>;
+  let httpClientSpy: jasmine.SpyObj<HttpClient>;
+  let dialogRefSpy: jasmine.SpyObj<MatDialogRef<SquadEditorModalComponent>>;
+
+  beforeEach(async () => {
+    httpClientSpy = jasmine.createSpyObj('HttpClient', ['get', 'post']);
+    dialogRefSpy = jasmine.createSpyObj('MatDialogRef', ['close']);
+
+    httpClientSpy.get.and.callFake(((url: string) => {
+      if (url.includes('/editor/subdivisions')) return of([]);
+      if (url.includes('/editor/formations')) return of([]);
+      if (url.includes('/career/lineup/current')) return of(null);
+      return of(null);
+    }) as any);
+    httpClientSpy.post.and.callFake(((_url: string, _body: any) => of({})) as any);
+
+    await TestBed.configureTestingModule({
+      imports: [SquadEditorModalComponent, NoopAnimationsModule],
+      providers: [
+        { provide: MAT_DIALOG_DATA, useValue: { careerId: 'c1', matchId: null } },
+        { provide: MatDialogRef, useValue: dialogRefSpy },
+        { provide: HttpClient, useValue: httpClientSpy }
+      ]
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(SquadEditorModalComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+  });
+
+  // ---- rolesMatch() ----
+
+  it('rolesMatch: exact string match returns true', () => {
+    expect((component as any).rolesMatch('CB', 'CB')).toBeTrue();
+    expect((component as any).rolesMatch('GK', 'GK')).toBeTrue();
+  });
+
+  it('rolesMatch: GK only matches GK (no cross-family)', () => {
+    expect((component as any).rolesMatch('GK', 'CB')).toBeFalse();
+    expect((component as any).rolesMatch('CB', 'GK')).toBeFalse();
+  });
+
+  it('rolesMatch: DEF family covers CB/LB/RB/LWB/RWB/DEF in either direction', () => {
+    const defRoles = ['CB', 'LB', 'RB', 'LWB', 'RWB', 'DEF'];
+    for (const r1 of defRoles) {
+      for (const r2 of defRoles) {
+        expect((component as any).rolesMatch(r1, r2)).withContext(`${r1} <-> ${r2} must match (DEF family)`).toBeTrue();
+      }
+    }
+  });
+
+  it('rolesMatch: MID family covers CM/CDM/CAM/LM/RM/MID in either direction', () => {
+    const midRoles = ['CM', 'CDM', 'CAM', 'LM', 'RM', 'MID'];
+    for (const r1 of midRoles) {
+      for (const r2 of midRoles) {
+        expect((component as any).rolesMatch(r1, r2)).withContext(`${r1} <-> ${r2} must match (MID family)`).toBeTrue();
+      }
+    }
+  });
+
+  it('rolesMatch: ATT family covers ST/LW/RW/CF/ATT/WINGER in either direction', () => {
+    const attRoles = ['ST', 'LW', 'RW', 'CF', 'ATT', 'WINGER'];
+    for (const r1 of attRoles) {
+      for (const r2 of attRoles) {
+        expect((component as any).rolesMatch(r1, r2)).withContext(`${r1} <-> ${r2} must match (ATT family)`).toBeTrue();
+      }
+    }
+  });
+
+  it('rolesMatch: cross-family returns false (DEF vs MID, MID vs ATT, etc.)', () => {
+    expect((component as any).rolesMatch('CB', 'CM')).toBeFalse();
+    expect((component as any).rolesMatch('CM', 'ST')).toBeFalse();
+    expect((component as any).rolesMatch('LB', 'LW')).toBeFalse();
+    expect((component as any).rolesMatch('DEF', 'WINGER')).toBeFalse();
+  });
+
+  it('rolesMatch: undefined or empty role returns false (defensive)', () => {
+    expect((component as any).rolesMatch(undefined, 'CB')).toBeFalse();
+    expect((component as any).rolesMatch('CB', undefined)).toBeFalse();
+    expect((component as any).rolesMatch(undefined, undefined)).toBeFalse();
+  });
+
+  it('rolesMatch: unknown role returns false (backward compat with legacy roles)', () => {
+    expect((component as any).rolesMatch('UNKNOWN', 'CB')).toBeFalse();
+    expect((component as any).rolesMatch('CB', 'MYSTERY')).toBeFalse();
+  });
+
+  // ---- getRoleFamily() (private, exercised via rolesMatch coverage) ----
+  // Family classification is implicitly covered by the matrix tests above.
+  // Adding explicit spot checks here for the WINGER edge case (V25D91.6
+  // explicit decision: WINGER is ATT family, not its own family).
+
+  it('getRoleFamily: WINGER maps to ATT (lateral attacker classification)', () => {
+    expect((component as any).getRoleFamily('WINGER')).toBe('ATT');
+  });
+
+  it('getRoleFamily: GK maps to GK', () => {
+    expect((component as any).getRoleFamily('GK')).toBe('GK');
+  });
+
+  it('getRoleFamily: unknown role returns null', () => {
+    expect((component as any).getRoleFamily('UNKNOWN')).toBeNull();
+  });
+});
+
+/**
+ * V25D91.6-FRONT F6 P0 regression: role-match by family.
+ *
+ * <p>Pre-V25D91.6 the component used `player.position === posRole` for the
+ * role-match fallback. That failed because formations return SPECIFIC roles
+ * (CB/LB/RB/CM/ST) while the squad returns GENERIC roles (GK/DEF/MID/ATT/
+ * WINGER). Only GK matched exactly, so only 1 marker rendered after a
+ * formation change.
+ *
+ * <p>V25D91.6 introduces {@link SquadEditorModalComponent.rolesMatch}
+ * which compares by family (GK/DEF/MID/ATT) — so a player with position
+ * "DEF" matches a formation slot with role "CB", etc. WINGER falls into
+ * ATT family (lateral attacker).
+ *
+ * <p>Strategy: pure unit tests on the helper method. The full
+ * formation-change flow is covered by R1-R6 (V25D91.5) and the V25D91.6
+ * integration smoke (Playwright self-test in workspace).
+ */
+
+/**
  * V25D91.5-FRONT F6 regression: changing formation via the `<select>` updates
  * BOTH the header (selectedFormation + homeFormation$ observable) AND the
  * markers on the pitch (homePlayers$ gets the new positions). Also asserts
