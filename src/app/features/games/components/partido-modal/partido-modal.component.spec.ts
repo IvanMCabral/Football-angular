@@ -337,6 +337,60 @@ describe('PartidoModalComponent (V25D89-FRONT-A)', () => {
     expect(src).toContain('.banner-info-ai');
   });
 
+  // ========== V25D89.4-FRONT: full-width modal CSS source ==========
+
+  it('ɵcmp.styles expands .partido-modal-root to max-width: 100% (full-width modal)', () => {
+    // V25D89.4: V25D89.3 capped the modal at max-width: 540px which made
+    // it look pegged to the left on wide viewports. The new base rule
+    // lets the modal content fill the dialog container (which itself is
+    // 95vw via the :host override below).
+    const src = stripEncapsulation(stylesSource());
+    expect(src).toMatch(/\.partido-modal-root\s*\{[^}]*max-width:\s*100%/);
+  });
+
+  it('ɵcmp.styles sets the MDC dialog container to 95vw + align-self: center', () => {
+    // V25D89.4: the :host ::ng-deep override on .mat-mdc-dialog-container
+    // is what actually expands the modal beyond the Material default
+    // content-size. Both width AND max-width must be set (Material's
+    // default with only max-width stays at content-size). align-self
+    // center prevents the "modal pegado a la izquierda" appearance on
+    // wide viewports (overlay pane defaults to flex-start).
+    const src = stripEncapsulation(stylesSource());
+    const dialogContainerRule = src.match(/\.mat-mdc-dialog-container\s*\{[^}]*\}/);
+    expect(dialogContainerRule).toBeTruthy();
+    const ruleSrc = dialogContainerRule![0];
+    expect(ruleSrc).toContain('max-width: 95vw');
+    expect(ruleSrc).toContain('width: 95vw');
+    expect(ruleSrc).toContain('align-self: center');
+  });
+
+  it('ɵcmp.styles caps .mat-mdc-dialog-content at 80vh with overflow-y: auto (V25D89.4 scroll safety)', () => {
+    // V25D89.4: with the modal expanded to 95vw, the inner content
+    // (pitch + bench + stats + events) can exceed 100vh on shorter
+    // laptop screens. The content area needs a max-height + internal
+    // scroll so the dialog footer stays visible without overflowing
+    // the viewport.
+    const src = stripEncapsulation(stylesSource());
+    const dialogContentRule = src.match(/\.mat-mdc-dialog-container\s+\.mat-mdc-dialog-content\s*\{[^}]*\}/);
+    expect(dialogContentRule).toBeTruthy();
+    const ruleSrc = dialogContentRule![0];
+    expect(ruleSrc).toContain('max-height: 80vh');
+    expect(ruleSrc).toContain('overflow-y: auto');
+  });
+
+  it('ɵcmp.styles mobile breakpoint (<600px) caps the MDC container at 100vw (overrides 95vw base)', () => {
+    // V25D89.4: the mobile @media block must override the 95vw base
+    // rule on the .mat-mdc-dialog-container so phones don't show a
+    // 95vw modal with horizontal scrollbars. CSS cascade picks the
+    // later rule (the @media one), so this is the safety net.
+    const src = stripEncapsulation(stylesSource());
+    const mobileBlock = src.match(/@media\s*\(max-width:\s*600px\)\s*\{[\s\S]*?\}\s*\}/);
+    expect(mobileBlock).toBeTruthy();
+    const blockSrc = mobileBlock![0];
+    expect(blockSrc).toMatch(/\.mat-mdc-dialog-container\s*\{[^}]*max-width:\s*100vw/);
+    expect(blockSrc).toMatch(/\.mat-mdc-dialog-container\s*\{[^}]*width:\s*100vw/);
+  });
+
   // ========== ngOnDestroy cleanup ==========
 
   it('ngOnDestroy completes the destroy$ subject', () => {

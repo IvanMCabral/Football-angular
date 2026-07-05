@@ -49,12 +49,58 @@
      h3 margin-bottom 0.3→0.25. events-list gap 0.2→0.15 + max-height 140→120.
      event-item padding 0.25/0.4→0.18/0.4 + font 0.72→0.7.
    - rival-pitch-wrapper padding 0.5/0→0.2/0/0.3.
-   - partido-modal-actions padding 0.25/1/0.35→0.15/1/0.2. */
+   - partido-modal-actions padding 0.25/1/0.35→0.15/1/0.2.
+
+   V25D89.4-FRONT changes (full-width modal, no DOM change):
+   - .partido-modal-root max-width 540→100% so the modal content fills
+     whatever the dialog container gives it. The compact V25D89.3 internal
+     spacing (banner / pitch / bench / stats / events paddings+margins)
+     is preserved — only the outer container expands.
+   - :host ::ng-deep .mat-mdc-dialog-container max-width 540px→95vw +
+     new width:95vw so the MDC container actually takes the requested
+     width (Material defaults to content-size with max-width alone).
+     Added align-self:center so the expanded container stays horizontally
+     centered in the overlay pane (default flex-start was the "modal
+     pegado a la izquierda" Iván saw in the V25D89.3 screenshot).
+   - :host ::ng-deep .mat-mdc-dialog-container .mat-mdc-dialog-content
+     added max-height:80vh + overflow-y:auto so the expanded modal can
+     scroll internally on shorter screens (pitch + bench + stats +
+     events stack can exceed 100vh on laptops).
+   - @media (max-width:600px) added :host ::ng-deep .mat-mdc-dialog-
+     container max-width:100vw + width:100vw override so the mobile
+     base case doesn't fight the 95vw desktop rule (CSS cascade picks
+     the later rule, this one).
+   - @media (min-width:601px and max-width:1024px) .partido-modal-root
+     max-width 460px→100% so the tablet breakpoint also benefits from
+     the full-width container.
+   - @media (min-width:1600px) .partido-modal-root max-width 800px→100%
+     so xlarge viewports use the full 95vw instead of capping at 800px.
+     Player-dot scale-up (36px + font 0.8rem) preserved.
+   - Backwards compat: V25D89.3 base max-width:540px and the V25D89.1
+     responsive caps (600/1024/1600) for player-dot sizing are preserved
+     via the explicit media queries — only the .partido-modal-root and
+     .mat-mdc-dialog-container outer caps changed. */
 
 /* Tab shell — mat-tab-header background */
 .partido-tabs ::ng-deep .mat-mdc-tab-header {
   background: #f5f7fa;
   border-radius: 6px 6px 0 0;
+}
+
+/* V25D89.4-FRONT: outer container + MDC dialog container override for
+   full-width display. Mirrored from the inlined styles array for IDE
+   hint support — same rule appears in partido-modal.component.ts
+   styles:[...] so ɵcmp.styles exposes it to unit tests. */
+.partido-modal-root {
+  min-width: 0;
+  max-width: 100%;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+}
+
+:host ::ng-deep .mat-mdc-dialog-container {
+  max-width: 95vw;
+  width: 95vw;
+  align-self: center;
 }
 
 /* Banner styles + pitch lines + pseudo-elements are in the inlined array. */

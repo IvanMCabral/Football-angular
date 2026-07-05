@@ -204,26 +204,51 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
   // (only `styles: [...]` inline arrays work). The .css companion file
   // is kept on disk for IDE hints only — see partido-modal.component.css.
   styles: [`
+    /* V25D89.4-FRONT: full-width modal. The V25D89.3 cap (540px) made
+       the modal look like it floated in a corner of the viewport on
+       desktop — Iván saw ~40-50% of empty white space to the right of
+       a 540px modal on a 1920px screen. New target: use 95% of the
+       viewport width so the pitch + bench + stats + events layout
+       has room to breathe. We keep the V25D89.3 compact spacing for
+       internal padding/margins — only the outer container expands. */
     .partido-modal-root {
       min-width: 0;
-      max-width: 540px;
+      max-width: 100%;
       font-family: 'Segoe UI', system-ui, sans-serif;
+    }
+
+    /* V25D89.4-FRONT: override Angular Material MDC dialog container
+       to fill the viewport instead of capping at 540px. Both width AND
+       max-width are set so the dialog actually takes the requested
+       width (Material's default behavior with max-width alone leaves
+       the container at content-size). align-self: center ensures the
+       expanded container stays horizontally centered in the overlay
+       pane (Material defaults to flex-start which is what produced
+       the "modal pegado a la izquierda" appearance). */
+    :host ::ng-deep .mat-mdc-dialog-container {
+      max-width: 95vw;
+      width: 95vw;
+      align-self: center;
     }
 
     /* V25D89.3-FRONT: override Angular Material MDC dialog default
        padding so the title bar and content hug the modal edges.
        Without these overrides Material adds ~24px padding around the
        title and the content body — that's the bulk of the "espacio
-       blanco lateral / superior" Iván saw in the V25D89.2 screenshot. */
-    :host ::ng-deep .mat-mdc-dialog-container {
-      max-width: 540px;
-    }
+       blanco lateral / superior" Iván saw in the V25D89.2 screenshot.
+       V25D89.4: also cap max-height + enable vertical scroll so the
+       expanded modal doesn't overflow the viewport on shorter screens
+       (the pitch + bench + stats + events stack can exceed 100vh on
+       laptops with the height of the formation pitch + stats header +
+       8 stat rows + 6 events + footer). */
     :host ::ng-deep .mat-mdc-dialog-container .mat-mdc-dialog-title {
       padding: 0;
       margin: 0;
     }
     :host ::ng-deep .mat-mdc-dialog-container .mat-mdc-dialog-content {
       padding: 0;
+      max-height: 80vh;
+      overflow-y: auto;
     }
     :host ::ng-deep .mat-mdc-dialog-container h2.mat-mdc-dialog-title {
       padding: 0.4rem 0.75rem 0.3rem;
@@ -784,6 +809,13 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
         max-width: 100vw;
         padding: 0 0.25rem;
       }
+      /* V25D89.4-FRONT: also override the dialog container cap at
+         mobile so the 95vw base rule doesn't fight the 100vw mobile
+         rule (CSS cascade picks the later rule, which is this one). */
+      :host ::ng-deep .mat-mdc-dialog-container {
+        max-width: 100vw;
+        width: 100vw;
+      }
       .pitch {
         padding: 0.35rem 0.25rem;
         gap: 0.2rem;
@@ -818,9 +850,12 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
     }
 
     @media (min-width: 601px) and (max-width: 1024px) {
+      /* V25D89.4-FRONT: tablet — drop the 460px cap so the modal uses
+         the full 95vw from the base rule. Keep a sensible min-width
+         (320px) so the pitch doesn't get squashed on portrait tablets. */
       .partido-modal-root {
         min-width: 320px;
-        max-width: 460px;
+        max-width: 100%;
       }
       .pitch { padding: 0.4rem 0.3rem; gap: 0.3rem; min-height: 300px; }
       .pitch::after { width: 54px; height: 54px; }
@@ -836,7 +871,11 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
     }
 
     @media (min-width: 1600px) {
-      .partido-modal-root { max-width: 800px; }
+      /* V25D89.4-FRONT: xlarge viewport — keep the player-dot scale-up
+         but DROP the 800px max-width cap so the 95vw base rule applies.
+         On a 1920px+ monitor the modal now fills 95% of the width
+         (~1824px) instead of being capped at 800px. */
+      .partido-modal-root { max-width: 100%; }
       .player-dot {
         width: 36px;
         height: 36px;

@@ -419,7 +419,14 @@ export class LiveMatchModalsService {
 
         const dialogRef = this.dialog.open(PartidoModalComponent, {
           data,
-          width: '720px',
+          // V25D89.4-FRONT: full-width modal. The V25D89.3 720px cap
+          // produced a modal that felt pegged to the left side of
+          // the viewport on desktop (see partido-modal.component.ts
+          // styles:[] for the matching 95vw MDC container override).
+          // The dialog config width sets the inline style on the MDC
+          // container — kept consistent with the CSS rule so both
+          // layers (config + CSS) request the same width.
+          width: '95vw',
           maxWidth: '95vw',
           disableClose: false,
           autoFocus: 'first-tabbable'
