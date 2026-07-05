@@ -276,6 +276,27 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       vertical-align: middle;
     }
 
+    /* V25D90-FRONT-F3: score chip in the modal title bar — sits between
+       the icon and the minute tag. Same pill visual vocabulary as the
+       minute tag so the title looks like a single coherent chip row.
+       Background uses the score-themed green (not the neutral grey of
+       the minute tag) so the eye lands on it first — it's the most
+       information-dense element of the modal. */
+    .score-chip {
+      display: inline-block;
+      margin-left: 0.5rem;
+      padding: 0.2rem 0.65rem;
+      background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%);
+      color: #fff;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      vertical-align: middle;
+      letter-spacing: 0.04em;
+      min-width: 2.6rem;
+      text-align: center;
+    }
+
     .partido-modal-content { padding-top: 0; padding-bottom: 0; }
 
     /* V25D89-FRONT-A: banner styling mirrors the F5 modal's banner so
@@ -335,13 +356,18 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       position: relative;
       background: linear-gradient(180deg, #2e7d32 0%, #1b5e20 100%);
       border-radius: 8px;
-      padding: 0.4rem 0.35rem;
+      padding: 0.5rem 0.35rem;
       display: flex;
       flex-direction: column;
       gap: 0.3rem;
       border: 2px solid #fff;
       box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
-      min-height: 280px;
+      /* V25D90-FRONT-F2: 280px → 380px so the larger 56x56 dots
+         (4 lines × 64px pitch-line + 3 gaps × ~5px + 2 padding ×
+         8px ≈ 285px of inner content) don't crowd the pitch border.
+         380px leaves ~95px of headroom for the center circle + the
+         halfway line pseudo-elements. */
+      min-height: 380px;
       justify-content: space-around;
       margin-bottom: 0.25rem;
       overflow: hidden;
@@ -387,17 +413,31 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       display: flex;
       justify-content: space-around;
       align-items: center;
-      min-height: 30px;
+      /* V25D90-FRONT-F2: bumped from 30px to 64px so the larger 56x56
+         player-dots (F2) have room without clipping the role label
+         below the name. The extra headroom also keeps drag targets
+         comfortable on touch devices. */
+      min-height: 64px;
     }
 
     .player-dot {
-      width: 30px;
-      height: 30px;
+      /* V25D90-FRONT-F2: 30px → 56px so the full player name (e.g.
+         "Bellingham", "Vinícius", "Mbappé") fits without aggressive
+         ellipsis. The 56px width lets ~7 chars fit on one line at
+         0.65rem; longer names wrap to 2 lines (white-space: normal
+         on .dot-player-name below). Height matches width for a true
+         circle, but the column-flex layout (name + role) means the
+         inner content drives the actual visual height. */
+      width: 56px;
+      height: 56px;
       border-radius: 50%;
       background: #fff;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
+      gap: 1px;
+      padding: 3px 2px;
       border: 2px solid #1e3c72;
       font-size: 0.7rem;
       font-weight: 700;
@@ -406,6 +446,7 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       cursor: grab;
       user-select: none;
       transition: transform 0.1s ease, box-shadow 0.1s ease;
+      position: relative;
     }
     .player-dot:active { cursor: grabbing; }
 
@@ -448,14 +489,37 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
     }
 
     .dot-player-name {
-      font-size: 0.55rem;
-      font-weight: 600;
-      line-height: 1;
-      max-width: 26px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      /* V25D90-FRONT-F2: bumped from 0.55rem to 0.7rem + max-width 50px
+         so the full name fits on one line (or wraps to two for names
+         like "Bellingham"). Killed the aggressive text-overflow:
+         ellipsis that was truncating "Mbappé" → "Mb". The white-space
+         rule is now normal (was nowrap) so long names break onto a
+         second line instead of being cut. The 50px max-width matches
+         the 56px dot minus 2×2px padding minus 2×2px border. */
+      font-size: 0.7rem;
+      font-weight: 700;
+      line-height: 1.1;
+      max-width: 50px;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      text-align: center;
       color: #1e3c72;
+    }
+
+    /* V25D90-FRONT-F1: the role label now lives INSIDE every slot
+       (was: only empty slots). Same vocabulary as .dot-label so
+       empty slots and filled slots read identically. Slightly dimmer
+       than the player name (opacity 0.78) so the eye lands on the
+       name first, then the role. */
+    .dot-role {
+      font-size: 0.55rem;
+      font-weight: 700;
+      line-height: 1;
+      color: #1e3c72;
+      opacity: 0.78;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
     }
 
     .dot-label { user-select: none; }
@@ -819,7 +883,10 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       .pitch {
         padding: 0.35rem 0.25rem;
         gap: 0.2rem;
-        min-height: 260px;
+        /* V25D90-FRONT-F2: mobile pitch keeps the smaller dot scale so
+           11 dots still fit on a portrait phone (320-360px viewport).
+           320px is enough for 11 × ~24px dots with ~5px gaps. */
+        min-height: 300px;
       }
       .pitch::after {
         width: 48px;
@@ -827,14 +894,27 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       }
       .pitch-line {
         gap: 4px;
-        min-height: 28px;
+        min-height: 36px;
       }
       .player-dot {
-        width: 18px;
-        height: 18px;
-        min-width: 12px;
-        max-width: 22px;
+        /* V25D90-FRONT-F2: mobile dot scale — still bigger than the
+           legacy 18px so the role label below the name stays legible,
+           but small enough that 11 dots fit on a 320px viewport with
+           the standard pitch-line gap. */
+        width: 28px;
+        height: 28px;
+        min-width: 22px;
+        max-width: 32px;
         font-size: 0.6rem;
+        padding: 1px 1px;
+      }
+      .dot-player-name {
+        font-size: 0.55rem;
+        line-height: 1.05;
+        max-width: 26px;
+      }
+      .dot-role {
+        font-size: 0.45rem;
       }
       .dot-label {
         font-size: 0.6rem;
@@ -847,6 +927,11 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
         max-width: 100%;
       }
       .formation-row { margin-bottom: 0.35rem; }
+      .score-chip {
+        font-size: 0.75rem;
+        padding: 0.15rem 0.5rem;
+        min-width: 2.2rem;
+      }
     }
 
     @media (min-width: 601px) and (max-width: 1024px) {
@@ -857,16 +942,27 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
         min-width: 320px;
         max-width: 100%;
       }
-      .pitch { padding: 0.4rem 0.3rem; gap: 0.3rem; min-height: 300px; }
+      .pitch { padding: 0.4rem 0.3rem; gap: 0.3rem; min-height: 340px; }
       .pitch::after { width: 54px; height: 54px; }
-      .pitch-line { gap: 8px; }
+      .pitch-line { gap: 8px; min-height: 48px; }
       .player-dot {
-        width: 24px;
-        height: 24px;
-        min-width: 18px;
-        max-width: 28px;
+        /* V25D90-FRONT-F2: tablet scale — bigger than mobile, smaller
+           than the 56px desktop base. Gives portrait tablets (~768px)
+           enough room for 11 dots without the names overflowing the
+           4-3-3 / 4-4-2 lines. */
+        width: 40px;
+        height: 40px;
+        min-width: 32px;
+        max-width: 46px;
         font-size: 0.7rem;
+        padding: 2px 2px;
       }
+      .dot-player-name {
+        font-size: 0.62rem;
+        line-height: 1.05;
+        max-width: 36px;
+      }
+      .dot-role { font-size: 0.5rem; }
       .dot-label { font-size: 0.7rem; }
     }
 
@@ -877,10 +973,53 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
          (~1824px) instead of being capped at 800px. */
       .partido-modal-root { max-width: 100%; }
       .player-dot {
-        width: 36px;
-        height: 36px;
-        font-size: 0.8rem;
+        /* V25D90-FRONT-F2: xlarge scale — bigger than the 56px base
+           so the dot feels proportional to the wider modal. The 4-4-2
+           line has 4 dots, so on a 1824px modal each dot can claim
+           ~440px of horizontal space; 64px leaves room for ~9 chars
+           on a single line (e.g. "Vinícius"). */
+        width: 64px;
+        height: 64px;
+        font-size: 0.78rem;
       }
+      .dot-player-name {
+        font-size: 0.75rem;
+        max-width: 58px;
+      }
+      .dot-role { font-size: 0.6rem; }
+    }
+
+    /* ========== V25D90-FRONT-F4: z-index layering for the Formation
+       mat-select dropdown so it stays visible above the partido
+       modal backdrop. Material CDK renders each overlay in its own
+       cdk-overlay-container div appended to the body, and the cdk
+       assigns z-indices by pane-creation order (last pane wins by
+       default, but the partido modal cdk-overlay-backdrop is a
+       sibling that absorbs clicks). We bump the partido modal pane
+       above the default Material z-index (1000) and push the
+       mat-select panel one step further so the dropdown options
+       render on top of the partido backdrop.
+
+       The partido modal pane class is "partido-modal-pane" (added via
+       MatDialogConfig.panelClass in live-match-modals.service.ts so
+       both the substitution / formation / partido / rival-card modals
+       can share the layer). The mat-select panel class is
+       "formation-select-panel" (added via MatSelectConfig.panelClass
+       or on the mat-select element). These two classes are the
+       handles we override here.
+
+       Why not just raise the whole cdk-overlay-container z-index?
+       Because Material uses multiple sibling overlays and globally
+       raising them would also re-stack the snackbar (which lives
+       above 1050). Per-pane targeting keeps the change scoped. */
+    :host ::ng-deep .cdk-overlay-pane.partido-modal-pane {
+      z-index: 1050;
+    }
+    :host ::ng-deep .cdk-overlay-pane.formation-select-panel {
+      z-index: 1060;
+    }
+    :host ::ng-deep .formation-select {
+      z-index: 1100;
     }
   `],
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -1046,6 +1185,24 @@ export class PartidoModalComponent {
    */
   currentMinute(): number {
     return this.data.currentMinute ?? 0;
+  }
+
+  /**
+   * V25D90-FRONT-F3: home score accessor for the score chip in the modal
+   * title bar AND the stats-header-row "score-cell" (replaces the V25D89.2
+   * dash placeholder). Sourced from {@code data.score.home}, falling back
+   * to 0 when the SSE feed hasn't reached tick 1.
+   */
+  homeScore(): number {
+    return this.data.score?.home ?? 0;
+  }
+
+  /**
+   * V25D90-FRONT-F3: away score accessor (sister of {@link homeScore}).
+   * Same fall-back semantics.
+   */
+  awayScore(): number {
+    return this.data.score?.away ?? 0;
   }
 
   /**
