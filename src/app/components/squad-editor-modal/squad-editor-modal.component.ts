@@ -2240,7 +2240,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // Ignorar cambios durante inicialización (evita NG0100)
+// Ignorar cambios durante inicialización (evita NG0100)
     if (this.isInitializing) {
       return;
     }
@@ -2251,6 +2251,22 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     const targetFormation = newFormation ?? this.selectedFormation;
     if (!targetFormation) {
       return;
+    }
+
+    // V25D91.5-FRONT F6: sincronizar this.selectedFormation con la nueva
+    // formación. En producción vía (ngModelChange) NgModel ya lo escribió,
+    // pero en llamadas programáticas (tests, debugging) necesitamos hacerlo
+    // nosotros para que el getter y el template queden consistentes.
+    if (this.selectedFormation !== targetFormation) {
+      this.selectedFormation = targetFormation;
+    }
+
+    // V25D91.5-FRONT F6: sincronizar this.selectedFormation con la nueva
+    // formación. En producción vía (ngModelChange) NgModel ya lo escribió,
+    // pero en llamadas programáticas (tests, debugging) necesitamos hacerlo
+    // nosotros para que el getter y el template queden consistentes.
+    if (this.selectedFormation !== targetFormation) {
+      this.selectedFormation = targetFormation;
     }
 
     // No-op si la formación no cambió realmente
