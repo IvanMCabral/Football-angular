@@ -376,10 +376,16 @@ export class MatchEngineService {
               buffer = events.pop() ?? '';
 
               for (const event of events) {
-                const dataLine = event.split('\n').find(line => line.startsWith('data: '));
+                // V25D88-FRONT-F1: tolerate both Spring's wire format
+                // `data:{json}` (NO trailing space) and the legacy `data: {json}`
+                // (WITH space). Spring's default ServerSentEventHttpMessageWriter
+                // emits without the space, so a strict `'data: '` prefix missed
+                // every event. The regex now anchors on `'data:'` only and the
+                // payload substring is trimmed defensively.
+                const dataLine = event.split('\n').find(line => line.startsWith('data:'));
                 if (!dataLine) continue;
                 try {
-                  const payload = JSON.parse(dataLine.substring('data: '.length)) as T;
+                  const payload = JSON.parse(dataLine.substring('data:'.length).trim()) as T;
                   this.ngZone.run(() => {
                     observer.next(payload);
                     if (isComplete(payload)) {

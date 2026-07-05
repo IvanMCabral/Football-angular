@@ -148,9 +148,16 @@ class MockFetchSse {
     this.rejectFetch(new Error(message));
   }
 
-  /** Push one SSE data event into the open stream. */
+  /**
+   * V25D88-FRONT-F1: push one SSE data event into the open stream using the
+   * REAL Spring `ServerSentEventHttpMessageWriter` wire format
+   * {@code `data:${JSON.stringify(payload)}\n\n`} — NO trailing space after
+   * {@code data:}. The pre-V25D88 mock used {@code `data: ${...}`} (WITH space),
+   * which matched the front's stale regex but NOT what the backend actually
+   * emits in production, so the parser bug slipped through unit tests.
+   */
   emit(payload: unknown): void {
-    const data = `data: ${JSON.stringify(payload)}\n\n`;
+    const data = `data:${JSON.stringify(payload)}\n\n`;
     this.readerQueue.push({ done: false, value: new TextEncoder().encode(data) });
     this.drainReader();
   }
@@ -412,13 +419,50 @@ describe('MatchEngineService — LIVE-MATCH-F3-UI-LIVE FE1 + V25D85-SSE-AUTH', (
     await flushMicrotasks();
     MockFetchSse.instances[0].respondOk();
     await flushMicrotasks();
-    // Push a single wire-format chunk with TWO events back-to-back.
-    const combined = `data: ${JSON.stringify({ matchId: 'x', currentMinute: 1 })}\n\ndata: ${JSON.stringify({ matchId: 'y', currentMinute: 2 })}\n\n`;
+    // V25D88-FRONT-F1: use the real Spring wire format `data:${json}` (NO
+    // trailing space) instead of the legacy `data: ${json}` (WITH space).
+    // The split-across-reads behavior is the same; only the wire format
+    // changes to reflect what the backend actually sends in production.
+    const combined = `data:${JSON.stringify({ matchId: 'x', currentMinute: 1 })}\n\ndata:${JSON.stringify({ matchId: 'y', currentMinute: 2 })}\n\n`;
     MockFetchSse.instances[0].emitRaw(combined);
     await flushMicrotasks();
     expect(received.length).toBe(2);
     expect((received[0] as { matchId: string }).matchId).toBe('x');
     expect((received[1] as { matchId: string }).matchId).toBe('y');
+  });
+
+  // ========== V25D88-FRONT-F1: tolerance for both wire formats ==========
+
+  /**
+   * V25D88-FRONT-F1: defense-in-depth regression test. The parser now matches
+   * any line that starts with {@code 'data:'} (without requiring the trailing
+   * space the previous regex needed). This test verifies both conventions are
+   * accepted in the same stream so a future change to the backend encoder —
+   * or an intermediary proxy that re-wraps the chunks — won't silently break
+   * the round-live UI again.
+   */
+  it('V25D88-FRONT-F1: tolerates both "data:" (no space) and "data: " (with space) SSE formats', async () => {
+    const received: unknown[] = [];
+    service.streamRoundState('r-v25d88').subscribe(p => received.push(p));
+    await flushMicrotasks();
+    MockFetchSse.instances[0].respondOk();
+    await flushMicrotasks();
+    // Spring wire format (no space), legacy format (with space), and one chunk
+    // that mixes both — the parser must surface all four JSON payloads.
+    const wire =
+      `data:${JSON.stringify({ matchId: 'no-space-1', currentMinute: 1 })}\n\n` +
+      `data: ${JSON.stringify({ matchId: 'with-space-2', currentMinute: 2 })}\n\n` +
+      `data:${JSON.stringify({ matchId: 'no-space-3', currentMinute: 3 })}\n\n` +
+      `data: ${JSON.stringify({ matchId: 'with-space-4', currentMinute: 4 })}\n\n`;
+    MockFetchSse.instances[0].emitRaw(wire);
+    await flushMicrotasks();
+    expect(received.length).toBe(4);
+    expect((received[0] as { matchId: string }).matchId).toBe('no-space-1');
+    expect((received[1] as { matchId: string }).matchId).toBe('with-space-2');
+    expect((received[2] as { matchId: string }).matchId).toBe('no-space-3');
+    expect((received[3] as { matchId: string }).matchId).toBe('with-space-4');
+    // Sanity: all currentMinutes must round-trip the JSON -> trim -> parse path.
+    expect(received.map(p => (p as { currentMinute: number }).currentMinute)).toEqual([1, 2, 3, 4]);
   });
 
   it('V25D85-SSE-AUTH: signals abort on the request signal when unsubscribed', async () => {
