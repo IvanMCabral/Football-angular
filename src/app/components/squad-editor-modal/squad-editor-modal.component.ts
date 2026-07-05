@@ -403,6 +403,14 @@ import { SessionPlayer } from '../../shared/models/player.model';
       display: flex;
       align-items: center;
       gap: 10px;
+      /* V25D91-FRONT-F4: flex-shrink:0 prevents the chemistry preview row
+         (right side, margin-left:auto) from compressing this group. The
+         pre-F4 default flex-shrink:1 let the selector squeeze, which caused
+         the label "Formacion:" to overlap with the <select> value at certain
+         viewport widths where the preview row grew large. */
+      flex-shrink: 0;
+      position: relative;
+      z-index: 1;
     }
 
     .formation-selector .formation-change-blocked {
@@ -419,6 +427,12 @@ import { SessionPlayer } from '../../shared/models/player.model';
     .formation-selector label {
       color: #a0d4a8;
       font-size: 0.9rem;
+      /* V25D91-FRONT-F4: position:relative + z-index:1 keeps the label
+         above the field background. Without it, the label could render
+         underneath the field if the layout compressed to near-overlap. */
+      position: relative;
+      z-index: 1;
+      white-space: nowrap;
     }
 
     .formation-selector select {
@@ -430,6 +444,15 @@ import { SessionPlayer } from '../../shared/models/player.model';
       font-size: 1.1rem;
       font-weight: bold;
       cursor: pointer;
+      /* V25D91-FRONT-F4: explicit z-index:2 so the select (and its dropdown
+         options when expanded) overlay the header preview row instead of
+         the other way around. The 2-stack hierarchy is:
+           .formation-selector label/select  → z-index:1
+           .formation-selector select        → z-index:2 (above label)
+       */
+      position: relative;
+      z-index: 2;
+      flex-shrink: 0;
     }
 
     .close-btn {
@@ -445,6 +468,11 @@ import { SessionPlayer } from '../../shared/models/player.model';
       gap: 4px;
       margin-left: auto;
       margin-right: 0.5rem;
+      /* V25D91-FRONT-F4: flex-shrink:0 prevents the preview stack from
+         compressing itself when the header viewport is narrow. Without it,
+         the formation selector (left of it) could be squeezed to the point
+         where its label overlapped the <select>. */
+      flex-shrink: 0;
     }
 
     /* V25D45 (Sprint C10): chemistry preview row — projected chemistry of
