@@ -236,17 +236,25 @@ import { SessionPlayer } from '../../shared/models/player.model';
 
           <!-- Marcadores de jugadores activos — V25D47 (C11b) extended
                with effectiveness color band. The marker is a visual-only
-               overlay (the slot's player-chip is the draggable handle). -->
+               overlay (the slot's player-chip is the draggable handle).
+               V25D91-FRONT-F1: marker now renders as a card showing the
+               squad number (1-22) on top, the player name truncated to
+               ~10 chars in the middle, and a role badge color-coded by
+               family (yellow GK / blue DEF / green MID / red ATT — same
+               palette as V25D90 PartidoModal). -->
           <ng-container *ngFor="let player of homePlayers; let i = index">
             <div *ngIf="player.slotId"
                  class="player-marker"
                  [style.left.%]="getSlotCenterX(player.slotId)"
                  [style.top.%]="getSlotCenterY(player.slotId)"
                  [class.gk-player]="player.role === 'GK'"
+                 [ngClass]="getMarkerRoleClasses(player.role)"
                  [class.eff-green]="getEffectivenessColor(player.slotId) === 'green'"
                  [class.eff-yellow]="getEffectivenessColor(player.slotId) === 'yellow'"
                  [class.eff-red]="getEffectivenessColor(player.slotId) === 'red'">
               <div class="player-number">{{i + 1}}</div>
+              <div class="player-name-label">{{player.name}}</div>
+              <div class="player-role-label">{{player.role}}</div>
             </div>
           </ng-container>
 
@@ -664,15 +672,6 @@ import { SessionPlayer } from '../../shared/models/player.model';
       background: rgba(197, 48, 48, 0.2);
       border-color: rgba(197, 48, 48, 0.6);
     }
-    .player-marker.eff-green .player-number {
-      box-shadow: 0 0 0 3px #48bb78, 0 2px 6px rgba(0, 0, 0, 0.3);
-    }
-    .player-marker.eff-yellow .player-number {
-      box-shadow: 0 0 0 3px #eab308, 0 2px 6px rgba(0, 0, 0, 0.3);
-    }
-    .player-marker.eff-red .player-number {
-      box-shadow: 0 0 0 3px #c53030, 0 2px 6px rgba(0, 0, 0, 0.3);
-    }
 
     /* CDK drag-drop polish: highlight drop targets on hover/active. */
     .cdk-drop-list-receiving,
@@ -986,34 +985,102 @@ import { SessionPlayer } from '../../shared/models/player.model';
       cursor: grabbing;
     }
 
-    /* Player Marker (número sobre el campo) */
+    /* Player Marker (number + name + role badge sobre el campo).
+       V25D91-FRONT-F1: el marker pasó de círculo 32x32 a card 70x56
+       que muestra squad-number (1-22) arriba, nombre truncado en el
+       medio, y role badge color-codeado por familia. Mismo scheme que
+       V25D90 PartidoModal (yellow GK / blue DEF / green MID / red ATT). */
     .player-marker {
       position: absolute;
-      width: 32px;
-      height: 32px;
+      width: 70px;
+      height: 56px;
       transform: translate(-50%, -50%);
       z-index: 20;
       pointer-events: none;
-    }
-
-    .player-number {
-      width: 100%;
-      height: 100%;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #c0392b 0%, #e74c3c 100%);
-      border: 2px solid #fff;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      font-weight: bold;
-      font-size: 0.85rem;
+      gap: 1px;
+      filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));
+    }
+
+    .player-marker .player-number {
+      min-width: 18px;
+      height: 16px;
+      padding: 0 5px;
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.7);
       color: #fff;
-      text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
-      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      font-size: 0.65rem;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      line-height: 1;
     }
 
     .player-marker.gk-player .player-number {
-      background: linear-gradient(135deg, #f39c12 0%, #f1c40f 100%);
+      /* GK gets an amber tint to complement the role label below. */
+      background: rgba(245, 158, 11, 0.9);
+      border-color: rgba(245, 158, 11, 1);
+    }
+
+    .player-marker .player-name-label {
+      font-size: 0.6rem;
+      font-weight: 700;
+      color: #fff;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 1px 4px;
+      border-radius: 3px;
+      max-width: 70px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+      line-height: 1.2;
+    }
+
+    .player-marker .player-role-label {
+      font-size: 0.6rem;
+      font-weight: 700;
+      color: #fff;
+      padding: 1px 5px;
+      border-radius: 3px;
+      text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+      line-height: 1.2;
+    }
+
+    /* V25D91-FRONT-F1: role color scheme — yellow GK, blue DEF,
+       green MID, red ATT. Same palette as V25D90 PartidoModal. */
+    .player-marker.color-gk .player-role-label {
+      background: #f59e0b;  /* amber-500 */
+    }
+    .player-marker.color-def .player-role-label {
+      background: #3b82f6;  /* blue-500 */
+    }
+    .player-marker.color-mid .player-role-label {
+      background: #10b981;  /* emerald-500 */
+    }
+    .player-marker.color-att .player-role-label {
+      background: #ef4444;  /* red-500 */
+    }
+
+    /* V25D91-FRONT-F1: effectiveness glow now wraps the entire marker
+       (not just the inner number circle as in pre-V25D91). drop-shadow
+       follows the bounding box of all visible children so the ring
+       hugs the card more naturally. The default drop-shadow from
+       .player-marker is preserved as the second filter. */
+    .player-marker.eff-green {
+      filter: drop-shadow(0 0 4px #48bb78) drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));
+    }
+    .player-marker.eff-yellow {
+      filter: drop-shadow(0 0 4px #eab308) drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));
+    }
+    .player-marker.eff-red {
+      filter: drop-shadow(0 0 4px #c53030) drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));
     }
 
     /* Loading overlay for field */
@@ -2030,6 +2097,35 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     if (v >= 0.9) { return 'eff-good'; }
     if (v >= 0.7) { return 'eff-warning'; }
     return 'eff-bad';
+  }
+
+  /**
+   * V25D91-FRONT-F1: classify a player's role into a color family for the
+   * marker's role badge. Returns an {@code ngClass} map with one of
+   * {@code color-gk} / {@code color-def} / {@code color-mid} / {@code color-att}
+   * set to {@code true}. The map keys drive the CSS background-color of the
+   * role-label badge in the player-marker.
+   *
+   * <p>Palette (mirrors V25D90 PartidoModal):
+   * <ul>
+   *   <li>GK → color-gk (yellow)</li>
+   *   <li>CB / LB / RB / DEF → color-def (blue)</li>
+   *   <li>CM / CDM / CAM / LM / RM / MID → color-mid (green)</li>
+   *   <li>ST / LW / RW / CF / ATT → color-att (red)</li>
+   * </ul>
+   *
+   * <p>Returns an empty object for unknown roles so the role badge falls
+   * back to the default (no background) — same defensive pattern as the
+   * other classifiers (effectivenessColor etc.).
+   */
+  getMarkerRoleClasses(role: string | undefined): { [klass: string]: boolean } {
+    if (!role) { return {}; }
+    return {
+      'color-gk':  role === 'GK',
+      'color-def': ['CB', 'LB', 'RB', 'DEF'].includes(role),
+      'color-mid': ['CM', 'CDM', 'CAM', 'LM', 'RM', 'MID'].includes(role),
+      'color-att': ['ST', 'LW', 'RW', 'CF', 'ATT'].includes(role)
+    };
   }
 
   /**
