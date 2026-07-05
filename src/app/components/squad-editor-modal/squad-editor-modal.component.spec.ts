@@ -2012,3 +2012,243 @@ describe('SquadEditorModalComponent — V25D66-C26 bench display', () => {
     });
   });
 });
+
+/**
+ * V25D91-FRONT-F1: marker cards render squad number + player name + role
+ * badge color-coded by family (yellow GK / blue DEF / green MID / red ATT).
+ *
+ * <p>Pre-V25D91 the marker was a 32x32 circle showing only the squad
+ * number. Post-F1 it is a 70x56 card with three stacked rows. The color
+ * family comes from {@link SquadEditorModalComponent.getMarkerRoleClasses}
+ * via [ngClass].
+ *
+ * <p>Strategy: drive the component through the same setup as the V25D51
+ * chip-level tests (5 slots + 5 players + formationEffectiveness) so the
+ * marker DOM is fully populated, then assert the marker elements + class
+ * bindings render correctly per role.
+ */
+describe('SquadEditorModalComponent — V25D91-FRONT-F1 marker cards (name + role badge)', () => {
+  let component: SquadEditorModalComponent;
+  let fixture: ComponentFixture<SquadEditorModalComponent>;
+  let httpClientSpy: jasmine.SpyObj<HttpClient>;
+  let dialogRefSpy: jasmine.SpyObj<MatDialogRef<SquadEditorModalComponent>>;
+
+  // 5 slots: GK-1 + 4 outfield, one per role family tested.
+  const SUBDIVISIONS_RESPONSE = [
+    { subdivisionId: 'GK-1',  isGoalkeeper: true,  sector: 26, subIndex: 1, left: 35, top: 88, width: 30, height: 10, zone: 'GK' },
+    { subdivisionId: 'S22-1', isGoalkeeper: false, sector: 22, subIndex: 1, left: 10, top: 70, width: 25, height: 12, zone: 'DEFENSE' },
+    { subdivisionId: 'S13-2', isGoalkeeper: false, sector: 13, subIndex: 2, left: 40, top: 45, width: 20, height: 12, zone: 'MIDFIELD' },
+    { subdivisionId: 'S05-2', isGoalkeeper: false, sector:  5, subIndex: 2, left: 30, top: 10, width: 10, height: 10, zone: 'ATTACK' },
+    { subdivisionId: 'S05-3', isGoalkeeper: false, sector:  5, subIndex: 3, left: 70, top: 10, width: 10, height: 10, zone: 'ATTACK' }
+  ];
+
+  // Each player has the position that will end up in its corresponding slot
+  // via role-match (since the /current response carries no persistedSlots).
+  // Positions match the formation slot roles 1:1 (GK → GK-1, DEF → S22-1,
+  // MID → S13-2, ATT → S05-2, MID → S05-3). The marker .player-role-label
+  // will render player.role which equals player.position here.
+  const PLAYERS = [
+    { playerId: 'p-gk',   name: 'Courtois',         position: 'GK',  overall: 90, energy: 100, injured: false, role: 'GK' },
+    { playerId: 'p-def',  name: 'Fran Garcia',      position: 'DEF', overall: 82, energy: 100, injured: false, role: 'DEF' },
+    { playerId: 'p-mid1', name: 'Modric',           position: 'MID', overall: 88, energy: 100, injured: false, role: 'MID' },
+    { playerId: 'p-att',  name: 'Vinicius Jr',      position: 'ATT', overall: 89, energy: 100, injured: false, role: 'ATT' },
+    { playerId: 'p-mid2', name: 'Bellingham',       position: 'MID', overall: 90, energy: 100, injured: false, role: 'MID' }
+  ];
+
+  beforeEach(async () => {
+    httpClientSpy = jasmine.createSpyObj('HttpClient', ['get', 'post']);
+    dialogRefSpy = jasmine.createSpyObj('MatDialogRef', ['close']);
+
+    httpClientSpy.get.and.callFake(((url: string) => {
+      if (url.includes('/editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
+      if (url.includes('/editor/formations'))  return of([
+        {
+          name: '4-4-2', description: '4-4-2',
+          defenders: 1, midfielders: 1, attackers: 2, outfieldPlayers: 4,
+          positions: [
+            { index: 0, role: 'GK',  xPercent: 50, yPercent: 93, actionRangePercent: 5, subdivisionId: 'GK-1' },
+            { index: 1, role: 'DEF', xPercent: 20, yPercent: 75, actionRangePercent: 7, subdivisionId: 'S22-1' },
+            { index: 2, role: 'MID', xPercent: 50, yPercent: 50, actionRangePercent: 7, subdivisionId: 'S13-2' },
+            { index: 3, role: 'ATT', xPercent: 30, yPercent: 10, actionRangePercent: 6, subdivisionId: 'S05-2' },
+            { index: 4, role: 'MID', xPercent: 70, yPercent: 10, actionRangePercent: 6, subdivisionId: 'S05-3' }
+          ]
+        }
+      ]);
+      if (url.includes('/career/lineup/current')) {
+        return of({
+          formation: '4-4-2',
+          players: PLAYERS,
+          confirmed: true,
+          warnings: [],
+          slots: []
+        });
+      }
+      return of([]);
+    }) as any);
+
+    httpClientSpy.post.and.callFake(((_url: string, _body: any) => of({}))) as any;
+
+    await TestBed.configureTestingModule({
+      imports: [SquadEditorModalComponent, NoopAnimationsModule],
+      providers: [
+        { provide: MAT_DIALOG_DATA, useValue: { careerId: 'c1', matchId: null } },
+        { provide: MatDialogRef, useValue: dialogRefSpy },
+        { provide: HttpClient, useValue: httpClientSpy }
+      ]
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(SquadEditorModalComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+  });
+
+  // ---- helper method: getMarkerRoleClasses ----
+
+  it('getMarkerRoleClass( GK ) returns color-gk: true and all others false', () => {
+    const cls = component.getMarkerRoleClasses('GK');
+    expect(cls['color-gk']).toBeTrue();
+    expect(cls['color-def']).toBeFalse();
+    expect(cls['color-mid']).toBeFalse();
+    expect(cls['color-att']).toBeFalse();
+  });
+
+  it('getMarkerRoleClasses covers all DEF roles (CB / LB / RB / DEF)', () => {
+    ['CB', 'LB', 'RB', 'DEF'].forEach(role => {
+      const cls = component.getMarkerRoleClasses(role);
+      expect(cls['color-def']).withContext(`${role} must map to color-def`).toBeTrue();
+      expect(cls['color-gk']).withContext(`${role} must NOT map to color-gk`).toBeFalse();
+    });
+  });
+
+  it('getMarkerRoleClasses covers all MID roles (CM / CDM / CAM / LM / RM / MID)', () => {
+    ['CM', 'CDM', 'CAM', 'LM', 'RM', 'MID'].forEach(role => {
+      const cls = component.getMarkerRoleClasses(role);
+      expect(cls['color-mid']).withContext(`${role} must map to color-mid`).toBeTrue();
+    });
+  });
+
+  it('getMarkerRoleClasses covers all ATT roles (ST / LW / RW / CF / ATT)', () => {
+    ['ST', 'LW', 'RW', 'CF', 'ATT'].forEach(role => {
+      const cls = component.getMarkerRoleClasses(role);
+      expect(cls['color-att']).withContext(`${role} must map to color-att`).toBeTrue();
+    });
+  });
+
+  it('getMarkerRoleClasses returns empty map for unknown role (defensive)', () => {
+    const cls = component.getMarkerRoleClasses('UNKNOWN');
+    expect(cls['color-gk']).toBeFalse();
+    expect(cls['color-def']).toBeFalse();
+    expect(cls['color-mid']).toBeFalse();
+    expect(cls['color-att']).toBeFalse();
+    expect(cls['color-gk'] || cls['color-def'] || cls['color-mid'] || cls['color-att'])
+      .withContext('unknown role must not match any color family').toBeFalsy();
+  });
+
+  it('getMarkerRoleClasses returns empty map for undefined role', () => {
+    const cls = component.getMarkerRoleClasses(undefined);
+    expect(cls['color-gk'] || cls['color-def'] || cls['color-mid'] || cls['color-att'])
+      .withContext('undefined role must not match any color family').toBeFalsy();
+  });
+
+  // ---- template bindings: marker renders name + role badge ----
+
+  it('renders one .player-marker per occupied slot, with .player-number + .player-name-label + .player-role-label', (done) => {
+    // V25D91-FRONT-F1: 5 players → 5 markers. Each marker has 3 inner
+    // spans/divs: number (top), name-label (middle), role-label (bottom).
+    setTimeout(() => {
+      fixture.detectChanges();
+      const markers = fixture.nativeElement.querySelectorAll('.player-marker') as NodeListOf<HTMLElement>;
+      expect(markers.length).toBe(5,
+        `expected 5 markers (one per occupied slot), got ${markers.length}`);
+
+      markers.forEach((m: HTMLElement) => {
+        expect(m.querySelector('.player-number')).withContext('marker must contain .player-number').toBeTruthy();
+        expect(m.querySelector('.player-name-label')).withContext('marker must contain .player-name-label').toBeTruthy();
+        expect(m.querySelector('.player-role-label')).withContext('marker must contain .player-role-label').toBeTruthy();
+      });
+      done();
+    }, 30);
+  });
+
+  it('marker .player-name-label text matches the player name', (done) => {
+    setTimeout(() => {
+      fixture.detectChanges();
+      const labels = fixture.nativeElement.querySelectorAll('.player-marker .player-name-label') as NodeListOf<HTMLElement>;
+      const names = Array.from(labels).map(l => (l.textContent || '').trim());
+      // The 5 players in PLAYERS (after role-match against the formation):
+      // GK-1 → GK (Courtois), S22-1 → LB (Fran Garcia), S13-2 → CM (Modric),
+      // S05-2 → LW (Vinicius Jr), S05-3 → CM (Bellingham).
+      expect(names).toContain('Courtois');
+      expect(names).toContain('Fran Garcia');
+      expect(names).toContain('Modric');
+      expect(names).toContain('Vinicius Jr');
+      expect(names).toContain('Bellingham');
+      done();
+    }, 30);
+  });
+
+  it('marker .player-role-label text matches the player role', (done) => {
+    setTimeout(() => {
+      fixture.detectChanges();
+      const labels = fixture.nativeElement.querySelectorAll('.player-marker .player-role-label') as NodeListOf<HTMLElement>;
+      const roles = Array.from(labels).map(l => (l.textContent || '').trim());
+      expect(roles).toContain('GK');
+      expect(roles).toContain('DEF');
+      expect(roles).toContain('MID');
+      expect(roles).toContain('ATT');
+      done();
+    }, 30);
+  });
+
+  it('marker has color-gk class on the GK slot marker', (done) => {
+    setTimeout(() => {
+      fixture.detectChanges();
+      const gkMarker = fixture.nativeElement.querySelector('.player-marker.gk-player') as HTMLElement | null;
+      expect(gkMarker).withContext('GK marker must exist').toBeTruthy();
+      expect(gkMarker?.classList.contains('color-gk')).withContext('GK marker must carry .color-gk').toBeTrue();
+      done();
+    }, 30);
+  });
+
+  it('marker has color-def class on a DEF (LB) slot marker', (done) => {
+    setTimeout(() => {
+      fixture.detectChanges();
+      const defMarkers = fixture.nativeElement.querySelectorAll('.player-marker.color-def') as NodeListOf<HTMLElement>;
+      expect(defMarkers.length).withContext('at least 1 DEF marker must carry .color-def').toBeGreaterThan(0);
+      done();
+    }, 30);
+  });
+
+  it('marker has color-mid class on MID (CM) slot markers', (done) => {
+    setTimeout(() => {
+      fixture.detectChanges();
+      const midMarkers = fixture.nativeElement.querySelectorAll('.player-marker.color-mid') as NodeListOf<HTMLElement>;
+      expect(midMarkers.length).withContext('at least 1 MID marker must carry .color-mid').toBeGreaterThan(0);
+      done();
+    }, 30);
+  });
+
+  it('marker has color-att class on ATT (LW) slot markers', (done) => {
+    setTimeout(() => {
+      fixture.detectChanges();
+      const attMarkers = fixture.nativeElement.querySelectorAll('.player-marker.color-att') as NodeListOf<HTMLElement>;
+      expect(attMarkers.length).withContext('at least 1 ATT marker must carry .color-att').toBeGreaterThan(0);
+      done();
+    }, 30);
+  });
+
+  // ---- CSS smoke check ----
+
+  it('CSS source defines the role-color rules for all 4 families', () => {
+    // The companion CSS source-parse pattern (used by V25D56/V25D58 specs
+    // for @media + field rule checks) works on inline `styles:`. We re-use
+    // it to assert the 4 color rules exist with the expected palette.
+    const styles = (SquadEditorModalComponent as any).ɵcmp?.styles ?? [];
+    const src = (Array.isArray(styles) ? styles.join('\n') : String(styles))
+      .replace(/\[[_]?ngcontent-[^\]]*\]/g, '');
+    expect(src).toMatch(/\.player-marker\.color-gk\s+\.player-role-label\s*\{[^}]*background:\s*#f59e0b/);
+    expect(src).toMatch(/\.player-marker\.color-def\s+\.player-role-label\s*\{[^}]*background:\s*#3b82f6/);
+    expect(src).toMatch(/\.player-marker\.color-mid\s+\.player-role-label\s*\{[^}]*background:\s*#10b981/);
+    expect(src).toMatch(/\.player-marker\.color-att\s+\.player-role-label\s*\{[^}]*background:\s*#ef4444/);
+  });
+});
