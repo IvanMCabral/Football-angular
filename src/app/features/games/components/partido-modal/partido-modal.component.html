@@ -2,6 +2,13 @@
   <h2 mat-dialog-title>
     <span class="title-icon">⚽</span>
     Partido
+    <!-- V25D90-FRONT-F3: score chip next to the minute tag. The score
+         arrives on PartidoDialogData.score (V25D89.2 wire-up) — bind it
+         directly, no backend change required. Defaults to 0-0 when the
+         dialog opens before the first SSE tick. -->
+    <span class="score-chip" data-testid="partido-score-chip">
+      {{ homeScore() }} - {{ awayScore() }}
+    </span>
     <span class="minute-tag">Minuto {{ currentMinute() }}</span>
   </h2>
 
@@ -38,8 +45,14 @@
           <div class="formation-row">
             <mat-form-field appearance="outline" class="formation-select">
               <mat-label>Formación</mat-label>
+              <!-- V25D90-FRONT-F4: panelClass used by partido-modal.component.ts
+                   to bump the cdk-overlay-pane z-index above the partido
+                   modal pane (which is at 1050). Without this the formation
+                   dropdown options render BEHIND the partido modal backdrop
+                   and become unclickable. -->
               <mat-select [value]="selectedFormation()"
                           (selectionChange)="onFormationChange($event.value)"
+                          panelClass="formation-select-panel"
                           data-testid="formation-select">
                 <mat-option *ngFor="let f of formations" [value]="f">
                   {{ f }}
@@ -71,9 +84,17 @@
                        (drop)="onSlotDrop($event, getSlotIndex(lineIdx, dotIdx))"
                        (dragend)="onSlotDragEnd()">
                     <ng-container *ngIf="playerAtSlot(getSlotIndex(lineIdx, dotIdx)) as p; else emptyDot">
+                      <!-- V25D90-FRONT-F1: render role label ALWAYS below the
+                           player name (was: only shown in empty slots). The
+                           same getDotLabel() drives both branches so the
+                           role vocabulary stays in sync with the empty-slot
+                           fallback (and with the rival tab). -->
                       <span class="dot-player-name"
                             [title]="(isAutoFilledSlot(getSlotIndex(lineIdx, dotIdx)) ? 'Auto-asignado · ' : '') + p.name + ' (' + p.position + ')'">
                         {{ p.name }}
+                      </span>
+                      <span class="dot-role" data-testid="dot-role">
+                        {{ getDotLabel(lineIdx, dotIdx, count, false) }}
                       </span>
                       <span *ngIf="isAutoFilledSlot(getSlotIndex(lineIdx, dotIdx))"
                             class="auto-fill-badge"
@@ -83,7 +104,9 @@
                       </span>
                     </ng-container>
                     <ng-template #emptyDot>
-                      <span class="dot-label">{{ getDotLabel(lineIdx, dotIdx, count, false) }}</span>
+                      <!-- F1: empty slots keep the role label as the only
+                           content (no player name to anchor below). -->
+                      <span class="dot-label" data-testid="dot-label-empty">{{ getDotLabel(lineIdx, dotIdx, count, false) }}</span>
                     </ng-template>
                   </div>
                 </div>
@@ -130,7 +153,14 @@
               </span>
             </h3>
             <div class="stats-header-row">
-              <span class="stat-label">—</span>
+              <!-- V25D90-FRONT-F3: replace the dash placeholder with the
+                   real score. The 2fr column on the left of the stats
+                   header now reads "2 - 1" (or whatever the live snapshot
+                   carries) so the manager sees the scoreline without
+                   having to scan the stats rows. -->
+              <span class="stat-label score-cell" data-testid="stats-score-cell">
+                {{ homeScore() }} - {{ awayScore() }}
+              </span>
               <span class="team-label home" data-testid="stats-home-name">{{ data.homeTeamName }}</span>
               <span class="team-label away" data-testid="stats-away-name">{{ data.awayTeamName }}</span>
             </div>
@@ -219,7 +249,12 @@
               </span>
             </h3>
             <div class="stats-header-row">
-              <span class="stat-label">—</span>
+              <!-- V25D90-FRONT-F3: same F3 fix mirrored on the rival tab
+                   (the rival stats section shows match-level data, not
+                   per-side data — so the score belongs there too). -->
+              <span class="stat-label score-cell" data-testid="stats-score-cell-rival">
+                {{ homeScore() }} - {{ awayScore() }}
+              </span>
               <span class="team-label home" data-testid="stats-home-name-rival">{{ data.homeTeamName }}</span>
               <span class="team-label away" data-testid="stats-away-name-rival">{{ data.awayTeamName }}</span>
             </div>
