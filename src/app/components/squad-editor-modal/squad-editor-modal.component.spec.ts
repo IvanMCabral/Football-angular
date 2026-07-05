@@ -14,7 +14,8 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { HttpClient } from '@angular/common/http';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { of } from 'rxjs';
+import { of, timer } from 'rxjs';
+import { map } from 'rxjs/operators';
 import { SquadEditorModalComponent } from './squad-editor-modal.component';
 
 describe('SquadEditorModalComponent — MVP1-lineup-cancha-1', () => {
@@ -2252,5 +2253,336 @@ describe('SquadEditorModalComponent — V25D91-FRONT-F1 marker cards (name + rol
     expect(src).toMatch(/\.player-marker\.color-def\s+\.player-role-label\s*\{[^}]*background:\s*#3b82f6/);
     expect(src).toMatch(/\.player-marker\.color-mid\s+\.player-role-label\s*\{[^}]*background:\s*#10b981/);
     expect(src).toMatch(/\.player-marker\.color-att\s+\.player-role-label\s*\{[^}]*background:\s*#ef4444/);
+  });
+});
+
+/**
+ * V25D91.5-FRONT F6 regression: changing formation via the `<select>` updates
+ * BOTH the header (selectedFormation + homeFormation$ observable) AND the
+ * markers on the pitch (homePlayers$ gets the new positions). Also asserts
+ * that {@code isFormationChanging} resets to {@code false} after the HTTP
+ * completes — pre-V25D91.5 it stayed {@code true} forever because the reset
+ * lived in {@code onFormationChange.then()} and depended on the parent
+ * (squad-management) listening to {@code formationChangeComplete}, which it
+ * never did.
+ *
+ * <p>Strategy: drive {@code component.onFormationChange('X-Y-Z')} directly
+ * (the production HTML now wires it via {@code (ngModelChange)} which
+ * guarantees NgModel has already updated the model before the handler runs).
+ * Use the same 11-player setup as the F4 spec (line ~270) so role-match
+ * assigns all players to the new formation's slots.
+ */
+describe('SquadEditorModalComponent — V25D91.5-FRONT F6 formation change updates header + markers', () => {
+  let component: SquadEditorModalComponent;
+  let fixture: ComponentFixture<SquadEditorModalComponent>;
+  let httpClientSpy: jasmine.SpyObj<HttpClient>;
+  let dialogRefSpy: jasmine.SpyObj<MatDialogRef<SquadEditorModalComponent>>;
+
+  const SUBDIVISIONS_RESPONSE = [
+    { subdivisionId: 'GK-1', isGoalkeeper: true, sector: 26, subIndex: 1, left: 35, top: 88, width: 30, height: 10, zone: 'GK' }
+  ];
+
+  // 11 players positioned GK + LB + CB + CB + RB + CM + CM + CM + CM + ST + ST
+  // (4-4-2 shape). For F6 we only care that the HTTP fires with the right
+  // formation arg; the per-slot mapping is tested elsewhere.
+  const ELEVEN_PLAYERS = [
+    { playerId: 'p-gk',  name: 'GK',  position: 'GK', overall: 80, energy: 100, injured: false },
+    { playerId: 'p-lb',  name: 'LB',  position: 'LB', overall: 80, energy: 100, injured: false },
+    { playerId: 'p-cb1', name: 'CB1', position: 'CB', overall: 80, energy: 100, injured: false },
+    { playerId: 'p-cb2', name: 'CB2', position: 'CB', overall: 80, energy: 100, injured: false },
+    { playerId: 'p-rb',  name: 'RB',  position: 'RB', overall: 80, energy: 100, injured: false },
+    { playerId: 'p-cm1', name: 'CM1', position: 'CM', overall: 80, energy: 100, injured: false },
+    { playerId: 'p-cm2', name: 'CM2', position: 'CM', overall: 80, energy: 100, injured: false },
+    { playerId: 'p-cm3', name: 'CM3', position: 'CM', overall: 80, energy: 100, injured: false },
+    { playerId: 'p-lm',  name: 'LM',  position: 'LM', overall: 80, energy: 100, injured: false },
+    { playerId: 'p-st1', name: 'ST1', position: 'ST', overall: 80, energy: 100, injured: false },
+    { playerId: 'p-st2', name: 'ST2', position: 'ST', overall: 80, energy: 100, injured: false }
+  ];
+
+  // 4-4-2 formation response — used for /current and as the initial selectedFormation.
+  const FORMATIONS_RESPONSE = [
+    {
+      name: '4-4-2', description: '4-4-2',
+      defenders: 4, midfielders: 4, attackers: 2, outfieldPlayers: 10,
+      positions: [
+        { index: 0, role: 'GK', xPercent: 50, yPercent: 93, actionRangePercent: 5, subdivisionId: 'GK-1' },
+        { index: 1, role: 'LB', xPercent: 11, yPercent: 83, actionRangePercent: 7, subdivisionId: 'S22-1' },
+        { index: 2, role: 'CB', xPercent: 33, yPercent: 83, actionRangePercent: 6, subdivisionId: 'S22-2' },
+        { index: 3, role: 'CB', xPercent: 67, yPercent: 83, actionRangePercent: 6, subdivisionId: 'S23-2' },
+        { index: 4, role: 'RB', xPercent: 89, yPercent: 83, actionRangePercent: 7, subdivisionId: 'S24-3' },
+        { index: 5, role: 'CM', xPercent: 30, yPercent: 50, actionRangePercent: 8, subdivisionId: 'S13-2' },
+        { index: 6, role: 'CM', xPercent: 50, yPercent: 55, actionRangePercent: 7, subdivisionId: 'S14-2' },
+        { index: 7, role: 'CM', xPercent: 70, yPercent: 50, actionRangePercent: 8, subdivisionId: 'S15-2' },
+        { index: 8, role: 'LM', xPercent: 11, yPercent: 17, actionRangePercent: 7, subdivisionId: 'S04-1' },
+        { index: 9, role: 'ST', xPercent: 50, yPercent: 12, actionRangePercent: 6, subdivisionId: 'S05-2' },
+        { index: 10, role: 'ST', xPercent: 89, yPercent: 17, actionRangePercent: 7, subdivisionId: 'S06-3' }
+      ]
+    },
+    {
+      name: '3-5-2', description: '3-5-2',
+      defenders: 3, midfielders: 5, attackers: 2, outfieldPlayers: 10,
+      positions: [
+        { index: 0, role: 'GK', xPercent: 50, yPercent: 93, actionRangePercent: 5, subdivisionId: 'GK-1' },
+        { index: 1, role: 'CB', xPercent: 50, yPercent: 85, actionRangePercent: 6, subdivisionId: 'S22-2' }
+      ]
+    }
+  ];
+
+  beforeEach(async () => {
+    httpClientSpy = jasmine.createSpyObj('HttpClient', ['get', 'post']);
+    dialogRefSpy = jasmine.createSpyObj('MatDialogRef', ['close']);
+
+    httpClientSpy.get.and.callFake(((url: string) => {
+      if (url.includes('/editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
+      if (url.includes('/editor/formations')) return of(FORMATIONS_RESPONSE);
+      if (url.includes('/career/lineup/current')) {
+        return of({
+          formation: '4-4-2',
+          players: ELEVEN_PLAYERS,
+          confirmed: false,
+          warnings: [],
+          slots: []
+        });
+      }
+      return of(null);
+    }) as any);
+
+    // /auto-select returns the same 11 players. The F6 fix doesn't depend
+    // on the response shape beyond applyLineupToSlots() running.
+    //
+    // V25D91.5 spec note: usamos timer(0).pipe(map(...)) en lugar de of(...)
+    // para que la respuesta HTTP sea ASÍNCRONA. of(...) emite sincrónicamente
+    // y eso rompe los tests R2/R6 que necesitan observar el flag
+    // isFormationChanging=true mientras la llamada está en vuelo (antes de
+    // que el callback HTTP lo resetee).
+    httpClientSpy.post.and.callFake(((url: string, body: any) => {
+      if (url.includes('/career/lineup/auto-select')) {
+        return timer(0).pipe(map(() => ({ formation: body?.formation || '4-4-2', players: ELEVEN_PLAYERS, warnings: [] })));
+      }
+      if (url.includes('/career/lineup/manual-select')) {
+        return timer(0).pipe(map(() => ({ players: ELEVEN_PLAYERS, warnings: [] })));
+      }
+      if (url.includes('/career/lineup/confirm')) {
+        return timer(0).pipe(map(() => ({ confirmed: true, warnings: [] })));
+      }
+      return timer(0).pipe(map(() => ({})));
+    }) as any);
+
+    await TestBed.configureTestingModule({
+      imports: [SquadEditorModalComponent, NoopAnimationsModule],
+      providers: [
+        { provide: MAT_DIALOG_DATA, useValue: { careerId: 'c1', matchId: null } },
+        { provide: MatDialogRef, useValue: dialogRefSpy },
+        { provide: HttpClient, useValue: httpClientSpy }
+      ]
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(SquadEditorModalComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+  });
+
+  // ---- F6 regression suite ----
+
+  it('F6 R1: onFormationChange(3-5-2) triggers HTTP /auto-select with formation=3-5-2', (done) => {
+    // V25D91.5 F6 fix: ngModelChange() guarantees the model is updated before
+    // the handler runs, so passing the new formation explicitly avoids the
+    // (change)-vs-NgModel ordering bug that pre-F6 sometimes sent the OLD
+    // formation to the backend.
+    setTimeout(() => {
+      component.onFormationChange('3-5-2');
+
+      // Wait for the HTTP call to flush (subscribe is synchronous since
+      // of(...) emits immediately, but cdr.detectChanges etc. may batch).
+      setTimeout(() => {
+        const autoSelectCalls = httpClientSpy.post.calls.allArgs()
+          .filter(args => String(args[0]).includes('/career/lineup/auto-select'));
+        expect(autoSelectCalls.length).withContext('at least 1 /auto-select call expected').toBeGreaterThan(0);
+        const lastCall = autoSelectCalls[autoSelectCalls.length - 1];
+        expect((lastCall[1] as any).formation).withContext(
+          'body.formation must be the NEW formation (3-5-2), not the OLD one (4-4-2)').toBe('3-5-2');
+        done();
+      }, 30);
+    }, 30);
+  });
+
+  it('F6 R1b: homeFormation$ observable reflects the new formation after change', (done) => {
+    setTimeout(() => {
+      component.onFormationChange('3-5-2');
+      // homeFormation$ is updated synchronously inside onFormationChange
+      // (before the HTTP call). The BehaviorSubject emits the new value
+      // immediately.
+      expect(component.homeFormation$.value).withContext(
+        'homeFormation$ must reflect the new formation immediately').toBe('3-5-2');
+      done();
+    }, 30);
+  });
+
+  it('F6 R1c: selectedFormation is updated to the new formation', (done) => {
+    // The (ngModelChange) wiring in the production template sets
+    // selectedFormation before invoking the handler. We simulate that by
+    // passing the new value through the handler arg (which is what the
+    // production flow effectively delivers).
+    setTimeout(() => {
+      component.onFormationChange('3-5-2');
+      expect(component.selectedFormation).withContext(
+        'selectedFormation must be the new formation').toBe('3-5-2');
+      done();
+    }, 30);
+  });
+
+  it('F6 R2: isFormationChanging resets to false after HTTP completes (not stuck true)', (done) => {
+    // V25D91.5 F6 fix: previously isFormationChanging stayed true because
+    // the reset depended on the parent (squad-management) listening to
+    // formationChangeCompleteSubject via the (formationChangeComplete) Output,
+    // which it never did. Now the reset lives inside the HTTP callback of
+    // executeFormationChange, independent of any parent listener.
+    setTimeout(() => {
+      expect(component.isFormationChanging).withContext(
+        'precondition: flag must start false after init').toBeFalse();
+
+      component.onFormationChange('3-5-2');
+      expect(component.isFormationChanging).withContext(
+        'flag must be true synchronously after handler runs').toBeTrue();
+
+      // Wait for HTTP callback to flush + reset the flag.
+      setTimeout(() => {
+        expect(component.isFormationChanging).withContext(
+          'flag must reset to false after HTTP completes (F6 fix)').toBeFalse();
+        done();
+      }, 30);
+    }, 30);
+  });
+
+  it('F6 R3: changing formation TWICE in a row — second call NOT blocked by stuck flag', (done) => {
+    // Pre-F6: after the first formation change, isFormationChanging was true
+    // forever, so the second change early-returned and never hit the backend.
+    // Post-F6: the flag resets after each HTTP, so 2nd/3rd/Nth changes work.
+    setTimeout(() => {
+      component.onFormationChange('3-5-2');
+      setTimeout(() => {
+        // First HTTP completed, flag reset.
+        const callsAfterFirst = httpClientSpy.post.calls.allArgs()
+          .filter(args => String(args[0]).includes('/career/lineup/auto-select')).length;
+
+        component.onFormationChange('4-3-3');
+        setTimeout(() => {
+          const callsAfterSecond = httpClientSpy.post.calls.allArgs()
+            .filter(args => String(args[0]).includes('/career/lineup/auto-select')).length;
+          expect(callsAfterSecond - callsAfterFirst).withContext(
+            'second formation change must trigger a SECOND /auto-select call (pre-F6 it would be blocked)').toBe(1);
+
+          // Last call's body must have formation=4-3-3 (the second target),
+          // not 3-5-2 (the first target).
+          const lastCall = httpClientSpy.post.calls.allArgs()
+            .filter(args => String(args[0]).includes('/career/lineup/auto-select'))
+            .pop();
+          expect((lastCall![1] as any).formation).toBe('4-3-3');
+          done();
+        }, 30);
+      }, 30);
+    }, 30);
+  });
+
+  it('F6 R4: no-op when target formation equals current formation (early-return)', (done) => {
+    // V25D91.5 F6 optimization: if user re-selects the same formation
+    // (e.g., opens the dropdown and clicks the active option), we should
+    // NOT make a redundant HTTP call. The early-return short-circuits
+    // before setting isFormationChanging.
+    setTimeout(() => {
+      const callsBefore = httpClientSpy.post.calls.allArgs()
+        .filter(args => String(args[0]).includes('/career/lineup/auto-select')).length;
+
+      // selectedFormation starts as '4-4-2' (from /current).
+      // homeFormation$ also '4-4-2'. Same value → no-op.
+      component.onFormationChange('4-4-2');
+      setTimeout(() => {
+        const callsAfter = httpClientSpy.post.calls.allArgs()
+          .filter(args => String(args[0]).includes('/career/lineup/auto-select')).length;
+        expect(callsAfter - callsBefore).withContext(
+          'selecting the current formation must NOT trigger /auto-select').toBe(0);
+        expect(component.isFormationChanging).withContext(
+          'flag must remain false for no-op selection').toBeFalse();
+        done();
+      }, 20);
+    }, 30);
+  });
+
+  it('F6 R5: <select> in the DOM is wired with (ngModelChange), not (change) — guard against accidental revert', (done) => {
+    // V25D91.5 F6 fix: production HTML switched from (change) to (ngModelChange)
+    // to guarantee listener ordering. R1 ya cubre el comportamiento funcional
+    // (HTTP call con la formación correcta), este test es un guard adicional
+    // contra un revert accidental del HTML. Leemos el source file directo
+    // porque el @Component.template compilado de Angular no preserva la fuente
+    // original como string — viene como function expressions, no como texto.
+    setTimeout(() => {
+      fixture.detectChanges();
+      const compiled = (fixture.nativeElement as HTMLElement).querySelector('.formation-selector select') as HTMLSelectElement;
+      expect(compiled).withContext('.formation-selector select must exist in DOM').toBeTruthy();
+      // Leemos el .ts del componente para verificar el source HTML.
+      // En karma, __dirname apunta al directorio del spec compilado, así que
+      // subimos hasta encontrar el .ts.
+      const fs = (window as any).require ? (window as any).require('fs') : null;
+      // fs puede no estar disponible en jsdom; si no, este test es un no-op
+      // (los demás tests cubren el comportamiento).
+      if (!fs) {
+        pending('fs not available in this karma runtime — relying on R1 to cover functional behavior');
+        return;
+      }
+      // Buscar el component.ts relativo al spec.
+      const candidates = [
+        'src/app/components/squad-editor-modal/squad-editor-modal.component.ts',
+        '../squad-editor-modal.component.ts'
+      ];
+      let source: string | null = null;
+      for (const c of candidates) {
+        try {
+          source = fs.readFileSync(c, 'utf-8') as string;
+          if (source && source.includes('squad-editor-modal')) { break; }
+        } catch (e) {
+          // continue
+        }
+      }
+      if (!source) {
+        pending('could not locate component .ts source for static check — relying on R1');
+        return;
+      }
+      // Verificar (ngModelChange) en el bloque formation-selector.
+      const ngModelChangeMatch = /formation-selector[\s\S]{0,500}\(ngModelChange\)/.test(source);
+      expect(ngModelChangeMatch).withContext(
+        'template source must wire the formation <select> with (ngModelChange) (F6 fix)').toBeTrue();
+      // Negative guard.
+      const oldStyleChange = /formation-selector[\s\S]{0,500}\(change\)\s*=\s*[\"\']onFormationChange/.test(source);
+      expect(oldStyleChange).withContext(
+        'template source must NOT use (change)="onFormationChange()" on the formation select (F6 regression guard)').toBeFalse();
+      done();
+    }, 30);
+  });
+
+  it('F6 R6: isFormationChanging toggles true→false around HTTP lifecycle (was stuck true pre-F6)', (done) => {
+    // V25D91.5 F6 fix: antes el flag quedaba en true para siempre porque
+    // el reset dependia del padre escuchando formationChangeCompleteSubject.
+    // Ahora el reset vive en el callback HTTP de executeFormationChange.
+    //
+    // Verificamos el estado del flag en lugar del DOM disabled attribute
+    // porque el [disabled] binding depende de change detection schedules
+    // que pueden tener timing fragil en jsdom; el flag JS es la fuente
+    // de verdad y lo que el template lee.
+    setTimeout(() => {
+      // Precondicion: flag debe arrancar en false despues de init.
+      expect(component.isFormationChanging).withContext(
+        'precondition: flag must start false after init').toBeFalse();
+
+      component.onFormationChange('3-5-2');
+      expect(component.isFormationChanging).withContext(
+        'flag must be true synchronously after handler runs (HTTP in flight)').toBeTrue();
+
+      // Esperar a que el timer(0) del mock emita y el callback HTTP corra.
+      setTimeout(() => {
+        expect(component.isFormationChanging).withContext(
+          'flag must reset to false after HTTP completes (F6 fix)').toBeFalse();
+        done();
+      }, 30);
+    }, 30);
   });
 });
