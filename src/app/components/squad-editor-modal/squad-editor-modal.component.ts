@@ -43,7 +43,26 @@ import { SessionPlayer } from '../../shared/models/player.model';
         <h2>Editor de Formación</h2>
         <div class="formation-selector">
           <label>Formación:</label>
-          <select [(ngModel)]="selectedFormation" (change)="onFormationChange()" [disabled]="isFormationChanging">
+          <!-- V25D91.5-FRONT F6 fix: use (ngModelChange) en lugar de (change).
+               Razon: con [(ngModel)] + (change), el orden de los listeners es
+               incierto — Angular puede disparar el handler ANTES de que
+               NgModel haya actualizado el modelo, por lo que onFormationChange()
+               leía el valor VIEJO de selectedFormation. El HTTP call iba con
+               la formacion anterior → no-op. El markers/header no se actualizaban.
+
+               Con (ngModelChange) Angular garantiza que el handler corre
+               DESPUES de actualizar el modelo, asi que el argumento (o
+               this.selectedFormation) ya refleja la nueva eleccion del usuario.
+
+               Tambien reseteamos isFormationChanging directamente en el callback
+               HTTP (ver onFormationChange) en vez de depender del padre
+               escuchando a (formationChangeComplete). El padre squad-management
+               (squad-management.component.ts) no subscribe a ese Output, asi que
+               antes el select quedaba permanentemente disabled tras el primer
+               cambio. -->
+          <select [(ngModel)]="selectedFormation"
+                  (ngModelChange)="onFormationChange($event)"
+                  [disabled]="isFormationChanging">
             <option *ngFor="let f of formations" [value]="f">{{f}}</option>
           </select>
           <span *ngIf="isFormationChanging" class="formation-change-blocked">(espera...)</span>
@@ -157,7 +176,9 @@ import { SessionPlayer } from '../../shared/models/player.model';
                      [class.eff-yellow]="getEffectivenessColor(sub.subdivisionId) === 'yellow'"
                      [class.eff-red]="getEffectivenessColor(sub.subdivisionId) === 'red'"
                      (click)="onSlotClick(sub)">
-                  <span class="slot-id">{{sub.subdivisionId}}</span>
+                  <!-- V25D91-FRONT-F3: slot-id label removida (era debug-only
+                       desde V25D47 C11b). Ahora el slot es clickeable sin
+                       saturar visualmente el campo con 82 labels SBX-Y. -->
                   <!-- V25D51 (Sprint C13): chip-level effectiveness feedback.
                        eff-good (>=0.9) keeps the default chip style; eff-warning
                        (0.7-0.9) draws an orange border; eff-bad (<0.7) draws a red
@@ -207,7 +228,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
                      [class.eff-yellow]="getEffectivenessColor(sub.subdivisionId) === 'yellow'"
                      [class.eff-red]="getEffectivenessColor(sub.subdivisionId) === 'red'"
                      (click)="onSlotClick(sub)">
-                  <span class="slot-id">{{sub.subdivisionId}}</span>
+                  <!-- V25D91-FRONT-F3: slot-id label removida (era debug-only). -->
                   <!-- V25D51 (Sprint C13): chip-level effectiveness feedback.
                        See the slot-gk block above for full details on the
                        eff-good/eff-warning/eff-bad classification and the
@@ -236,17 +257,25 @@ import { SessionPlayer } from '../../shared/models/player.model';
 
           <!-- Marcadores de jugadores activos — V25D47 (C11b) extended
                with effectiveness color band. The marker is a visual-only
-               overlay (the slot's player-chip is the draggable handle). -->
+               overlay (the slot's player-chip is the draggable handle).
+               V25D91-FRONT-F1: marker now renders as a card showing the
+               squad number (1-22) on top, the player name truncated to
+               ~10 chars in the middle, and a role badge color-coded by
+               family (yellow GK / blue DEF / green MID / red ATT — same
+               palette as V25D90 PartidoModal). -->
           <ng-container *ngFor="let player of homePlayers; let i = index">
             <div *ngIf="player.slotId"
                  class="player-marker"
                  [style.left.%]="getSlotCenterX(player.slotId)"
                  [style.top.%]="getSlotCenterY(player.slotId)"
                  [class.gk-player]="player.role === 'GK'"
+                 [ngClass]="getMarkerRoleClasses(player.role)"
                  [class.eff-green]="getEffectivenessColor(player.slotId) === 'green'"
                  [class.eff-yellow]="getEffectivenessColor(player.slotId) === 'yellow'"
                  [class.eff-red]="getEffectivenessColor(player.slotId) === 'red'">
               <div class="player-number">{{i + 1}}</div>
+              <div class="player-name-label">{{player.name}}</div>
+              <div class="player-role-label">{{player.role}}</div>
             </div>
           </ng-container>
 
@@ -393,6 +422,14 @@ import { SessionPlayer } from '../../shared/models/player.model';
       display: flex;
       align-items: center;
       gap: 10px;
+      /* V25D91-FRONT-F4: flex-shrink:0 prevents the chemistry preview row
+         (right side, margin-left:auto) from compressing this group. The
+         pre-F4 default flex-shrink:1 let the selector squeeze, which caused
+         the label "Formacion:" to overlap with the <select> value at certain
+         viewport widths where the preview row grew large. */
+      flex-shrink: 0;
+      position: relative;
+      z-index: 1;
     }
 
     .formation-selector .formation-change-blocked {
@@ -409,6 +446,12 @@ import { SessionPlayer } from '../../shared/models/player.model';
     .formation-selector label {
       color: #a0d4a8;
       font-size: 0.9rem;
+      /* V25D91-FRONT-F4: position:relative + z-index:1 keeps the label
+         above the field background. Without it, the label could render
+         underneath the field if the layout compressed to near-overlap. */
+      position: relative;
+      z-index: 1;
+      white-space: nowrap;
     }
 
     .formation-selector select {
@@ -420,6 +463,15 @@ import { SessionPlayer } from '../../shared/models/player.model';
       font-size: 1.1rem;
       font-weight: bold;
       cursor: pointer;
+      /* V25D91-FRONT-F4: explicit z-index:2 so the select (and its dropdown
+         options when expanded) overlay the header preview row instead of
+         the other way around. The 2-stack hierarchy is:
+           .formation-selector label/select  → z-index:1
+           .formation-selector select        → z-index:2 (above label)
+       */
+      position: relative;
+      z-index: 2;
+      flex-shrink: 0;
     }
 
     .close-btn {
@@ -435,6 +487,11 @@ import { SessionPlayer } from '../../shared/models/player.model';
       gap: 4px;
       margin-left: auto;
       margin-right: 0.5rem;
+      /* V25D91-FRONT-F4: flex-shrink:0 prevents the preview stack from
+         compressing itself when the header viewport is narrow. Without it,
+         the formation selector (left of it) could be squeezed to the point
+         where its label overlapped the <select>. */
+      flex-shrink: 0;
     }
 
     /* V25D45 (Sprint C10): chemistry preview row — projected chemistry of
@@ -608,8 +665,11 @@ import { SessionPlayer } from '../../shared/models/player.model';
       border: 1px solid rgba(255, 255, 255, 0.25);
       border-radius: 6px;
       cursor: grab;
+      /* V25D91-FRONT-F2: bumped max-width from 140 → 200px so nombres como
+         \"Fran García\" o \"Kepa Arrizabalaga\" no se trunquen a \"Fran Gar...\"
+         / \"Kepa Arr...\" visualmente. */
       min-width: 80px;
-      max-width: 140px;
+      max-width: 200px;
       transition: background 0.15s ease, border-color 0.15s ease;
     }
     .bench-player:hover {
@@ -620,13 +680,20 @@ import { SessionPlayer } from '../../shared/models/player.model';
       cursor: grabbing;
     }
     .bench-player-name {
+      /* V25D91-FRONT-F2: allow multi-line wrap with tight line-height so
+         full names render without truncation. text-align:center for centered
+         wrap. overflow:visible (was hidden) y text-overflow:clip (was
+         ellipsis) para que no corte con \"…\". */
       font-size: 0.75rem;
       color: #fff;
       font-weight: 600;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      white-space: normal;
+      line-height: 1.1;
+      overflow: visible;
+      text-overflow: clip;
       max-width: 100%;
+      text-align: center;
+      word-break: break-word;
     }
     .bench-player-pos {
       font-size: 0.65rem;
@@ -663,15 +730,6 @@ import { SessionPlayer } from '../../shared/models/player.model';
     .slot.eff-red {
       background: rgba(197, 48, 48, 0.2);
       border-color: rgba(197, 48, 48, 0.6);
-    }
-    .player-marker.eff-green .player-number {
-      box-shadow: 0 0 0 3px #48bb78, 0 2px 6px rgba(0, 0, 0, 0.3);
-    }
-    .player-marker.eff-yellow .player-number {
-      box-shadow: 0 0 0 3px #eab308, 0 2px 6px rgba(0, 0, 0, 0.3);
-    }
-    .player-marker.eff-red .player-number {
-      box-shadow: 0 0 0 3px #c53030, 0 2px 6px rgba(0, 0, 0, 0.3);
     }
 
     /* CDK drag-drop polish: highlight drop targets on hover/active. */
@@ -889,12 +947,6 @@ import { SessionPlayer } from '../../shared/models/player.model';
       text-transform: uppercase;
     }
 
-    .slot-id {
-      font-size: 0.55rem;
-      color: rgba(255, 255, 255, 0.5);
-      font-weight: bold;
-    }
-
     .player-chip {
       font-size: 0.5rem;
       color: #fff;
@@ -986,34 +1038,102 @@ import { SessionPlayer } from '../../shared/models/player.model';
       cursor: grabbing;
     }
 
-    /* Player Marker (número sobre el campo) */
+    /* Player Marker (number + name + role badge sobre el campo).
+       V25D91-FRONT-F1: el marker pasó de círculo 32x32 a card 70x56
+       que muestra squad-number (1-22) arriba, nombre truncado en el
+       medio, y role badge color-codeado por familia. Mismo scheme que
+       V25D90 PartidoModal (yellow GK / blue DEF / green MID / red ATT). */
     .player-marker {
       position: absolute;
-      width: 32px;
-      height: 32px;
+      width: 70px;
+      height: 56px;
       transform: translate(-50%, -50%);
       z-index: 20;
       pointer-events: none;
-    }
-
-    .player-number {
-      width: 100%;
-      height: 100%;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #c0392b 0%, #e74c3c 100%);
-      border: 2px solid #fff;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      font-weight: bold;
-      font-size: 0.85rem;
+      gap: 1px;
+      filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));
+    }
+
+    .player-marker .player-number {
+      min-width: 18px;
+      height: 16px;
+      padding: 0 5px;
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.7);
       color: #fff;
-      text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
-      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      font-size: 0.65rem;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      line-height: 1;
     }
 
     .player-marker.gk-player .player-number {
-      background: linear-gradient(135deg, #f39c12 0%, #f1c40f 100%);
+      /* GK gets an amber tint to complement the role label below. */
+      background: rgba(245, 158, 11, 0.9);
+      border-color: rgba(245, 158, 11, 1);
+    }
+
+    .player-marker .player-name-label {
+      font-size: 0.6rem;
+      font-weight: 700;
+      color: #fff;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 1px 4px;
+      border-radius: 3px;
+      max-width: 70px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+      line-height: 1.2;
+    }
+
+    .player-marker .player-role-label {
+      font-size: 0.6rem;
+      font-weight: 700;
+      color: #fff;
+      padding: 1px 5px;
+      border-radius: 3px;
+      text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+      line-height: 1.2;
+    }
+
+    /* V25D91-FRONT-F1: role color scheme — yellow GK, blue DEF,
+       green MID, red ATT. Same palette as V25D90 PartidoModal. */
+    .player-marker.color-gk .player-role-label {
+      background: #f59e0b;  /* amber-500 */
+    }
+    .player-marker.color-def .player-role-label {
+      background: #3b82f6;  /* blue-500 */
+    }
+    .player-marker.color-mid .player-role-label {
+      background: #10b981;  /* emerald-500 */
+    }
+    .player-marker.color-att .player-role-label {
+      background: #ef4444;  /* red-500 */
+    }
+
+    /* V25D91-FRONT-F1: effectiveness glow now wraps the entire marker
+       (not just the inner number circle as in pre-V25D91). drop-shadow
+       follows the bounding box of all visible children so the ring
+       hugs the card more naturally. The default drop-shadow from
+       .player-marker is preserved as the second filter. */
+    .player-marker.eff-green {
+      filter: drop-shadow(0 0 4px #48bb78) drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));
+    }
+    .player-marker.eff-yellow {
+      filter: drop-shadow(0 0 4px #eab308) drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));
+    }
+    .player-marker.eff-red {
+      filter: drop-shadow(0 0 4px #c53030) drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));
     }
 
     /* Loading overlay for field */
@@ -1250,10 +1370,6 @@ import { SessionPlayer } from '../../shared/models/player.model';
         height: auto;
       }
 
-      .slot-id {
-        font-size: 0.35rem;
-      }
-
       /* Mobile chips keep visible — shrink font-size + padding so they
          fit narrow slots without overflowing. */
       .player-chip {
@@ -1293,10 +1409,6 @@ import { SessionPlayer } from '../../shared/models/player.model';
       }
 
       .player-chip {
-        font-size: 0.45rem;
-      }
-
-      .slot-id {
         font-size: 0.45rem;
       }
 
@@ -1698,7 +1810,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
           for (let i = 0; i < positions.length; i++) {
             if (assignedPositions.has(i)) continue;
             const posRole = positions[i].role;
-            if (player.position === posRole) {
+            if (this.rolesMatch(player.position, posRole)) {
               const slotId = positions[i].subdivisionId;
               player.slotId = slotId;
               this.slotPlayerMap[slotId] = player;
@@ -2033,6 +2145,87 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   }
 
   /**
+   * V25D91-FRONT-F1: classify a player's role into a color family for the
+   * marker's role badge. Returns an {@code ngClass} map with one of
+   * {@code color-gk} / {@code color-def} / {@code color-mid} / {@code color-att}
+   * set to {@code true}. The map keys drive the CSS background-color of the
+   * role-label badge in the player-marker.
+   *
+   * <p>Palette (mirrors V25D90 PartidoModal):
+   * <ul>
+   *   <li>GK → color-gk (yellow)</li>
+   *   <li>CB / LB / RB / DEF → color-def (blue)</li>
+   *   <li>CM / CDM / CAM / LM / RM / MID → color-mid (green)</li>
+   *   <li>ST / LW / RW / CF / ATT → color-att (red)</li>
+   * </ul>
+   *
+   * <p>Returns an empty object for unknown roles so the role badge falls
+   * back to the default (no background) — same defensive pattern as the
+   * other classifiers (effectivenessColor etc.).
+   */
+  getMarkerRoleClasses(role: string | undefined): { [klass: string]: boolean } {
+    if (!role) { return {}; }
+    return {
+      'color-gk':  role === 'GK',
+      'color-def': ['CB', 'LB', 'RB', 'DEF'].includes(role),
+      'color-mid': ['CM', 'CDM', 'CAM', 'LM', 'RM', 'MID'].includes(role),
+      'color-att': ['ST', 'LW', 'RW', 'CF', 'ATT'].includes(role)
+    };
+  }
+
+  /**
+   * V25D91.6-FRONT F6 P0: role-match entre jugador y slot de formacion.
+   *
+   * <p>Antes: comparacion exacta `player.position === posRole`. Esto fallaba
+   * porque el back devuelve posiciones con roles GENERICOS (GK/DEF/MID/ATT/
+   * WINGER — formato SessionPlayer desde /career/players/squad), pero las
+   * formations desde /editor/formations tienen roles ESPECIFICOS
+   * (GK/CB/LB/RB/CM/CDM/CAM/LM/RM/ST/LW/RW/CF/WINGER). El unico match era GK.
+   *
+   * <p>Resultado: solo 1 marker (el GK) se renderizaba tras cambiar formacion.
+   * El header SÍ cambiaba (mi fix V25D91.5 ngModelChange funciona), pero
+   * los markers quedaban atascados en el slot GK.
+   *
+   * <p>Fix: comparar por FAMILIA. GK solo matchea GK. Cualquier rol de la
+   * familia DEF matchea cualquier slot DEF (y vice versa). Misma logica
+   * para MID y ATT. WINGER entra en ATT porque es un atacante lateral.
+   *
+   * <p>Si ambos roles son desconocidos, fallback a comparacion exacta (no
+   * matchea) — comportamiento legacy preservado para roles exoticos.
+   */
+  rolesMatch(playerRole: string | undefined, formationRole: string | undefined): boolean {
+    if (!playerRole || !formationRole) { return false; }
+    if (playerRole === formationRole) { return true; }
+    const playerFamily = this.getRoleFamily(playerRole);
+    const formationFamily = this.getRoleFamily(formationRole);
+    if (playerFamily !== null && playerFamily === formationFamily) {
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * V25D91.6-FRONT F6 P0: clasifica un rol a su familia. Devuelve null si
+   * el rol no pertenece a ninguna familia conocida (backward compat con
+   * roles exoticos legacy que no matchean contra formations).
+   *
+   * <p>Familias:
+   * <ul>
+   *   <li>GK: GK</li>
+   *   <li>DEF: CB, LB, RB, LWB, RWB, DEF</li>
+   *   <li>MID: CM, CDM, CAM, LM, RM, MID</li>
+   *   <li>ATT: ST, LW, RW, CF, ATT, WINGER</li>
+   * </ul>
+   */
+  private getRoleFamily(role: string): 'GK' | 'DEF' | 'MID' | 'ATT' | null {
+    if (role === 'GK') return 'GK';
+    if (['CB', 'LB', 'RB', 'LWB', 'RWB', 'DEF'].includes(role)) return 'DEF';
+    if (['CM', 'CDM', 'CAM', 'LM', 'RM', 'MID'].includes(role)) return 'MID';
+    if (['ST', 'LW', 'RW', 'CF', 'ATT', 'WINGER'].includes(role)) return 'ATT';
+    return null;
+  }
+
+  /**
    * V25D47 (Sprint C11b): compute the displayed chemistry score by weighting
    * the preview's raw score with the formationEffectiveness teamAverage.
    *
@@ -2071,52 +2264,83 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     return fe?.inferredFormation ?? null;
   }
 
-  /** Cambia la formación - espera a que termine el ciclo completo incluyendo predicción */
-  onFormationChange(): void {
+  /**
+   * Cambia la formación cuando el usuario selecciona una opción del `<select>`.
+   *
+   * <p>V25D91.5-FRONT F6 fix: este handler se invoca desde `(ngModelChange)` (no
+   * `(change)`), lo que garantiza que Angular ya actualizó {@code this.selectedFormation}
+   * cuando el handler corre. Antes con `(change)` el orden era incierto y a veces
+   * leía el valor VIEJO, mandando un HTTP call con la formación anterior → no-op
+   * visual.
+   *
+   * <p>El parámetro {@code newFormation} viene del `(ngModelChange)`; si por
+   * alguna razón llega undefined (e.g. una llamada programática sin arg), fallback
+   * a {@code this.selectedFormation}.
+   *
+   * <p>Antes el flag {@code isFormationChanging} solo se reseteaba cuando
+   * {@code formationChangeCompleteSubject.next()} se llamaba desde el padre
+   * (vía `(formationChangeComplete)` Output). Pero el padre
+   * {@code squad-management.component.ts} nunca escucha ese Output, así que
+   * el select quedaba permanentemente disabled después del primer cambio. Ahora
+   * reseteamos el flag directamente en el callback HTTP de
+   * {@link executeFormationChange}, independiente del padre.
+   */
+  onFormationChange(newFormation?: string): void {
     // Bloquear si hay un cambio en progreso
     if (this.isFormationChanging) {
       console.log('[SQUAD-EDITOR] Formation change blocked - waiting for previous change to complete');
       return;
     }
 
-    // Ignorar cambios durante inicialización (evita NG0100)
+// Ignorar cambios durante inicialización (evita NG0100)
     if (this.isInitializing) {
+      return;
+    }
+
+    // V25D91.5-FRONT F6: priorizar el argumento explícito (viene de ngModelChange,
+    // siempre actualizado) sobre this.selectedFormation (puede no estarlo si se
+    // llama el handler programáticamente antes de que Angular sincronice el DOM).
+    const targetFormation = newFormation ?? this.selectedFormation;
+    if (!targetFormation) {
+      return;
+    }
+
+    // V25D91.5-FRONT F6: sincronizar this.selectedFormation con la nueva
+    // formación. En producción vía (ngModelChange) NgModel ya lo escribió,
+    // pero en llamadas programáticas (tests, debugging) necesitamos hacerlo
+    // nosotros para que el getter y el template queden consistentes.
+    if (this.selectedFormation !== targetFormation) {
+      this.selectedFormation = targetFormation;
+    }
+
+    // V25D91.5-FRONT F6: sincronizar this.selectedFormation con la nueva
+    // formación. En producción vía (ngModelChange) NgModel ya lo escribió,
+    // pero en llamadas programáticas (tests, debugging) necesitamos hacerlo
+    // nosotros para que el getter y el template queden consistentes.
+    if (this.selectedFormation !== targetFormation) {
+      this.selectedFormation = targetFormation;
+    }
+
+    // No-op si la formación no cambió realmente
+    if (targetFormation === this.homeFormation$.value) {
       return;
     }
 
     // Bloquear nuevos cambios mientras carga
     this.isFormationChanging = true;
+    this.cdr.markForCheck();
 
-    // Resetear el subject para esperar nueva confirmación
+    // Resetear el subject para esperar nueva confirmación (legacy contract
+    // con el padre — squad-management no escucha, pero lo emitimos por si
+    // otro caller en el futuro lo hace).
     this.formationChangeCompleteSubject = new Subject<void>();
 
-    const newFormation = this.selectedFormation;
-    this.homeFormation$.next(newFormation);
+    this.homeFormation$.next(targetFormation);
 
-    // Ejecutar cambio y esperar a que termine (save en Redis completo)
-    this.executeFormationChange(newFormation).then(() => {
-      // Emitir el subject para que el padre pueda completar cuando la predicción esté lista
-      this.formationChangeComplete.emit(this.formationChangeCompleteSubject);
-
-      // Solo DESBLOQUEAR cuando el subject complete (cuando predicción termine)
-      this.formationChangeCompleteSubject.subscribe({
-        next: () => {
-          this.isFormationChanging = false;
-          this.cdr.detectChanges();
-        },
-        error: () => {
-          // También desbloquear en caso de error
-          this.isFormationChanging = false;
-          this.cdr.detectChanges();
-        }
-      });
-
-      this.cdr.detectChanges();
-    }).catch(() => {
-      // También desbloquear en caso de error
-      this.isFormationChanging = false;
-      this.formationChangeCompleteSubject.complete();
-    });
+    // Ejecutar cambio. El reset de isFormationChanging ahora vive adentro
+    // de executeFormationChange (next + error callbacks), sin depender del
+    // padre escuchando formationChangeComplete.
+    this.executeFormationChange(targetFormation);
   }
 
   /** Ejecuta auto-select sin limpiar el mapa primero (para carga inicial) */
@@ -2186,7 +2410,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
         if (assignedPositions.has(i)) continue;
 
         const posRole = positions[i].role;
-        if (player.position === posRole) {
+        if (this.rolesMatch(player.position, posRole)) {
           const slotId = positions[i].subdivisionId;
           player.slotId = slotId;
           this.slotPlayerMap[slotId] = player;
@@ -2200,45 +2424,72 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     this.homePlayers$.next(allPlayers.filter(p => p.slotId));
     this.benchPlayers$.next(allPlayers.filter(p => !p.slotId));
 
+    // V25D91.5-FRONT F6 fix: markForCheck + detectChanges. El template
+    // itera sobre homePlayers (getter sobre BehaviorSubject) sin async
+    // pipe, así que necesita change detection explícita para repintar
+    // los markers en sus nuevas posiciones. Antes solo había detectChanges
+    // que funcionaba pero era frágil ante schedules async.
+    this.cdr.markForCheck();
     this.cdr.detectChanges();
   }
 
-  /** Ejecuta el cambio de formación - retorna Promise para esperar completado */
-  private executeFormationChange(newFormation: string): Promise<void> {
+  /**
+   * Ejecuta el cambio de formación vía POST /career/lineup/auto-select y aplica
+   * los players retornados a los slots del campo.
+   *
+   * <p>V25D91.5-FRONT F6 fix: antes este método retornaba una Promise que solo
+   * resolvía después del HTTP. El reset de {@code isFormationChanging} vivía
+   * en {@code onFormationChange.then()} y dependía de que el padre
+   * escuchara {@code formationChangeCompleteSubject}. Como el padre no lo hace,
+   * el flag quedaba en true para siempre y el select quedaba disabled.
+   *
+   * <p>Ahora el reset del flag vive directamente en los callbacks next/error
+   * de este método, sin depender del padre. También agregamos
+   * {@code cdr.markForCheck()} + {@code cdr.detectChanges()} para forzar change
+   * detection en el squad-header (donde está el select y la chemistry preview).
+   */
+  private executeFormationChange(newFormation: string): void {
     const startTime = performance.now();
     this.loadingFormation$.next(true);
+    this.cdr.markForCheck();
 
-    // Retornar Promise que se resuelve cuando termine el HTTP call
-    return new Promise((resolve, reject) => {
-      // Llamar al endpoint auto-select para obtener los mejores jugadores
-      this.http.post<any>(`${environment.apiUrl}/career/lineup/auto-select`, {
-        formation: newFormation
-      }).subscribe({
-        next: (response) => {
-          this.loadingFormation$.next(false);
-          this.applyLineupToSlots(newFormation, response?.players || []);
-          // MVP1-lineup-cancha-1.5 FIX (F4, defensivo): persistir los slots
-          // después del auto-select. Si F1 (back) está bien implementado,
-          // el back ya persistió el subdivision map; este saveLineup es
-          // redundante pero defensivo. Si F1 tiene un bug, este saveLineup
-          // asegura persistencia. El guard interno bloquea si lineup < 7.
-          this.saveLineup();
-          // EMITIR EVENTO AL PADRE con los players directamente (sin esperar backend)
-          this.formationChanged.emit({
-            formation: newFormation,
-            players: response?.players || []
-          });
-          resolve(); // Resolver Promise
-        },
-        error: (err) => {
-          this.loadingFormation$.next(false);
-          const elapsed = (performance.now() - startTime).toFixed(0);
-          console.error(`[SQUAD-EDITOR] Auto-select ERROR after ${elapsed}ms:`, err);
-          this.errorMessage$.next('Error al auto-seleccionar jugadores');
-          this.cdr.detectChanges();
-          resolve(); // También resolver en caso de error para no bloquear
-        }
-      });
+    // Llamar al endpoint auto-select para obtener los mejores jugadores
+    this.http.post<any>(`${environment.apiUrl}/career/lineup/auto-select`, {
+      formation: newFormation
+    }).subscribe({
+      next: (response) => {
+        this.loadingFormation$.next(false);
+        this.applyLineupToSlots(newFormation, response?.players || []);
+        // MVP1-lineup-cancha-1.5 FIX (F4, defensivo): persistir los slots
+        // después del auto-select. Si F1 (back) está bien implementado,
+        // el back ya persistió el subdivision map; este saveLineup es
+        // redundante pero defensivo. Si F1 tiene un bug, este saveLineup
+        // asegura persistencia. El guard interno bloquea si lineup < 7.
+        this.saveLineup();
+        // EMITIR EVENTO AL PADRE con los players directamente (sin esperar backend)
+        this.formationChanged.emit({
+          formation: newFormation,
+          players: response?.players || []
+        });
+        // Legacy: emit formationChangeComplete con el subject (no-op si nadie escucha).
+        this.formationChangeComplete.emit(this.formationChangeCompleteSubject);
+
+        // V25D91.5-FRONT F6 fix: reset del flag + cd explicit. Antes dependía del
+        // padre escuchando formationChangeComplete, lo que nunca pasaba.
+        this.isFormationChanging = false;
+        this.cdr.markForCheck();
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        this.loadingFormation$.next(false);
+        const elapsed = (performance.now() - startTime).toFixed(0);
+        console.error(`[SQUAD-EDITOR] Auto-select ERROR after ${elapsed}ms:`, err);
+        this.errorMessage$.next('Error al auto-seleccionar jugadores');
+        // V25D91.5-FRONT F6 fix: reset también en error path.
+        this.isFormationChanging = false;
+        this.cdr.markForCheck();
+        this.cdr.detectChanges();
+      }
     });
   }
 
