@@ -343,7 +343,21 @@ export class LiveMatchModalsService {
    * they confirm; resume on afterClosed() whether the manager confirmed
    * OR discarded.
    */
-  openPartidoModal(matchId: string, state: MatchState): Observable<unknown> {
+  openPartidoModal(
+    matchId: string,
+    state: MatchState,
+    /**
+     * V25D89.2: optional human-readable team names. The round-live
+     * component already builds a {@code teamNameMap} (sourced from
+     * {@link CareerService.getCareerTeams}) and passes it down so the
+     * modal's stats section shows "REAL MADRID 55% | 45% BARCELONA"
+     * instead of the raw teamIds. When omitted the modal falls back to
+     * the teamIds (less readable but the stats still compute correctly
+     * — the teamId match is what drives the event attribution, the
+     * names are display-only).
+     */
+    teamNames?: { home: string; away: string }
+  ): Observable<unknown> {
     if (state.status === 'FINISHED' || state.status === 'CANCELLED') {
       this.snackBar.open('El partido ya terminó, no se puede editar la formación', 'OK', { duration: 3000 });
       return new Observable(sub => sub.complete());
@@ -369,13 +383,27 @@ export class LiveMatchModalsService {
           // The Partido modal uses this to seed the dropdown + slot re-flow.
           currentFormation: state.homeFormation || '4-4-2',
           homeTeamId: state.homeTeamId,
+          // V25D89.2: awayTeamId drives event attribution in the stats
+          // derivation (without it we cannot tell which team a SHOT
+          // belongs to). Sourced from state.awayTeamId — the SSE feed
+          // exposes this on every MatchState tick.
+          awayTeamId: state.awayTeamId,
           currentSlots,
           squad: squad ?? [],
           startingIds,
           // V25D89-FRONT-A: rival formation comes from state.awayFormation
           // (the only rival-side data the SSE feed exposes). Falls back to
           // '4-4-2' defensively so the rival tab always renders.
-          rivalFormation: state.awayFormation || '4-4-2'
+          rivalFormation: state.awayFormation || '4-4-2',
+          // ========== V25D89.2: stats live data ==========
+          currentMinute: state.currentMinute ?? 0,
+          score: state.score ?? { home: 0, away: 0 },
+          homePossession: state.homePossession ?? 50,
+          awayPossession: state.awayPossession ?? 50,
+          homeTeamName: teamNames?.home ?? String(state.homeTeamId ?? ''),
+          awayTeamName: teamNames?.away ?? String(state.awayTeamId ?? ''),
+          events: state.events ?? [],
+          substitutionsRemaining: state.substitutionsRemaining ?? 5
         };
 
         // LIVE-MATCH-F5.3.3 BUG-015: pause the round BEFORE the dialog

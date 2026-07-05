@@ -952,12 +952,24 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
    * match-card's (partidoOpen) output. Delegates to
    * {@link LiveMatchModalsService.openPartidoModal} which handles
    * pause/resume round + dialog opening.
+   *
+   * <p>V25D89.2: passes the {@code teamNameMap} (sourced from
+   * {@code CareerService.getCareerTeams} in the constructor) to the
+   * modal as the 3rd parameter, so the stats section shows readable
+   * team names ("REAL MADRID 55% | 45% BARCELONA") instead of raw
+   * sessionTeamIds. The modal's stats derivation falls back to the
+   * teamIds if these are missing — passing them is cosmetic, not
+   * required for correctness.
    */
   onPartidoOpen(match: Match, state: MatchState | undefined): void {
     if (!state) {
       return;
     }
-    this.modals.openPartidoModal(String(match.id), state)
+    const currentVm = this.vmSubject.value;
+    this.modals.openPartidoModal(String(match.id), state, {
+      home: this.getTeamName(state.homeTeamId, currentVm.teamNameMap),
+      away: this.getTeamName(state.awayTeamId, currentVm.teamNameMap)
+    })
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         error: (err) => console.error('[ROUND-LIVE] openPartidoModal error', err)
