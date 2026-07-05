@@ -89,6 +89,32 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
    */
   private autoStartTriggered = false;
 
+  /**
+   * V25D86 sprint: resolved roundId from the latest successful
+   * {@code engineService.startRound(...)} POST response. The
+   * backend registers the {@code RoundEngine} under THIS roundId —
+   * not necessarily whatever string the request body sent (the
+   * server may canonicalize to a real UUID, or the player's
+   * careerId may not be a parseable UUID at the SSE endpoint).
+   * Frontend code MUST subscribe to {@code streamRoundState(...)}
+   * with the value carried here, NEVER with {@code gameId}.
+   *
+   * <ul>
+   *   <li>Initialized to {@code null}; any of the three POST call
+   *       sites ({@link tryAutoStartRound}, {@link startRoundEngine},
+   *       {@link iniciarTodos}) push the response's
+   *       {@code state.roundId} here as soon as the backend answers.</li>
+   *   <li>The SSE subscription in {@link startRoundEngine} waits on
+   *       this subject ({@code filter(id !== null), take(1)}) before
+   *       opening the stream, so we never send a wrong roundId to
+   *       {@code GET /api/v1/match-engine/rounds/{roundId}/stream}.</li>
+   *   <li>Without this, {@code MatchEngineController:48} returns
+   *       {@code Flux.empty()} because the registry has no entry for
+   *       the frontend's {@code gameId} — silently idle SSE.</li>
+   * </ul>
+   */
+  private resolvedRoundId$ = new BehaviorSubject<string | null>(null);
+
   private vmSubject = new BehaviorSubject<RoundLiveViewModel>({
     gameId: '',
     roundNumber: 1,
@@ -291,7 +317,15 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
   }
 
   private startRoundEngine(gameId: string, matches: RoundMatchVM[]) {
-    const roundId = gameId;
+    // V25D86 sprint: roundId is NOT a local alias for gameId anymore.
+    // The backend registers the RoundEngine under whatever
+    // `state.roundId` it returns from the POST response — frontend
+    // cannot assume gameId is a parseable UUID or that the backend
+    // uses it 1:1. We keep gameId as the POST body parameter (so the
+    // idempotency key matches what the upstream auto-start sent) and
+    // capture the server-resolved roundId into resolvedRoundId$ for
+    // the SSE stream to consume.
+    const requestRoundId = gameId;
     const matchData = matches.map(rm => ({
       matchId: String(rm.match.id),
       homeTeamId: String(rm.match.homeTeamId),
@@ -317,12 +351,40 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
     // TS level — TS infers {@code Observable<null> | Observable<RoundState>}
     // which has no common subscribe signature without the explicit
     // {@code Observable<RoundState | null>} annotation.
+    //
+    // <p>V25D86 sprint: the {@code tap} on the POST response captures
+    // {@code state.roundId} into {@code resolvedRoundId$} so the SSE
+    // subscription below uses the backend-resolved key, NOT
+    // {@code requestRoundId}. When {@code autoStartTriggered} short-
+    // circuits to {@code of(null)}, we rely on the matching tap in
+    // {@link tryAutoStartRound} (which fires the POST that wins the
+    // race) to populate {@code resolvedRoundId$} — the two paths
+    // rendezvous on the same BehaviorSubject.
     const startRound$: Observable<RoundState | null> = this.autoStartTriggered
       ? of(null)
-      : this.engineService.startRound(roundId, matchData);
+      : this.engineService.startRound(requestRoundId, matchData).pipe(
+          tap(state => {
+            if (state && state.roundId) {
+              this.resolvedRoundId$.next(state.roundId);
+            }
+          })
+        );
+
+    // V25D86 sprint: the SSE stream subscribes with the
+    // backend-resolved roundId from resolvedRoundId$, NOT with
+    // requestRoundId. The filter wait is the why: tryAutoStartRound
+    // runs the POST synchronously, but the POST response is async,
+    // so {@code resolvedRoundId$} may not be populated yet at the
+    // moment of(startRound$). We block on the first non-null emit
+    // before opening the SSE stream.
+    const sseStream$ = this.resolvedRoundId$.pipe(
+      filter((id): id is string => !!id),
+      take(1),
+      switchMap(id => this.engineService.streamRoundState(id))
+    );
 
     startRound$.pipe(
-      switchMap(() => this.engineService.streamRoundState(roundId)),
+      switchMap(() => sseStream$),
       takeUntil(this.destroy$)
     ).subscribe({
       next: (roundState) => {
@@ -731,6 +793,16 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
     const roundId = vm.gameId;
     this.engineService.startRound(roundId, pending).subscribe({
       next: (state) => {
+        // V25D86 sprint: capture the backend-resolved roundId so any
+        // subsequent SSE subscription (including a fresh mount via
+        // tryAutoStartRound) uses the same registry key the backend
+        // registered. Without this, a "Iniciar Todos" retry after a
+        // failed auto-start can return a different roundId than the
+        // one already resolved (e.g. when the backend re-issued a
+        // new round under a new UUID).
+        if (state && state.roundId) {
+          this.resolvedRoundId$.next(state.roundId);
+        }
         console.log('[ROUND-LIVE] all matches started via Iniciar Todos', state);
       },
       error: (err) => {
@@ -801,6 +873,17 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
     console.log('[ROUND-LIVE] V25D84 auto-starting', pending.length, 'matches');
     this.engineService.startRound(vm.gameId, pending).subscribe({
       next: (state) => {
+        // V25D86 sprint: capture the backend-resolved roundId so the
+        // SSE subscription started later by startRoundEngine (which
+        // sees autoStartTriggered=true and short-circuits its own POST)
+        // uses the SAME roundId as the registry key. Before this fix
+        // the SSE chain did `streamRoundState(vm.gameId)`, but the
+        // backend roundEngineRegistry.get(vm.gameId) returned null
+        // and MatchEngineController returned Flux.empty() — silent
+        // idle SSE.
+        if (state && state.roundId) {
+          this.resolvedRoundId$.next(state.roundId);
+        }
         console.log('[ROUND-LIVE] V25D84 auto-start success', state);
       },
       error: (err) => {

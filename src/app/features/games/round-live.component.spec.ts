@@ -42,6 +42,12 @@ import { MatchState, RoundState } from '../../core/services/match-engine.model';
 import { RoundLiveViewModel, RoundMatchVM } from './models/round-live.model';
 
 const SAMPLE_GAME_ID = 'game-abc';
+// V25D86 sprint: the roundId returned by the backend's
+// POST /api/v1/match-engine/rounds/start response is NOT
+// necessarily equal to the frontend's gameId. Tests use this
+// value to drive the SSE stream with the registry key the
+// backend actually registered.
+const SAMPLE_BACKEND_ROUND_ID = 'round-uuid-1234-abcd-5678-efgh';
 const SAMPLE_MATCH_ID = 'match-xyz';
 const SAMPLE_HOME_TEAM_ID = 'team-home-1';
 const SAMPLE_AWAY_TEAM_ID = 'team-away-1';
@@ -82,9 +88,9 @@ function makeMatch(status: MatchStatus = 'SCHEDULED'): Match {
   };
 }
 
-function makeRoundState(matches: MatchState[], status: 'IN_PROGRESS' | 'COMPLETED' = 'IN_PROGRESS'): RoundState {
+function makeRoundState(matches: MatchState[], status: 'IN_PROGRESS' | 'COMPLETED' = 'IN_PROGRESS', roundId: string = SAMPLE_BACKEND_ROUND_ID): RoundState {
   return {
-    roundId: SAMPLE_GAME_ID,
+    roundId,
     timestamp: new Date().toISOString(),
     matches,
     status
@@ -106,7 +112,13 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
       'startRound',
       'streamRoundState'
     ]);
-    engineServiceSpy.startRound.and.returnValue(of({} as any));
+    // V25D86 sprint: the default mock now returns a RoundState with the
+    // backend-resolved roundId (NOT equal to SAMPLE_GAME_ID). This lets
+    // startRoundEngine's `switchMap(() => resolvedRoundId$...)` chain
+    // find a non-null roundId and open the SSE stream. Per-test overrides
+    // can pin this to other fixtures (e.g. a state without a roundId to
+    // exercise the defensive null path).
+    engineServiceSpy.startRound.and.returnValue(of(makeRoundState([])));
     engineServiceSpy.streamRoundState.and.returnValue(roundStateSubject.asObservable());
 
     careerServiceSpy = jasmine.createSpyObj<CareerService>('CareerService', [
@@ -891,6 +903,148 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
       expect(roundIdArg).toBe(SAMPLE_GAME_ID);
       expect(matchesArg.length).toBe(1);
       expect(matchesArg[0].matchId).toBe(SAMPLE_MATCH_ID);
+    });
+  });
+
+  // ========== V25D86 sprint: SSE roundId resolution ==========
+
+  /**
+   * V25D86 sprint: the frontend was passing {@code gameId} (careerId) as
+   * the SSE {@code roundId}. The backend registers the RoundEngine
+   * under the value the POST response's {@code state.roundId} returns,
+   * which can differ from the request body (e.g. careerId may not be a
+   * UUID string parseable by {@code UUID.fromString} on the server). When
+   * the frontend subscribed to {@code streamRoundState(gameId)}, the
+   * SSE controller's {@code roundEngineRegistry.get(gameId)} returned
+   * {@code null} and the endpoint returned {@code Flux.empty()} — the
+   * SSE went silently idle (state never updated in the UI).
+   *
+   * <p>Fix: capture {@code state.roundId} from the
+   * {@code engineService.startRound} POST response into a
+   * {@code BehaviorSubject<String> resolvedRoundId$} and subscribe the
+   * SSE chain to that subject (filtered to non-null, take(1)). The
+   * POST body itself still carries {@code gameId} so backend idempotency
+   * on re-init is preserved, but the SSE URL uses the registry key.
+   *
+   * <p>Tests cover:
+   * <ol>
+   *   <li>{@code startRoundEngine} subscribes to
+   *       {@code streamRoundState} with the roundId from the POST
+   *       response, NOT the gameId passed to the constructor.</li>
+   *   <li>The auto-start ({@code tryAutoStartRound}) pipeline captures
+   *       the roundId into the same subject so the SSE chain — which
+   *       has short-circuited its own POST — picks up the resolved
+   *       roundId without re-POSTing.</li>
+   *   <li>{@code iniciarTodos} (manual fallback) also pushes the
+   *       roundId so any SSE subscription that follows uses the
+   *       registry key.</li>
+   *   <li>Defensive: when the POST response lacks a {@code roundId}
+   *       (e.g. the body shape is unknown), the SSE does NOT crash —
+   *       the existing {@code Flux.empty()} behavior is preserved
+   *       (no streamRoundState call with an empty id).</li>
+   * </ol>
+   */
+  describe('V25D86 sprint: streamRoundState uses POST roundId, not gameId', () => {
+    /**
+     * Helper: trigger the auto-start + startRoundEngine the same way the
+     * production flow does, without going through the constructor's
+     * combineLatest (which depends on careerService spies that aren't
+     * configured to return values here). Returns nothing; tests assert
+     * against the engineServiceSpy call history. Does NOT reset call
+     * counters so the assertions see both the auto-start POST AND the
+     * SSE call.
+     */
+    function runAutoStartAndOpenStream() {
+      setVm([{
+        match: makeMatch('SCHEDULED'),
+        state: makeMatchState({ status: 'NOT_STARTED', currentMinute: 0 }),
+        isUserMatch: true
+      }]);
+      // Explicitly call startRoundEngine after the auto-start so the
+      // SSE chain subscribes (autoStartTriggered=true short-circuits
+      // the POST and reads resolvedRoundId$ from the auto-start's
+      // captured response).
+      (component as any).startRoundEngine(SAMPLE_GAME_ID, (component as any).vmSubject.value.matches);
+    }
+
+    it('V25D86 #1: streamRoundState receives roundId from POST response, NOT gameId', () => {
+      // Configure startRound to return a RoundState whose roundId is
+      // explicitly DIFFERENT from SAMPLE_GAME_ID — this is the bug
+      // scenario: frontend posts gameId, backend resolves to a real UUID,
+      // frontend must use the UUID for SSE.
+      const realRoundId = 'real-round-uuid-9876-fedc-3210';
+      engineServiceSpy.startRound.and.returnValue(of(makeRoundState([], 'IN_PROGRESS', realRoundId)));
+
+      runAutoStartAndOpenStream();
+
+      // startRound was called once with SAMPLE_GAME_ID (the POST body
+      // roundId, used for idempotency)...
+      expect(engineServiceSpy.startRound).toHaveBeenCalledTimes(1);
+      expect(engineServiceSpy.startRound.calls.mostRecent().args[0]).toBe(SAMPLE_GAME_ID);
+
+      // ...and the roundId captured from the POST response was pushed
+      // into resolvedRoundId$ (the side effect that the SSE chain
+      // consumes)...
+      expect((component as any).resolvedRoundId$.value).toBe(realRoundId,
+          'V25D86: tryAutoStartRound must capture state.roundId into resolvedRoundId$');
+
+      // ...and the SSE URL was opened with that backend-resolved roundId,
+      // NOT gameId. Before V25D86 this assertion would fail: args[0]
+      // was SAMPLE_GAME_ID and the SSE went idle because the registry
+      // had no entry for the careerId.
+      expect(engineServiceSpy.streamRoundState).toHaveBeenCalledTimes(1);
+      expect(engineServiceSpy.streamRoundState.calls.mostRecent().args[0]).toBe(realRoundId,
+          'V25D86: streamRoundState must receive the roundId from the POST response, not the frontend gameId');
+      expect(engineServiceSpy.streamRoundState.calls.mostRecent().args[0]).not.toBe(SAMPLE_GAME_ID);
+    });
+
+    it('V25D86 #2: iniciarTodos pushes its POST roundId into resolvedRoundId$ (so an SSE retry sees the new key)', () => {
+      const realRoundId = 'iniciar-todos-round-uuid-cccc-dddd';
+      engineServiceSpy.startRound.and.returnValue(of(makeRoundState([], 'IN_PROGRESS', realRoundId)));
+      engineServiceSpy.startRound.calls.reset();
+      engineServiceSpy.streamRoundState.calls.reset();
+
+      // Manually fire iniciarTodos (the manager clicked the button).
+      // Build a VM with at least one NOT_STARTED match so iniciarTodos
+      // doesn't no-op.
+      setVm([{
+        match: makeMatch('SCHEDULED'),
+        state: makeMatchState({ status: 'NOT_STARTED', currentMinute: 0 }),
+        isUserMatch: true
+      }]);
+      // Reset the spies to isolate the iniciarTodos effect.
+      engineServiceSpy.startRound.calls.reset();
+      engineServiceSpy.streamRoundState.calls.reset();
+
+      component.iniciarTodos();
+
+      // iniciarTodos POST uses gameId; the next-handler captures
+      // state.roundId into resolvedRoundId$. Confirm the side effect
+      // by reading the private BehaviorSubject.
+      expect(engineServiceSpy.startRound).toHaveBeenCalledTimes(1);
+      expect((component as any).resolvedRoundId$.value).toBe(realRoundId,
+          'V25D86: iniciarTodos must publish its POST response roundId so the SSE rendezvous sees it');
+    });
+
+    it('V25D86 #3: defensive — when POST returns a state with no roundId, streamRoundState is NOT called', () => {
+      // Backend response without roundId (e.g. malformed body, future
+      // API drift). The SSE filter `id !== null` must block the empty
+      // id and prevent a `streamRoundState('')` call that would 404.
+      engineServiceSpy.startRound.and.returnValue(of({
+        // Build a "state-like" object missing roundId (roundId: undefined).
+        timestamp: new Date().toISOString(),
+        matches: [],
+        status: 'IN_PROGRESS'
+      } as any));
+      engineServiceSpy.streamRoundState.calls.reset();
+
+      runAutoStartAndOpenStream();
+
+      // streamRoundState must NOT be called: the filter `id !== null`
+      // blocks because resolvedRoundId$ stays null (startRound's
+      // response had no roundId to capture). The `takeUntil(this.destroy$)`
+      // subscription closes naturally without ever invoking streamRoundState.
+      expect(engineServiceSpy.streamRoundState).not.toHaveBeenCalled();
     });
   });
 });
