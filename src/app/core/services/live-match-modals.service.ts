@@ -14,6 +14,7 @@ import { LineupDTO, PlayerLineupDTO } from '../../shared/models/lineup/lineup.dt
 import { SessionPlayer } from '../../shared/models/player.model';
 import { SubstitutionModalComponent, SubstitutionDialogData } from '../../features/games/components/substitution-modal/substitution-modal.component';
 import { FormationModalComponent, FormationDialogData } from '../../features/games/components/formation-modal/formation-modal.component';
+import { PartidoModalComponent, PartidoDialogData } from '../../features/games/components/partido-modal/partido-modal.component';
 import { RivalCardInfoComponent, RivalCardInfoDialogData } from '../../features/games/components/rival-card-info/rival-card-info.component';
 import { MatchState } from './match-engine.model';
 
@@ -315,6 +316,92 @@ export class LiveMatchModalsService {
           dialogRef.afterClosed().subscribe(() => {
             this.engineService.resumeRoundForMatch(careerId, matchId).subscribe({
               error: (err) => console.warn('[LIVE-MATCH] resume round on formation modal close failed:', err)
+            });
+          });
+        }
+
+        return data;
+      })
+    );
+  }
+
+  /**
+   * V25D89-FRONT-A: opens the Partido modal for the given match/state.
+   * The Partido modal is the new dual-tab entry point (Mi Formación editable
+   * + Formación Rival read-only) that supersedes neither the F5 formation
+   * modal nor the F4 substitution modal — those two modals stay available
+   * per parent direction (KEEP existing Formación button OK). The Partido
+   * modal is the single "match view" the manager opens when they want to
+   * see the tactical matchup at a glance.
+   *
+   * <p>Data wiring mirrors {@link openFormationModal}: lineup + squad
+   * forkJoin, then build the dialog data with the addition of
+   * {@code rivalFormation} sourced from
+   * {@code state.awayFormation}. Pause/resume round follows the same
+   * F5.3.3 BUG-015 pattern: pause BEFORE the dialog opens so the
+   * `currentMinute` the manager saw at click time is still current when
+   * they confirm; resume on afterClosed() whether the manager confirmed
+   * OR discarded.
+   */
+  openPartidoModal(matchId: string, state: MatchState): Observable<unknown> {
+    if (state.status === 'FINISHED' || state.status === 'CANCELLED') {
+      this.snackBar.open('El partido ya terminó, no se puede editar la formación', 'OK', { duration: 3000 });
+      return new Observable(sub => sub.complete());
+    }
+    const careerId = this.getCurrentCareerId();
+    return forkJoin({
+      lineup: this.http.get<LineupDTO>(`${environment.apiUrl}/career/lineup/current`),
+      squad: this.teamService.getMyTeamSquad()
+    }).pipe(
+      map(({ lineup, squad }) => {
+        const currentSlots = (lineup?.players ?? []).map((p, i) => ({
+          sessionPlayerId: p.playerId,
+          position: p.position,
+          slotIndex: i
+        }));
+        const startingIds = new Set<string>(
+          currentSlots.map(s => s.sessionPlayerId).filter(id => !!id)
+        );
+        const data: PartidoDialogData = {
+          matchId,
+          // V25D89-FRONT-A: same currentFormation source as openFormationModal
+          // (home formation when the manager team is home, else away).
+          // The Partido modal uses this to seed the dropdown + slot re-flow.
+          currentFormation: state.homeFormation || '4-4-2',
+          homeTeamId: state.homeTeamId,
+          currentSlots,
+          squad: squad ?? [],
+          startingIds,
+          // V25D89-FRONT-A: rival formation comes from state.awayFormation
+          // (the only rival-side data the SSE feed exposes). Falls back to
+          // '4-4-2' defensively so the rival tab always renders.
+          rivalFormation: state.awayFormation || '4-4-2'
+        };
+
+        // LIVE-MATCH-F5.3.3 BUG-015: pause the round BEFORE the dialog
+        // opens (same wire as openFormationModal — see that method for
+        // the full rationale).
+        if (careerId) {
+          this.engineService.pauseRoundForMatch(careerId, matchId).subscribe({
+            error: (err) => console.warn('[LIVE-MATCH] pause round on partido modal open failed:', err)
+          });
+        } else {
+          console.warn('[LIVE-MATCH] could not resolve careerId from URL; round will NOT be paused on modal open');
+        }
+
+        const dialogRef = this.dialog.open(PartidoModalComponent, {
+          data,
+          width: '720px',
+          maxWidth: '95vw',
+          disableClose: false,
+          autoFocus: 'first-tabbable'
+        });
+
+        // LIVE-MATCH-F5.3.3 BUG-015: resume on afterClosed (confirm or discard).
+        if (careerId) {
+          dialogRef.afterClosed().subscribe(() => {
+            this.engineService.resumeRoundForMatch(careerId, matchId).subscribe({
+              error: (err) => console.warn('[LIVE-MATCH] resume round on partido modal close failed:', err)
             });
           });
         }

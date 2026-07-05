@@ -57,7 +57,8 @@
       [awayTeamName]="getTeamName(userMatch.match.awayTeamId, vm.teamNameMap)"
       (tacticChange)="onTacticChange(userMatch.match, $event)"
       (substitutionOpen)="onSubstitutionOpen(userMatch.match, userMatch.state)"
-      (formationOpen)="onFormationOpen(userMatch.match, userMatch.state)">
+      (formationOpen)="onFormationOpen(userMatch.match, userMatch.state)"
+      (partidoOpen)="onPartidoOpen(userMatch.match, userMatch.state)">
     </app-match-card>
   </div>
 

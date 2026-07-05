@@ -46,7 +46,12 @@
     </div>
   </div>
 
-  <!-- LIVE-MATCH-F3-UI-LIVE FE6: shortcuts de sustitución / formación (solo user match) -->
+  <!-- LIVE-MATCH-F3-UI-LIVE FE6: shortcuts de sustitución / formación (solo user match).
+       V25D89-FRONT-A: added "Partido" button next to Sustituir/Formación. The
+       new button opens the dual-tab PartidoModalComponent (Mi Formación +
+       Formación Rival). The existing Sustituir and Formación buttons stay —
+       they're separate entry points per parent direction (KEEP existing
+       Formación button OK). -->
   <div *ngIf="isUserMatch && state && state.status !== 'FINISHED'" class="quick-actions">
     <button (click)="onSubstitutionOpen()" class="btn btn-action"
             aria-label="Sustituir jugadores">
@@ -55,6 +60,11 @@
     <button (click)="onFormationOpen()" class="btn btn-action"
             aria-label="Cambiar formación">
       📐 Formación
+    </button>
+    <button (click)="onPartidoOpen()" class="btn btn-action"
+            aria-label="Abrir modal de partido"
+            data-testid="partido-button">
+      ⚽ Partido
     </button>
   </div>
 

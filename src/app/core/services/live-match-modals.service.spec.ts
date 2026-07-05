@@ -12,6 +12,9 @@
  *       round resumes whether the manager confirms OR cancels.</li>
  *   <li>{@code openFormationModal} has the same pause/resume wiring
  *       (F5.3.3 scope decision: "modal de sustitución O de formación").</li>
+ *   <li>{@code openPartidoModal} (V25D89-FRONT-A) has the same pause/resume
+ *       wiring — the new dual-tab Partido modal (Mi Formación editable +
+ *       Formación Rival read-only) freezes the round while open.</li>
  *   <li>If the URL doesn't match {@code /games/{careerId}/...} the service
  *       skips the pause call and logs a warning instead of crashing.</li>
  * </ul>
@@ -235,6 +238,67 @@ describe('LiveMatchModalsService — LIVE-MATCH-F5.3 BUG-015 (pause on modal ope
       expect(engineServiceSpy.resumeRoundForMatch).not.toHaveBeenCalled();
       afterClosedSubject.next(undefined);
       expect(engineServiceSpy.resumeRoundForMatch).toHaveBeenCalledWith('career-abc', 'match-1');
+      done();
+    });
+  });
+
+  // ========== openPartidoModal (V25D89-FRONT-A) ==========
+
+  it('openPartidoModal — calls engineService.pauseRoundForMatch BEFORE dialog.open', (done) => {
+    const callOrder: string[] = [];
+    engineServiceSpy.pauseRoundForMatch.and.callFake(() => {
+      callOrder.push('pause');
+      return of({ success: true });
+    });
+    dialogSpy.open.and.callFake(() => {
+      callOrder.push('dialog.open');
+      return dialogRefSpy;
+    });
+
+    service.openPartidoModal('match-1', RUNNING_STATE).subscribe(() => {
+      expect(callOrder[0]).toBe('pause');
+      expect(engineServiceSpy.pauseRoundForMatch).toHaveBeenCalledWith('career-abc', 'match-1');
+      done();
+    });
+  });
+
+  it('openPartidoModal — dialog.afterClosed() triggers engineService.resumeRoundForMatch', (done) => {
+    service.openPartidoModal('match-1', RUNNING_STATE).subscribe(() => {
+      expect(engineServiceSpy.resumeRoundForMatch).not.toHaveBeenCalled();
+      afterClosedSubject.next(undefined);
+      expect(engineServiceSpy.resumeRoundForMatch).toHaveBeenCalledWith('career-abc', 'match-1');
+      done();
+    });
+  });
+
+  it('openPartidoModal — short-circuits (no pause) if match is FINISHED', (done) => {
+    const finished = { ...RUNNING_STATE, status: 'FINISHED' as const };
+
+    service.openPartidoModal('match-1', finished).subscribe({
+      complete: () => {
+        expect(engineServiceSpy.pauseRoundForMatch).not.toHaveBeenCalled();
+        expect(snackBarSpy.open).toHaveBeenCalled();
+        done();
+      }
+    });
+  });
+
+  it('openPartidoModal — passes the rivalFormation from state.awayFormation to the dialog data', (done) => {
+    const away433 = { ...RUNNING_STATE, awayFormation: '4-3-3' };
+    service.openPartidoModal('match-1', away433).subscribe(() => {
+      // dialog.open was called with the PartidoDialogData including rivalFormation
+      expect(dialogSpy.open).toHaveBeenCalled();
+      const dataArg = (dialogSpy.open.calls.mostRecent().args[1] as any)?.data;
+      expect(dataArg.rivalFormation).toBe('4-3-3');
+      done();
+    });
+  });
+
+  it('openPartidoModal — falls back to 4-4-2 when state.awayFormation is missing', (done) => {
+    const noAway = { ...RUNNING_STATE, awayFormation: undefined as any };
+    service.openPartidoModal('match-1', noAway).subscribe(() => {
+      const dataArg = (dialogSpy.open.calls.mostRecent().args[1] as any)?.data;
+      expect(dataArg.rivalFormation).toBe('4-4-2');
       done();
     });
   });

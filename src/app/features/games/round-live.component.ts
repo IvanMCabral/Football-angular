@@ -946,6 +946,24 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
       });
   }
 
+  /**
+   * V25D89-FRONT-A: open the Partido modal (dual-tab: Mi Formación editable +
+   * Formación Rival read-only) for the user match. Called from the
+   * match-card's (partidoOpen) output. Delegates to
+   * {@link LiveMatchModalsService.openPartidoModal} which handles
+   * pause/resume round + dialog opening.
+   */
+  onPartidoOpen(match: Match, state: MatchState | undefined): void {
+    if (!state) {
+      return;
+    }
+    this.modals.openPartidoModal(String(match.id), state)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        error: (err) => console.error('[ROUND-LIVE] openPartidoModal error', err)
+      });
+  }
+
   getTeamName(teamId: any, teamNameMap: { [id: string]: string } | null): string {
     const id = String(teamId);
     return teamNameMap?.[id] || id.substring(0, 8);

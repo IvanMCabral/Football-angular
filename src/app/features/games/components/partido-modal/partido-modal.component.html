@@ -1,0 +1,197 @@
+<div class="partido-modal-root">
+  <h2 mat-dialog-title>
+    <span class="title-icon">⚽</span>
+    Partido
+    <span class="minute-tag">Minuto {{ data.currentFormation ? 'en juego' : 'preparación' }}</span>
+  </h2>
+
+  <mat-dialog-content class="partido-modal-content">
+
+    <!-- V25D89-FRONT-A: shared error banner surfaces backend rejection
+         of the formation change. Stays visible across tabs so the
+         manager sees the error regardless of which tab they're on. -->
+    <div *ngIf="errorMsg" class="banner banner-error" role="alert" data-testid="partido-error">
+      <mat-icon>error</mat-icon>
+      <span>{{ errorMsg }}</span>
+    </div>
+
+    <!-- V25D89-FRONT-A: warning banner (auto-fill uncovered slots).
+         Same orange styling as the F5 modal. -->
+    <div *ngIf="warningMsg && !errorMsg" class="banner banner-warning" role="status" data-testid="partido-autofill-warning">
+      <mat-icon>warning</mat-icon>
+      <span>{{ warningMsg }}</span>
+    </div>
+
+    <!-- V25D89-FRONT-A: dual-tab shell via mat-tab-group. The "Mi
+         Formación" tab is the editable manager pitch; "Formación Rival"
+         is the read-only AI-managed pitch. -->
+    <mat-tab-group
+      class="partido-tabs"
+      [selectedIndex]="activeTab() === 'mine' ? 0 : 1"
+      (selectedIndexChange)="onTabChange($event)"
+      data-testid="partido-tabs">
+
+      <!-- ========== TAB 1: Mi Formación (editable) ========== -->
+      <mat-tab label="Mi Formación" data-testid="tab-mine">
+        <ng-template matTabContent>
+
+          <div class="formation-row">
+            <mat-form-field appearance="outline" class="formation-select">
+              <mat-label>Formación</mat-label>
+              <mat-select [value]="selectedFormation()"
+                          (selectionChange)="onFormationChange($event.value)"
+                          data-testid="formation-select">
+                <mat-option *ngFor="let f of formations" [value]="f">
+                  {{ f }}
+                </mat-option>
+              </mat-select>
+            </mat-form-field>
+          </div>
+
+          <div class="formation-grid">
+            <!-- Visual pitch (manager team starting XI) -->
+            <section class="col col-pitch" data-area="pitch" aria-label="Mi formación">
+              <h3>Mi XI (arrastra para re-ordenar)</h3>
+              <div class="pitch" role="img"
+                   [attr.aria-label]="'Vista previa de la formación ' + selectedFormation()">
+                <div class="pitch-line" *ngFor="let count of formationLines; let lineIdx = index">
+                  <div class="player-dot"
+                       *ngFor="let _ of [].constructor(count); let dotIdx = index"
+                       [attr.data-slot-idx]="getSlotIndex(lineIdx, dotIdx)"
+                       [class.is-gk]="lineIdx === 0"
+                       [class.is-def]="lineIdx === 1"
+                       [class.is-mid]="lineIdx > 1 && lineIdx < formationLines.length - 1"
+                       [class.is-att]="lineIdx === formationLines.length - 1"
+                       [class.is-empty]="!playerAtSlot(getSlotIndex(lineIdx, dotIdx))"
+                       [class.is-drag-source]="dragSourceSlotIdx === getSlotIndex(lineIdx, dotIdx)"
+                       [class.is-auto-filled]="isAutoFilledSlot(getSlotIndex(lineIdx, dotIdx))"
+                       [attr.draggable]="true"
+                       (dragstart)="onSlotDragStart($event, getSlotIndex(lineIdx, dotIdx))"
+                       (dragover)="onSlotDragOver($event)"
+                       (drop)="onSlotDrop($event, getSlotIndex(lineIdx, dotIdx))"
+                       (dragend)="onSlotDragEnd()">
+                    <ng-container *ngIf="playerAtSlot(getSlotIndex(lineIdx, dotIdx)) as p; else emptyDot">
+                      <span class="dot-player-name"
+                            [title]="(isAutoFilledSlot(getSlotIndex(lineIdx, dotIdx)) ? 'Auto-asignado · ' : '') + p.name + ' (' + p.position + ')'">
+                        {{ p.name }}
+                      </span>
+                      <span *ngIf="isAutoFilledSlot(getSlotIndex(lineIdx, dotIdx))"
+                            class="auto-fill-badge"
+                            aria-label="Auto-asignado"
+                            data-testid="auto-fill-badge">
+                        🔒
+                      </span>
+                    </ng-container>
+                    <ng-template #emptyDot>
+                      <span class="dot-label">{{ getDotLabel(lineIdx, dotIdx, count, false) }}</span>
+                    </ng-template>
+                  </div>
+                </div>
+              </div>
+              <p class="hint">
+                <mat-icon>info</mat-icon>
+                Arrastra un jugador a otro slot para intercambiarlos. Arrastra al banquillo para sacarlo.
+              </p>
+            </section>
+
+            <!-- Bench (manager team — squad players not in XI) -->
+            <section class="col col-bench" data-area="bench" aria-label="Banquillo">
+              <h3>Banquillo</h3>
+              <div class="bench-list">
+                <div *ngFor="let p of benchPlayers"
+                     class="bench-player"
+                     [attr.data-player-id]="p.sessionPlayerId"
+                     [attr.draggable]="true"
+                     (dragstart)="onBenchDragStart($event, p.sessionPlayerId)"
+                     (dragend)="onSlotDragEnd()"
+                     [title]="p.name + ' (' + p.position + ')'">
+                  <span class="bench-player-name">{{ p.name }}</span>
+                  <span class="bench-player-pos">{{ p.position }}</span>
+                </div>
+                <div *ngIf="benchPlayers.length === 0" class="bench-empty">
+                  <mat-icon>info</mat-icon>
+                  <span>Todos los jugadores están en el XI.</span>
+                </div>
+              </div>
+              <p class="hint">
+                <mat-icon>info</mat-icon>
+                Arrastra desde aquí al campo para sumar al XI.
+              </p>
+            </section>
+          </div>
+
+        </ng-template>
+      </mat-tab>
+
+      <!-- ========== TAB 2: Formación Rival (read-only) ========== -->
+      <mat-tab label="Formación Rival" data-testid="tab-rival">
+        <ng-template matTabContent>
+
+          <div class="banner banner-info-ai" role="status" data-testid="rival-ai-banner">
+            <mat-icon>smart_toy</mat-icon>
+            <span>Lo maneja la IA — no editable durante el partido</span>
+          </div>
+
+          <div class="rival-pitch-wrapper">
+            <div class="formation-row">
+              <span class="rival-formation-readonly"
+                    data-testid="rival-formation-display">
+                Formación Rival: {{ rivalFormation() }}
+              </span>
+            </div>
+
+            <div class="pitch rival-pitch"
+                 role="img"
+                 data-testid="rival-pitch"
+                 [attr.aria-label]="'Formación rival ' + rivalFormation() + ' (read-only)'">
+              <div class="pitch-line"
+                   *ngFor="let count of rivalFormationLines; let lineIdx = index">
+                <div class="player-dot is-empty"
+                     *ngFor="let _ of [].constructor(count); let dotIdx = index"
+                     [attr.data-rival-slot-idx]="lineIdx + '-' + dotIdx"
+                     [class.is-gk]="lineIdx === 0"
+                     [class.is-def]="lineIdx === 1"
+                     [class.is-mid]="lineIdx > 1 && lineIdx < rivalFormationLines.length - 1"
+                     [class.is-att]="lineIdx === rivalFormationLines.length - 1"
+                     [attr.aria-label]="'Posición rival ' + getRivalDotLabel(lineIdx, dotIdx)">
+                  <span class="dot-label">{{ getRivalDotLabel(lineIdx, dotIdx) }}</span>
+                </div>
+              </div>
+            </div>
+
+            <p class="hint">
+              <mat-icon>info</mat-icon>
+              Vista read-only — los nombres de los jugadores rivales no están disponibles en el feed en vivo.
+            </p>
+          </div>
+
+        </ng-template>
+      </mat-tab>
+
+    </mat-tab-group>
+
+    <div *ngIf="isSubmitting" class="submit-overlay">
+      <mat-spinner diameter="36"></mat-spinner>
+      <span>Enviando cambio…</span>
+    </div>
+  </mat-dialog-content>
+
+  <!-- V25D89-FRONT-A: footer with "Descartar" (left) + "Guardar"
+       (right, primary). Matches the task spec exactly. "Guardar" is
+       disabled when there are no pending changes OR while submitting. -->
+  <mat-dialog-actions align="end" class="partido-modal-actions">
+    <button mat-button
+            (click)="discard()"
+            [disabled]="isSubmitting"
+            data-testid="partido-discard">
+      Descartar
+    </button>
+    <button mat-flat-button
+            color="primary"
+            (click)="save()"
+            [disabled]="isSubmitting || !hasPendingChanges()"
+            data-testid="partido-save">
+      Guardar
+    </button>
+  </mat-dialog-actions>
+</div>

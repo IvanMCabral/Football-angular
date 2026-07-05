@@ -42,6 +42,12 @@ export class MatchCardComponent {
   // corresponding modal in response.
   @Output() substitutionOpen = new EventEmitter<void>();
   @Output() formationOpen = new EventEmitter<void>();
+  // V25D89-FRONT-A: emit when the user clicks the new "Partido" button.
+  // The parent (round-live) opens the dual-tab PartidoModalComponent in
+  // response — Tab 1 editable manager formation + Tab 2 read-only rival
+  // formation. Distinct from `formationOpen` (which only opens the F5
+  // FormationModalComponent for the editable manager formation).
+  @Output() partidoOpen = new EventEmitter<void>();
 
   onTacticChange(team: 'HOME' | 'AWAY', tactic: 'ATTACK' | 'DEFEND' | 'BALANCED') {
     this.tacticChange.emit({ team, tactic });
@@ -53,6 +59,10 @@ export class MatchCardComponent {
 
   onFormationOpen(): void {
     this.formationOpen.emit();
+  }
+
+  onPartidoOpen(): void {
+    this.partidoOpen.emit();
   }
 
   getStatusText(status: string): string {

@@ -1,0 +1,13 @@
+/* V25D89-FRONT-A: companion CSS file for IDE hints only.
+   The component's actual styles are INLINED via the `styles: [...]`
+   array on the @Component decorator so ɵcmp.styles exposes them to
+   unit tests (see angular-testing-patterns memory). When you change
+   styles, mirror the change in BOTH this file AND the inline array. */
+
+/* Tab shell — mat-tab-header background */
+.partido-tabs ::ng-deep .mat-mdc-tab-header {
+  background: #f5f7fa;
+  border-radius: 6px 6px 0 0;
+}
+
+/* Banner styles are in the inlined array. */
