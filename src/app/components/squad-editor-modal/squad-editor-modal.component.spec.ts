@@ -2086,7 +2086,9 @@ describe('SquadEditorModalComponent — V25D91-FRONT-F1 marker cards (name + rol
       return of([]);
     }) as any);
 
-    httpClientSpy.post.and.callFake(((_url: string, _body: any) => of({}))) as any;
+    httpClientSpy.post.and.callFake(((_url: string, _body: any) => {
+      return of({});
+    }) as any);
 
     await TestBed.configureTestingModule({
       imports: [SquadEditorModalComponent, NoopAnimationsModule],
