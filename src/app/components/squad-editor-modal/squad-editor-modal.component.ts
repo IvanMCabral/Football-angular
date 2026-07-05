@@ -1810,7 +1810,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
           for (let i = 0; i < positions.length; i++) {
             if (assignedPositions.has(i)) continue;
             const posRole = positions[i].role;
-            if (player.position === posRole) {
+            if (this.rolesMatch(player.position, posRole)) {
               const slotId = positions[i].subdivisionId;
               player.slotId = slotId;
               this.slotPlayerMap[slotId] = player;
@@ -2174,6 +2174,58 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   }
 
   /**
+   * V25D91.6-FRONT F6 P0: role-match entre jugador y slot de formacion.
+   *
+   * <p>Antes: comparacion exacta `player.position === posRole`. Esto fallaba
+   * porque el back devuelve posiciones con roles GENERICOS (GK/DEF/MID/ATT/
+   * WINGER — formato SessionPlayer desde /career/players/squad), pero las
+   * formations desde /editor/formations tienen roles ESPECIFICOS
+   * (GK/CB/LB/RB/CM/CDM/CAM/LM/RM/ST/LW/RW/CF/WINGER). El unico match era GK.
+   *
+   * <p>Resultado: solo 1 marker (el GK) se renderizaba tras cambiar formacion.
+   * El header SÍ cambiaba (mi fix V25D91.5 ngModelChange funciona), pero
+   * los markers quedaban atascados en el slot GK.
+   *
+   * <p>Fix: comparar por FAMILIA. GK solo matchea GK. Cualquier rol de la
+   * familia DEF matchea cualquier slot DEF (y vice versa). Misma logica
+   * para MID y ATT. WINGER entra en ATT porque es un atacante lateral.
+   *
+   * <p>Si ambos roles son desconocidos, fallback a comparacion exacta (no
+   * matchea) — comportamiento legacy preservado para roles exoticos.
+   */
+  rolesMatch(playerRole: string | undefined, formationRole: string | undefined): boolean {
+    if (!playerRole || !formationRole) { return false; }
+    if (playerRole === formationRole) { return true; }
+    const playerFamily = this.getRoleFamily(playerRole);
+    const formationFamily = this.getRoleFamily(formationRole);
+    if (playerFamily !== null && playerFamily === formationFamily) {
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * V25D91.6-FRONT F6 P0: clasifica un rol a su familia. Devuelve null si
+   * el rol no pertenece a ninguna familia conocida (backward compat con
+   * roles exoticos legacy que no matchean contra formations).
+   *
+   * <p>Familias:
+   * <ul>
+   *   <li>GK: GK</li>
+   *   <li>DEF: CB, LB, RB, LWB, RWB, DEF</li>
+   *   <li>MID: CM, CDM, CAM, LM, RM, MID</li>
+   *   <li>ATT: ST, LW, RW, CF, ATT, WINGER</li>
+   * </ul>
+   */
+  private getRoleFamily(role: string): 'GK' | 'DEF' | 'MID' | 'ATT' | null {
+    if (role === 'GK') return 'GK';
+    if (['CB', 'LB', 'RB', 'LWB', 'RWB', 'DEF'].includes(role)) return 'DEF';
+    if (['CM', 'CDM', 'CAM', 'LM', 'RM', 'MID'].includes(role)) return 'MID';
+    if (['ST', 'LW', 'RW', 'CF', 'ATT', 'WINGER'].includes(role)) return 'ATT';
+    return null;
+  }
+
+  /**
    * V25D47 (Sprint C11b): compute the displayed chemistry score by weighting
    * the preview's raw score with the formationEffectiveness teamAverage.
    *
@@ -2358,7 +2410,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
         if (assignedPositions.has(i)) continue;
 
         const posRole = positions[i].role;
-        if (player.position === posRole) {
+        if (this.rolesMatch(player.position, posRole)) {
           const slotId = positions[i].subdivisionId;
           player.slotId = slotId;
           this.slotPlayerMap[slotId] = player;
