@@ -428,6 +428,15 @@ export class LiveMatchModalsService {
           // layers (config + CSS) request the same width.
           width: '95vw',
           maxWidth: '95vw',
+          // V25D90-FRONT-F4: panelClass used by partido-modal.component.ts
+          // to bump the cdk-overlay-pane z-index above Material's default
+          // 1000. Without this, the partido modal's backdrop absorbs the
+          // formation mat-select dropdown's pointer events (the dropdown
+          // renders in the SAME cdk-overlay-container as the modal but at
+          // the SAME z-index by default — so the modal wins). Setting
+          // panelClass = 'partido-modal-pane' gives us a hook to scope
+          // the z-index override to this specific dialog.
+          panelClass: 'partido-modal-pane',
           disableClose: false,
           autoFocus: 'first-tabbable'
         });

@@ -79,7 +79,41 @@
    - Backwards compat: V25D89.3 base max-width:540px and the V25D89.1
      responsive caps (600/1024/1600) for player-dot sizing are preserved
      via the explicit media queries — only the .partido-modal-root and
-     .mat-mdc-dialog-container outer caps changed. */
+     .mat-mdc-dialog-container outer caps changed.
+
+   V25D90-FRONT changes (pitch readability, 4 fixes F1-F4):
+   - F1 (HTML, mirrored in .ts styles only): role label now renders
+     INSIDE every player-dot (was: only in empty slots). Same
+     getDotLabel() vocabulary as the empty-slot .dot-label. The new
+     .dot-role selector (mirrored below) styles the in-dot role with
+     0.55rem uppercase + 0.78 opacity so the eye lands on the name
+     first.
+   - F2 (CSS, inlined .ts array): .player-dot 30×30 → 56×56 so the
+     full player name (e.g. "Bellingham", "Vinícius", "Mbappé")
+     fits without aggressive ellipsis. .dot-player-name 0.55rem →
+     0.7rem, max-width 26px → 50px, white-space: nowrap → normal
+     (allows 2-line wrap for long names). .pitch-line min-height
+     30 → 64 so the larger dots don't clip the role label below
+     the name. .pitch min-height 280 → 380 to match the new pitch-
+     line height × 4 lines. Mobile/tablet/xlarge breakpoints all
+     re-tuned so 11 dots still fit at every viewport size.
+   - F3 (HTML, mirrored in .ts styles only): .score-chip pill in
+     the modal title bar (green gradient, sits between icon and
+     minute tag) + .score-cell in the stats-header-row of BOTH the
+     manager tab and the rival tab (replaces the V25D89.2 dash
+     placeholder). Score sourced from data.score.{home,away} via
+     the new homeScore()/awayScore() getters (defensively default
+     to 0 when SSE hasn't ticked).
+   - F4 (CSS, inlined .ts array): z-index layering for the formation
+     mat-select dropdown. New .cdk-overlay-pane.partido-modal-pane
+     rule (z-index 1050) + .cdk-overlay-pane.formation-select-panel
+     (z-index 1060) + .formation-select (z-index 1100). The two
+     panelClass hooks are added at the call site (MatDialog.open
+     in live-match-modals.service.ts) and at the template
+     (<mat-select panelClass="formation-select-panel">). Without
+     these, the partido modal's cdk-overlay-backdrop absorbs the
+     mat-select's pointer events and the dropdown options become
+     unclickable. */
 
 /* Tab shell — mat-tab-header background */
 .partido-tabs ::ng-deep .mat-mdc-tab-header {
@@ -103,4 +137,100 @@
   align-self: center;
 }
 
-/* Banner styles + pitch lines + pseudo-elements are in the inlined array. */
+/* V25D90-FRONT-F3: score chip in modal title bar. Mirrored from the
+   inlined styles array for IDE hint support. */
+.score-chip {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.2rem 0.65rem;
+  background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%);
+  color: #fff;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  vertical-align: middle;
+  letter-spacing: 0.04em;
+  min-width: 2.6rem;
+  text-align: center;
+}
+
+/* V25D90-FRONT-F2: enlarged player-dot base (was 30×30 → now 56×56)
+   + .dot-player-name (was 0.55rem max 26px → now 0.7rem max 50px
+   white-space normal). Mirrored from the inlined styles array. */
+.player-dot {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: 3px 2px;
+  border: 2px solid #1e3c72;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #1e3c72;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  cursor: grab;
+  user-select: none;
+  position: relative;
+}
+
+.dot-player-name {
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.1;
+  max-width: 50px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  text-align: center;
+  color: #1e3c72;
+}
+
+/* V25D90-FRONT-F1: role label inside every player-dot (new selector). */
+.dot-role {
+  font-size: 0.55rem;
+  font-weight: 700;
+  line-height: 1;
+  color: #1e3c72;
+  opacity: 0.78;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+/* V25D90-FRONT-F2: pitch-line height bumped 30 → 64 to fit the larger
+   56×56 dots + role label below the name. */
+.pitch-line {
+  min-height: 64px;
+}
+
+/* V25D90-FRONT-F2: pitch min-height 280 → 380 to match the new
+   pitch-line height × 4 lines + center circle headroom. */
+.pitch {
+  min-height: 380px;
+  padding: 0.5rem 0.35rem;
+}
+
+/* V25D90-FRONT-F4: z-index layering for the formation mat-select
+   dropdown. Material CDK renders each overlay in its own cdk-overlay-
+   container div appended to the body, with default z-index 1000. The
+   partido modal's cdk-overlay-backdrop absorbs the mat-select's
+   pointer events when both panes share z-index 1000. The fix:
+   bump partido-modal-pane to 1050, formation-select-panel to 1060,
+   and the .formation-select trigger to 1100. The .formation-select
+   rule uses the host's stacking context so the trigger button stays
+   clickable when other overlays appear (e.g. snackbar). */
+:host ::ng-deep .cdk-overlay-pane.partido-modal-pane {
+  z-index: 1050;
+}
+:host ::ng-deep .cdk-overlay-pane.formation-select-panel {
+  z-index: 1060;
+}
+:host ::ng-deep .formation-select {
+  z-index: 1100;
+}
+
+/* Banner styles + stats grid + recent events are in the inlined array. */
