@@ -20,12 +20,37 @@ import { Subject, takeUntil } from 'rxjs';
 import { MatchEngineService } from '../../../../core/services/match-engine.service';
 import { ALL_FORMATIONS, FormationCode } from '../../../../shared/constants/formations';
 import { SessionPlayer } from '../../../../shared/models/player.model';
+import { MatchEvent } from '../../../../core/services/match-engine.model';
+
+/**
+ * V25D89.2 (stats live): a single row in the stats grid. Each row maps
+ * one MatchEvent-derived counter to its home/away value. {@link label}
+ * is the display string ("Posesión", "Tiros totales", etc.), {@link home}
+ * and {@link away} are the formatted values ("55%", "8", "0", etc.).
+ *
+ * <p>Why a single shape instead of 8 separate getters: the template binds
+ * to {@code statsRows()} via {@code *ngFor} — keeping the row shape flat
+ * means the grid layout (label + home + away) renders identically for
+ * every stat without per-stat conditional markup.
+ */
+export interface PartidoStatRow {
+  label: string;
+  home: string;
+  away: string;
+}
 
 export interface PartidoDialogData {
   matchId: string;
   /** Current formation string (e.g. "4-4-2") for the manager team. */
   currentFormation: string;
   homeTeamId: string;
+  /**
+   * V25D89.2: rival team sessionTeamId, needed so the stats derivation
+   * can attribute events to home vs away (without it we cannot tell which
+   * shots belong to which side). Sourced from {@code state.awayTeamId}
+   * via {@link LiveMatchModalsService.openPartidoModal}.
+   */
+  awayTeamId?: string;
   /** Manager-side current slots (sessionPlayerId + position + slotIndex). */
   currentSlots: Array<{
     sessionPlayerId: string;
@@ -44,6 +69,48 @@ export interface PartidoDialogData {
    * see report section 1.3 / known-limitation V25D89.1).
    */
   rivalFormation: string;
+  /**
+   * V25D89.2: live minute at modal-open, sourced from
+   * {@code state.currentMinute}. Drives the stats header tag ("Minuto 47").
+   * Optional — defaults to 0 when the SSE feed hasn't reached tick 1 yet
+   * (modal opens while the match is still NOT_STARTED in rare cases).
+   */
+  currentMinute?: number;
+  /**
+   * V25D89.2: current score from {@code state.score}. Drives the goals row
+   * in the stats grid (the only stat we trust more than the event count
+   * — score.home/away is the canonical source, not GOAL events). Optional
+   * with default {0,0}.
+   */
+  score?: { home: number; away: number };
+  /**
+   * V25D89.2: live possession 0-100 from BE1 (LIVE-MATCH-F3-UI-LIVE). The
+   * Posesión row uses these verbatim — the event list doesn't carry a
+   * possession sample, so we MUST read it from the snapshot.
+   */
+  homePossession?: number;
+  awayPossession?: number;
+  /**
+   * V25D89.2: human-readable team names. When missing the modal falls
+   * back to the teamIds (less readable but still functional). Sourced
+   * from the round-live {@code teamNameMap} via the 3rd param of
+   * {@link LiveMatchModalsService.openPartidoModal}.
+   */
+  homeTeamName?: string;
+  awayTeamName?: string;
+  /**
+   * V25D89.2: full event timeline from {@code state.events}. Used to
+   * derive shots/corners/fouls/yellow/red + populate the recent events
+   * timeline. When empty (pre-kickoff) the stats section shows a graceful
+   * "disponibles cuando arranque el partido" message instead of zeros.
+   */
+  events?: MatchEvent[];
+  /**
+   * V25D89.2: subs the manager team can still make (V25D79 D5 source of
+   * truth). Rendered as a chip "Subs: 3/5" in the stats header so the
+   * manager knows at a glance how many changes they have left.
+   */
+  substitutionsRemaining?: number;
 }
 
 /**
@@ -157,7 +224,7 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       vertical-align: middle;
     }
 
-    .partido-modal-content { padding-top: 0; padding-bottom: 0.25rem; }
+    .partido-modal-content { padding-top: 0; padding-bottom: 0; }
 
     /* V25D89-FRONT-A: banner styling mirrors the F5 modal's banner so
        the look-and-feel is consistent across both modal entry points. */
@@ -341,6 +408,185 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
 
     .dot-label { user-select: none; }
 
+    /* ========== V25D89.2: stats grid (full-width under pitch + bench) ========== */
+    /* Layout: header row with team names + Subs chip, then 8 stat rows
+       (label + home value + away value). 3-col grid keeps every row
+       visually aligned so the manager can scan "Posesión", "Goles",
+       "Tiros totales" etc. left-to-right per team. */
+    .partido-stats {
+      margin-top: 0.5rem;
+      padding: 0.5rem 0.6rem 0.45rem;
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+    }
+    .partido-stats h3 {
+      margin: 0 0 0.35rem 0;
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #1e3c72;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+    }
+    .stats-minute-tag {
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: #5a6473;
+      background: #e3f2fd;
+      border: 1px solid #bbdefb;
+      padding: 0.1rem 0.5rem;
+      border-radius: 999px;
+    }
+    .stats-subs-chip {
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: #0d47a1;
+      background: #e3f2fd;
+      border: 1px solid #bbdefb;
+      padding: 0.1rem 0.5rem;
+      border-radius: 999px;
+      margin-left: 0.3rem;
+    }
+    .stats-header-row {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr;
+      gap: 0.5rem;
+      padding-bottom: 0.3rem;
+      margin-bottom: 0.25rem;
+      border-bottom: 1px solid #e5e7eb;
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: #5a6473;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+    .stats-header-row .team-label.home { text-align: left; padding-left: 0.15rem; }
+    .stats-header-row .team-label.away { text-align: right; padding-right: 0.15rem; }
+    .stats-row {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr;
+      gap: 0.5rem;
+      padding: 0.18rem 0;
+      font-size: 0.8rem;
+      align-items: center;
+    }
+    .stat-label {
+      text-align: center;
+      color: #5a6473;
+      font-weight: 500;
+    }
+    .stat-value {
+      font-weight: 700;
+      color: #1e3c72;
+      font-size: 0.9rem;
+    }
+    .stat-value.home { text-align: left; padding-left: 0.15rem; }
+    .stat-value.away { text-align: right; padding-right: 0.15rem; }
+    .stats-empty {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.6rem;
+      font-size: 0.78rem;
+      color: #5a6473;
+      font-style: italic;
+    }
+    .stats-empty mat-icon {
+      font-size: 1rem;
+      width: 1rem;
+      height: 1rem;
+    }
+
+    /* ========== V25D89.2: recent events timeline (compact list) ========== */
+    /* Layout: header + scrollable list of 6 events max. Each row is a
+       4-col grid (icon, minute, player, description) so the manager can
+       scan "who did what when" without parsing descriptions. */
+    .recent-events {
+      margin-top: 0.45rem;
+      padding: 0.5rem 0.6rem;
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+    }
+    .recent-events h3 {
+      margin: 0 0 0.3rem 0;
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #1e3c72;
+    }
+    .events-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+      max-height: 140px;
+      overflow-y: auto;
+    }
+    .event-item {
+      display: grid;
+      grid-template-columns: 24px 32px 1fr 2fr;
+      gap: 0.4rem;
+      padding: 0.25rem 0.4rem;
+      font-size: 0.72rem;
+      align-items: center;
+      border-radius: 4px;
+      background: #f5f7fa;
+      border-left: 3px solid transparent;
+    }
+    .event-icon { font-size: 0.9rem; text-align: center; }
+    .event-minute { font-weight: 700; color: #1e3c72; }
+    .event-player {
+      font-weight: 600;
+      color: #1e3c72;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .event-desc {
+      color: #5a6473;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .event-goal {
+      background: #e8f5e9;
+      border-left-color: #2e7d32;
+    }
+    .event-yellow_card {
+      background: #fff8e1;
+      border-left-color: #f57c00;
+    }
+    .event-red_card {
+      background: #ffebee;
+      border-left-color: #c62828;
+    }
+    .event-substitution {
+      background: #e3f2fd;
+      border-left-color: #1976d2;
+    }
+    .event-injury {
+      background: #fce4ec;
+      border-left-color: #ad1457;
+    }
+    .events-empty {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.6rem;
+      font-size: 0.75rem;
+      color: #5a6473;
+      font-style: italic;
+    }
+    .events-empty mat-icon {
+      font-size: 1rem;
+      width: 1rem;
+      height: 1rem;
+    }
+
     /* ========== V25D89-FRONT-A: rival tab — read-only ========== */
 
     .rival-pitch-wrapper {
@@ -492,7 +738,7 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       border-radius: 6px;
     }
 
-    .partido-modal-actions { padding: 0.25rem 1rem 0.5rem; }
+    .partido-modal-actions { padding: 0.25rem 1rem 0.35rem; }
 
     /* V25D89-FRONT-A: success toast styling (snackbar) — same as F5. */
     :host ::ng-deep .success-toast {
@@ -586,6 +832,191 @@ export class PartidoModalComponent {
 
   /** Currently visible tab. Default = 'mine' (manager formation first). */
   readonly activeTab = signal<'mine' | 'rival'>('mine');
+
+  // ========== V25D89.2: stats live data (derived from MatchEvent list) ==========
+
+  /**
+   * V25D89.2: full MatchEvent list from the snapshot, defensively defaulted
+   * to {@code []} when the SSE feed hasn't reached tick 1 (modal opens while
+   * the round is still NOT_STARTED). All derived stats + the timeline read
+   * from this signal.
+   */
+  private readonly eventList = (): MatchEvent[] => this.data.events ?? [];
+
+  /**
+   * V25D89.2: derived match stats from {@link eventList}. Returns a flat
+   * row-per-stat shape so the template can {@code *ngFor} over a single
+   * collection. Each row carries:
+   * <ul>
+   *   <li>{@code label} — display string in Spanish</li>
+   *   <li>{@code home} / {@code away} — formatted value</li>
+   * </ul>
+   * Computed eagerly (not as a {@code computed} signal) because Angular's
+   * signals don't deeply track {@code data.events} reference changes —
+   * the SSE feed pushes a NEW MatchState object every tick, so the dialog
+   * data is replaced wholesale on each round-live vm$ emission. Calling
+   * this getter per change-detection cycle is cheap (8 filter passes over
+   * a list that maxes at ~120 events per match) and keeps the data fresh.
+   *
+   * <p>Stats derived:
+   * <ul>
+   *   <li>Posesión — {@code state.homePossession}/{@code state.awayPossession}
+   *       (NOT derived from events; possession is its own BE1 field).</li>
+   *   <li>Goles — {@code state.score.home/away} (canonical, not GOAL events).</li>
+   *   <li>Tiros totales — count(SHOT + SHOT_ON_TARGET) for each team.</li>
+   *   <li>Tiros a puerta — count(SHOT_ON_TARGET) for each team.</li>
+   *   <li>Corners — count(CORNER) for each team.</li>
+   *   <li>Faltas — count(FOUL) for each team.</li>
+   *   <li>Offsides — count(OFFSIDE) for each team.</li>
+   *   <li>Tarjetas — count(YELLOW_CARD + RED_CARD) shown as "A:R" for each
+   *       team (yellows:reds) so the manager can spot ejections at a glance.</li>
+   * </ul>
+   *
+   * <p>Event attribution: each {@link MatchEvent} carries an optional
+   * {@code teamId}. We match it against {@code data.homeTeamId} /
+   * {@code data.awayTeamId} (both strings) and increment the corresponding
+   * bucket. Events without a {@code teamId} (legacy V23 synthetic events)
+   * are skipped — they don't carry enough info to attribute to a side.
+   *
+   * <p>Why string-comparison: {@code state.homeTeamId} and the event's
+   * {@code teamId} may have different types (UUID vs string) depending on
+   * the SSE serialization layer. {@link String(...)} normalizes both sides
+   * and handles the undefined case safely.
+   */
+  statsRows(): PartidoStatRow[] {
+    const events = this.eventList();
+    const homeId = String(this.data.homeTeamId ?? '');
+    const awayId = String(this.data.awayTeamId ?? '');
+
+    let homeShots = 0, awayShots = 0;
+    let homeShotsOnTarget = 0, awayShotsOnTarget = 0;
+    let homeCorners = 0, awayCorners = 0;
+    let homeFouls = 0, awayFouls = 0;
+    let homeOffsides = 0, awayOffsides = 0;
+    let homeYellow = 0, awayYellow = 0;
+    let homeRed = 0, awayRed = 0;
+
+    for (const ev of events) {
+      if (!ev) { continue; }
+      const teamId = String(ev.teamId ?? '');
+      const isHome = teamId === homeId;
+      const isAway = teamId === awayId;
+      if (!isHome && !isAway) { continue; }
+      const bucket = isHome
+        ? { shots: () => homeShots++, sot: () => homeShotsOnTarget++,
+            corner: () => homeCorners++, foul: () => homeFouls++,
+            offside: () => homeOffsides++, yellow: () => homeYellow++, red: () => homeRed++ }
+        : { shots: () => awayShots++, sot: () => awayShotsOnTarget++,
+            corner: () => awayCorners++, foul: () => awayFouls++,
+            offside: () => awayOffsides++, yellow: () => awayYellow++, red: () => awayRed++ };
+      switch (ev.eventType) {
+        case 'SHOT':
+        case 'SHOT_ON_TARGET':
+          bucket.shots();
+          if (ev.eventType === 'SHOT_ON_TARGET') { bucket.sot(); }
+          break;
+        case 'CORNER':
+          bucket.corner();
+          break;
+        case 'FOUL':
+          bucket.foul();
+          break;
+        case 'OFFSIDE':
+          bucket.offside();
+          break;
+        case 'YELLOW_CARD':
+          bucket.yellow();
+          break;
+        case 'RED_CARD':
+          bucket.red();
+          break;
+        default:
+          // GOAL / INJURY / SUBSTITUTION / etc. not part of the stats grid
+          // (goles comes from state.score; the rest is shown in the timeline).
+          break;
+      }
+    }
+
+    const score = this.data.score ?? { home: 0, away: 0 };
+    const homePoss = this.data.homePossession ?? 50;
+    const awayPoss = this.data.awayPossession ?? 50;
+
+    return [
+      { label: 'Posesión',           home: `${homePoss}%`,                   away: `${awayPoss}%` },
+      { label: 'Goles',              home: String(score.home),               away: String(score.away) },
+      { label: 'Tiros totales',      home: String(homeShots),                away: String(awayShots) },
+      { label: 'Tiros a puerta',     home: String(homeShotsOnTarget),        away: String(awayShotsOnTarget) },
+      { label: 'Corners',            home: String(homeCorners),              away: String(awayCorners) },
+      { label: 'Faltas',             home: String(homeFouls),                away: String(awayFouls) },
+      { label: 'Offsides',           home: String(homeOffsides),             away: String(awayOffsides) },
+      { label: 'Tarjetas A:R',       home: `${homeYellow}:${homeRed}`,       away: `${awayYellow}:${awayRed}` }
+    ];
+  }
+
+  /**
+   * V25D89.2: last 6 events, most recent first. Drives the timeline section
+   * below the stats. Capped at 6 so the section stays within ~140px (the
+   * modal's available height after the pitch + bench + stats + footer).
+   * No pagination — the timeline is a glance, not a full event log; the
+   * match-card already has a fuller feed on the round-live page.
+   */
+  recentEvents(): MatchEvent[] {
+    return this.eventList().slice(-6).reverse();
+  }
+
+  /**
+   * V25D89.2: true when the modal has received at least one event. Drives
+   * the "stats disponibles cuando arranque el partido" empty state.
+   */
+  hasEvents(): boolean {
+    return this.eventList().length > 0;
+  }
+
+  /**
+   * V25D89.2: current minute accessor used by the template header tag.
+   * Falls back to 0 when the modal opens while the round hasn't ticked
+   * yet (NOT_STARTED → minute 0).
+   */
+  currentMinute(): number {
+    return this.data.currentMinute ?? 0;
+  }
+
+  /**
+   * V25D89.2: subs remaining for the manager team. {@code 5 - 0} is the
+   * full quota; the chip "Subs: 3/5" lets the manager see at a glance
+   * how many changes they have left. Source of truth is the backend
+   * (V25D79 D5 = {@code max(0, 5 - count(SUBSTITUTION events))}).
+   */
+  substitutionsRemaining(): number {
+    return this.data.substitutionsRemaining ?? 5;
+  }
+
+  /**
+   * V25D89.2: human-readable event icon for the timeline. Matches the
+   * F3 timeline icons used on the round-live page (round-live.component.ts
+   * {@code getEventIcon}) so the visual vocabulary stays consistent.
+   */
+  getEventIcon(eventType: string): string {
+    const iconMap: Record<string, string> = {
+      'GOAL':          '⚽',
+      'SHOT':          '🎯',
+      'SHOT_ON_TARGET':'🎯',
+      'MISS':          '↗️',
+      'BLOCK':         '🛡️',
+      'SAVE':          '🧤',
+      'CHANCE_CREATED':'✨',
+      'FOUL':          '⚠️',
+      'YELLOW_CARD':   '🟨',
+      'RED_CARD':      '🟥',
+      'INJURY':        '🚑',
+      'CORNER':        '🚩',
+      'OFFSIDE':       '🚩',
+      'SUBSTITUTION':  '🔄',
+      'CARD':          '🟨',
+      'TACTICAL_CHANGE':'📋'
+    };
+    return iconMap[eventType] || '📋';
+  }
 
   // ========== V25D89-FRONT-A: manager-tab formation state (F5 mirror) ==========
 

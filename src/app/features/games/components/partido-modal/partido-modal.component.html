@@ -2,7 +2,7 @@
   <h2 mat-dialog-title>
     <span class="title-icon">⚽</span>
     Partido
-    <span class="minute-tag">Minuto {{ data.currentFormation ? 'en juego' : 'preparación' }}</span>
+    <span class="minute-tag">Minuto {{ currentMinute() }}</span>
   </h2>
 
   <mat-dialog-content class="partido-modal-content">
@@ -120,6 +120,50 @@
             </section>
           </div>
 
+          <!-- ========== V25D89.2: stats grid (full-width under pitch + bench) ========== -->
+          <section class="partido-stats" data-testid="partido-stats" aria-label="Estadísticas del partido">
+            <h3>
+              <span>Estadísticas del partido</span>
+              <span>
+                <span class="stats-minute-tag" data-testid="stats-minute">Minuto {{ currentMinute() }}</span>
+                <span class="stats-subs-chip" data-testid="stats-subs">Subs: {{ substitutionsRemaining() }}/5</span>
+              </span>
+            </h3>
+            <div class="stats-header-row">
+              <span class="stat-label">—</span>
+              <span class="team-label home" data-testid="stats-home-name">{{ data.homeTeamName }}</span>
+              <span class="team-label away" data-testid="stats-away-name">{{ data.awayTeamName }}</span>
+            </div>
+            <div class="stats-row" *ngFor="let row of statsRows()" [attr.data-stat-label]="row.label">
+              <span class="stat-label">{{ row.label }}</span>
+              <span class="stat-value home">{{ row.home }}</span>
+              <span class="stat-value away">{{ row.away }}</span>
+            </div>
+            <div *ngIf="!hasEvents()" class="stats-empty" data-testid="stats-empty">
+              <mat-icon>info</mat-icon>
+              <span>Las estadísticas aparecen cuando arranque el partido.</span>
+            </div>
+          </section>
+
+          <!-- ========== V25D89.2: recent events timeline ========== -->
+          <section class="recent-events" data-testid="recent-events" aria-label="Últimos eventos del partido">
+            <h3>Últimos eventos</h3>
+            <ul class="events-list" *ngIf="recentEvents().length > 0">
+              <li *ngFor="let ev of recentEvents()"
+                  class="event-item event-{{ ev.eventType.toLowerCase() }}"
+                  [attr.data-event-type]="ev.eventType">
+                <span class="event-icon" aria-hidden="true">{{ getEventIcon(ev.eventType) }}</span>
+                <span class="event-minute">{{ ev.minute }}'</span>
+                <span class="event-player" [title]="ev.playerName">{{ ev.playerName }}</span>
+                <span class="event-desc" [title]="ev.description">{{ ev.description }}</span>
+              </li>
+            </ul>
+            <div *ngIf="recentEvents().length === 0" class="events-empty" data-testid="events-empty">
+              <mat-icon>info</mat-icon>
+              <span>Aún no hay eventos en el partido.</span>
+            </div>
+          </section>
+
         </ng-template>
       </mat-tab>
 
@@ -164,6 +208,49 @@
               Vista read-only — los nombres de los jugadores rivales no están disponibles en el feed en vivo.
             </p>
           </div>
+
+          <!-- ========== V25D89.2: same stats + timeline in rival tab (match-level info) ========== -->
+          <section class="partido-stats" data-testid="partido-stats-rival" aria-label="Estadísticas del partido">
+            <h3>
+              <span>Estadísticas del partido</span>
+              <span>
+                <span class="stats-minute-tag" data-testid="stats-minute-rival">Minuto {{ currentMinute() }}</span>
+                <span class="stats-subs-chip" data-testid="stats-subs-rival">Subs: {{ substitutionsRemaining() }}/5</span>
+              </span>
+            </h3>
+            <div class="stats-header-row">
+              <span class="stat-label">—</span>
+              <span class="team-label home" data-testid="stats-home-name-rival">{{ data.homeTeamName }}</span>
+              <span class="team-label away" data-testid="stats-away-name-rival">{{ data.awayTeamName }}</span>
+            </div>
+            <div class="stats-row" *ngFor="let row of statsRows()" [attr.data-stat-label]="row.label">
+              <span class="stat-label">{{ row.label }}</span>
+              <span class="stat-value home">{{ row.home }}</span>
+              <span class="stat-value away">{{ row.away }}</span>
+            </div>
+            <div *ngIf="!hasEvents()" class="stats-empty" data-testid="stats-empty-rival">
+              <mat-icon>info</mat-icon>
+              <span>Las estadísticas aparecen cuando arranque el partido.</span>
+            </div>
+          </section>
+
+          <section class="recent-events" data-testid="recent-events-rival" aria-label="Últimos eventos del partido">
+            <h3>Últimos eventos</h3>
+            <ul class="events-list" *ngIf="recentEvents().length > 0">
+              <li *ngFor="let ev of recentEvents()"
+                  class="event-item event-{{ ev.eventType.toLowerCase() }}"
+                  [attr.data-event-type]="ev.eventType">
+                <span class="event-icon" aria-hidden="true">{{ getEventIcon(ev.eventType) }}</span>
+                <span class="event-minute">{{ ev.minute }}'</span>
+                <span class="event-player" [title]="ev.playerName">{{ ev.playerName }}</span>
+                <span class="event-desc" [title]="ev.description">{{ ev.description }}</span>
+              </li>
+            </ul>
+            <div *ngIf="recentEvents().length === 0" class="events-empty" data-testid="events-empty-rival">
+              <mat-icon>info</mat-icon>
+              <span>Aún no hay eventos en el partido.</span>
+            </div>
+          </section>
 
         </ng-template>
       </mat-tab>

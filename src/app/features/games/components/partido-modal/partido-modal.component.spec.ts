@@ -73,6 +73,18 @@ function makeData(overrides: Partial<PartidoDialogData> = {}): PartidoDialogData
     squad: SQUAD,
     startingIds: STARTING_IDS,
     rivalFormation: '4-3-3',
+    // V25D89.2 defaults — makeData provides safe defaults so the existing
+    // 22 tests don't need to be touched (their baseline asserts on Tab
+    // state + formation flow, not on stats).
+    awayTeamId: 'team-a',
+    currentMinute: 0,
+    score: { home: 0, away: 0 },
+    homePossession: 50,
+    awayPossession: 50,
+    homeTeamName: 'HOME',
+    awayTeamName: 'AWAY',
+    events: [],
+    substitutionsRemaining: 5,
     ...overrides
   };
 }
@@ -333,5 +345,198 @@ describe('PartidoModalComponent (V25D89-FRONT-A)', () => {
     component.ngOnDestroy();
     expect(component['destroy$'].next).toHaveBeenCalled();
     expect(component['destroy$'].complete).toHaveBeenCalled();
+  });
+
+  // ========== V25D89.2: stats live (derived from events list) ==========
+
+  it('statsRows() derives shots + shots-on-target + corners + fouls + offsides + cards from events with teamId attribution', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [NoopAnimationsModule, CommonModule, PartidoModalComponent],
+      providers: [
+        { provide: MAT_DIALOG_DATA, useValue: makeData({
+            events: [
+              { eventType: 'SHOT',            minute: 10, playerName: 'A', description: 'd', teamId: 'team-h' },
+              { eventType: 'SHOT',            minute: 15, playerName: 'B', description: 'd', teamId: 'team-a' },
+              { eventType: 'SHOT_ON_TARGET',  minute: 20, playerName: 'C', description: 'd', teamId: 'team-h' },
+              { eventType: 'SHOT_ON_TARGET',  minute: 25, playerName: 'D', description: 'd', teamId: 'team-a' },
+              { eventType: 'SHOT_ON_TARGET',  minute: 30, playerName: 'E', description: 'd', teamId: 'team-a' },
+              { eventType: 'CORNER',          minute: 35, playerName: 'F', description: 'd', teamId: 'team-h' },
+              { eventType: 'FOUL',            minute: 40, playerName: 'G', description: 'd', teamId: 'team-h' },
+              { eventType: 'FOUL',            minute: 42, playerName: 'H', description: 'd', teamId: 'team-h' },
+              { eventType: 'OFFSIDE',         minute: 45, playerName: 'I', description: 'd', teamId: 'team-a' },
+              { eventType: 'YELLOW_CARD',     minute: 50, playerName: 'J', description: 'd', teamId: 'team-h' },
+              { eventType: 'RED_CARD',        minute: 55, playerName: 'K', description: 'd', teamId: 'team-a' }
+            ]
+          })
+        },
+        { provide: MatDialogRef, useValue: dialogRefSpy },
+        { provide: MatchEngineService, useValue: engineSpy },
+        { provide: MatSnackBar, useValue: snackBarSpy }
+      ]
+    }).compileComponents();
+    const fx2 = TestBed.createComponent(PartidoModalComponent);
+    const cmp2 = fx2.componentInstance;
+    const rows = cmp2.statsRows();
+    const byLabel: Record<string, { home: string; away: string }> = {};
+    rows.forEach(r => { byLabel[r.label] = { home: r.home, away: r.away }; });
+
+    // Tiros totales = SHOT + SHOT_ON_TARGET per team
+    expect(byLabel['Tiros totales']).toEqual({ home: '2', away: '3' });
+    // Tiros a puerta = SHOT_ON_TARGET only
+    expect(byLabel['Tiros a puerta']).toEqual({ home: '1', away: '2' });
+    // Corners / Faltas / Offsides per team
+    expect(byLabel['Corners']).toEqual({ home: '1', away: '0' });
+    expect(byLabel['Faltas']).toEqual({ home: '2', away: '0' });
+    expect(byLabel['Offsides']).toEqual({ home: '0', away: '1' });
+    // Tarjetas A:R — yellows:reds format
+    expect(byLabel['Tarjetas A:R']).toEqual({ home: '1:0', away: '0:1' });
+  });
+
+  it('statsRows() uses score from dialog data (canonical source) instead of counting GOAL events', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [NoopAnimationsModule, CommonModule, PartidoModalComponent],
+      providers: [
+        { provide: MAT_DIALOG_DATA, useValue: makeData({
+            score: { home: 3, away: 1 },
+            events: [
+              { eventType: 'GOAL', minute: 10, playerName: 'A', description: 'd', teamId: 'team-h' },
+              { eventType: 'GOAL', minute: 30, playerName: 'B', description: 'd', teamId: 'team-h' }
+              // Only 2 GOAL events but score says 3:1 — the snapshot is the
+              // canonical source (events can be lost in SSE reconnect).
+            ]
+          })
+        },
+        { provide: MatDialogRef, useValue: dialogRefSpy },
+        { provide: MatchEngineService, useValue: engineSpy },
+        { provide: MatSnackBar, useValue: snackBarSpy }
+      ]
+    }).compileComponents();
+    const fx2 = TestBed.createComponent(PartidoModalComponent);
+    const cmp2 = fx2.componentInstance;
+    const rows = cmp2.statsRows();
+    const goles = rows.find(r => r.label === 'Goles');
+    expect(goles).toEqual({ label: 'Goles', home: '3', away: '1' });
+  });
+
+  it('statsRows() uses homePossession/awayPossession from dialog data (not derived from events)', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [NoopAnimationsModule, CommonModule, PartidoModalComponent],
+      providers: [
+        { provide: MAT_DIALOG_DATA, useValue: makeData({
+            homePossession: 62,
+            awayPossession: 38,
+            events: []  // no events — possession still comes from BE1
+          })
+        },
+        { provide: MatDialogRef, useValue: dialogRefSpy },
+        { provide: MatchEngineService, useValue: engineSpy },
+        { provide: MatSnackBar, useValue: snackBarSpy }
+      ]
+    }).compileComponents();
+    const fx2 = TestBed.createComponent(PartidoModalComponent);
+    const cmp2 = fx2.componentInstance;
+    const rows = cmp2.statsRows();
+    const posesion = rows.find(r => r.label === 'Posesión');
+    expect(posesion).toEqual({ label: 'Posesión', home: '62%', away: '38%' });
+  });
+
+  it('recentEvents() returns last 6 events reversed (most recent first)', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [NoopAnimationsModule, CommonModule, PartidoModalComponent],
+      providers: [
+        { provide: MAT_DIALOG_DATA, useValue: makeData({
+            events: [
+              { eventType: 'SHOT',           minute: 5,  playerName: 'P1', description: 'd', teamId: 'team-h' },
+              { eventType: 'GOAL',           minute: 10, playerName: 'P2', description: 'd', teamId: 'team-a' },
+              { eventType: 'YELLOW_CARD',    minute: 15, playerName: 'P3', description: 'd', teamId: 'team-h' },
+              { eventType: 'CORNER',         minute: 20, playerName: 'P4', description: 'd', teamId: 'team-a' },
+              { eventType: 'FOUL',           minute: 25, playerName: 'P5', description: 'd', teamId: 'team-h' },
+              { eventType: 'GOAL',           minute: 30, playerName: 'P6', description: 'd', teamId: 'team-h' },
+              { eventType: 'SUBSTITUTION',   minute: 35, playerName: 'P7', description: 'd', teamId: 'team-a' },
+              { eventType: 'RED_CARD',       minute: 40, playerName: 'P8', description: 'd', teamId: 'team-h' }
+            ]
+          })
+        },
+        { provide: MatDialogRef, useValue: dialogRefSpy },
+        { provide: MatchEngineService, useValue: engineSpy },
+        { provide: MatSnackBar, useValue: snackBarSpy }
+      ]
+    }).compileComponents();
+    const fx2 = TestBed.createComponent(PartidoModalComponent);
+    const cmp2 = fx2.componentInstance;
+    const recent = cmp2.recentEvents();
+    // 8 events → slice(-6) keeps minutes 15..40, reversed → minutes 40,35,30,25,20,15
+    expect(recent.length).toBe(6);
+    expect(recent[0].eventType).toBe('RED_CARD');
+    expect(recent[5].eventType).toBe('YELLOW_CARD');
+    // Most recent first
+    expect(recent[0].minute).toBe(40);
+    expect(recent[5].minute).toBe(15);
+  });
+
+  it('renders partido-stats + recent-events sections in DOM (data-testid present)', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [NoopAnimationsModule, CommonModule, PartidoModalComponent],
+      providers: [
+        { provide: MAT_DIALOG_DATA, useValue: makeData({
+            events: [{ eventType: 'GOAL', minute: 15, playerName: 'Juan', description: 'Golazo', teamId: 'team-h' }],
+            homeTeamName: 'REAL MADRID',
+            awayTeamName: 'BARCELONA',
+            currentMinute: 47,
+            substitutionsRemaining: 3
+          })
+        },
+        { provide: MatDialogRef, useValue: dialogRefSpy },
+        { provide: MatchEngineService, useValue: engineSpy },
+        { provide: MatSnackBar, useValue: snackBarSpy }
+      ]
+    }).compileComponents();
+    const fx2 = TestBed.createComponent(PartidoModalComponent);
+    fx2.detectChanges();
+    const stats = fx2.nativeElement.querySelector('[data-testid="partido-stats"]');
+    const events = fx2.nativeElement.querySelector('[data-testid="recent-events"]');
+    expect(stats).toBeTruthy();
+    expect(events).toBeTruthy();
+    // Header chips present
+    const minuteTag = fx2.nativeElement.querySelector('[data-testid="stats-minute"]');
+    const subsTag = fx2.nativeElement.querySelector('[data-testid="stats-subs"]');
+    expect(minuteTag.textContent).toContain('47');
+    expect(subsTag.textContent).toContain('3/5');
+    // Team labels visible
+    const homeLabel = fx2.nativeElement.querySelector('[data-testid="stats-home-name"]');
+    const awayLabel = fx2.nativeElement.querySelector('[data-testid="stats-away-name"]');
+    expect(homeLabel.textContent.trim()).toBe('REAL MADRID');
+    expect(awayLabel.textContent.trim()).toBe('BARCELONA');
+    // 8 stat rows rendered (Posesion, Goles, Tiros totales, Tiros a puerta, Corners, Faltas, Offsides, Tarjetas A:R)
+    const rows = fx2.nativeElement.querySelectorAll('.stats-row');
+    expect(rows.length).toBe(8);
+  });
+
+  it('hides stats gracefully when events list is empty AND shows empty event timeline', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [NoopAnimationsModule, CommonModule, PartidoModalComponent],
+      providers: [
+        { provide: MAT_DIALOG_DATA, useValue: makeData({ events: [] }) },
+        { provide: MatDialogRef, useValue: dialogRefSpy },
+        { provide: MatchEngineService, useValue: engineSpy },
+        { provide: MatSnackBar, useValue: snackBarSpy }
+      ]
+    }).compileComponents();
+    const fx2 = TestBed.createComponent(PartidoModalComponent);
+    fx2.detectChanges();
+    const emptyStats = fx2.nativeElement.querySelector('[data-testid="stats-empty"]');
+    const emptyEvents = fx2.nativeElement.querySelector('[data-testid="events-empty"]');
+    expect(emptyStats).toBeTruthy();
+    expect(emptyStats.textContent).toContain('cuando arranque');
+    expect(emptyEvents).toBeTruthy();
+    // Match any 'no hay eventos' substring — accents vary in jsdom's
+    // textContent collation so we use a substring that's accent-free.
+    expect(emptyEvents.textContent).toContain('no hay eventos');
   });
 });
