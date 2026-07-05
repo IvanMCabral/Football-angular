@@ -1,8 +1,29 @@
-/* V25D89-FRONT-A: companion CSS file for IDE hints only.
+/* V25D89.1-FRONT: companion CSS file for IDE hints only.
    The component's actual styles are INLINED via the `styles: [...]`
    array on the @Component decorator so ɵcmp.styles exposes them to
    unit tests (see angular-testing-patterns memory). When you change
-   styles, mirror the change in BOTH this file AND the inline array. */
+   styles, mirror the change in BOTH this file AND the inline array.
+
+   V25D89.1 changes (visual polish — pure CSS, no DOM change):
+   - .pitch: added position:relative + overflow:hidden so the new
+     pseudo-element lines (::before = halfway line, ::after = center
+     circle) are clipped to the rounded pitch border. min-height raised
+     280px → 340px so the lines have room without crowding the dots.
+   - .pitch::before: halfway line (horizontal stripe, white 65% opacity,
+     full width, 1.5px tall, centered on 50% Y).
+   - .pitch::after: center circle (64×64 ring, centered, pointer-events
+     disabled so drag/drop on the dots still works).
+   - .pitch > .pitch-line: position:relative + z-index:1 so dots render
+     above the new lines.
+   - Layout compacted: partido-modal-root min-width 460→0, max-width
+     720→640. partido-modal-content padding-top 0.5rem→0. Banner padding
+     0.6rem→0.45rem + font-size 0.9rem→0.85rem. formation-row margin
+     1rem→0.5rem. formation-grid gap 0.75→0.5 + margin-bottom 0.75→0.4.
+     hint padding 0.4→0.3 + font 0.78→0.75. partido-modal-actions padding
+     tightened. bench-list max-height 360→340 + padding 0.4→0.35.
+   - Responsive: small (<600px) center circle 64→48px, min-height 220→260;
+     mid (601-1024px) center circle 64→54px, min-height 280→300, modal
+     max-width 480→460. */
 
 /* Tab shell — mat-tab-header background */
 .partido-tabs ::ng-deep .mat-mdc-tab-header {
@@ -10,4 +31,4 @@
   border-radius: 6px 6px 0 0;
 }
 
-/* Banner styles are in the inlined array. */
+/* Banner styles + pitch lines + pseudo-elements are in the inlined array. */

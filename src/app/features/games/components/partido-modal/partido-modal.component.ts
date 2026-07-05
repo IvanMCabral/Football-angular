@@ -138,8 +138,8 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
   // is kept on disk for IDE hints only — see partido-modal.component.css.
   styles: [`
     .partido-modal-root {
-      min-width: 460px;
-      max-width: 720px;
+      min-width: 0;
+      max-width: 640px;
       font-family: 'Segoe UI', system-ui, sans-serif;
     }
 
@@ -157,7 +157,7 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       vertical-align: middle;
     }
 
-    .partido-modal-content { padding-top: 0.5rem; }
+    .partido-modal-content { padding-top: 0; padding-bottom: 0.25rem; }
 
     /* V25D89-FRONT-A: banner styling mirrors the F5 modal's banner so
        the look-and-feel is consistent across both modal entry points. */
@@ -165,10 +165,10 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       display: flex;
       align-items: center;
       gap: 0.5rem;
-      padding: 0.6rem 0.8rem;
+      padding: 0.45rem 0.7rem;
       border-radius: 6px;
-      font-size: 0.9rem;
-      margin-bottom: 0.75rem;
+      font-size: 0.85rem;
+      margin-bottom: 0.5rem;
     }
     .banner mat-icon {
       font-size: 1.2rem;
@@ -198,26 +198,70 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
     .formation-row {
       display: flex;
       justify-content: center;
-      margin-bottom: 1rem;
+      margin-bottom: 0.5rem;
     }
 
     .formation-select {
       width: 100%;
-      max-width: 240px;
+      max-width: 220px;
     }
 
+    /* V25D89.1-FRONT: pitch now has halfway line + center circle drawn
+       via ::before / ::after pseudo-elements so the manager can read the
+       formation at a glance (lines act as visual anchors for "two halves"
+       and "midfield zone"). The white pitch border already provides the
+       touch-lines and goal-lines. Pure CSS — no DOM change, no new
+       assets, scales with the modal width. */
     .pitch {
+      position: relative;
       background: linear-gradient(180deg, #2e7d32 0%, #1b5e20 100%);
       border-radius: 8px;
-      padding: 0.6rem 0.4rem;
+      padding: 0.5rem 0.4rem;
       display: flex;
       flex-direction: column;
-      gap: 0.4rem;
+      gap: 0.35rem;
       border: 2px solid #fff;
       box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
-      min-height: 280px;
+      min-height: 340px;
       justify-content: space-around;
-      margin-bottom: 0.75rem;
+      margin-bottom: 0.5rem;
+      overflow: hidden;
+    }
+    /* Halfway line — horizontal stripe at 50% height, full pitch width.
+       White at 65% opacity so the player dots stay legible on top. */
+    .pitch::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 0;
+      right: 0;
+      height: 1.5px;
+      background: rgba(255, 255, 255, 0.65);
+      transform: translateY(-50%);
+      pointer-events: none;
+      z-index: 0;
+    }
+    /* Center circle — fixed 64×64 px ring so it stays circular on any
+       modal width. Centered on the pitch; visually anchors the midfield
+       line in the formation layout. pointer-events:none so drag/drop
+       on the dots still works. */
+    .pitch::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 64px;
+      height: 64px;
+      border: 1.5px solid rgba(255, 255, 255, 0.65);
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 0;
+    }
+    /* Lift pitch lines above the pseudo-element lines so dots are visible. */
+    .pitch > .pitch-line {
+      position: relative;
+      z-index: 1;
     }
 
     .pitch-line {
@@ -334,8 +378,8 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
     .formation-grid {
       display: grid;
       grid-template-columns: 1fr;
-      gap: 0.75rem;
-      margin-bottom: 0.75rem;
+      gap: 0.5rem;
+      margin-bottom: 0.4rem;
     }
     @media (min-width: 601px) {
       .formation-grid {
@@ -344,8 +388,8 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
     }
     .col-pitch h3,
     .col-bench h3 {
-      margin: 0 0 0.4rem 0;
-      font-size: 0.85rem;
+      margin: 0 0 0.3rem 0;
+      font-size: 0.82rem;
       font-weight: 700;
       color: #1e3c72;
     }
@@ -353,10 +397,10 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
     .bench-list {
       display: flex;
       flex-direction: column;
-      gap: 0.35rem;
-      max-height: 360px;
+      gap: 0.3rem;
+      max-height: 340px;
       overflow-y: auto;
-      padding: 0.4rem;
+      padding: 0.35rem;
       background: #f9fafb;
       border: 1px solid #e5e7eb;
       border-radius: 6px;
@@ -413,10 +457,10 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       display: flex;
       align-items: center;
       gap: 0.4rem;
-      font-size: 0.78rem;
+      font-size: 0.75rem;
       color: #5a6473;
       margin: 0;
-      padding: 0.4rem 0.5rem;
+      padding: 0.3rem 0.45rem;
       background: #f5f7fa;
       border-radius: 4px;
     }
@@ -448,7 +492,7 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       border-radius: 6px;
     }
 
-    .partido-modal-actions { padding: 0.5rem 1rem; }
+    .partido-modal-actions { padding: 0.25rem 1rem 0.5rem; }
 
     /* V25D89-FRONT-A: success toast styling (snackbar) — same as F5. */
     :host ::ng-deep .success-toast {
@@ -467,9 +511,13 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
         padding: 0 0.25rem;
       }
       .pitch {
-        padding: 0.4rem 0.25rem;
-        gap: 0.25rem;
-        min-height: 220px;
+        padding: 0.35rem 0.25rem;
+        gap: 0.2rem;
+        min-height: 260px;
+      }
+      .pitch::after {
+        width: 48px;
+        height: 48px;
       }
       .pitch-line {
         gap: 4px;
@@ -492,15 +540,16 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       .formation-select {
         max-width: 100%;
       }
-      .formation-row { margin-bottom: 0.5rem; }
+      .formation-row { margin-bottom: 0.35rem; }
     }
 
     @media (min-width: 601px) and (max-width: 1024px) {
       .partido-modal-root {
-        min-width: 360px;
-        max-width: 480px;
+        min-width: 320px;
+        max-width: 460px;
       }
-      .pitch { padding: 0.5rem 0.35rem; gap: 0.35rem; }
+      .pitch { padding: 0.4rem 0.3rem; gap: 0.3rem; min-height: 300px; }
+      .pitch::after { width: 54px; height: 54px; }
       .pitch-line { gap: 8px; }
       .player-dot {
         width: 24px;
