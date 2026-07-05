@@ -23,7 +23,33 @@
      tightened. bench-list max-height 360→340 + padding 0.4→0.35.
    - Responsive: small (<600px) center circle 64→48px, min-height 220→260;
      mid (601-1024px) center circle 64→54px, min-height 280→300, modal
-     max-width 480→460. */
+     max-width 480→460.
+
+   V25D89.3-FRONT changes (compact whitespace, no DOM change):
+   - .partido-modal-root max-width 640→540 so the modal feels tighter
+     in wide viewports. Dialog container override mirrors the same cap.
+   - Material MDC dialog padding overrides (::ng-deep): kill the
+     ~24px default padding on .mat-mdc-dialog-title and .mat-mdc-dialog-
+     content, and the 16px default on .mat-mdc-tab-body-content. The
+     title bar and content body now hug the modal edges instead of
+     floating in Material's default frame.
+   - Banner margin-bottom 0.5→0.35 + padding 0.45/0.7→0.35/0.6.
+   - formation-row margin-bottom 0.5→0.3.
+   - pitch min-height 340→280, padding 0.5/0.4→0.4/0.35, gap 0.35→0.3,
+     margin-bottom 0.5→0.25. Center circle 64→56px (scales with smaller
+     pitch). pitch-line min-height 36→30.
+   - formation-grid gap 0.5→0.4 + margin-bottom 0.4→0.2.
+   - col-pitch h3 / col-bench h3 margin-bottom 0.3→0.25.
+   - bench-list max-height 340→280 + gap 0.3→0.25 + padding 0.35→0.3.
+   - bench-player padding 0.45/0.55→0.35/0.5.
+   - hint padding 0.3/0.45→0.18/0.35 + font 0.75→0.72 + line-height 1.3.
+   - partido-stats margin-top 0.5→0.35 + padding 0.5/0.6/0.45→0.4/0.55/0.35.
+     h3 margin-bottom 0.35→0.25. stats-row padding 0.18→0.12 + font 0.8→0.78.
+   - recent-events margin-top 0.45→0.3 + padding 0.5/0.6→0.4/0.55.
+     h3 margin-bottom 0.3→0.25. events-list gap 0.2→0.15 + max-height 140→120.
+     event-item padding 0.25/0.4→0.18/0.4 + font 0.72→0.7.
+   - rival-pitch-wrapper padding 0.5/0→0.2/0/0.3.
+   - partido-modal-actions padding 0.25/1/0.35→0.15/1/0.2. */
 
 /* Tab shell — mat-tab-header background */
 .partido-tabs ::ng-deep .mat-mdc-tab-header {

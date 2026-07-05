@@ -206,8 +206,35 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
   styles: [`
     .partido-modal-root {
       min-width: 0;
-      max-width: 640px;
+      max-width: 540px;
       font-family: 'Segoe UI', system-ui, sans-serif;
+    }
+
+    /* V25D89.3-FRONT: override Angular Material MDC dialog default
+       padding so the title bar and content hug the modal edges.
+       Without these overrides Material adds ~24px padding around the
+       title and the content body — that's the bulk of the "espacio
+       blanco lateral / superior" Iván saw in the V25D89.2 screenshot. */
+    :host ::ng-deep .mat-mdc-dialog-container {
+      max-width: 540px;
+    }
+    :host ::ng-deep .mat-mdc-dialog-container .mat-mdc-dialog-title {
+      padding: 0;
+      margin: 0;
+    }
+    :host ::ng-deep .mat-mdc-dialog-container .mat-mdc-dialog-content {
+      padding: 0;
+    }
+    :host ::ng-deep .mat-mdc-dialog-container h2.mat-mdc-dialog-title {
+      padding: 0.4rem 0.75rem 0.3rem;
+      margin: 0;
+    }
+    :host ::ng-deep .mat-mdc-dialog-container .mat-mdc-tab-body-content {
+      padding: 0.35rem 0.6rem 0.5rem;
+      overflow: hidden;
+    }
+    :host ::ng-deep .mat-mdc-dialog-container .mdc-dialog__content {
+      padding: 0;
     }
 
     .title-icon { margin-right: 0.4rem; }
@@ -232,10 +259,10 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       display: flex;
       align-items: center;
       gap: 0.5rem;
-      padding: 0.45rem 0.7rem;
+      padding: 0.35rem 0.6rem;
       border-radius: 6px;
       font-size: 0.85rem;
-      margin-bottom: 0.5rem;
+      margin-bottom: 0.35rem;
     }
     .banner mat-icon {
       font-size: 1.2rem;
@@ -265,7 +292,7 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
     .formation-row {
       display: flex;
       justify-content: center;
-      margin-bottom: 0.5rem;
+      margin-bottom: 0.3rem;
     }
 
     .formation-select {
@@ -283,15 +310,15 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       position: relative;
       background: linear-gradient(180deg, #2e7d32 0%, #1b5e20 100%);
       border-radius: 8px;
-      padding: 0.5rem 0.4rem;
+      padding: 0.4rem 0.35rem;
       display: flex;
       flex-direction: column;
-      gap: 0.35rem;
+      gap: 0.3rem;
       border: 2px solid #fff;
       box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
-      min-height: 340px;
+      min-height: 280px;
       justify-content: space-around;
-      margin-bottom: 0.5rem;
+      margin-bottom: 0.25rem;
       overflow: hidden;
     }
     /* Halfway line — horizontal stripe at 50% height, full pitch width.
@@ -318,8 +345,8 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      width: 64px;
-      height: 64px;
+      width: 56px;
+      height: 56px;
       border: 1.5px solid rgba(255, 255, 255, 0.65);
       border-radius: 50%;
       pointer-events: none;
@@ -335,7 +362,7 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       display: flex;
       justify-content: space-around;
       align-items: center;
-      min-height: 36px;
+      min-height: 30px;
     }
 
     .player-dot {
@@ -414,14 +441,14 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
        visually aligned so the manager can scan "Posesión", "Goles",
        "Tiros totales" etc. left-to-right per team. */
     .partido-stats {
-      margin-top: 0.5rem;
-      padding: 0.5rem 0.6rem 0.45rem;
+      margin-top: 0.35rem;
+      padding: 0.4rem 0.55rem 0.35rem;
       background: #f9fafb;
       border: 1px solid #e5e7eb;
       border-radius: 6px;
     }
     .partido-stats h3 {
-      margin: 0 0 0.35rem 0;
+      margin: 0 0 0.25rem 0;
       font-size: 0.82rem;
       font-weight: 700;
       color: #1e3c72;
@@ -468,8 +495,8 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       display: grid;
       grid-template-columns: 2fr 1fr 1fr;
       gap: 0.5rem;
-      padding: 0.18rem 0;
-      font-size: 0.8rem;
+      padding: 0.12rem 0;
+      font-size: 0.78rem;
       align-items: center;
     }
     .stat-label {
@@ -504,14 +531,14 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
        4-col grid (icon, minute, player, description) so the manager can
        scan "who did what when" without parsing descriptions. */
     .recent-events {
-      margin-top: 0.45rem;
-      padding: 0.5rem 0.6rem;
+      margin-top: 0.3rem;
+      padding: 0.4rem 0.55rem;
       background: #fff;
       border: 1px solid #e5e7eb;
       border-radius: 6px;
     }
     .recent-events h3 {
-      margin: 0 0 0.3rem 0;
+      margin: 0 0 0.25rem 0;
       font-size: 0.82rem;
       font-weight: 700;
       color: #1e3c72;
@@ -522,16 +549,16 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       padding: 0;
       display: flex;
       flex-direction: column;
-      gap: 0.2rem;
-      max-height: 140px;
+      gap: 0.15rem;
+      max-height: 120px;
       overflow-y: auto;
     }
     .event-item {
       display: grid;
       grid-template-columns: 24px 32px 1fr 2fr;
       gap: 0.4rem;
-      padding: 0.25rem 0.4rem;
-      font-size: 0.72rem;
+      padding: 0.18rem 0.4rem;
+      font-size: 0.7rem;
       align-items: center;
       border-radius: 4px;
       background: #f5f7fa;
@@ -590,7 +617,7 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
     /* ========== V25D89-FRONT-A: rival tab — read-only ========== */
 
     .rival-pitch-wrapper {
-      padding: 0.5rem 0;
+      padding: 0.2rem 0 0.3rem;
     }
 
     /* V25D89-FRONT-A: rival dots are visually de-emphasized (grayed
@@ -624,8 +651,8 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
     .formation-grid {
       display: grid;
       grid-template-columns: 1fr;
-      gap: 0.5rem;
-      margin-bottom: 0.4rem;
+      gap: 0.4rem;
+      margin-bottom: 0.2rem;
     }
     @media (min-width: 601px) {
       .formation-grid {
@@ -634,7 +661,7 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
     }
     .col-pitch h3,
     .col-bench h3 {
-      margin: 0 0 0.3rem 0;
+      margin: 0 0 0.25rem 0;
       font-size: 0.82rem;
       font-weight: 700;
       color: #1e3c72;
@@ -643,10 +670,10 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
     .bench-list {
       display: flex;
       flex-direction: column;
-      gap: 0.3rem;
-      max-height: 340px;
+      gap: 0.25rem;
+      max-height: 280px;
       overflow-y: auto;
-      padding: 0.35rem;
+      padding: 0.3rem;
       background: #f9fafb;
       border: 1px solid #e5e7eb;
       border-radius: 6px;
@@ -655,7 +682,7 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
     .bench-player {
       display: flex;
       flex-direction: column;
-      padding: 0.45rem 0.55rem;
+      padding: 0.35rem 0.5rem;
       background: #fff;
       border: 1px solid #d1d5db;
       border-radius: 4px;
@@ -703,12 +730,13 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       display: flex;
       align-items: center;
       gap: 0.4rem;
-      font-size: 0.75rem;
+      font-size: 0.72rem;
       color: #5a6473;
       margin: 0;
-      padding: 0.3rem 0.45rem;
+      padding: 0.18rem 0.35rem;
       background: #f5f7fa;
       border-radius: 4px;
+      line-height: 1.3;
     }
     .hint mat-icon {
       font-size: 1rem;
@@ -738,7 +766,7 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       border-radius: 6px;
     }
 
-    .partido-modal-actions { padding: 0.25rem 1rem 0.35rem; }
+    .partido-modal-actions { padding: 0.15rem 1rem 0.2rem; }
 
     /* V25D89-FRONT-A: success toast styling (snackbar) — same as F5. */
     :host ::ng-deep .success-toast {
