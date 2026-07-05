@@ -157,7 +157,9 @@ import { SessionPlayer } from '../../shared/models/player.model';
                      [class.eff-yellow]="getEffectivenessColor(sub.subdivisionId) === 'yellow'"
                      [class.eff-red]="getEffectivenessColor(sub.subdivisionId) === 'red'"
                      (click)="onSlotClick(sub)">
-                  <span class="slot-id">{{sub.subdivisionId}}</span>
+                  <!-- V25D91-FRONT-F3: slot-id label removida (era debug-only
+                       desde V25D47 C11b). Ahora el slot es clickeable sin
+                       saturar visualmente el campo con 82 labels SBX-Y. -->
                   <!-- V25D51 (Sprint C13): chip-level effectiveness feedback.
                        eff-good (>=0.9) keeps the default chip style; eff-warning
                        (0.7-0.9) draws an orange border; eff-bad (<0.7) draws a red
@@ -207,7 +209,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
                      [class.eff-yellow]="getEffectivenessColor(sub.subdivisionId) === 'yellow'"
                      [class.eff-red]="getEffectivenessColor(sub.subdivisionId) === 'red'"
                      (click)="onSlotClick(sub)">
-                  <span class="slot-id">{{sub.subdivisionId}}</span>
+                  <!-- V25D91-FRONT-F3: slot-id label removida (era debug-only). -->
                   <!-- V25D51 (Sprint C13): chip-level effectiveness feedback.
                        See the slot-gk block above for full details on the
                        eff-good/eff-warning/eff-bad classification and the
@@ -898,12 +900,6 @@ import { SessionPlayer } from '../../shared/models/player.model';
       text-transform: uppercase;
     }
 
-    .slot-id {
-      font-size: 0.55rem;
-      color: rgba(255, 255, 255, 0.5);
-      font-weight: bold;
-    }
-
     .player-chip {
       font-size: 0.5rem;
       color: #fff;
@@ -1327,10 +1323,6 @@ import { SessionPlayer } from '../../shared/models/player.model';
         height: auto;
       }
 
-      .slot-id {
-        font-size: 0.35rem;
-      }
-
       /* Mobile chips keep visible — shrink font-size + padding so they
          fit narrow slots without overflowing. */
       .player-chip {
@@ -1370,10 +1362,6 @@ import { SessionPlayer } from '../../shared/models/player.model';
       }
 
       .player-chip {
-        font-size: 0.45rem;
-      }
-
-      .slot-id {
         font-size: 0.45rem;
       }
 
