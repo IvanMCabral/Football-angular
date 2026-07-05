@@ -616,8 +616,11 @@ import { SessionPlayer } from '../../shared/models/player.model';
       border: 1px solid rgba(255, 255, 255, 0.25);
       border-radius: 6px;
       cursor: grab;
+      /* V25D91-FRONT-F2: bumped max-width from 140 → 200px so nombres como
+         \"Fran García\" o \"Kepa Arrizabalaga\" no se trunquen a \"Fran Gar...\"
+         / \"Kepa Arr...\" visualmente. */
       min-width: 80px;
-      max-width: 140px;
+      max-width: 200px;
       transition: background 0.15s ease, border-color 0.15s ease;
     }
     .bench-player:hover {
@@ -628,13 +631,20 @@ import { SessionPlayer } from '../../shared/models/player.model';
       cursor: grabbing;
     }
     .bench-player-name {
+      /* V25D91-FRONT-F2: allow multi-line wrap with tight line-height so
+         full names render without truncation. text-align:center for centered
+         wrap. overflow:visible (was hidden) y text-overflow:clip (was
+         ellipsis) para que no corte con \"…\". */
       font-size: 0.75rem;
       color: #fff;
       font-weight: 600;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      white-space: normal;
+      line-height: 1.1;
+      overflow: visible;
+      text-overflow: clip;
       max-width: 100%;
+      text-align: center;
+      word-break: break-word;
     }
     .bench-player-pos {
       font-size: 0.65rem;
