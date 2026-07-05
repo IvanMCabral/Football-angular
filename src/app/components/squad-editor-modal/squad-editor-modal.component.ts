@@ -43,7 +43,26 @@ import { SessionPlayer } from '../../shared/models/player.model';
         <h2>Editor de Formación</h2>
         <div class="formation-selector">
           <label>Formación:</label>
-          <select [(ngModel)]="selectedFormation" (change)="onFormationChange()" [disabled]="isFormationChanging">
+          <!-- V25D91.5-FRONT F6 fix: use (ngModelChange) en lugar de (change).
+               Razon: con [(ngModel)] + (change), el orden de los listeners es
+               incierto — Angular puede disparar el handler ANTES de que
+               NgModel haya actualizado el modelo, por lo que onFormationChange()
+               leía el valor VIEJO de selectedFormation. El HTTP call iba con
+               la formacion anterior → no-op. El markers/header no se actualizaban.
+
+               Con (ngModelChange) Angular garantiza que el handler corre
+               DESPUES de actualizar el modelo, asi que el argumento (o
+               this.selectedFormation) ya refleja la nueva eleccion del usuario.
+
+               Tambien reseteamos isFormationChanging directamente en el callback
+               HTTP (ver onFormationChange) en vez de depender del padre
+               escuchando a (formationChangeComplete). El padre squad-management
+               (squad-management.component.ts) no subscribe a ese Output, asi que
+               antes el select quedaba permanentemente disabled tras el primer
+               cambio. -->
+          <select [(ngModel)]="selectedFormation"
+                  (ngModelChange)="onFormationChange($event)"
+                  [disabled]="isFormationChanging">
             <option *ngFor="let f of formations" [value]="f">{{f}}</option>
           </select>
           <span *ngIf="isFormationChanging" class="formation-change-blocked">(espera...)</span>
@@ -2193,8 +2212,28 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     return fe?.inferredFormation ?? null;
   }
 
-  /** Cambia la formación - espera a que termine el ciclo completo incluyendo predicción */
-  onFormationChange(): void {
+  /**
+   * Cambia la formación cuando el usuario selecciona una opción del `<select>`.
+   *
+   * <p>V25D91.5-FRONT F6 fix: este handler se invoca desde `(ngModelChange)` (no
+   * `(change)`), lo que garantiza que Angular ya actualizó {@code this.selectedFormation}
+   * cuando el handler corre. Antes con `(change)` el orden era incierto y a veces
+   * leía el valor VIEJO, mandando un HTTP call con la formación anterior → no-op
+   * visual.
+   *
+   * <p>El parámetro {@code newFormation} viene del `(ngModelChange)`; si por
+   * alguna razón llega undefined (e.g. una llamada programática sin arg), fallback
+   * a {@code this.selectedFormation}.
+   *
+   * <p>Antes el flag {@code isFormationChanging} solo se reseteaba cuando
+   * {@code formationChangeCompleteSubject.next()} se llamaba desde el padre
+   * (vía `(formationChangeComplete)` Output). Pero el padre
+   * {@code squad-management.component.ts} nunca escucha ese Output, así que
+   * el select quedaba permanentemente disabled después del primer cambio. Ahora
+   * reseteamos el flag directamente en el callback HTTP de
+   * {@link executeFormationChange}, independiente del padre.
+   */
+  onFormationChange(newFormation?: string): void {
     // Bloquear si hay un cambio en progreso
     if (this.isFormationChanging) {
       console.log('[SQUAD-EDITOR] Formation change blocked - waiting for previous change to complete');
@@ -2206,39 +2245,34 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
       return;
     }
 
+    // V25D91.5-FRONT F6: priorizar el argumento explícito (viene de ngModelChange,
+    // siempre actualizado) sobre this.selectedFormation (puede no estarlo si se
+    // llama el handler programáticamente antes de que Angular sincronice el DOM).
+    const targetFormation = newFormation ?? this.selectedFormation;
+    if (!targetFormation) {
+      return;
+    }
+
+    // No-op si la formación no cambió realmente
+    if (targetFormation === this.homeFormation$.value) {
+      return;
+    }
+
     // Bloquear nuevos cambios mientras carga
     this.isFormationChanging = true;
+    this.cdr.markForCheck();
 
-    // Resetear el subject para esperar nueva confirmación
+    // Resetear el subject para esperar nueva confirmación (legacy contract
+    // con el padre — squad-management no escucha, pero lo emitimos por si
+    // otro caller en el futuro lo hace).
     this.formationChangeCompleteSubject = new Subject<void>();
 
-    const newFormation = this.selectedFormation;
-    this.homeFormation$.next(newFormation);
+    this.homeFormation$.next(targetFormation);
 
-    // Ejecutar cambio y esperar a que termine (save en Redis completo)
-    this.executeFormationChange(newFormation).then(() => {
-      // Emitir el subject para que el padre pueda completar cuando la predicción esté lista
-      this.formationChangeComplete.emit(this.formationChangeCompleteSubject);
-
-      // Solo DESBLOQUEAR cuando el subject complete (cuando predicción termine)
-      this.formationChangeCompleteSubject.subscribe({
-        next: () => {
-          this.isFormationChanging = false;
-          this.cdr.detectChanges();
-        },
-        error: () => {
-          // También desbloquear en caso de error
-          this.isFormationChanging = false;
-          this.cdr.detectChanges();
-        }
-      });
-
-      this.cdr.detectChanges();
-    }).catch(() => {
-      // También desbloquear en caso de error
-      this.isFormationChanging = false;
-      this.formationChangeCompleteSubject.complete();
-    });
+    // Ejecutar cambio. El reset de isFormationChanging ahora vive adentro
+    // de executeFormationChange (next + error callbacks), sin depender del
+    // padre escuchando formationChangeComplete.
+    this.executeFormationChange(targetFormation);
   }
 
   /** Ejecuta auto-select sin limpiar el mapa primero (para carga inicial) */
@@ -2322,45 +2356,72 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     this.homePlayers$.next(allPlayers.filter(p => p.slotId));
     this.benchPlayers$.next(allPlayers.filter(p => !p.slotId));
 
+    // V25D91.5-FRONT F6 fix: markForCheck + detectChanges. El template
+    // itera sobre homePlayers (getter sobre BehaviorSubject) sin async
+    // pipe, así que necesita change detection explícita para repintar
+    // los markers en sus nuevas posiciones. Antes solo había detectChanges
+    // que funcionaba pero era frágil ante schedules async.
+    this.cdr.markForCheck();
     this.cdr.detectChanges();
   }
 
-  /** Ejecuta el cambio de formación - retorna Promise para esperar completado */
-  private executeFormationChange(newFormation: string): Promise<void> {
+  /**
+   * Ejecuta el cambio de formación vía POST /career/lineup/auto-select y aplica
+   * los players retornados a los slots del campo.
+   *
+   * <p>V25D91.5-FRONT F6 fix: antes este método retornaba una Promise que solo
+   * resolvía después del HTTP. El reset de {@code isFormationChanging} vivía
+   * en {@code onFormationChange.then()} y dependía de que el padre
+   * escuchara {@code formationChangeCompleteSubject}. Como el padre no lo hace,
+   * el flag quedaba en true para siempre y el select quedaba disabled.
+   *
+   * <p>Ahora el reset del flag vive directamente en los callbacks next/error
+   * de este método, sin depender del padre. También agregamos
+   * {@code cdr.markForCheck()} + {@code cdr.detectChanges()} para forzar change
+   * detection en el squad-header (donde está el select y la chemistry preview).
+   */
+  private executeFormationChange(newFormation: string): void {
     const startTime = performance.now();
     this.loadingFormation$.next(true);
+    this.cdr.markForCheck();
 
-    // Retornar Promise que se resuelve cuando termine el HTTP call
-    return new Promise((resolve, reject) => {
-      // Llamar al endpoint auto-select para obtener los mejores jugadores
-      this.http.post<any>(`${environment.apiUrl}/career/lineup/auto-select`, {
-        formation: newFormation
-      }).subscribe({
-        next: (response) => {
-          this.loadingFormation$.next(false);
-          this.applyLineupToSlots(newFormation, response?.players || []);
-          // MVP1-lineup-cancha-1.5 FIX (F4, defensivo): persistir los slots
-          // después del auto-select. Si F1 (back) está bien implementado,
-          // el back ya persistió el subdivision map; este saveLineup es
-          // redundante pero defensivo. Si F1 tiene un bug, este saveLineup
-          // asegura persistencia. El guard interno bloquea si lineup < 7.
-          this.saveLineup();
-          // EMITIR EVENTO AL PADRE con los players directamente (sin esperar backend)
-          this.formationChanged.emit({
-            formation: newFormation,
-            players: response?.players || []
-          });
-          resolve(); // Resolver Promise
-        },
-        error: (err) => {
-          this.loadingFormation$.next(false);
-          const elapsed = (performance.now() - startTime).toFixed(0);
-          console.error(`[SQUAD-EDITOR] Auto-select ERROR after ${elapsed}ms:`, err);
-          this.errorMessage$.next('Error al auto-seleccionar jugadores');
-          this.cdr.detectChanges();
-          resolve(); // También resolver en caso de error para no bloquear
-        }
-      });
+    // Llamar al endpoint auto-select para obtener los mejores jugadores
+    this.http.post<any>(`${environment.apiUrl}/career/lineup/auto-select`, {
+      formation: newFormation
+    }).subscribe({
+      next: (response) => {
+        this.loadingFormation$.next(false);
+        this.applyLineupToSlots(newFormation, response?.players || []);
+        // MVP1-lineup-cancha-1.5 FIX (F4, defensivo): persistir los slots
+        // después del auto-select. Si F1 (back) está bien implementado,
+        // el back ya persistió el subdivision map; este saveLineup es
+        // redundante pero defensivo. Si F1 tiene un bug, este saveLineup
+        // asegura persistencia. El guard interno bloquea si lineup < 7.
+        this.saveLineup();
+        // EMITIR EVENTO AL PADRE con los players directamente (sin esperar backend)
+        this.formationChanged.emit({
+          formation: newFormation,
+          players: response?.players || []
+        });
+        // Legacy: emit formationChangeComplete con el subject (no-op si nadie escucha).
+        this.formationChangeComplete.emit(this.formationChangeCompleteSubject);
+
+        // V25D91.5-FRONT F6 fix: reset del flag + cd explicit. Antes dependía del
+        // padre escuchando formationChangeComplete, lo que nunca pasaba.
+        this.isFormationChanging = false;
+        this.cdr.markForCheck();
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        this.loadingFormation$.next(false);
+        const elapsed = (performance.now() - startTime).toFixed(0);
+        console.error(`[SQUAD-EDITOR] Auto-select ERROR after ${elapsed}ms:`, err);
+        this.errorMessage$.next('Error al auto-seleccionar jugadores');
+        // V25D91.5-FRONT F6 fix: reset también en error path.
+        this.isFormationChanging = false;
+        this.cdr.markForCheck();
+        this.cdr.detectChanges();
+      }
     });
   }
 
