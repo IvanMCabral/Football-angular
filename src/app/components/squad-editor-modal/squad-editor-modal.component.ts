@@ -1549,64 +1549,80 @@ import { SessionPlayer } from '../../shared/models/player.model';
        medio, y role badge color-codeado por familia. Mismo scheme que
        V25D90 PartidoModal (yellow GK / blue DEF / green MID / red ATT). */
 .player-marker {
-       position: absolute;
-       /* V25D93-FRONT F3: width fijo 70px (suficiente para nombres largos en 2
-          lineas). Height VARIA por role per Ivan spec — ver los selectores
-          .color-gk/.color-def/.color-mid/.color-att abajo.
+        position: absolute;
+        /* V25D93-FRONT F3: width fijo 70px (suficiente para nombres largos en 2
+           lineas). Height VARIA por role per Ivan spec — ver los selectores
+           .color-gk/.color-def/.color-mid/.color-att abajo.
 
-          V25D95.1-FRONT F4: z-index 20 → 10. El hierarchy final es
-          .field-slots=1, .field-line=2, .player-marker=10, .tactical-number=11.
-          El marker queda encima de slots + markings pero el dorsal flota
-          externo en z:11. Antes z:20 era muy alto — el assignment panel
-          (z:100) y los warnings (z:100) ya estaban muy por encima, asi que
-          bajar a 10 no afecta ningun overlay del modal.
+           V25D95.1-FRONT F4: z-index 20 → 10. El hierarchy final es
+           .field-slots=1, .field-line=2, .player-marker=10, .tactical-number=11.
+           El marker queda encima de slots + markings pero el dorsal flota
+           externo en z:11. Antes z:20 era muy alto — el assignment panel
+           (z:100) y los warnings (z:100) ya estaban muy por encima, asi que
+           bajar a 10 no afecta ningun overlay del modal.
 
-          V25D99-FRONT: pointer-events: auto (was: none). Pre-V25D99 the
-          marker was purely visual — the slot's cdkDropList captured drag
-          events. V25D99 moved drag capture to (cdkDragEnded) on the
-          marker itself. pointer-events: none blocked ALL mouse events
-          on the marker so cdkDrag never started — Ivan reported 'no
-          deja hacer cambio de nada'. Re-enabling pointer events here
-          makes the marker the drag handle as intended by the V25D99
-          rewrite. The inner .player-chip-name text inherits pointer
-          events normally; the slot is still clickable (pointer-events
-          pass through to siblings, but the marker sits ON TOP of slots
-          so clicks land on the marker, which uses cdkDrag to start a
-          drag). The marker template also forwards click to onSlotClick
-          via the (click) on the .field element — but since the marker
-          has its own cdkDrag, plain clicks would be CDK-initiated
-          drags; for click-to-assign UX see the assignment-panel flow. */
-       width: 70px;
-       height: 48px;
-       transform: translate(-50%, -50%);
-       z-index: 10;
-       pointer-events: auto;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 1px;
-      /* V25D93-FRONT F3: border 2px solid white per parent spec (ANTES no
-         habia border visible — solo drop-shadow). Ahora el marker se separa
-         claramente del field green con borde blanco solido. */
-      border: 2px solid #fff;
-      border-radius: 6px;
-      background: rgba(0, 0, 0, 0.55);
-      /* V25D93-FRONT F3: drop-shadow per parent spec rgba(0,0,0,.35) 0 1px 3px
-         (ANTES era 0,0,0,0.5 0 2px 3px). Mas sutil. */
-      filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.35));
-    }
+           V25D99-FRONT: pointer-events: auto (was: none). Pre-V25D99 the
+           marker was purely visual — the slot's cdkDropList captured drag
+           events. V25D99 moved drag capture to (cdkDragEnded) on the
+           marker itself. pointer-events: none blocked ALL mouse events
+           on the marker so cdkDrag never started — Ivan reported 'no
+           deja hacer cambio de nada'. Re-enabling pointer events here
+           makes the marker the drag handle as intended by the V25D99
+           rewrite. The inner .player-chip-name text inherits pointer
+           events normally; the slot is still clickable (pointer-events
+           pass through to siblings, but the marker sits ON TOP of slots
+           so clicks land on the marker, which uses cdkDrag to start a
+           drag). The marker template also forwards click to onSlotClick
+           via the (click) on the .field element — but since the marker
+           has its own cdkDrag, plain clicks would be CDK-initiated
+           drags; for click-to-assign UX see the assignment-panel flow.
 
-    /* V25D93-FRONT F3: height por role per Ivan spec:
-       GK 56px (portero grande — un solo player, special status)
-       DEF 48px (4 defenders en formacion tipica)
-       MID 44px (4-5 mids, mas pequenos pq son mas por fila)
-       FW  48px (2-3 forwards)
-       Overrides the default .player-marker { height: 48px }. */
-    .player-marker.color-gk { height: 56px; }
-    .player-marker.color-def { height: 48px; }
-    .player-marker.color-mid { height: 44px; }
-    .player-marker.color-att { height: 48px; }
+           V25D99.10-FRONT: removed transform: translate(-50%, -50%).
+           Replaced with MARGIN-based centering (below). Reason: CDK's
+           inline transform: translate3d(dragX, dragY, 0) during drag
+           OVERRIDES any CSS transform on the element — the centering
+           was being lost during drag, causing the marker to be offset
+           from the cursor (Ivan: 'queda dependiendo de a donde volando
+           mas a la derecha, cuando lo agarro'). Margin affects the
+           element's BOUNDING RECT (not its CSS transform), so CDK's
+           drag math respects the centering — cursor stays on the
+           marker's center regardless of where the user clicks. */
+        width: 70px;
+        height: 48px;
+        margin-left: -35px;
+        margin-top: -24px;
+        z-index: 10;
+        pointer-events: auto;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1px;
+        /* V25D93-FRONT F3: border 2px solid white per parent spec (ANTES no
+           habia border visible — solo drop-shadow). Ahora el marker se separa
+           claramente del field green con borde blanco solido. */
+        border: 2px solid #fff;
+        border-radius: 6px;
+        background: rgba(0, 0, 0, 0.55);
+        /* V25D93-FRONT F3: drop-shadow per parent spec rgba(0,0,0,.35) 0 1px 3px
+           (ANTES era 0,0,0,0.5 0 2px 3px). Mas sutil. */
+        filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.35));
+        /* V25D99.10-FRONT: box-sizing border-box so the 70px width INCLUDES
+           the 2px border (otherwise total visual width is 74px and margin
+           math would be off by 2px on each side). */
+        box-sizing: border-box;
+      }
+
+      /* V25D99.10-FRONT: per-role margin-top adjustment for centering.
+         With margin-top: -24px default for 48px height (def/att),
+         the marker's vertical center sits exactly on style.top. GK
+         (56px) and MID (44px) need different offsets to keep their
+         centers on style.top.
+         (The height overrides below are V25D93-FRONT F3.) */
+      .player-marker.color-gk { height: 56px; margin-top: -28px; }
+      .player-marker.color-def { height: 48px; margin-top: -24px; }
+      .player-marker.color-mid { height: 44px; margin-top: -22px; }
+      .player-marker.color-att { height: 48px; margin-top: -24px; }
 
     .player-marker .player-number {
       min-width: 18px;
