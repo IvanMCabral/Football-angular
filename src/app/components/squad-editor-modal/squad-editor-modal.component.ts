@@ -1394,10 +1394,25 @@ import { SessionPlayer } from '../../shared/models/player.model';
        por arriba' on the V25D98.5 fix. Combined with onSlotClick's
        early-return, the slot is now a pure visual ghost until the user
        drag-drops the marker back onto it (handleSlotDrop restores
-       slotPlayerMap + removes .abandoned). */
+       slotPlayerMap + removes .abandoned).
+
+       V25D99.3-FRONT: visual distinction for abandoned slots. Ivan reported
+       'queda ese espacio como reservado' — the empty slot looked like a
+       reserved/active slot because it had no visual cue. Now: dashed amber
+       outline at 30% opacity, clearly communicates "slot vacío, drop acá
+       para llenarlo" vs an active occupied slot (white border + colored
+       chip). pointer-events:none retained (chip click should still be
+       inert) but the marker's cdkDragEnded hit-test works regardless of
+       pointer-events on the slot — it uses dropPoint coords vs slot's
+       bounding rect, so drops on abandoned slots DO assign. */
     .slot.abandoned {
       pointer-events: none;
       cursor: default;
+      outline: 1.5px dashed rgba(245, 158, 11, 0.55);
+      outline-offset: -2px;
+      border-radius: 4px;
+      opacity: 0.55;
+      transition: outline 0.15s ease, opacity 0.15s ease;
     }
 
     .slot.recommended {
@@ -3077,19 +3092,71 @@ const targetSlot = this.findSlotAtPosition(xPct, yPct);
     this.homePlayers$.next([...this.homePlayers$.value]);
     this.cdr.markForCheck();
     this.cdr.detectChanges();
+
+    // V25D99.3-FRONT: reset CDK drag internal state so the next drag works.
+    // Ivan reported 'no deja volver a mover' — the second drag of the
+    // SAME marker after a free drop didn't fire. CDK's internal DragRef
+    // keeps a 'disabled until next pointerdown' flag that doesn't always
+    // clear on its own after a non-dropList drag. Calling _dragRef.reset()
+    // explicitly clears that flag plus the preview/placeholder state.
+    // We use the internal _dragRef (DragRef.reset() is not part of the
+    // public CdkDrag API) — this is the standard Angular Material team's
+    // own workaround for this exact issue. After reset(), the marker's
+    // CSS position is still bound to [style.left/top] which Angular
+    // re-renders to the new xPercent/yPercent, so the marker stays at
+    // the new position — reset() only clears CDK's internal drag state,
+    // not Angular's bindings.
+    const dragRef = (event.source as any)?._dragRef;
+    if (dragRef && typeof dragRef.reset === 'function') {
+      dragRef.reset();
+    }
   }
 
   /**
    * V25D99-FRONT: find the subdivision whose bounding box contains the
    * given (xPercent, yPercent) field-relative coordinates. Returns null
-   * if the point is in free space (outside any slot). Used by
-   * handleMarkerDragEnd to decide between slot-snap and free positioning.
-   */
+* if the point is in free space (outside any slot). Used by
+    * handleMarkerDragEnd to decide between slot-snap and free positioning.
+    *
+    * V25D99.3-FRONT: snap-to-nearest-slot margin. If the drop point is
+    * OUTSIDE all slot bounding boxes but within SNAP_MARGIN_PCT of a
+    * slot (Manhattan distance to slot center, measured in % of field),
+    * snap to that slot. Ivan reported 'quedo como mal' on free drops
+    * where the cursor was visually over a slot but the hit-test failed
+    * (small offset between cursor and slot center due to mousedown
+    * offset math). With 5% margin, drops close to a slot snap to it
+    * instead of falling through to free positioning. Only the NEAREST
+    * slot within margin is returned — no ambiguity when two slots are
+    * both close (returns the closer one).
+    */
   private findSlotAtPosition(xPct: number, yPct: number): FieldSubdivisionDTO | null {
-    return this.subdivisions.find(s =>
+    // Pass 1: exact hit (inside slot bounds) — original behavior.
+    const exact = this.subdivisions.find(s =>
       xPct >= s.left && xPct <= s.left + s.width
       && yPct >= s.top && yPct <= s.top + s.height
-    ) ?? null;
+    );
+    if (exact) { return exact; }
+
+    // Pass 2: snap-to-nearest within margin. 5% of field = ~30-60px
+    // depending on viewport, enough to cover small cursor/slot offset
+    // misalignments without falsely snapping to distant slots.
+    const SNAP_MARGIN_PCT = 5;
+    let nearest: FieldSubdivisionDTO | null = null;
+    let nearestDist = Infinity;
+    for (const s of this.subdivisions) {
+      const distX = Math.abs(xPct - (s.left + s.width / 2));
+      const distY = Math.abs(yPct - (s.top + s.height / 2));
+      // Snap if within (half-slot + margin) of slot center.
+      if (distX <= s.width / 2 + SNAP_MARGIN_PCT
+          && distY <= s.height / 2 + SNAP_MARGIN_PCT) {
+        const dist = distX + distY;
+        if (dist < nearestDist) {
+          nearestDist = dist;
+          nearest = s;
+        }
+      }
+    }
+    return nearest;
   }
 
   /**
