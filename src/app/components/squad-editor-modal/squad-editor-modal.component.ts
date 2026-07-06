@@ -150,20 +150,36 @@ import { SessionPlayer } from '../../shared/models/player.model';
           <div class="zone-label zone-midfield-label">MEDIO</div>
           <div class="zone-label zone-defense-label">DEFENSA</div>
 
-          <!-- Marcaciones del campo -->
+          <!-- V25D95-FRONT F2: reinforced soccer markings for TV-broadcast
+               look. Pre-V25D95 era 16%×30% penalty area (chico); Ivan pidio
+               "la cancha se vea profesional como TV". Spec: 60% w × 16% h
+               penalty areas, 25% × 6% goal areas, 18% diameter center
+               circle, 14% w penalty arcs, 0.6% w penalty spots + 4 corner
+               arcs (NEW element). Ver CSS rules para proporciones exactas.
+               Tambien F4: 2 goal posts (arcos pequenos en top/bottom del
+               field, 8%×4% con net pattern). -->
           <div class="field-line center-line"></div>
           <div class="field-line center-circle"></div>
           <div class="field-line left-penalty-area"></div>
           <div class="field-line right-penalty-area"></div>
           <div class="field-line left-goal-area"></div>
           <div class="field-line right-goal-area"></div>
-          <!-- V25D93-FRONT F2: penalty spots (puntitos blancos a 11% de cada
-               goal-line) + penalty arcs (semicirculos fuera de cada
-               penalty area). See CSS for proportions (16% w x 30% h). -->
           <div class="field-line left-penalty-spot"></div>
           <div class="field-line right-penalty-spot"></div>
           <div class="field-line left-penalty-arc"></div>
           <div class="field-line right-penalty-arc"></div>
+          <!-- V25D95-FRONT F2 NEW: corner arcs (cuarto de circulo en cada
+               esquina). Selective border-radius: 100% en una sola esquina
+               para mostrar solo el quarter visible. 2.5% w × 2.5% h. -->
+          <div class="corner-arc corner-tl"></div>
+          <div class="corner-arc corner-tr"></div>
+          <div class="corner-arc corner-bl"></div>
+          <div class="corner-arc corner-br"></div>
+          <!-- V25D95-FRONT F4 NEW: goal posts (mini-arcos en top y bottom
+               del field, 8% w × 4% h, centro horizontalmente). Border 2px
+               solido + bg transparente con net pattern sutil. -->
+          <div class="goal-post goal-post-top"></div>
+          <div class="goal-post goal-post-bottom"></div>
 
           <!-- SUBDIVISIONES COMO SLOTS (81 + 1 GK) — V25D47 (C11b) extended
                each slot as a cdkDropList connected to all other slots +
@@ -289,10 +305,18 @@ import { SessionPlayer } from '../../shared/models/player.model';
                  [class.eff-green]="getEffectivenessColor(player.slotId) === 'green'"
                  [class.eff-yellow]="getEffectivenessColor(player.slotId) === 'yellow'"
                  [class.eff-red]="getEffectivenessColor(player.slotId) === 'red'">
-              <!-- V25D93-FRONT F4: tooltip moved to .player-chip (line 211+)
-                   which has pointer-events:auto by default. The marker itself
-                   has pointer-events:none for click-passthrough, so the [title]
-                   attribute on the marker would never fire. Removing for clarity. -->
+               <!-- V25D93-FRONT F4: tooltip moved to .player-chip (line 211+)
+                    which has pointer-events:auto by default. The marker itself
+                    has pointer-events:none for click-passthrough, so the [title]
+                    attribute on the marker would never fire. Removing for clarity.
+
+                    V25D95-FRONT F3: tactical number badge (small 14x14) que
+                    flota en el top-right corner EXTERNO del marker. Absolute
+                    top:-10 right:-8, semi-transparent, numero de dorsal 1-11.
+                    Complementa .player-number (INTERNO, mas grande) — la
+                    combinacion da legibilidad "tactica" desde lejos, similar
+                    a dorsales en broadcasts de TV. -->
+              <div class="tactical-number">{{i + 1}}</div>
               <div class="player-number">{{i + 1}}</div>
               <div class="player-name-label">{{player.name}}</div>
               <div class="player-role-label">{{player.role}}</div>
@@ -899,9 +923,39 @@ import { SessionPlayer } from '../../shared/models/player.model';
       width: auto;
       max-width: 100%;
       aspect-ratio: 1.15 / 1;
-      background: linear-gradient(180deg, #4a8c5c 0%, #5a9c6c 50%, #4a8c5c 100%);
-      border: 3px solid #fff;
+      /* V25D95-FRONT F1: grass texture profesional. Pre-V25D95 el field
+         era linear-gradient verde plano (#4a8c5c → #5a9c6c → #4a8c5c).
+         Ivan: "la cancha se ve fea, parece un bloque verde sin textura".
+         Spec: stripe pattern alternado cada 5% (repeating-linear-gradient
+         overlay) + radial-gradient center-to-edge (centro #3a8159 mas
+         brillante, bordes #235534 mas oscuros). background-blend-mode:
+         overlay mezcla las 2 capas para un efecto realista. */
+      background:
+        repeating-linear-gradient(
+          0deg,
+          rgba(255, 255, 255, 0.015) 0px,
+          rgba(255, 255, 255, 0.015) 5%,
+          transparent 5%,
+          transparent 10%
+        ),
+        radial-gradient(
+          ellipse at center,
+          #3a8159 0%,
+          #2d6a3e 50%,
+          #235534 100%
+        );
+      background-blend-mode: overlay;
+      /* V25D95-FRONT F2: outer border (frame del field) bumped from 3px
+         solid #fff to 2.5px solid rgba(255,255,255,0.95) per spec TV-
+         broadcast. Mismo thickness que la line del centro (consistencia). */
+      border: 2.5px solid rgba(255, 255, 255, 0.95);
       border-radius: 4px;
+      /* NOTA: NO agregamos overflow:hidden al .field porque romperia
+         .player-chip .eff-badge (positioned absolute top:-8 right:-8
+         desde el chip — sobresale del slot y podria extenderse fuera
+         del field para slots en los extremos como S24-3 / GK). Los
+         .corner-arc NO requieren clip: estan completamente dentro del
+         field (2.5% × 2.5% anchored en cada esquina). */
     }
 
     /* Etiquetas de zonas */
@@ -922,135 +976,240 @@ import { SessionPlayer } from '../../shared/models/player.model';
     .zone-defense-label { top: 68%; color: #99bbff; }
 
     /* Field Markings */
+    /* V25D95-FRONT F2: base .field-line con thickness bumped from 2px a
+       2-2.5px variable segun element spec. Border default white alpha 0.85
+       (vs old 0.7) per TV broadcast visual. */
     .field-line {
       position: absolute;
-      border: 2px solid rgba(255, 255, 255, 0.7);
+      border: 2px solid rgba(255, 255, 255, 0.85);
     }
 
+    /* V25D95-FRONT F2: halfway line — bumped to 2.5px height + alpha 0.95
+       (vs old 0.7). Posicionado en yPercent 50% exacto via top:50% +
+       translateY(-50%). Background-fill en vez de border (line horizontal
+       full-width no necesita 4-border). */
     .center-line {
       top: 50%;
-      height: 2px;
+      height: 2.5px;
       width: 100%;
       transform: translateY(-50%);
-      background: rgba(255, 255, 255, 0.7);
+      background: rgba(255, 255, 255, 0.95);
+      border: none;
     }
 
+    /* V25D95-FRONT F2: center circle diameter 13% → 18% per spec. Border
+       bumped a 2.5px alpha 0.95 (vs old 2px alpha 0.7). Igual AR:1 para
+       garantizar circular perfecto a cualquier field width. */
     .center-circle {
-      /* V25D93.5-FRONT: center circle converted to %-based for landscape.
-         Pre-V25D93.5 era 90x90 absolute px (tuned for 500w portrait field).
-         En landscape field (~700w+), 90px queda chico proporcional al
-         field. Ahora width:13% + aspect-ratio:1 — circle cuyo diameter
-         es 13% del field width. En 700w field = 91px (similar al portrait).
-         En 1200w field = 156px (escala con field). Border-radius:50% lo
-         mantiene circular. */
       top: 50%;
       left: 50%;
-      width: 13%;
+      width: 18%;
       aspect-ratio: 1;
       transform: translate(-50%, -50%);
       border-radius: 50%;
+      border: 2.5px solid rgba(255, 255, 255, 0.95);
     }
 
-    /* V25D93-FRONT F2: Penalty areas rectangulares per Ivan spec original
-       (16% ancho x 30% profundidad). V25D93.5 mantuvo estos %s — los %
-       escalan correctamente en landscape porque parent aspect cambia solo
-       el contenedor, no las proporciones internas. bottom:0 para own
-       penalty area (porteria del usuario abajo del field). */
+    /* V25D95-FRONT F2: Penalty areas per spec TV-broadcast. Bumped from
+       16% × 30% a 60% w × 16% h. El "60% del field width" era lo que
+       Ivan queria como "linea mas prominente" — V25D93 lo dejo chico
+       (proporciones reales-pitch). V25D95 trade-off: no es 100%
+       proporcional real pero se ve "profesional" como TV broadcast.
+       Border 2px solid rgba(255,255,255,0.9) per spec. bottom:0 (own)
+       o top:0 (opponent). */
     .left-penalty-area {
       bottom: 0;
       left: 50%;
-      width: 16%;
-      height: 30%;
+      width: 60%;
+      height: 16%;
       transform: translateX(-50%);
-      /* V25D93: solo top + lados. El bottom coincide con la goal-line, asi
-         que el rectangulo se conecta visualmente con el borde del field
-         sin doble linea. */
+      border: 2px solid rgba(255, 255, 255, 0.9);
+      /* Solo top + lados. El bottom coincide con la goal-line, asi el
+         rectangulo se conecta con el field border sin doble linea. */
       border-bottom: none;
     }
 
     .right-penalty-area {
       top: 0;
       left: 50%;
-      width: 16%;
-      height: 30%;
+      width: 60%;
+      height: 16%;
       transform: translateX(-50%);
-      /* Mismo trick: solo bottom + lados, top conecta con goal-line. */
+      border: 2px solid rgba(255, 255, 255, 0.9);
       border-top: none;
     }
 
-    /* V25D93-FRONT F2: Goal areas (chica, dentro de penalty area). En cancha
-       real es ~5.5m ancho x 9.16m profundidad del goal-line. Per Ivan spec
-       dejo 8% ancho x 12% profundidad. */
+    /* V25D95-FRONT F2: Goal areas (chica, dentro de penalty area). Spec:
+       25% w × 6% h (vs old 8% × 12%). Border 2px solid rgba(255,255,255,0.9).
+       Posicion dentro del penalty area, en el extremo (junto a la goal-line). */
     .left-goal-area {
       bottom: 0;
       left: 50%;
-      width: 8%;
-      height: 12%;
+      width: 25%;
+      height: 6%;
       transform: translateX(-50%);
+      border: 2px solid rgba(255, 255, 255, 0.9);
       border-bottom: none;
     }
 
     .right-goal-area {
       top: 0;
       left: 50%;
-      width: 8%;
-      height: 12%;
+      width: 25%;
+      height: 6%;
       transform: translateX(-50%);
+      border: 2px solid rgba(255, 255, 255, 0.9);
       border-top: none;
     }
 
-    /* V25D93.5-FRONT: Penalty spots convertidos a %-based. Pre-V25D93.5 eran
-       5x5 absolute (constante, no escalada). En landscape field, 5x5 queda
-       diminuto. Ahora width:0.8% aspect-ratio:1 — dot proporcional al field.
-       En 700w field = 5.6px (similar), en 1200w field = 9.6px (scaling up). */
+    /* V25D95-FRONT F2: Penalty spots per spec 0.6% w × 0.6% h (vs old
+       0.8%). Position bumped from 11% a 12% del goal-line (mas cerca
+       del centro segun FIFA regulations). Border-radius:50% mantiene
+       circular. Background blanco alpha 0.95 (full opacity para que
+       se vea como spot blanco solido). */
     .left-penalty-spot {
-      bottom: 11%;
+      bottom: 12%;
       left: 50%;
-      width: 0.8%;
+      width: 0.6%;
       aspect-ratio: 1;
       border-radius: 50%;
-      background: rgba(255, 255, 255, 0.85);
+      background: rgba(255, 255, 255, 0.95);
       transform: translateX(-50%);
       border: none;
     }
 
     .right-penalty-spot {
-      top: 11%;
+      top: 12%;
       left: 50%;
-      width: 0.8%;
+      width: 0.6%;
       aspect-ratio: 1;
       border-radius: 50%;
-      background: rgba(255, 255, 255, 0.85);
+      background: rgba(255, 255, 255, 0.95);
       transform: translateX(-50%);
       border: none;
     }
 
-    /* V25D93.5-FRONT: Penalty arcs convertidos a %-based (10% w + aspect 1).
-       Pre-V25D93.5 eran 90px absolute — ahora escalan con field width. */
+    /* V25D95-FRONT F2: Penalty arcs (D-shaped semicircle on top of penalty
+       area, parcialmente visible). Bumped from 10% a 14% w (mas prominente).
+       Border 2px solid rgba(255,255,255,0.85). El semicirculo visible se
+       logra con 3 borders transparent + transform translate que mueve el
+       circulo atras/abajo del penalty spot. */
     .left-penalty-arc {
-      bottom: 11%;
+      bottom: 12%;
       left: 50%;
-      width: 10%;
+      width: 14%;
       aspect-ratio: 1;
       border-radius: 50%;
       transform: translate(-50%, 35%);
-      border: 2px solid rgba(255, 255, 255, 0.7);
+      border: 2px solid rgba(255, 255, 255, 0.85);
       border-bottom-color: transparent;
       border-left-color: transparent;
       border-right-color: transparent;
     }
 
     .right-penalty-arc {
-      top: 11%;
+      top: 12%;
       left: 50%;
-      width: 10%;
+      width: 14%;
       aspect-ratio: 1;
       border-radius: 50%;
       transform: translate(-50%, -35%);
-      border: 2px solid rgba(255, 255, 255, 0.7);
+      border: 2px solid rgba(255, 255, 255, 0.85);
       border-top-color: transparent;
       border-left-color: transparent;
       border-right-color: transparent;
+    }
+
+    /* V25D95-FRONT F2 NEW: Corner arcs (4 esquinas del field). Cada uno es
+       un cuarto de circulo visible en una esquina. Width 2.5% × height
+       2.5% per spec — dimension pequena para no dominar visualmente. Border
+       2px solid rgba(255,255,255,0.9). El "quarter visible only" trick:
+       usamos border-radius:100% SOLO en la esquina que debe ser redonda;
+       las otras 3 esquinas quedan en border-radius:0 (sharp). Tambien
+       removemos los 2 borders que no se ven (los que apuntan hacia el
+       centro del field) para evitar doble linea visual.
+       Posicion: cada corner se ancla a su esquina del field via
+       top/left/right/bottom:0. Overflow:hidden del .field (V25D95 F2 fix)
+       clipa cualquier overflow accidental. */
+    .corner-arc {
+      position: absolute;
+      width: 2.5%;
+      height: 2.5%;
+      border: 2px solid rgba(255, 255, 255, 0.9);
+      border-radius: 0;
+    }
+
+    .corner-tl {
+      top: 0;
+      left: 0;
+      border-top-left-radius: 100%;
+      border-bottom: none;
+      border-right: none;
+    }
+
+    .corner-tr {
+      top: 0;
+      right: 0;
+      border-top-right-radius: 100%;
+      border-bottom: none;
+      border-left: none;
+    }
+
+    .corner-bl {
+      bottom: 0;
+      left: 0;
+      border-bottom-left-radius: 100%;
+      border-top: none;
+      border-right: none;
+    }
+
+    .corner-br {
+      bottom: 0;
+      right: 0;
+      border-bottom-right-radius: 100%;
+      border-top: none;
+      border-left: none;
+    }
+
+    /* V25D95-FRONT F4 NEW: Goal posts (mini-arcos en los goal-lines).
+       Width 8% del field × height 4% del field per spec. Border 2px
+       rgba(255,255,255,0.85) + bg alpha 0.15 para look de "net" semi-
+       transparent. Border-radius solo en los 2 corners que miran hacia
+       el centro del field (donde estaria la red colgando):
+         - top goal (en top del field): border-radius: 0 0 8% 8%
+           (bottom corners redondeados, net "cuelga" hacia abajo)
+         - bottom goal (en bottom del field): border-radius: 8% 8% 0 0
+           (top corners redondeados, net "cuelga" hacia arriba)
+       El z-index:3 los pone encima de las markings (default z) pero
+       debajo de los slots (z:5) y markers (z:20). */
+    .goal-post {
+      position: absolute;
+      left: 50%;
+      width: 8%;
+      height: 4%;
+      transform: translateX(-50%);
+      background:
+        /* Net pattern sutil: lineas verticales cada 4% del field. */
+        repeating-linear-gradient(
+          90deg,
+          rgba(255, 255, 255, 0.25) 0px,
+          rgba(255, 255, 255, 0.25) 0.5px,
+          transparent 0.5px,
+          transparent 4%
+        ),
+        rgba(255, 255, 255, 0.15);
+      border: 2px solid rgba(255, 255, 255, 0.85);
+      z-index: 3;
+    }
+
+    .goal-post-top {
+      top: 0;
+      border-radius: 0 0 8% 8%;
+    }
+
+    .goal-post-bottom {
+      bottom: 0;
+      border-radius: 8% 8% 0 0;
     }
 
     /* Slots Layer */
@@ -1293,6 +1452,34 @@ import { SessionPlayer } from '../../shared/models/player.model';
       /* GK gets an amber tint to complement the role label below. */
       background: rgba(245, 158, 11, 0.9);
       border-color: rgba(245, 158, 11, 1);
+    }
+
+    /* V25D95-FRONT F3: tactical number badge (cuadradito chico que flota
+       en el corner top-right EXTERNO del marker card). 14×14px per spec,
+       absolute top:-10 right:-8. Font 0.55rem semi-transparent (alpha
+       0.55) — sutil, complementa al .player-number INTERNO (mas grande
+       y opaco) sin distraer. Background alpha 0.4 (semi-transparent
+       black) para legibilidad sobre cualquier field background. Border-
+       radius:50% lo hace circular como dorsales en TV broadcast.
+       z-index:21 encima del marker (z:20) — sin esto el border-radius:6px
+       del .player-marker lo cortaria visualmente. */
+    .player-marker .tactical-number {
+      position: absolute;
+      top: -10px;
+      right: -8px;
+      width: 14px;
+      height: 14px;
+      font-size: 0.55rem;
+      font-weight: 700;
+      color: rgba(255, 255, 255, 0.55);
+      background: rgba(0, 0, 0, 0.4);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      pointer-events: none;
+      z-index: 21;
     }
 
     .player-marker .player-name-label {
