@@ -81,7 +81,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
           <select [value]="dropdownFormationValue"
                   (change)="onFormationSelect($any($event.target).value)"
                   [disabled]="isFormationChanging"
-                  [title]="(_isCustomLineup ? 'Tu lineup personalizado no coincide con una formación canónica' : '')">
+                  [title]="(isCustomLineup() ? 'Tu lineup personalizado no coincide con una formación canónica' : '')">
             <option *ngFor="let f of formations" [value]="f">{{f}}</option>
             <option [value]="userFormationLabel" [disabled]="true">Formación del User</option>
           </select>
@@ -3055,7 +3055,11 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     const sub = this.subdivisions.find(s => s.subdivisionId === player.slotId);
     if (!sub) { return false; }
     const recommended = this.getRecommendedRole(sub);
-    return !!recommended && player.role !== recommended;
+    if (!recommended) { return false; }
+    const playerFamily = this.getRoleFamily(player.role);
+    const recommendedFamily = this.getRoleFamily(recommended);
+    if (playerFamily === null || recommendedFamily === null) { return false; }
+    return playerFamily !== recommendedFamily;
   }
 
   /**
