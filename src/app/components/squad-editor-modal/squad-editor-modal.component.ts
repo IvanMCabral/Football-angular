@@ -329,6 +329,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
                   [style.left.%]="getSlotCenterX(player.slotId)"
                   [style.top.%]="getSlotCenterY(player.slotId)"
                   [class.gk-player]="player.role === 'GK'"
+                  [class.off-role]="isOffRole(player)"
                   [ngClass]="getMarkerRoleClasses(player.role)">
               <!-- V25D95.5-FRONT: removed [class.eff-green/yellow/red] bindings
                    + V25D95.3 tactical-number badge. The marker now shows
@@ -343,6 +344,15 @@ import { SessionPlayer } from '../../shared/models/player.model';
                <div class="player-number">{{i + 1}}</div>
                <div class="player-name-label">{{player.name}}</div>
                <div class="player-role-label">{{player.role}}</div>
+               <!-- V25D96-FRONT F4: OFF badge visible only when the player's
+                    role doesn't match the slot's recommended role in the
+                    active canonical formation. The dashed orange border on
+                    the parent .player-marker (set when 'off-role' class
+                    applies) is the second visual hint — both reinforce that
+                    the player is in an off-role slot so the manager sees
+                    the chemistry penalty even when scanning the field at a
+                    glance. -->
+               <div *ngIf="isOffRole(player)" class="off-role-badge">OFF</div>
              </div>
           </ng-container>
 
@@ -1614,6 +1624,41 @@ import { SessionPlayer } from '../../shared/models/player.model';
     }
     .player-marker.eff-red {
       filter: drop-shadow(0 0 4px #c53030) drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));
+    }
+
+    /* V25D96-FRONT F4: off-role marker styling. When a player is dragged to a
+       slot whose recommended role in the active canonical formation doesn't
+       match their 'role', we apply TWO visual hints:
+         - dashed orange border 2px on the .player-marker (overrides the
+           default 2px solid white), AND
+         - a small orange 'OFF' badge anchored at the marker's top-left corner
+           (analogous to the existing .tactical-number badge at top-right).
+
+       Both reinforce the cross-role placement. The badge in particular is
+       readable at distance — the manager can scan the field for orange 'OFF'
+       labels to find the off-role players without inspecting every marker.
+       The border uses border-style dashed (and the same amber-500 color
+       as the chip-level eff-warning) so it visually matches the existing
+       off-role feedback in the .player-chip element below.
+       !important overrides the existing .player-marker border 2px solid white. */
+    .player-marker.off-role {
+      border: 2px dashed #f59e0b !important;
+      box-sizing: border-box;
+    }
+    .player-marker .off-role-badge {
+      position: absolute;
+      top: -10px;
+      left: -8px;
+      font-size: 0.55rem;
+      font-weight: 700;
+      color: #fff;
+      background: rgba(245, 158, 11, 0.95);
+      border-radius: 3px;
+      padding: 1px 4px;
+      pointer-events: none;
+      z-index: 11;
+      letter-spacing: 0.5px;
+      text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.6);
     }
 
     /* Loading overlay for field */
@@ -2985,6 +3030,32 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   updateFormationDetection(): void {
     this.detectFormation();
     this.cdr.markForCheck();
+  }
+
+  /**
+   * V25D96-FRONT F4: returns true when the player's role doesn't match
+   * the slot's recommended role in the active formation. Used to attach
+   * the "off-role" badge + dashed orange border on the marker.
+   *
+   * <p>When the lineup is in canonical mode, the comparison is direct:
+   * player.role vs the role attached to this subdivisionId in the active
+   * canonical formation (the last formation the user picked from the
+   * dropdown — same value used as the GET parameter for auto-select).
+   *
+   * <p>When the lineup is in custom mode ({@code _isCustomLineup}), the
+   * "recommended" role for slots outside the canonical positions is empty,
+   * so we still compare against the active canonical positions — even
+   * though the marker is allowed to render at any slot. This keeps the
+   * OFF badge consistent: a CB placed in a MID slot of 4-4-2 (where the
+   * MID slot's recommended role is 'MID') shows OFF; a CB placed in a
+   * slot that 4-4-2 doesn't even define has no role to compare → no badge.
+   */
+  isOffRole(player: PlayerOnFieldDto): boolean {
+    if (!player.slotId) { return false; }
+    const sub = this.subdivisions.find(s => s.subdivisionId === player.slotId);
+    if (!sub) { return false; }
+    const recommended = this.getRecommendedRole(sub);
+    return !!recommended && player.role !== recommended;
   }
 
   /**
