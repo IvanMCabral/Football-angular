@@ -2698,6 +2698,15 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
 
   /** Click en un slot */
   onSlotClick(sub: FieldSubdivisionDTO): void {
+    // V25D98.5-FRONT: abandoned slots (player free-positioned elsewhere)
+    // are inert on click. Iván no quiere popup — ni siquiera "Sin asignar"
+    // — porque el player está fully relocated a su override position. El
+    // slot queda como un rectángulo visual sin función hasta que el
+    // user drag-dropee al player de vuelta (handleSlotDrop restaura el
+    // slotPlayerMap y el slot vuelve a ser clickeable con player info).
+    if (this.isSlotAbandonedByOverride(sub)) {
+      return;
+    }
     this.selectedSlot = sub;
     this.selectedPlayerToAssign = '';
     this.cdr.detectChanges();

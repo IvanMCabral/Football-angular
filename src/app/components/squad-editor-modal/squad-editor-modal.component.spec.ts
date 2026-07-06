@@ -3987,4 +3987,53 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
       done();
     }, 30);
   });
+
+  /**
+   * V25D98.5-FRONT: regression — Ivan reported 'no deberia decir eso
+   * [Sin asignar], directamente no deberia decir nada apretar ese slot'.
+   * After V25D98.4 the empty original slot shows 'Sin asignar' on
+   * click. Iván wants the slot to be FULLY INERT on click — not even
+   * 'Sin asignar'. The player has fully relocated to the override
+   * position; the slot is just a visual rectangle with no functional
+   * click handler until the user drag-drops the marker back onto it
+   * (handleSlotDrop restores slotPlayerMap entry, click works again).
+   * Verify: onSlotClick returns early when slot is abandoned and
+   * selectedSlot stays null (popup never renders).
+   */
+  it('V25D98.5: onSlotClick is inert on abandoned slot (no popup at all)', (done) => {
+    setTimeout(() => {
+      const pDef = (component as any).slotPlayerMap['S22-1'];
+      const slotS22 = (component as any).subdivisions.find((s: any) => s.subdivisionId === 'S22-1');
+      const fieldEl = fixture.nativeElement.querySelector('.field');
+      fieldEl.getBoundingClientRect = () => ({
+        left: 0, top: 0, right: 1000, bottom: 800, width: 1000, height: 800,
+        x: 0, y: 0, toJSON: () => ({})
+      });
+
+      // Sanity: before free drop the slot is occupied and clickable.
+      (component as any).onSlotClick(slotS22);
+      expect((component as any).selectedSlot).toBe(slotS22);
+      // Reset selectedSlot for the next assertion.
+      (component as any).selectedSlot = null;
+      fixture.detectChanges();
+
+      // Free drop the player out of the slot.
+      (component as any).handleFieldDrop({
+        item: { data: pDef },
+        previousContainer: { id: 'slot-S22-1' },
+        container: { id: 'field-drop-area', element: { nativeElement: fieldEl } },
+        dropPoint: { x: 700, y: 350 }
+      } as any);
+      expect((component as any).isSlotAbandonedByOverride(slotS22)).toBeTrue();
+
+      // V25D98.5: clicking the abandoned slot must NOT set selectedSlot
+      // (no popup, not even "Sin asignar").
+      (component as any).onSlotClick(slotS22);
+      expect((component as any).selectedSlot).withContext('abandoned slot must be inert — no popup rendered').toBeNull();
+      fixture.detectChanges();
+      const popup = fixture.nativeElement.querySelector('.assignment-panel');
+      expect(popup).toBeFalsy('assignment-panel must NOT render for abandoned slot click');
+      done();
+    }, 30);
+  });
 });
