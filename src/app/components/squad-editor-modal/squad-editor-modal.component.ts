@@ -1766,6 +1766,50 @@ import { SessionPlayer } from '../../shared/models/player.model';
       text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.6);
     }
 
+    /* V25D99.2-FRONT: drag UX cursor fix.
+       Ivan report post-V25D99.1: 'el cursor mientras lo arrastras
+       desaparece'. Root cause: Angular CDK's cdk-drag-preview element
+       is a clone of .player-marker centered EXACTLY at the cursor
+       position (the original transform: translate(-50%, -50%) is
+       effectively preserved via the mousedown-offset math CDK applies
+       to its translate3d(x, y, 0)). The marker is opaque (background
+       color + border + chip), so the cursor pixel sits BEHIND the
+       preview's center — visually it looks like the OS cursor vanished.
+
+       Fix:
+       1. cursor: grabbing on the marker at all times — Ivan sees the
+          standard 'grab/grabbing' cursor on hover+drag so the cursor
+          type is always explicit (better UX than implicit default).
+       2. cdk-drag-preview opacity 0.92 — slight transparency so the
+          OS cursor pixel is visible THROUGH the preview at its
+          center. Also adds a deeper drop-shadow so the preview reads
+          as 'lifted off the field' = clear drag affordance.
+       3. cdk-drag-placeholder opacity 0.3 — the original marker stays
+          in place but at 30% so Ivan can see WHERE the player will
+          snap back to if he releases outside the field.
+       4. cursor: grabbing on the preview itself — guards against the
+          browser ever rendering 'default' cursor during the drag.
+
+       Scope: marker (.player-marker + .cdk-drag-*) only. Bench cards
+       already had cursor: grab/grabbing (V25D92.6-FRONT). */
+    .player-marker {
+      cursor: grab;
+    }
+    .player-marker:active,
+    .player-marker.cdk-drag-preview {
+      cursor: grabbing;
+    }
+    .player-marker.cdk-drag-preview {
+      opacity: 0.92;
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45),
+                  0 2px 6px rgba(0, 0, 0, 0.35);
+      transform: rotate(0.5deg);
+    }
+    .player-marker.cdk-drag-placeholder {
+      opacity: 0.3;
+      transition: opacity 0.15s ease;
+    }
+
     /* Loading overlay for field */
     .field-loading-overlay {
       position: absolute;
