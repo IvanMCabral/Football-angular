@@ -3281,3 +3281,316 @@ describe('SquadEditorModalComponent — V25D95.1 ghost slots + drag-drop overlap
     }, 30);
   });
 });
+
+/**
+ * V25D96-FRONT: free-formation + drag-drop cross-role validation.
+ *
+ * <p>Ivan feedback (2026-07-06): "los colores los entiendo, pero me
+ * resulta raro que pongo 4-4-2 pero yo después de eso quiero mover mis
+ * jugadores a voluntad, talvez que se cambie el 4-4-2 automáticamente y
+ * diga formación del user pero que pueda poner a por ejemplo Rudiger en
+ * el mediocampo si esa es mi estrategia para ganar".
+ *
+ * <p>Test goals:
+ * <ul>
+ *   <li>F1 — handleSlotDrop debe aceptar drop cross-role (CB en MID slot).</li>
+ *   <li>F2 — detectFormation devuelve el nombre canónico cuando el lineup
+ *       matchea exactamente; devuelve 'Formación del User' cuando no matchea.</li>
+ *   <li>F3 — dropdown muestra 'Formación del User' como selected después de
+ *       un cross-role drop.</li>
+ *   <li>F4 — el marker de un player off-role recibe la clase `off-role`.</li>
+ * </ul>
+ */
+describe('SquadEditorModalComponent — V25D96 free-formation + drag-drop cross-role', () => {
+  let component: SquadEditorModalComponent;
+  let fixture: ComponentFixture<SquadEditorModalComponent>;
+  let httpClientSpy: jasmine.SpyObj<HttpClient>;
+  let dialogRefSpy: jasmine.SpyObj<MatDialogRef<SquadEditorModalComponent>>;
+
+  /**
+   * Minimal field with 4 slots matching a 4-4-2 formation. Default
+   * loadSquadFromBackend places 4 players (p-gk, p-def, p-mid, p-att)
+   * one per slot. Use this for cross-role single-drop tests.
+   */
+  const SUBDIVISIONS_RESPONSE = [
+    { subdivisionId: 'GK-1', isGoalkeeper: true,  sector: 26, subIndex: 1, left: 35, top: 88, width: 30, height: 10, zone: 'GK' },
+    { subdivisionId: 'S22-1', isGoalkeeper: false, sector: 22, subIndex: 1, left: 10, top: 70, width: 25, height: 12, zone: 'DEFENSE' },
+    { subdivisionId: 'S13-2', isGoalkeeper: false, sector: 13, subIndex: 2, left: 40, top: 45, width: 20, height: 12, zone: 'MIDFIELD' },
+    { subdivisionId: 'S05-2', isGoalkeeper: false, sector:  5, subIndex: 2, left: 45, top: 10, width: 10, height: 10, zone: 'ATTACK' }
+  ];
+
+  /**
+   * Two canonical formations: 4-4-2 (default) and 4-3-3. We expose
+   * 4-3-3 so the canonical-detection test can switch formations.
+   */
+  const FORMATIONS_RESPONSE = [
+    {
+      name: '4-4-2', description: '4-4-2',
+      defenders: 1, midfielders: 1, attackers: 1, outfieldPlayers: 3,
+      positions: [
+        { index: 0, role: 'GK',  xPercent: 50, yPercent: 93, actionRangePercent: 5, subdivisionId: 'GK-1' },
+        { index: 1, role: 'CB',  xPercent: 20, yPercent: 75, actionRangePercent: 7, subdivisionId: 'S22-1' },
+        { index: 2, role: 'CM',  xPercent: 50, yPercent: 50, actionRangePercent: 7, subdivisionId: 'S13-2' },
+        { index: 3, role: 'ST',  xPercent: 50, yPercent: 10, actionRangePercent: 6, subdivisionId: 'S05-2' }
+      ]
+    },
+    {
+      name: '4-3-3', description: '4-3-3',
+      defenders: 1, midfielders: 1, attackers: 1, outfieldPlayers: 3,
+      positions: [
+        { index: 0, role: 'GK',  xPercent: 50, yPercent: 93, actionRangePercent: 5, subdivisionId: 'GK-1' },
+        { index: 1, role: 'CB',  xPercent: 20, yPercent: 75, actionRangePercent: 7, subdivisionId: 'S22-1' },
+        { index: 2, role: 'CM',  xPercent: 50, yPercent: 50, actionRangePercent: 7, subdivisionId: 'S13-2' },
+        { index: 3, role: 'CF',  xPercent: 50, yPercent: 10, actionRangePercent: 6, subdivisionId: 'S05-2' }
+      ]
+    }
+  ];
+
+  /**
+   * Build a /current response with 4 players + optional formationEffectiveness.
+   * formationEffectiveness=null by default (preserves the existing test setup
+   * that doesn't worry about the formationEffectiveness row visibility).
+   */
+  function buildCurrentLineup(chemistryScore: number | null, slots: any[] = []): any {
+    return {
+      formation: '4-4-2',
+      players: [
+        { playerId: 'p-gk',  name: 'GK',  position: 'GK',  overall: 80, energy: 100, injured: false },
+        { playerId: 'p-def', name: 'Rudiger', position: 'CB', overall: 85, energy: 100, injured: false },
+        { playerId: 'p-mid', name: 'Valverde', position: 'CM', overall: 86, energy: 100, injured: false },
+        { playerId: 'p-att', name: 'Mbappé', position: 'ST', overall: 92, energy: 100, injured: false }
+      ],
+      confirmed: true,
+      warnings: [],
+      slots,
+      chemistryScore
+    };
+  }
+
+  beforeEach(async () => {
+    httpClientSpy = jasmine.createSpyObj('HttpClient', ['get', 'post']);
+    dialogRefSpy = jasmine.createSpyObj('MatDialogRef', ['close']);
+
+    httpClientSpy.get.and.callFake(((url: string) => {
+      if (url.includes('/editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
+      if (url.includes('/editor/formations'))  return of(FORMATIONS_RESPONSE);
+      if (url.includes('/career/lineup/current')) {
+        return of(buildCurrentLineup(85));
+      }
+      return of([]);
+    }) as any);
+
+    httpClientSpy.post.and.callFake(((url: string, _body: any) => {
+      if (url.includes('/career/lineup/preview-chemistry')) {
+        return of({ score: 91, breakdown: { positionGroups: {}, maxSkillByType: {}, coveragePercentage: 10 },
+                    maxSkillByType: {}, coveragePercentage: 10 });
+      }
+      if (url.includes('/career/lineup/manual-select')) {
+        return of({ players: [], warnings: [] });
+      }
+      if (url.includes('/career/lineup/confirm')) {
+        return of({ confirmed: true, warnings: [] });
+      }
+      if (url.includes('/career/lineup/auto-select')) {
+        return of({ formation: '4-4-2', players: [], warnings: [] });
+      }
+      return of({});
+    }) as any);
+
+    await TestBed.configureTestingModule({
+      imports: [SquadEditorModalComponent, NoopAnimationsModule],
+      providers: [
+        { provide: MAT_DIALOG_DATA, useValue: { careerId: 'c1', matchId: null } },
+        { provide: MatDialogRef, useValue: dialogRefSpy },
+        { provide: HttpClient, useValue: httpClientSpy }
+      ]
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(SquadEditorModalComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+  });
+
+  // ---- F1 — handleSlotDrop allows cross-role drops ----
+
+  it('V25D96 F1: handleSlotDrop allows cross-role drop (CB p-def → MID slot S13-2)', (done) => {
+    // Ivan spec: "puedo poner a por ejemplo Rudiger en el mediocampo".
+    // p-def is Rudiger (CB). S13-2 is the MID slot. handleSlotDrop must
+    // NOT block this; after the drop Rudiger ends in the MID slot.
+    setTimeout(() => {
+      const rudiger = (component as any).slotPlayerMap['S22-1'];
+      expect(rudiger).toBeTruthy('Rudiger must be at S22-1 (DEF slot) in default loadSquadFromBackend');
+      expect(rudiger.role).toBe('CB', 'p-def should be a CB so the cross-role test is meaningful');
+
+      (component as any).handleSlotDrop({
+        item: { data: rudiger },
+        previousContainer: { id: 'slot-S22-1' },
+        container: { id: 'slot-S13-2' }
+      } as any);
+
+      // Cross-role drop succeeds (no role validation in handleSlotDrop).
+      expect((component as any).slotPlayerMap['S13-2']?.playerId).toBe('p-def',
+        'Rudiger must end up in S13-2 (MID slot) after cross-role drop');
+      expect(rudiger.slotId).toBe('S13-2',
+        'Rudiger.slotId must reflect the new slot, not the old DEF slot');
+      done();
+    }, 30);
+  });
+
+  // ---- F2 — detectFormation ----
+
+  it('V25D96 F2: detectFormation returns "Formación del User" for an incomplete lineup', (done) => {
+    // Default loadSquadFromBackend populates only 4 players (1 GK + 1 DEF +
+    // 1 MID + 1 ATT) into a 4-slot mock. This is incomplete (< 11) so the
+    // formation has no canonical match → returns USER_FORMATION_LABEL.
+    setTimeout(() => {
+      const detected = (component as any).detectFormation();
+      expect(detected).toBe('Formación del User',
+        'Incomplete (< 11) lineup must be flagged as user-formation, not silently matched to a canonical');
+      expect((component as any).isCustomLineup()).toBeTrue();
+      done();
+    }, 30);
+  });
+
+  it('V25D96 F2: detectFormation returns a canonical name when role counts match exactly', (done) => {
+    // Build a complete 11-player lineup with role family counts
+    // 1 GK + 4 DEF + 4 MID + 2 ATT (= '4-4-2'). Force it into the
+    // component via the BehaviorSubject so we don't depend on the auto-select
+    // back-end flow.
+    //
+    // Approach: the FORMATIONS_RESPONSE mock above only defines a 4-position
+    // 4-4-2 (a fixture simplification). The real 4-4-2 has 11 positions, so
+    // detectFormation's canonical comparison would naturally fail against
+    // any lineup of 11 real players. To exercise the canonical-match path
+    // without rewriting the mock, we inject `formationPositions['4-4-2']`
+    // directly on the component after the formations load, then push an
+    // 11-player lineup whose family counts match it exactly.
+    setTimeout(() => {
+      // 11 positions for a real 4-4-2 — GK + 4 DEF + 4 MID + 2 ATT.
+      (component as any).formationPositions['4-4-2'] = [
+        { subdivisionId: 'GK', role: 'GK', xPercent: 50, yPercent: 93, actionRangePercent: 5, index: 0 },
+        { subdivisionId: 'D1', role: 'LB', xPercent: 15, yPercent: 78, actionRangePercent: 7, index: 1 },
+        { subdivisionId: 'D2', role: 'CB', xPercent: 35, yPercent: 78, actionRangePercent: 7, index: 2 },
+        { subdivisionId: 'D3', role: 'CB', xPercent: 65, yPercent: 78, actionRangePercent: 7, index: 3 },
+        { subdivisionId: 'D4', role: 'RB', xPercent: 85, yPercent: 78, actionRangePercent: 7, index: 4 },
+        { subdivisionId: 'M1', role: 'LM', xPercent: 15, yPercent: 50, actionRangePercent: 7, index: 5 },
+        { subdivisionId: 'M2', role: 'CM', xPercent: 35, yPercent: 50, actionRangePercent: 8, index: 6 },
+        { subdivisionId: 'M3', role: 'CM', xPercent: 65, yPercent: 50, actionRangePercent: 8, index: 7 },
+        { subdivisionId: 'M4', role: 'RM', xPercent: 85, yPercent: 50, actionRangePercent: 7, index: 8 },
+        { subdivisionId: 'A1', role: 'ST', xPercent: 35, yPercent: 12, actionRangePercent: 6, index: 9 },
+        { subdivisionId: 'A2', role: 'ST', xPercent: 65, yPercent: 12, actionRangePercent: 6, index: 10 }
+      ];
+
+      const canonical4_4_2 = [
+        { playerId: 'gk', role: 'GK', position: 'GK', slotId: 'GK', overall: 80, energy: 100, injured: false, stamina: 100, active: true, isEmpty: false, name: 'GK' },
+        { playerId: 'd1', role: 'LB', position: 'LB', slotId: 'D1', overall: 80, energy: 100, injured: false, stamina: 100, active: true, isEmpty: false, name: 'D1' },
+        { playerId: 'd2', role: 'CB', position: 'CB', slotId: 'D2', overall: 80, energy: 100, injured: false, stamina: 100, active: true, isEmpty: false, name: 'D2' },
+        { playerId: 'd3', role: 'CB', position: 'CB', slotId: 'D3', overall: 80, energy: 100, injured: false, stamina: 100, active: true, isEmpty: false, name: 'D3' },
+        { playerId: 'd4', role: 'RB', position: 'RB', slotId: 'D4', overall: 80, energy: 100, injured: false, stamina: 100, active: true, isEmpty: false, name: 'D4' },
+        { playerId: 'm1', role: 'LM', position: 'LM', slotId: 'M1', overall: 80, energy: 100, injured: false, stamina: 100, active: true, isEmpty: false, name: 'M1' },
+        { playerId: 'm2', role: 'CM', position: 'CM', slotId: 'M2', overall: 80, energy: 100, injured: false, stamina: 100, active: true, isEmpty: false, name: 'M2' },
+        { playerId: 'm3', role: 'CM', position: 'CM', slotId: 'M3', overall: 80, energy: 100, injured: false, stamina: 100, active: true, isEmpty: false, name: 'M3' },
+        { playerId: 'm4', role: 'RM', position: 'RM', slotId: 'M4', overall: 80, energy: 100, injured: false, stamina: 100, active: true, isEmpty: false, name: 'M4' },
+        { playerId: 'a1', role: 'ST', position: 'ST', slotId: 'A1', overall: 80, energy: 100, injured: false, stamina: 100, active: true, isEmpty: false, name: 'A1' },
+        { playerId: 'a2', role: 'ST', position: 'ST', slotId: 'A2', overall: 80, energy: 100, injured: false, stamina: 100, active: true, isEmpty: false, name: 'A2' }
+      ];
+      (component as any).homePlayers$.next(canonical4_4_2);
+      fixture.detectChanges();
+
+      const detected = (component as any).detectFormation();
+      expect(detected).toBe('4-4-2',
+        'A lineup with 1 GK + 4 DEF + 4 MID + 2 ATT (11 players) must match the 4-4-2 canonical');
+      expect((component as any).isCustomLineup()).toBeFalse();
+      done();
+    }, 30);
+  });
+
+  it('V25D96 F2 (helper): countRoleFamily buckets roles into the 4 families', () => {
+    // Direct unit test of the role-family counter with explicit input.
+    // Bypasses the canonical-formations + lineup machinery to isolate
+    // the counting logic from the matching logic.
+    const counts = (component as any).countRoleFamily(
+      ['GK', 'CB', 'LB', 'RB', 'CM', 'CDM', 'CAM', 'ST', 'LW', 'CF', 'WINGER']
+    );
+    //   GK    → 1
+    //   CB LB RB → 3 DEF
+    //   CM CDM CAM → 3 MID
+    //   ST LW CF WINGER → 4 ATT
+    expect(counts).toEqual({ gk: 1, def: 3, mid: 3, att: 4 });
+  });
+
+  // ---- F3 — dropdown displays user-formation after cross-role drop ----
+
+  it('V25D96 F3: dropdown shows "Formación del User" after a cross-role drop', (done) => {
+    // After Rudiger (CB) is dragged into the MID slot, the lineup becomes
+    // off-canonical (3 DEF + 5 MID + 1 GK for the 4-4-2 mock which only
+    // has 4 players total → still incomplete, so detectFormation returns
+    // 'Formación del User' either way). The dropdown's `dropdownFormationValue`
+    // getter should reflect the user-formation state, and the rendered
+    // select's selected option should match.
+    setTimeout(() => {
+      const rudiger = (component as any).slotPlayerMap['S22-1'];
+      (component as any).handleSlotDrop({
+        item: { data: rudiger },
+        previousContainer: { id: 'slot-S22-1' },
+        container: { id: 'slot-S13-2' }
+      } as any);
+
+      fixture.detectChanges();
+      // dropdownFormationValue getter reflects the post-drop state.
+      expect((component as any).dropdownFormationValue).toBe('Formación del User',
+        'dropdownFormationValue must flip to user-formation label after cross-role drop');
+      expect((component as any).isCustomLineup()).toBeTrue();
+
+      // The rendered <select> should have the disabled "Formación del User"
+      // option selected. The select's <option> for the user-formation label
+      // is appended after the canonical loop; we verify by checking the
+      // selected option's textContent.
+      const select = fixture.nativeElement.querySelector('.formation-selector select') as HTMLSelectElement;
+      expect(select).toBeTruthy();
+      const selectedOption = select.options[select.selectedIndex];
+      expect(selectedOption?.textContent?.trim()).toBe('Formación del User',
+        'The visible selected option text must be "Formación del User"');
+      done();
+    }, 30);
+  });
+
+  // ---- F4 — marker off-role class ----
+
+  it('V25D96 F4: marker receives off-role class when player role != slot recommended role', (done) => {
+    // After Rudiger (CB) is dragged to S13-2 (MID slot with recommended 'CM'),
+    // the player-marker rendered for Rudiger must carry the `off-role` class
+    // so the dashed orange border + OFF badge visual kicks in.
+    setTimeout(() => {
+      // Manually set up state: place Rudiger at S13-2 (off-role).
+      const rudiger = (component as any).slotPlayerMap['S22-1'];
+      (component as any).slotPlayerMap['S22-1'] = undefined;
+      (component as any).slotPlayerMap['S13-2'] = rudiger;
+      rudiger.slotId = 'S13-2';
+      // Re-emit homePlayers so the *ngFor sees the change.
+      const home = (component as any).homePlayers$.value.slice();
+      const idx = home.findIndex((p: any) => p.playerId === 'p-def');
+      if (idx >= 0) { home[idx] = rudiger; }
+      (component as any).homePlayers$.next([...home]);
+      fixture.detectChanges();
+
+      // Find the marker for Rudiger in the DOM.
+      const markers: NodeListOf<HTMLElement> = fixture.nativeElement.querySelectorAll('.player-marker');
+      let rudigerMarker: HTMLElement | null = null;
+      markers.forEach((m) => {
+        if (m.textContent?.includes('Rudiger')) {
+          rudigerMarker = m;
+        }
+      });
+      expect(rudigerMarker).toBeTruthy('Rudiger marker must be rendered after the move');
+      // Marker for Rudiger (CB) at MID slot must carry the off-role class for the dashed orange ring.
+      expect(rudigerMarker!.classList.contains('off-role')).toBeTrue();
+      // The OFF badge child should also be present.
+      const offBadge = rudigerMarker!.querySelector('.off-role-badge');
+      expect(offBadge).toBeTruthy(
+        'OFF badge must render as a child of the off-role marker');
+      expect(offBadge?.textContent?.trim()).toBe('OFF');
+      done();
+    }, 30);
+  });
+});
