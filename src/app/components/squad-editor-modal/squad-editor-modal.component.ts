@@ -1363,14 +1363,13 @@ import { SessionPlayer } from '../../shared/models/player.model';
     }
 
     .slot:hover {
-      /* V25D99.7-FRONT: hover drop-hint. Empty slots are invisible at
-         rest (no yellow box-shadow, no amber outline — per Ivan's
-         'desaparece donde estaba antes' spec). On hover, a subtle
-         dashed outline appears so users can see WHERE empty slots are
-         when they're about to drop a player. Only visible during
-         hover, not persistent. */
-      outline: 1.5px dashed rgba(255, 255, 255, 0.45);
-      outline-offset: -2px;
+      /* V25D99.9-FRONT: REMOVED the dashed outline. Ivan: 'si paso por
+         una casilla donde estuvo antes se ve punteada, porque? no
+         deberia verse nada y ya'. Empty slots are completely invisible
+         at all states — at rest AND on hover AND during drag-over.
+         No visual indicator at all. The slot is still cdkDropList
+         (droppable) and still clickable for the assignment panel,
+         just invisible. */
     }
 
     /* V25D93-FRONT F1: removidas .slot.attack/.midfield/.defense/.gk role-tinted
