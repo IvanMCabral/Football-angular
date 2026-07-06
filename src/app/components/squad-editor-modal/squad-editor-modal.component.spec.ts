@@ -1065,71 +1065,71 @@ describe('SquadEditorModalComponent — V25D51 chip-level effectiveness feedback
 
   // ---- template bindings ----
 
-  it('renders eff-good on the chip for eff >= 0.9', (done) => {
+  it('renders eff-good on the marker for eff >= 0.9', (done) => {
+    // V25D99.4-FRONT: chip was removed; chemistry feedback now lives on
+    // the .player-marker via drop-shadow filter (eff-green/yellow/red).
     setTimeout(() => {
       fixture.detectChanges();
-      const chips = fixture.nativeElement.querySelectorAll('.player-chip');
+      const markers = fixture.nativeElement.querySelectorAll('.player-marker');
       let goodCount = 0;
-      chips.forEach((c: HTMLElement) => {
-        if (c.classList.contains('eff-good')) goodCount++;
+      markers.forEach((c: HTMLElement) => {
+        if (c.classList.contains('eff-green')) goodCount++;
       });
-      // GK-1 (1.0) + S22-1 (0.85) + S05-3 (1.0) = 3 eff-good chips.
+      // GK-1 (1.0) + S22-1 (0.85) + S05-3 (1.0) = 3 eff-good markers.
       expect(goodCount).toBe(3,
-        `expected 3 chips with eff-good (eff >= 0.9), got ${goodCount}`);
+        `expected 3 markers with eff-green (eff >= 0.9), got ${goodCount}`);
       done();
     }, 30);
   });
 
-  it('renders eff-warning on the chip for 0.7 <= eff < 0.9', (done) => {
+  it('renders eff-warning on the marker for 0.7 <= eff < 0.9', (done) => {
     setTimeout(() => {
       fixture.detectChanges();
-      const chips = fixture.nativeElement.querySelectorAll('.player-chip');
+      const markers = fixture.nativeElement.querySelectorAll('.player-marker');
       let warnCount = 0;
-      chips.forEach((c: HTMLElement) => {
-        if (c.classList.contains('eff-warning')) warnCount++;
+      markers.forEach((c: HTMLElement) => {
+        if (c.classList.contains('eff-yellow')) warnCount++;
       });
-      // S13-2 (0.7) = 1 eff-warning chip.
+      // S13-2 (0.7) = 1 eff-yellow marker.
       expect(warnCount).toBe(1,
-        `expected 1 chip with eff-warning (0.7-0.9), got ${warnCount}`);
+        `expected 1 marker with eff-yellow (0.7-0.9), got ${warnCount}`);
       done();
     }, 30);
   });
 
-  it('renders eff-bad on the chip for eff < 0.7', (done) => {
+  it('renders eff-bad on the marker for eff < 0.7', (done) => {
+    setTimeout(() => {
+      fixture.detectChanges();
+      const markers = fixture.nativeElement.querySelectorAll('.player-marker');
+      let badCount = 0;
+      markers.forEach((c: HTMLElement) => {
+        if (c.classList.contains('eff-red')) badCount++;
+      });
+      // S05-2 (0.5) = 1 eff-red marker.
+      expect(badCount).toBe(1,
+        `expected 1 marker with eff-red (eff < 0.7), got ${badCount}`);
+      done();
+    }, 30);
+  });
+
+  it('does NOT render any chip element (removed in V25D99.4)', (done) => {
+    // V25D99.4-FRONT: chip was REMOVED entirely. The .player-marker IS
+    // the player — there's no chip+marker duplication. This test asserts
+    // the chip element no longer exists in the DOM.
     setTimeout(() => {
       fixture.detectChanges();
       const chips = fixture.nativeElement.querySelectorAll('.player-chip');
-      let badCount = 0;
-      chips.forEach((c: HTMLElement) => {
-        if (c.classList.contains('eff-bad')) badCount++;
-      });
-      // S05-2 (0.5) = 1 eff-bad chip.
-      expect(badCount).toBe(1,
-        `expected 1 chip with eff-bad (eff < 0.7), got ${badCount}`);
-      done();
-    }, 30);
-  });
-
-  it('does NOT render chip-level eff-badge (removed in V25D95.4)', (done) => {
-    // V25D95.4 removed the chip-level eff-badge ("100%" / "95%" / etc. anchored
-    // to the chip's top-right). V25D95.7 then removed the chip-level border too.
-    // Chemistry feedback now lives on the .player-marker via drop-shadow filter
-    // (eff-green/yellow/red) — see `.player-marker.eff-green` rules in component.ts.
-    // This test asserts the badge div is gone from the chip template.
-    setTimeout(() => {
-      fixture.detectChanges();
-      const badges = fixture.nativeElement.querySelectorAll('.player-chip .eff-badge');
-      expect(badges.length).toBe(0,
-        `expected 0 eff-badges inside chips after V25D95.4 removed them, got ${badges.length}`);
+      expect(chips.length).toBe(0,
+        `expected 0 .player-chip elements after V25D99.4 removed them, got ${chips.length}`);
       done();
     }, 30);
   });
 
   // ---- backward compat ----
 
-  it('does NOT render any chip-level feedback when formationEffectiveness is null', (done) => {
+  it('does NOT render any marker-level eff feedback when formationEffectiveness is null', (done) => {
     // V25D51 backward compat: legacy pre-V25D51 lineups must not show
-    // chip-level effectiveness classes or badges.
+    // chemistry feedback. V25D99.4 moved it from chip to marker.
     httpClientSpy.get.and.callFake(((url: string) => {
       if (url.includes('/editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
       if (url.includes('/editor/formations'))  return of(FORMATIONS_RESPONSE);
@@ -1144,15 +1144,12 @@ describe('SquadEditorModalComponent — V25D51 chip-level effectiveness feedback
 
     setTimeout(() => {
       fixture.detectChanges();
-      const chips = fixture.nativeElement.querySelectorAll('.player-chip');
-      chips.forEach((c: HTMLElement) => {
-        // Jasmine's toBeFalse() takes 0 args; use the negated form with a message.
-        expect(c.classList.contains('eff-good')).withContext('legacy lineups must NOT render eff-good on chips').toBeFalse();
-        expect(c.classList.contains('eff-warning')).withContext('legacy lineups must NOT render eff-warning on chips').toBeFalse();
-        expect(c.classList.contains('eff-bad')).withContext('legacy lineups must NOT render eff-bad on chips').toBeFalse();
+      const markers = fixture.nativeElement.querySelectorAll('.player-marker');
+      markers.forEach((c: HTMLElement) => {
+        expect(c.classList.contains('eff-green')).withContext('legacy lineups must NOT render eff-green on markers').toBeFalse();
+        expect(c.classList.contains('eff-yellow')).withContext('legacy lineups must NOT render eff-yellow on markers').toBeFalse();
+        expect(c.classList.contains('eff-red')).withContext('legacy lineups must NOT render eff-red on markers').toBeFalse();
       });
-      const badges = fixture.nativeElement.querySelectorAll('.player-chip .eff-badge');
-      expect(badges.length).withContext('legacy lineups must NOT render eff-badges inside chips').toBe(0);
       done();
     }, 30);
   });
@@ -1633,20 +1630,21 @@ describe('SquadEditorModalComponent — V25D64 (C24) eff-good green border', () 
     fixture.detectChanges();
   });
 
-  // V25D64 C24 P0: el chip con eff >= 0.9 debe tener la clase eff-good en el DOM.
-  // El border verde (#10b981) se valida visualmente con REVISOR smoke
-  // (no se puede medir color en Karma/jsdom sin Playwright e2e).
-  it('CSS class eff-good applies to chips with eff >= 0.9 (green border visual symmetry check)', (done) => {
+  // V25D64 C24 P0 + V25D99.4: el marker con eff >= 0.9 debe tener eff-green
+  // (era eff-good en el chip antes de V25D99.4). El glow verde via drop-shadow
+  // (#10b981) se valida visualmente con REVISOR smoke (no se puede medir
+  // color en Karma/jsdom sin Playwright e2e).
+  it('CSS class eff-green applies to markers with eff >= 0.9 (green glow visual symmetry check)', (done) => {
     setTimeout(() => {
       fixture.detectChanges();
-      const goodChips = fixture.nativeElement.querySelectorAll('.player-chip.eff-good') as NodeListOf<HTMLElement>;
-      // 3 chips con eff >= 0.9 (GK-1=1.0, S22-1=0.95, S05-3=1.0).
-      expect(goodChips.length).toBeGreaterThan(0,
-        'expected at least 1 eff-good chip rendered in the DOM');
-      // Sanity: eff-good no deberia colisionar con eff-warning ni eff-bad.
-      goodChips.forEach((c: HTMLElement) => {
-        expect(c.classList.contains('eff-warning')).withContext('eff-good chip must not also be eff-warning').toBeFalse();
-        expect(c.classList.contains('eff-bad')).withContext('eff-good chip must not also be eff-bad').toBeFalse();
+      const goodMarkers = fixture.nativeElement.querySelectorAll('.player-marker.eff-green') as NodeListOf<HTMLElement>;
+      // 3 markers con eff >= 0.9 (GK-1=1.0, S22-1=0.95, S05-3=1.0).
+      expect(goodMarkers.length).toBeGreaterThan(0,
+        'expected at least 1 eff-green marker rendered in the DOM');
+      // Sanity: eff-green no deberia colisionar con eff-yellow ni eff-red.
+      goodMarkers.forEach((c: HTMLElement) => {
+        expect(c.classList.contains('eff-yellow')).withContext('eff-green marker must not also be eff-yellow').toBeFalse();
+        expect(c.classList.contains('eff-red')).withContext('eff-green marker must not also be eff-red').toBeFalse();
       });
       done();
     }, 30);
@@ -3795,14 +3793,21 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
    *     the previous override position — Iván's "solo 1 vez" symptom).
    *  6. handleBenchDrop must clear xPercent/yPercent too.
    */
-  it('V25D98.2: chip + missing-indicator hidden after free drop, override cleared on slot/bench drop', (done) => {
+  it('V25D99.4: free drop uses marker-only model (no chip, no missing-indicator) + override cleared on slot/bench drop', (done) => {
+    // V25D99.4 PROFESSIONAL REWRITE: chip + missing-indicator were REMOVED.
+    // The .player-marker IS the player. After a free drop, the original
+    // slot is just empty space (no chip, no missing-indicator), and the
+    // marker is rendered at the new xPercent/yPercent position via the
+    // marker's [style.left/top] binding. This test verifies:
+    //  1. hasOverridePosition(player) returns true once xPercent/yPercent set.
+    //  2. The DOM has NO .player-chip ANYWHERE (chip was removed).
+    //  3. The DOM has NO .missing-indicator ANYWHERE (indicator was removed).
+    //  4. The marker DOM is rendered ONCE per player (no duplication).
+    //  5. handleSlotDrop must clear xPercent/yPercent on the dropped player.
+    //  6. handleBenchDrop must clear xPercent/yPercent too.
     setTimeout(() => {
       const pDef = (component as any).slotPlayerMap['S22-1'];
       expect(pDef).toBeTruthy('fixture must seed a CB in S22-1');
-      // baseline: chip visible in the slot.
-      const slotS22 = fixture.nativeElement.querySelector('#slot-S22-1');
-      const chipBefore = slotS22?.querySelector('.player-chip');
-      expect(chipBefore).toBeTruthy('pre-drop: chip should be visible in S22-1');
 
       // Free drop: assign xPercent=80, yPercent=40 to pDef.
       pDef.xPercent = 80;
@@ -3810,17 +3815,26 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
       (component as any).homePlayers$.next([...((component as any).homePlayers$.value)]);
       fixture.detectChanges();
 
-      // V25D98.2: chip hidden AND slot shows NO indicator at all.
-      expect((component as any).hasOverridePosition(pDef)).toBeTrue();
-      const overridden = (component as any).isSlotOverridden((component as any).subdivisions.find((s: any) => s.subdivisionId === 'S22-1'));
-      expect(overridden).withContext('S22-1 must report as overridden').toBeTrue();
-      const chipAfter = slotS22?.querySelector('.player-chip');
-      expect(chipAfter).toBeFalsy('post-drop: chip must be hidden to avoid ghost');
-      const anyMissing = slotS22?.querySelector('.missing-indicator');
-      expect(anyMissing).toBeFalsy('post-drop: no missing-indicator allowed (V25D98.2 removed amber override indicator)');
+      // V25D99.4: chip and missing-indicator must NOT exist in the DOM
+      // anywhere — chip was removed (marker IS the player) and the
+      // missing-indicator was removed (no more "ST" fantasma).
+      const allChips = fixture.nativeElement.querySelectorAll('.player-chip');
+      expect(allChips.length).withContext('V25D99.4: no .player-chip elements should exist anywhere').toBe(0);
+      const allMissing = fixture.nativeElement.querySelectorAll('.missing-indicator');
+      expect(allMissing.length).withContext('V25D99.4: no .missing-indicator elements should exist anywhere').toBe(0);
 
-      // V25D98.2: handleSlotDrop must clear overrides so subsequent moves work.
-      // Simulate drag from S22-1 (slot) to S05-2 (slot, empty in fixture).
+      // Marker renders ONCE per player — count markers with the same
+      // playerId and assert no duplication.
+      const allMarkers = fixture.nativeElement.querySelectorAll('.player-marker');
+      const defPlayerIds: string[] = [];
+      allMarkers.forEach((m: HTMLElement) => {
+        if (m.textContent && pDef.name && m.textContent.includes(pDef.name)) {
+          defPlayerIds.push(pDef.playerId);
+        }
+      });
+      expect(defPlayerIds.length).withContext('V25D99.4: marker must render once per player (no duplication)').toBe(1);
+
+      // V25D99.4: handleSlotDrop must clear overrides so subsequent moves work.
       (component as any).handleSlotDrop({
         item: { data: pDef },
         previousContainer: { id: 'slot-S22-1' },

@@ -240,7 +240,32 @@ import { SessionPlayer } from '../../shared/models/player.model';
                    level for defense-in-depth — the loadSquadFromBackend
                    validation is the primary fix, this prevents ghost UI
                    even if backend returns stale slots. -->
-              <ng-container *ngIf="shouldRenderSlot(sub)">
+<ng-container *ngIf="shouldRenderSlot(sub)">
+              <!-- V25D99.4-FRONT PROFESSIONAL REWRITE: the slot is now a PURE
+                   drop target — no chip, no missing-indicator, no visual state.
+                   The .player-marker (rendered below as a sibling, outside the
+                   slot) is the ONLY visual representation of a player. This
+                   eliminates the duplication Ivan reported ('se duplico 1')
+                   where the chip + marker rendered for the same player at
+                   different positions.
+
+                   Slot visibility rules (handled via .slot classes):
+                   - .occupied    → marker exists for this slotId in slotPlayerMap
+                   - .abandoned   → slotPlayerMap empty BUT a player has
+                                     slotId===subdivisionId with override (free)
+                   - .recommended → slotId is in formationPositions
+                                     AND not abandoned (yellow box-shadow)
+
+                   The slot has no (cdkDropListDropped) binding — V25D99 removed
+                   it. Drops are handled by the marker's (cdkDragEnded) via
+                   handleMarkerDragEnd which hit-tests against subdivisions.
+                   The slot's cdkDropList is kept only so CDK can render the
+                   hover drop highlight during drag.
+
+                   V25D98.6 .slot.abandoned { pointer-events: none } kept:
+                   Iván wants the abandoned slot INERT on click (no popup).
+                   Drop on abandoned slot DOES still work because the marker
+                   hits via dropPoint coords, not pointer-events. -->
               <!-- Slot de arquero (sector 26) -->
               <ng-container *ngIf="sub.isGoalkeeper">
 <div class="slot slot-gk"
@@ -253,40 +278,9 @@ import { SessionPlayer } from '../../shared/models/player.model';
                        [style.width.%]="sub.width"
                        [style.height.%]="sub.height"
 [class.occupied]="isSlotOccupied(sub)"
-                     [class.abandoned]="isSlotAbandonedByOverride(sub)"
-                     [class.missing-player]="isMissingPlayer(sub)"
-                      (click)="onSlotClick(sub)">
-                  <!-- V25D91-FRONT-F3: slot-id label removida (era debug-only
-                       desde V25D47 C11b). Ahora el slot es clickeable sin
-                       saturar visualmente el campo con 82 labels SBX-Y. -->
-                  <!-- V25D51 (Sprint C13): chip-level effectiveness feedback.
-                       eff-good (>=0.9) keeps the default chip style; eff-warning
-                       (0.7-0.9) draws an orange border; eff-bad (<0.7) draws a red
-                       border. The corner badge (eff-badge) always shows the
-                       percentage when formationEffectiveness has data. The
-                       pre-existing slot-eff-badge was removed from this slot since
-                       the chip-level badge replaces its visual function. -->
-<ng-container *ngIf="getPlayerInSlot(sub) as player">
-                  <div *ngIf="!hasOverridePosition(player)"
-                       class="player-chip"
-                       cdkDrag
-                       [cdkDragData]="player"
-                       [class.eff-good]="getChipEffectivenessClass(sub.subdivisionId) === 'eff-good'"
-                       [class.eff-warning]="getChipEffectivenessClass(sub.subdivisionId) === 'eff-warning'"
-                       [class.eff-bad]="getChipEffectivenessClass(sub.subdivisionId) === 'eff-bad'">
-                    <span class="player-chip-name">{{player.name | slice:0:10}}</span>
-                  </div>
-                </ng-container>
-                  <!-- V25D98.2-FRONT: ya no mostramos .missing-indicator-overridden
-                       (era el ámbar con role que Iván veía como 'el espacio
-                       sigue claiming al player'). El slot ahora se ve
-                       completamente vacío cuando el player está free-positioned:
-                       sin chip, sin role label, sin missing indicator. Iván
-                       lo lee como "este slot ya no es de nadie" y el marker
-                       en la override position es el dueño real. -->
-                  <div *ngIf="isMissingPlayer(sub) && !isSlotOverridden(sub)" class="missing-indicator">
-                    {{getRecommendedRole(sub)}}
-                  </div>
+                      [class.recommended]="isRecommendedSlot(sub) && !isSlotAbandonedByOverride(sub)"
+                      [class.abandoned]="isSlotAbandonedByOverride(sub)"
+                       (click)="onSlotClick(sub)">
                 </div>
               </ng-container>
 
@@ -304,37 +298,15 @@ import { SessionPlayer } from '../../shared/models/player.model';
                      [class.occupied]="isSlotOccupied(sub)"
                      [class.recommended]="isRecommendedSlot(sub) && !isSlotAbandonedByOverride(sub)"
                      [class.abandoned]="isSlotAbandonedByOverride(sub)"
-                     [class.missing-player]="isMissingPlayer(sub)"
                      [class.attack]="sub.zone === 'ATTACK'"
                      [class.midfield]="sub.zone === 'MIDFIELD'"
                      [class.defense]="sub.zone === 'DEFENSE'"
                      (click)="onSlotClick(sub)">
-                  <!-- V25D91-FRONT-F3: slot-id label removida (era debug-only). -->
-                  <!-- V25D51 (Sprint C13): chip-level effectiveness feedback.
-                       See the slot-gk block above for full details on the
-                       eff-good/eff-warning/eff-bad classification and the
-                       embedded eff-badge. -->
-<ng-container *ngIf="getPlayerInSlot(sub) as player">
-                    <div *ngIf="!hasOverridePosition(player)"
-                         class="player-chip"
-                         cdkDrag
-                         [cdkDragData]="player"
-                         [class.eff-good]="getChipEffectivenessClass(sub.subdivisionId) === 'eff-good'"
-                         [class.eff-warning]="getChipEffectivenessClass(sub.subdivisionId) === 'eff-warning'"
-                         [class.eff-bad]="getChipEffectivenessClass(sub.subdivisionId) === 'eff-bad'"
-                         [attr.title]="player.name + ' (' + player.role + ') · OVR ' + player.overall + ' · eff. ' + (getEffectivenessColor(sub.subdivisionId) || 'unknown')">
-                      <span class="player-chip-name">{{player.name | slice:0:10}}</span>
-                    </div>
-                  </ng-container>
-                   <!-- V25D98.2-FRONT: ver bloque equivalente en slot-gk arriba -->
-                   <div *ngIf="isMissingPlayer(sub) && !isSlotOverridden(sub)" class="missing-indicator">
-                     {{getRecommendedRole(sub)}}
-                   </div>
                  </div>
                </ng-container>
               </ng-container>
              </ng-container>
-           </div>
+            </div>
 
           <!-- Marcadores de jugadores activos — V25D47 (C11b) extended
                with effectiveness color band. The marker is a visual-only
