@@ -410,13 +410,18 @@ import { SessionPlayer } from '../../shared/models/player.model';
     }
 
     /* Header */
+    /* V25D92.5-FRONT: header pegado al top-corner sin padding excesivo.
+       Padding 1rem 1.5rem (era 12px 20px = 0.75rem 1.25rem). Border-bottom
+       mas visible (alpha 0.1 -> 0.25) para divider claro entre header
+       verde oscuro y body verde claro. */
     .squad-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 12px 20px;
-      background: rgba(0, 0, 0, 0.4);
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 1rem 1.5rem;
+      background: rgba(0, 0, 0, 0.55);
+      border-bottom: 2px solid rgba(255, 255, 255, 0.25);
+      border-radius: 12px 12px 0 0;
     }
 
     .squad-header h2 {
@@ -650,10 +655,15 @@ import { SessionPlayer } from '../../shared/models/player.model';
       font-weight: 600;
       flex-shrink: 0;
     }
-    .bench-container .bench-list {
-      display: flex;
+.bench-container .bench-list {
+      /* V25D92.5-FRONT: CSS grid auto-fit para 11+ bench players wrapped en
+         2-3 filas en vez de una sola linea horizontal con scroll.
+         minmax(150px, 1fr) crea columnas flexibles que:
+         - con 4 bench players (Alaves squad en smoke): ~280px cada una (cap visual)
+         - con 11 bench players: wrap automatico a 2 filas si no entran en 1fr */
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
       gap: 0.4rem;
-      overflow-x: auto;
       flex: 1;
       padding: 0.2rem 0;
     }
@@ -667,16 +677,21 @@ import { SessionPlayer } from '../../shared/models/player.model';
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 0.35rem 0.6rem;
+      padding: 0.5rem 0.7rem;
       background: rgba(255, 255, 255, 0.12);
       border: 1px solid rgba(255, 255, 255, 0.25);
       border-radius: 6px;
       cursor: grab;
-      /* V25D91-FRONT-F2: bumped max-width from 140 → 200px so nombres como
-         \"Fran García\" o \"Kepa Arrizabalaga\" no se trunquen a \"Fran Gar...\"
-         / \"Kepa Arr...\" visualmente. */
-      min-width: 80px;
-      max-width: 200px;
+      /* V25D92.5-FRONT: bumped min-width 80 -> 130px + max-width 200 -> 240px.
+         V25D92.5 introduces bench-list como CSS grid auto-fit, pero
+         auto-fit con 1fr haria cards absorber todo el espacio vacio.
+         max-width:240px las CAP para que 4 bench cards no se estiren
+         grotescamente en viewports wide. Padding 0.35rem 0.6rem ->
+         0.5rem 0.7rem da mas espacio lateral para que nombres como
+         "Lucas Vazquez" / "Kepa Arrizabalaga" no se corten en la
+         ultima letra (problema edge del viewport). */
+      min-width: 130px;
+      max-width: 240px;
       transition: background 0.15s ease, border-color 0.15s ease;
     }
     .bench-player:hover {
@@ -1450,8 +1465,16 @@ import { SessionPlayer } from '../../shared/models/player.model';
     }
 
     @media (min-width: 1600px) {
+      /* V25D92.5-FRONT F1 v2: removed max-width: 1200px cap on
+         .squad-editor-container. Pre-V25D92.5 the cap limited container
+         to 1200px even though the CDK overlay pane was 1520px (95vw of
+         1600vw viewport) — leaving 320px of empty dark green background
+         (the .squad-editor-container extends to its background-image
+         gradient) so the field looked floated to the left of a wider
+         pane. With the cap removed, container = 95vw = 1520px = pane,
+         eliminating the visual gap. */
       .squad-editor-container {
-        max-width: 1200px;
+        max-width: 95vw;
       }
 
       .field {
