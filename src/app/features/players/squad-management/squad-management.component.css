@@ -141,9 +141,22 @@
 }
 
 /* Players Grid */
+/* V25D92.6-FRONT F2: bumped minmax(260px → 140px, 1fr). Pre-V25D92.6 the
+   260px minimum caused cards (Andriy Lunin, Vinicius Junior, etc.) to
+   overflow horizontally at 1600vw+ viewports — the 260px min forced each
+   card to expand to its content's min-content size when the .container
+   was wider than 260*N cards, and at narrow viewports the 260px min
+   locked the grid into 4-5 columns even when 6-7 would fit comfortably.
+
+   With minmax(140px, 1fr) the grid fills the container more evenly:
+     - 1280vw container (1190px content): 1190/140 = 8.5 → 8 cards per row
+     - 1600vw container (1310px content): 1310/140 = 9.36 → 9 cards per row
+   auto-fill (no auto-fit) preserva los tracks vacíos cuando hay menos
+   cards que tracks posibles, asi que el grid no se estira para llenar
+   huecos. Cards now respeta viewport width sin overflow horizontal. */
 .players-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 0.75rem;
 }
 

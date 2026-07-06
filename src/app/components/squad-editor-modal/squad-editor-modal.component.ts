@@ -40,8 +40,9 @@ import { SessionPlayer } from '../../shared/models/player.model';
     <div class="squad-editor-container">
       <!-- Header -->
       <div class="squad-header">
-        <h2>Editor de Formación</h2>
-        <div class="formation-selector">
+        <div class="squad-header-left">
+          <h2>Editor de Formación</h2>
+          <div class="formation-selector">
           <label>Formación:</label>
           <!-- V25D91.5-FRONT F6 fix: use (ngModelChange) en lugar de (change).
                Razon: con [(ngModel)] + (change), el orden de los listeners es
@@ -67,6 +68,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
           </select>
           <span *ngIf="isFormationChanging" class="formation-change-blocked">(espera...)</span>
         </div>
+        </div>
 
         <!-- V25D45 (Sprint C10): chemistry preview row. Shows the projected
              chemistry of the in-progress lineup (debounced 300ms after the
@@ -78,8 +80,9 @@ import { SessionPlayer } from '../../shared/models/player.model';
              formationEffectiveness.teamAverage (rawScore * teamAverage,
              rounded). When formationEffectiveness is missing the raw score
              is shown unchanged (backward compat with pre-V25D47 lineups). -->
-        <div class="header-preview-stack">
-          <div class="chemistry-preview-row">
+        <div class="squad-header-right">
+          <div class="header-preview-stack">
+            <div class="chemistry-preview-row">
             <ng-container *ngIf="getDisplayedChemistryScore() as displayedScore; else previewEmpty">
               <span class="preview-label">Chemistry proyectado:</span>
               <span class="preview-score"
@@ -129,10 +132,15 @@ import { SessionPlayer } from '../../shared/models/player.model';
               {{ (fe.teamAverage * 100).toFixed(0) }}%
             </span>
           </div>
+          </div>
+          <button mat-icon-button (click)="close()" class="close-btn" title="Cerrar">✕</button>
         </div>
-
-        <button mat-icon-button (click)="close()" class="close-btn" title="Cerrar">✕</button>
       </div>
+      <!-- ^^^ V25D92.6-FRONT F1: restructured header. .squad-header-left (h2 +
+           .formation-selector) is column 1 of the new 2-column grid, and
+           .squad-header-right (.header-preview-stack + close-btn) is column 2.
+           Keeps the chemistry preview stack and close-btn visually anchored
+           to the right of the header, no big empty middle as pre-V25D92.6. -->
 
       <!-- Field Canvas - Vertical Orientation -->
       <div class="field-container">
@@ -398,9 +406,18 @@ import { SessionPlayer } from '../../shared/models/player.model';
          to the right of the dark green gradient background. Replaced the
          900px cap with max-width: 95vw so the container matches the pane
          width (consistent with the V25D89.4 PartidoModal full-width fix
-         + the dialog.open(width: 95vw) config in squad-management). */
-      width: 95vw;
-      max-width: 95vw;
+         + the dialog.open(width: 95vw) config in squad-management).
+
+         V25D92.6-FRONT F1: bumped 95vw → 98vw to eliminate las "franjas
+         blancas" a los lados del modal @ 1600vw viewport. Pre-V25D92.6, el
+         modal era 1520px (95% de 1600vw) con 40px de gap a cada lado. Esos
+         40px mostraban el body bg del squad-management page (#f5f5f5 light
+         gray) a traves del cdk-overlay-pane — Ivan: "no parte blanca a la
+         derecha, feo". 98vw = 1568px, gap lateral de 16px cada lado, mucho
+         menos visible. Si en pantallas mas anchas (1920, 2560) el gap sigue
+         siendo perceptible, se puede bumpear a 100vw sin margin. */
+      width: 98vw;
+      max-width: 98vw;
       height: 90vh;
       background: linear-gradient(180deg, #1a472a 0%, #2d5a3d 100%);
       border-radius: 12px;
@@ -410,18 +427,51 @@ import { SessionPlayer } from '../../shared/models/player.model';
     }
 
     /* Header */
-    /* V25D92.5-FRONT: header pegado al top-corner sin padding excesivo.
-       Padding 1rem 1.5rem (era 12px 20px = 0.75rem 1.25rem). Border-bottom
-       mas visible (alpha 0.1 -> 0.25) para divider claro entre header
-       verde oscuro y body verde claro. */
+    /* V25D92.6-FRONT F1: header re-balanceado. Pre-V25D92.6, .squad-header
+       era display:flex + justify-content:space-between con 3 items
+       (h2, .formation-selector, .header-preview-stack). A 1600vw esto
+       producia un VACIO enorme en el medio del header (h2+selector
+       compactos a la izquierda, chemistry a la derecha, ~600px de bg
+       sin contenido en el medio = "white band" visual).
+
+       V25D92.6 wrap h2 + .formation-selector en un sub-group .squad-header-left
+       con flex display (left side cluster), y cambia .squad-header a grid
+       2-columnas: 1fr | auto. Asi:
+         - columna 1: h2 + selector + chemistry preview (left, fill available)
+         - columna 2: X close button (right, intrinsic width)
+
+       Ademas .squad-header-left es flex display con align-items: center +
+       gap para que h2 y selector se mantengan juntos lado-a-lado, llenando
+       la columna izquierda sin vacio interior.
+
+       V25D92.5-FRONT: header padding 1rem 1.5rem + border-bottom mas visible
+       (alpha 0.1 -> 0.25) para divider claro entre header verde oscuro y
+       body verde claro. border-radius 12px 12px 0 0 mantiene top corners
+       redondeados que conectan con el container border-radius. */
     .squad-header {
-      display: flex;
+      display: grid;
+      grid-template-columns: 1fr auto;
       align-items: center;
-      justify-content: space-between;
+      gap: 1rem;
       padding: 1rem 1.5rem;
       background: rgba(0, 0, 0, 0.55);
       border-bottom: 2px solid rgba(255, 255, 255, 0.25);
       border-radius: 12px 12px 0 0;
+    }
+
+    .squad-header-left {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+      min-width: 0;
+    }
+
+    .squad-header-right {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-shrink: 0;
     }
 
     .squad-header h2 {
@@ -492,12 +542,17 @@ import { SessionPlayer } from '../../shared/models/player.model';
 
     /* V25D47 (Sprint C11b): wrapper for chemistry-preview-row +
        formation-effectiveness-row. Pushes both to the right of the header
-       via margin-left: auto and stacks them vertically with a small gap. */
+       via margin-left: auto and stacks them vertically with a small gap.
+
+       V25D92.6-FRONT F1: removed margin-left:auto because the parent
+       .squad-header now uses CSS grid (1fr | auto) — .header-preview-stack
+       sits naturally in the 2nd column (.squad-header-right) without
+       needing the auto-margin trick. Keeping margin-right:0.5rem for
+       visual breathing room from the close button. */
     .header-preview-stack {
       display: flex;
       flex-direction: column;
       gap: 4px;
-      margin-left: auto;
       margin-right: 0.5rem;
       /* V25D91-FRONT-F4: flex-shrink:0 prevents the preview stack from
          compressing itself when the header viewport is narrow. Without it,
@@ -658,14 +713,28 @@ import { SessionPlayer } from '../../shared/models/player.model';
 .bench-container .bench-list {
       /* V25D92.5-FRONT: CSS grid auto-fit para 11+ bench players wrapped en
          2-3 filas en vez de una sola linea horizontal con scroll.
-         minmax(150px, 1fr) crea columnas flexibles que:
-         - con 4 bench players (Alaves squad en smoke): ~280px cada una (cap visual)
-         - con 11 bench players: wrap automatico a 2 filas si no entran en 1fr */
+
+         V25D92.6-FRONT F3: bumped minmax(150px → 110px, 1fr). Pre-V25D92.6
+         the 150px minimum + max-width:240px cap on .bench-player produced
+         "irregular 8+2 o 5+4+2" layouts at 1280-1600vw — Ivan: visual
+         inconsistente entre squad sizes. Con minmax(110px, 1fr):
+           - 4 bench players @ 1280vw bench-list (1118px): 4 columns × ~280px each
+           - 4 bench players @ 1600vw bench-list (1422px): 4 columns × ~355px each
+           - 11 bench players wrap a 2 filas cuando no entran en 1 row
+         Cada fila tiene cards uniformes, no mas gaps grotescos de 117px
+         como antes (4 players × 240px cap + gaps enormes).
+         Removi tmb el max-width:240px cap del .bench-player para que 1fr
+         pueede estirar libremente el track. */
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
       gap: 0.4rem;
       flex: 1;
       padding: 0.2rem 0;
+      /* V25D92.6-FRONT F3 fallback: con 11+ bench players y viewport chico,
+         auto-fit colapsa tracks vacias, pero los cards pueden stretch
+         mas alla del minmax(110px,1fr) si el row solo tiene 1-2 cards.
+         El overflow-x permite scroll horizontal en esos edge cases. */
+      overflow-x: auto;
     }
     .bench-container .bench-empty {
       color: rgba(255, 255, 255, 0.45);
@@ -689,9 +758,15 @@ import { SessionPlayer } from '../../shared/models/player.model';
          grotescamente en viewports wide. Padding 0.35rem 0.6rem ->
          0.5rem 0.7rem da mas espacio lateral para que nombres como
          "Lucas Vazquez" / "Kepa Arrizabalaga" no se corten en la
-         ultima letra (problema edge del viewport). */
-      min-width: 130px;
-      max-width: 240px;
+         ultima letra (problema edge del viewport).
+
+         V25D92.6-FRONT F3: removed max-width:240px cap. Con
+         grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)) el
+         card usa el full track width cuando solo hay 1-4 cards, evitando
+         los gaps de 117px entre cards que veia Ivan pre-V25D92.6.
+         min-width se mantiene en 110px (matches grid minmax min) para
+         que nombres largos no se corten. */
+      min-width: 110px;
       transition: background 0.15s ease, border-color 0.15s ease;
     }
     .bench-player:hover {
@@ -1471,10 +1546,11 @@ import { SessionPlayer } from '../../shared/models/player.model';
          1600vw viewport) — leaving 320px of empty dark green background
          (the .squad-editor-container extends to its background-image
          gradient) so the field looked floated to the left of a wider
-         pane. With the cap removed, container = 95vw = 1520px = pane,
-         eliminating the visual gap. */
+         pane. With the cap removed, container = 98vw = 1568px = pane,
+         eliminating the visual gap (gap reduced from 80px to 32px total
+         at 1600vw). */
       .squad-editor-container {
-        max-width: 95vw;
+        max-width: 98vw;
       }
 
       .field {
