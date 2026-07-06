@@ -333,8 +333,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
                     Complementa .player-number (INTERNO, mas grande) — la
                     combinacion da legibilidad "tactica" desde lejos, similar
                     a dorsales en broadcasts de TV. -->
-              <div class="tactical-number">{{i + 1}}</div>
-              <div class="player-number">{{i + 1}}</div>
+<div class="player-number">{{i + 1}}</div>
               <div class="player-name-label">{{player.name}}</div>
               <div class="player-role-label">{{player.role}}</div>
             </div>
