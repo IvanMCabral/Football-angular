@@ -1275,8 +1275,8 @@ describe('SquadEditorModalComponent — V25D56 (C17) responsive breakpoints', ()
   // max-height:50vh lo sobreescribia. Verificamos que los 3 bloques
   // tienen la regla correcta y que NO hay height/max-height que anule
   // el ratio.
-  describe('SquadEditorModalComponent — V25D57 (C17b) field aspect-ratio', () => {
-    it('default viewport (>=1025px): .field has aspect-ratio 1 / 1.4 outside any @media block', () => {
+  describe('SquadEditorModalComponent — V25D94 field aspect-ratio 1.15 / 1 (was V25D93.5 landscape 1.4 / 1)', () => {
+    it('default viewport (>=1025px): .field has aspect-ratio 1.15 / 1 outside any @media block', () => {
       const src = stripEncapsulation(stylesSource());
       // Strip @media blocks so we only inspect the default rules.
       const nonMedia = src.replace(/@media[\s\S]*?\}\s*\}/g, '');
@@ -1284,28 +1284,29 @@ describe('SquadEditorModalComponent — V25D56 (C17) responsive breakpoints', ()
       // (we strip comments + the rule body).
       const fieldRule = nonMedia.match(/\.field\s*\{[^}]*\}/);
       expect(fieldRule).withContext('top-level .field rule must exist').toBeTruthy();
-      expect(fieldRule![0]).toMatch(/aspect-ratio:\s*1\s*\/\s*1\.4/);
-      // Sanity: height:100% was the original bug source — assert it's gone.
-      // V25D58 (Sprint C18): use a negative lookbehind so this still passes
-      // when max-height:100% is present (which contains "height: 100%" as
-      // a substring but is a different property).
-      expect(fieldRule![0]).not.toMatch(/(?<![\w-])height:\s*100%/);
+      // V25D94-FRONT: aspect 1.15/1 (more square, less landscape).
+      // Ivan: "la cancha se vea como cancha no tan ancha".
+      expect(fieldRule![0]).toMatch(/aspect-ratio:\s*1\.15\s*\/\s*1/);
+      // Sanity: height:100% is now the driver (not aspect-ratio's height
+      // auto). V25D93.5 inverted the strategy: height:100% + aspect-ratio
+      // so the field fills available height and width adjusts via aspect.
+      expect(fieldRule![0]).toMatch(/height:\s*100%/);
     });
 
-    it('tablet viewport (601-1024px): .field has aspect-ratio 1 / 1.4 inside the @media block', () => {
+    it('tablet viewport (601-1024px): .field has aspect-ratio 1.15 / 1 inside the @media block', () => {
       const block = extractMediaBlock('min-width: 601px) and (max-width: 1024px');
       expect(block).withContext('tablet @media block must exist').toBeTruthy();
       const fieldRule = block.match(/\.field\s*\{[^}]*\}/);
       expect(fieldRule).withContext('tablet .field rule must exist').toBeTruthy();
-      expect(fieldRule![0]).toMatch(/aspect-ratio:\s*1\s*\/\s*1\.4/);
+      expect(fieldRule![0]).toMatch(/aspect-ratio:\s*1\.15\s*\/\s*1/);
     });
 
-    it('mobile viewport (<=600px): .field has aspect-ratio 1 / 1.4 AND no max-height cap that would override it', () => {
+    it('mobile viewport (<=600px): .field has aspect-ratio 1.15 / 1 AND no max-height cap that would override it', () => {
       const block = extractMediaBlock('max-width: 600px');
       expect(block).withContext('mobile @media block must exist').toBeTruthy();
       const fieldRule = block.match(/\.field\s*\{[^}]*\}/);
       expect(fieldRule).withContext('mobile .field rule must exist').toBeTruthy();
-      expect(fieldRule![0]).toMatch(/aspect-ratio:\s*1\s*\/\s*1\.4/);
+      expect(fieldRule![0]).toMatch(/aspect-ratio:\s*1\.15\s*\/\s*1/);
       // The original bug: max-height: 50vh overrode aspect-ratio in jsdom
       // and real browsers alike, leaving the field wider than tall.
       // The fix sets max-height:none. Assert neither vh nor px cap is present.
@@ -1398,61 +1399,75 @@ describe('SquadEditorModalComponent — V25D58 (C18) field responsive sizing', (
     return fieldRule ? fieldRule[0] : '';
   }
 
-  it('desktop default viewport (>=1025px): .field has max-width: min(500px, 100%)', () => {
-    // Outside any @media block, the top-level .field rule must use the
-    // responsive min(cap, 100%) pattern — not a fixed pixel value.
+  it('desktop default viewport (>=1025px): .field has max-width: 100% (no V25D58 cap)', () => {
+    // V25D93.5-FRONT: removed the V25D58 max-width cap min(500px, 100%).
+    // The field is now height-driven landscape (aspect-ratio: 1.4 / 1)
+    // with max-width: 100% (no horizontal cap). Width is computed from
+    // height via aspect-ratio.
     const src = stripEncapsulation(stylesSource());
     const nonMedia = src.replace(/@media[\s\S]*?\}\s*\}/g, '');
     const fieldRule = extractFieldRule(nonMedia);
     expect(fieldRule).withContext('top-level .field rule must exist').toBeTruthy();
-    expect(fieldRule).toMatch(/max-width:\s*min\(\s*500px\s*,\s*100%\s*\)/,
-      'desktop default .field must use max-width: min(500px, 100%) to allow shrink in narrow modals');
-    // Sanity: no fixed max-width (regression guard for the pre-C18 bug).
-    expect(fieldRule).not.toMatch(/max-width:\s*500px\s*;/);
+    expect(fieldRule).toMatch(/max-width:\s*100%/,
+      'desktop default .field must use max-width: 100% (no V25D58 cap)');
+    // Sanity: no min(cap, ...) pattern.
+    expect(fieldRule).not.toMatch(/max-width:\s*min\(/);
   });
 
-  it('desktop default viewport (>=1025px): .field has max-height: 100% (no fixed cap)', () => {
-    // Pre-C18 the .field had max-height: 700px which could clip the field
-    // on tall phones. C18 swaps it for max-height: 100% so the field
-    // never exceeds its parent field-container's height.
+  it('desktop default viewport (>=1025px): .field has height: 100% (height-driven)', () => {
+    // V25D93.5-FRONT: field is height-driven (height: 100% of
+    // field-container), width adjusts via aspect-ratio. No max-height
+    // cap is needed because the parent field-container already bounds
+    // available height (min-height:0 allows flex child to honor aspect).
     const src = stripEncapsulation(stylesSource());
     const nonMedia = src.replace(/@media[\s\S]*?\}\s*\}/g, '');
     const fieldRule = extractFieldRule(nonMedia);
     expect(fieldRule).toBeTruthy();
-    expect(fieldRule).toMatch(/max-height:\s*100%\s*;/);
-    // Sanity: no fixed max-height: Npx.
-    expect(fieldRule).not.toMatch(/max-height:\s*\d+px\s*;/);
+    expect(fieldRule).toMatch(/height:\s*100%\s*;/);
   });
 
-  it('large desktop viewport (>=1600px): .field has max-width: min(600px, 100%)', () => {
+  it('large desktop viewport (>=1600px): .field inherits from base (no override)', () => {
+    // V25D93.5-FRONT: removed the V25D58 max-width: min(600px, 100%)
+    // override. Large desktop now uses the same .field rule as default
+    // (no @media block resets field dimensions). This guards against
+    // accidental re-addition of the V25D58 cap.
     const block = extractMediaBlock('min-width: 1600px');
-    expect(block).withContext('large-desktop @media block must exist').toBeTruthy();
-    const fieldRule = extractFieldRule(block);
-    expect(fieldRule).withContext('large-desktop .field rule must exist').toBeTruthy();
-    expect(fieldRule).toMatch(/max-width:\s*min\(\s*600px\s*,\s*100%\s*\)/,
-      'large-desktop .field must allow up to 600px before shrinking');
+    expect(block).toBeTruthy();
+    // The large-desktop @media block may have rules for other selectors
+    // (e.g. .squad-editor-container), but should NOT re-declare .field
+    // with a max-width cap.
+    const fieldRule = block.match(/\.field\s*\{[^}]*\}/);
+    if (fieldRule) {
+      expect(fieldRule[0]).not.toMatch(/max-width:\s*min\(/,
+        'large-desktop .field must NOT redefine V25D58 max-width cap');
+    }
   });
 
-  it('tablet viewport (601-1024px): .field has max-width: min(450px, 100%)', () => {
+  it('tablet viewport (601-1024px): .field has max-width: 100% (no V25D58 cap)', () => {
+    // V25D93.5-FRONT: same landscape flip applies to tablet — aspect-ratio
+    // 1.4 / 1, max-width 100%, height 100%. The V25D58 450px cap is gone.
     const block = extractMediaBlock('min-width: 601px) and (max-width: 1024px');
     expect(block).withContext('tablet @media block must exist').toBeTruthy();
     const fieldRule = extractFieldRule(block);
     expect(fieldRule).withContext('tablet .field rule must exist').toBeTruthy();
-    expect(fieldRule).toMatch(/max-width:\s*min\(\s*450px\s*,\s*100%\s*\)/,
-      'tablet .field must cap at 450px (and shrink in narrow modals)');
+    expect(fieldRule).toMatch(/max-width:\s*100%/,
+      'tablet .field must use max-width: 100% (no V25D58 cap)');
   });
 
-  it('mobile viewport (<=600px): .field has max-width: min(380px, 100%)', () => {
+  it('mobile viewport (<=600px): .field has max-width: 100% (no V25D58 cap)', () => {
+    // V25D93.5-FRONT: same landscape flip applies to mobile — aspect-ratio
+    // 1.4 / 1, max-width 100%, height 100%. The V25D58 380px cap is gone.
     const block = extractMediaBlock('max-width: 600px');
     expect(block).withContext('mobile @media block must exist').toBeTruthy();
     const fieldRule = extractFieldRule(block);
     expect(fieldRule).withContext('mobile .field rule must exist').toBeTruthy();
-    expect(fieldRule).toMatch(/max-width:\s*min\(\s*380px\s*,\s*100%\s*\)/,
-      'mobile .field must cap at 380px (and shrink in 375px viewports)');
+    expect(fieldRule).toMatch(/max-width:\s*100%/,
+      'mobile .field must use max-width: 100% (no V25D58 cap)');
   });
 
-  it('aspect-ratio 1 / 1.4 is preserved in all 4 viewports (default + 3 breakpoints)', () => {
-    // V25D58 inherits V25D57 (C17b): aspect-ratio must hold in every
+  it('aspect-ratio 1.15 / 1 is preserved in all 4 viewports (default + 3 breakpoints)', () => {
+    // V25D94-FRONT: aspect ratio 1.15/1 (more square, less landscape).
+    // V25D58 inherited V25D57 (C17b): aspect-ratio must hold in every
     // viewport so the field never becomes a horizontal slab. We sweep
     // each breakpoint and assert the .field rule carries the ratio.
     const src = stripEncapsulation(stylesSource());
@@ -1463,21 +1478,21 @@ describe('SquadEditorModalComponent — V25D58 (C18) field responsive sizing', (
 
     // Large-desktop block doesn't necessarily re-declare aspect-ratio
     // (it inherits from default), but mobile/tablet/default MUST carry it.
-    expect(nonMedia).toMatch(/aspect-ratio:\s*1\s*\/\s*1\.4/);
-    expect(mobile).toMatch(/aspect-ratio:\s*1\s*\/\s*1\.4/);
-    expect(tablet).toMatch(/aspect-ratio:\s*1\s*\/\s*1\.4/);
+    expect(nonMedia).toMatch(/aspect-ratio:\s*1\.15\s*\/\s*1/);
+    expect(mobile).toMatch(/aspect-ratio:\s*1\.15\s*\/\s*1/);
+    expect(tablet).toMatch(/aspect-ratio:\s*1\.15\s*\/\s*1/);
 
     // For large-desktop: assert that either the block sets aspect-ratio
     // OR there's no override (the default applies). We accept either
     // pattern as long as NO breakpoint strips aspect-ratio from the field.
-    const allBreakpointsHaveRatio = [mobile, tablet].every(r => /aspect-ratio:\s*1\s*\/\s*1\.4/.test(r));
-    expect(allBreakpointsHaveRatio).withContext('mobile + tablet .field must both carry aspect-ratio: 1 / 1.4').toBeTrue();
+    const allBreakpointsHaveRatio = [mobile, tablet].every(r => /aspect-ratio:\s*1\.15\s*\/\s*1/.test(r));
+    expect(allBreakpointsHaveRatio).withContext('mobile + tablet .field must both carry aspect-ratio: 1.15 / 1').toBeTrue();
 
     // large-desktop .field may NOT re-declare aspect-ratio (it inherits
     // from default). We assert that NO @media block STRIPS aspect-ratio
     // from the field — i.e., no @media block sets `aspect-ratio: <other>`
     // or removes it. Since CSS only adds/overrides, the safe check is:
-    // no @media block declares a different aspect-ratio value than 1/1.4.
+    // no @media block declares a different aspect-ratio value than 1.15/1.
     const mediaBlocks: Array<{label: string; block: string}> = [
       { label: 'mobile',         block: extractMediaBlock('max-width: 600px') },
       { label: 'tablet',         block: extractMediaBlock('min-width: 601px) and (max-width: 1024px') },
@@ -1486,14 +1501,14 @@ describe('SquadEditorModalComponent — V25D58 (C18) field responsive sizing', (
     mediaBlocks.forEach(({label, block}) => {
       const aspectRatioInBlock = block.match(/aspect-ratio:\s*([^;}]+)/);
       if (aspectRatioInBlock) {
-        // If the breakpoint declares aspect-ratio, it must be 1 / 1.4.
+        // If the breakpoint declares aspect-ratio, it must be 1.15 / 1.
         expect(aspectRatioInBlock[1].replace(/\s+/g, ' ').trim())
-          .withContext(`${label} .field aspect-ratio must be 1 / 1.4 if declared`)
-          .toMatch(/^1\s*\/\s*1\.4$/);
+          .withContext(`${label} .field aspect-ratio must be 1.15 / 1 if declared`)
+          .toMatch(/^1\.15\s*\/\s*1$/);
       }
       // If aspect-ratio is NOT declared in this block, that's fine —
       // it inherits from the default rule. We only assert that whatever
-      // is declared matches 1/1.4.
+      // is declared matches 1.15/1.
     });
   });
 

@@ -157,6 +157,13 @@ import { SessionPlayer } from '../../shared/models/player.model';
           <div class="field-line right-penalty-area"></div>
           <div class="field-line left-goal-area"></div>
           <div class="field-line right-goal-area"></div>
+          <!-- V25D93-FRONT F2: penalty spots (puntitos blancos a 11% de cada
+               goal-line) + penalty arcs (semicirculos fuera de cada
+               penalty area). See CSS for proportions (16% w x 30% h). -->
+          <div class="field-line left-penalty-spot"></div>
+          <div class="field-line right-penalty-spot"></div>
+          <div class="field-line left-penalty-arc"></div>
+          <div class="field-line right-penalty-arc"></div>
 
           <!-- SUBDIVISIONES COMO SLOTS (81 + 1 GK) — V25D47 (C11b) extended
                each slot as a cdkDropList connected to all other slots +
@@ -241,27 +248,28 @@ import { SessionPlayer } from '../../shared/models/player.model';
                        See the slot-gk block above for full details on the
                        eff-good/eff-warning/eff-bad classification and the
                        embedded eff-badge. -->
-                  <div *ngIf="getPlayerInSlot(sub) as player"
-                       class="player-chip"
-                       cdkDrag
-                       [cdkDragData]="player"
-                       [class.eff-good]="getChipEffectivenessClass(sub.subdivisionId) === 'eff-good'"
-                       [class.eff-warning]="getChipEffectivenessClass(sub.subdivisionId) === 'eff-warning'"
-                       [class.eff-bad]="getChipEffectivenessClass(sub.subdivisionId) === 'eff-bad'">
-                    <span class="player-chip-name">{{player.name | slice:0:10}}</span>
-                    <span *ngIf="getEffectivenessForSlot(sub.subdivisionId) as eff"
-                          class="eff-badge"
-                          [title]="'Effectiveness: ' + (eff * 100).toFixed(0) + '%'">
-                      {{ (eff * 100).toFixed(0) }}%
-                    </span>
-                  </div>
-                  <div *ngIf="isMissingPlayer(sub)" class="missing-indicator">
-                    {{getRecommendedRole(sub)}}
-                  </div>
-                </div>
-              </ng-container>
-            </ng-container>
-          </div>
+                   <div *ngIf="getPlayerInSlot(sub) as player"
+                        class="player-chip"
+                        cdkDrag
+                        [cdkDragData]="player"
+                        [class.eff-good]="getChipEffectivenessClass(sub.subdivisionId) === 'eff-good'"
+                        [class.eff-warning]="getChipEffectivenessClass(sub.subdivisionId) === 'eff-warning'"
+                        [class.eff-bad]="getChipEffectivenessClass(sub.subdivisionId) === 'eff-bad'"
+                        [attr.title]="player.name + ' (' + player.role + ') · OVR ' + player.overall + ' · eff. ' + (getEffectivenessColor(sub.subdivisionId) || 'unknown')">
+                     <span class="player-chip-name">{{player.name | slice:0:10}}</span>
+                     <span *ngIf="getEffectivenessForSlot(sub.subdivisionId) as eff"
+                           class="eff-badge"
+                           [title]="'Effectiveness: ' + (eff * 100).toFixed(0) + '%'">
+                       {{ (eff * 100).toFixed(0) }}%
+                     </span>
+                   </div>
+                   <div *ngIf="isMissingPlayer(sub)" class="missing-indicator">
+                     {{getRecommendedRole(sub)}}
+                   </div>
+                 </div>
+               </ng-container>
+             </ng-container>
+           </div>
 
           <!-- Marcadores de jugadores activos — V25D47 (C11b) extended
                with effectiveness color band. The marker is a visual-only
@@ -281,6 +289,10 @@ import { SessionPlayer } from '../../shared/models/player.model';
                  [class.eff-green]="getEffectivenessColor(player.slotId) === 'green'"
                  [class.eff-yellow]="getEffectivenessColor(player.slotId) === 'yellow'"
                  [class.eff-red]="getEffectivenessColor(player.slotId) === 'red'">
+              <!-- V25D93-FRONT F4: tooltip moved to .player-chip (line 211+)
+                   which has pointer-events:auto by default. The marker itself
+                   has pointer-events:none for click-passthrough, so the [title]
+                   attribute on the marker would never fire. Removing for clarity. -->
               <div class="player-number">{{i + 1}}</div>
               <div class="player-name-label">{{player.name}}</div>
               <div class="player-role-label">{{player.role}}</div>
@@ -860,7 +872,10 @@ import { SessionPlayer } from '../../shared/models/player.model';
       display: flex;
       justify-content: center;
       align-items: center;
-      padding: 20px;
+      /* V25D93.5-FRONT: padding 20px → 8px para dar mas espacio al field
+         landscape. Vertical space es limited (modal h = 90vh - header/bench),
+         asi que reducir padding vertical maximiza el field height. */
+      padding: 8px;
       overflow: hidden;
       /* V25D58 (Sprint C18): min-height:0 allows the flex child (.field) to
          honor its aspect-ratio without being constrained by the container's
@@ -873,23 +888,17 @@ import { SessionPlayer } from '../../shared/models/player.model';
     /* Field */
     .field {
       position: relative;
-      width: 100%;
-      /* V25D58 (Sprint C18): cap progresivo via min(cap, 100%). En desktop
-         mantiene los 500px del default anterior; en viewports chicos
-         permite shrink porque el cap nunca excede el ancho disponible.
-         Era max-width: 500px (fijo) lo que dejaba gap visual en modales
-         menores a 500px de field-container. */
-      max-width: min(500px, 100%);
-      /* V25D57 (Sprint C17b): aspect-ratio del campo de futbol.
-         Antes height: 100% aplastaba el field a horizontal slab en
-         viewports desktop/tablet. height: auto + aspect-ratio 1/1.4
-         garantiza que height = 1.4 * width (campo vertical). */
-      height: auto;
-      /* V25D58 (Sprint C18): max-height: 100% en lugar del cap fijo de 700px
-         para que el field NUNCA exceda el alto del field-container (que
-         es 90vh del squad-editor-container menos header/footer/bench). */
-      max-height: 100%;
-      aspect-ratio: 1 / 1.4;
+      /* V25D94-FRONT: aspect ratio 1.4/1 → 1.15/1 (mas cuadrado, parecido a
+         TV broadcast real). V25D93.5 estaba demasiado landscape (1.4:1);
+         Ivan pidio "la cancha se vea como cancha no tan ancha". 1.15/1
+         matches real TV broadcast aspect (16:9 cropped to ~1.15-1.2). */
+
+      /* Height-driven: field usa el maximo height disponible del
+         field-container, width se ajusta via aspect-ratio. */
+      height: 100%;
+      width: auto;
+      max-width: 100%;
+      aspect-ratio: 1.15 / 1;
       background: linear-gradient(180deg, #4a8c5c 0%, #5a9c6c 50%, #4a8c5c 100%);
       border: 3px solid #fff;
       border-radius: 4px;
@@ -927,44 +936,121 @@ import { SessionPlayer } from '../../shared/models/player.model';
     }
 
     .center-circle {
+      /* V25D93.5-FRONT: center circle converted to %-based for landscape.
+         Pre-V25D93.5 era 90x90 absolute px (tuned for 500w portrait field).
+         En landscape field (~700w+), 90px queda chico proporcional al
+         field. Ahora width:13% + aspect-ratio:1 — circle cuyo diameter
+         es 13% del field width. En 700w field = 91px (similar al portrait).
+         En 1200w field = 156px (escala con field). Border-radius:50% lo
+         mantiene circular. */
       top: 50%;
       left: 50%;
-      width: 80px;
-      height: 80px;
+      width: 13%;
+      aspect-ratio: 1;
       transform: translate(-50%, -50%);
       border-radius: 50%;
     }
 
+    /* V25D93-FRONT F2: Penalty areas rectangulares per Ivan spec original
+       (16% ancho x 30% profundidad). V25D93.5 mantuvo estos %s — los %
+       escalan correctamente en landscape porque parent aspect cambia solo
+       el contenedor, no las proporciones internas. bottom:0 para own
+       penalty area (porteria del usuario abajo del field). */
     .left-penalty-area {
       bottom: 0;
       left: 50%;
-      width: 120px;
-      height: 60px;
+      width: 16%;
+      height: 30%;
       transform: translateX(-50%);
+      /* V25D93: solo top + lados. El bottom coincide con la goal-line, asi
+         que el rectangulo se conecta visualmente con el borde del field
+         sin doble linea. */
+      border-bottom: none;
     }
 
     .right-penalty-area {
       top: 0;
       left: 50%;
-      width: 120px;
-      height: 60px;
+      width: 16%;
+      height: 30%;
       transform: translateX(-50%);
+      /* Mismo trick: solo bottom + lados, top conecta con goal-line. */
+      border-top: none;
     }
 
+    /* V25D93-FRONT F2: Goal areas (chica, dentro de penalty area). En cancha
+       real es ~5.5m ancho x 9.16m profundidad del goal-line. Per Ivan spec
+       dejo 8% ancho x 12% profundidad. */
     .left-goal-area {
       bottom: 0;
       left: 50%;
-      width: 40px;
-      height: 20px;
+      width: 8%;
+      height: 12%;
       transform: translateX(-50%);
+      border-bottom: none;
     }
 
     .right-goal-area {
       top: 0;
       left: 50%;
-      width: 40px;
-      height: 20px;
+      width: 8%;
+      height: 12%;
       transform: translateX(-50%);
+      border-top: none;
+    }
+
+    /* V25D93.5-FRONT: Penalty spots convertidos a %-based. Pre-V25D93.5 eran
+       5x5 absolute (constante, no escalada). En landscape field, 5x5 queda
+       diminuto. Ahora width:0.8% aspect-ratio:1 — dot proporcional al field.
+       En 700w field = 5.6px (similar), en 1200w field = 9.6px (scaling up). */
+    .left-penalty-spot {
+      bottom: 11%;
+      left: 50%;
+      width: 0.8%;
+      aspect-ratio: 1;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.85);
+      transform: translateX(-50%);
+      border: none;
+    }
+
+    .right-penalty-spot {
+      top: 11%;
+      left: 50%;
+      width: 0.8%;
+      aspect-ratio: 1;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.85);
+      transform: translateX(-50%);
+      border: none;
+    }
+
+    /* V25D93.5-FRONT: Penalty arcs convertidos a %-based (10% w + aspect 1).
+       Pre-V25D93.5 eran 90px absolute — ahora escalan con field width. */
+    .left-penalty-arc {
+      bottom: 11%;
+      left: 50%;
+      width: 10%;
+      aspect-ratio: 1;
+      border-radius: 50%;
+      transform: translate(-50%, 35%);
+      border: 2px solid rgba(255, 255, 255, 0.7);
+      border-bottom-color: transparent;
+      border-left-color: transparent;
+      border-right-color: transparent;
+    }
+
+    .right-penalty-arc {
+      top: 11%;
+      left: 50%;
+      width: 10%;
+      aspect-ratio: 1;
+      border-radius: 50%;
+      transform: translate(-50%, -35%);
+      border: 2px solid rgba(255, 255, 255, 0.7);
+      border-top-color: transparent;
+      border-left-color: transparent;
+      border-right-color: transparent;
     }
 
     /* Slots Layer */
@@ -980,15 +1066,22 @@ import { SessionPlayer } from '../../shared/models/player.model';
     /* Individual Slot */
     .slot {
       position: absolute;
-      border: 1px solid rgba(255, 255, 255, 0.3);
-      background: rgba(255, 255, 255, 0.05);
+      /* V25D93-FRONT F1: hide debug slot grid. Pre-V25D93 cada uno de los 82
+         slots se renderizaba como rectangulo con border rgba(255,255,255,0.3)
+         + bg rgba(255,255,255,0.05) tinted por role family (red attack, green
+         midfield, blue defense). Con soccer markings reales en V25D93 esa
+         grilla es ruido — Ivan: "cruces rojas adentro, feo". Fix:
+         border:none + background:transparent. .slot.missing-player mantiene
+         su tinted bg para que el user sepa DONDE falta asignar (info util,
+         no debug clutter). Slots siguen siendo cdkDropList/cdkDrag targets,
+         solo cambia la presentacion visual. */
+      border: none;
+      background: transparent;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       cursor: pointer;
-      border-radius: 2px;
-      transition: all 0.2s ease;
       /* V25D51 (Sprint C13): overflow:visible so the chip-level eff-badge
          (positioned at top:-8px, right:-8px against the chip) can extend
          above the slot's top edge without being clipped. The chip's own
@@ -998,48 +1091,40 @@ import { SessionPlayer } from '../../shared/models/player.model';
     }
 
     .slot:hover {
-      background: rgba(255, 255, 255, 0.15);
-      border-color: rgba(255, 255, 255, 0.6);
-      transform: scale(1.02);
-      z-index: 10;
+      /* V25D93-FRONT F1: hover feedback sutil para drag affordance. ANTES el
+         hover ponia bg alpha 0.15 + border-color solid white — Ivan vio
+         eso como "cruces rojas". Ahora: outline 2px white dashed solo en
+         hover (feedback temporal para drop target). */
+      outline: 2px dashed rgba(255, 255, 255, 0.6);
+      outline-offset: -2px;
     }
 
-    .slot.attack {
-      background: rgba(231, 76, 60, 0.1);
-      border-color: rgba(231, 76, 60, 0.4);
-    }
-
-    .slot.midfield {
-      background: rgba(46, 204, 113, 0.1);
-      border-color: rgba(46, 204, 113, 0.4);
-    }
-
-    .slot.defense {
-      background: rgba(52, 152, 219, 0.1);
-      border-color: rgba(52, 152, 219, 0.4);
-    }
+    /* V25D93-FRONT F1: removidas .slot.attack/.midfield/.defense/.gk role-tinted
+       backgrounds — eran debug-only que Ivan reporto como "cruces rojas". */
 
     .slot-gk {
-      background: rgba(255, 215, 0, 0.15);
-      border-color: rgba(255, 215, 0, 0.6);
-      border-width: 2px;
+      /* V25D93-FRONT F1: transparent. Mantengo la regla para no romper el
+         selector del template (slot-gk class aplicada en cdkDropList). */
+      background: transparent;
+      border: none;
     }
 
     .slot.recommended {
       box-shadow: inset 0 0 10px rgba(255, 200, 0, 0.3);
     }
 
-    .slot.occupied {
-      background: rgba(255, 255, 255, 0.2);
-      border-color: #fff;
-    }
+    /* V25D93-FRONT F1: removida .slot.occupied que ponia bg blanca alpha 0.2
+       + border blanco. El marker del player es suficiente indication. */
 
     /* Slot recomendado sin jugador asignado */
     .slot.missing-player {
-      background: rgba(231, 76, 60, 0.25);
-      border-color: #e74c3c;
+      /* V25D93-FRONT F1: MANTIENE el tinted bg — UNICA exception a la regla
+         "slots invisibles" porque esto ES informacion util (no debug clutter).
+         El user ve donde falta asignar. Border-style:dashed indica "vacio". */
+      background: rgba(231, 76, 60, 0.18);
+      border: 1px solid rgba(231, 76, 60, 0.5);
       border-style: dashed;
-      border-width: 2px;
+      border-radius: 4px;
     }
 
     /* Indicador de rol faltante */
@@ -1152,8 +1237,11 @@ import { SessionPlayer } from '../../shared/models/player.model';
        V25D90 PartidoModal (yellow GK / blue DEF / green MID / red ATT). */
     .player-marker {
       position: absolute;
+      /* V25D93-FRONT F3: width fijo 70px (suficiente para nombres largos en 2
+         lineas). Height VARIA por role per Ivan spec — ver los selectores
+         .color-gk/.color-def/.color-mid/.color-att abajo. */
       width: 70px;
-      height: 56px;
+      height: 48px;
       transform: translate(-50%, -50%);
       z-index: 20;
       pointer-events: none;
@@ -1162,8 +1250,27 @@ import { SessionPlayer } from '../../shared/models/player.model';
       align-items: center;
       justify-content: center;
       gap: 1px;
-      filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));
+      /* V25D93-FRONT F3: border 2px solid white per parent spec (ANTES no
+         habia border visible — solo drop-shadow). Ahora el marker se separa
+         claramente del field green con borde blanco solido. */
+      border: 2px solid #fff;
+      border-radius: 6px;
+      background: rgba(0, 0, 0, 0.55);
+      /* V25D93-FRONT F3: drop-shadow per parent spec rgba(0,0,0,.35) 0 1px 3px
+         (ANTES era 0,0,0,0.5 0 2px 3px). Mas sutil. */
+      filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.35));
     }
+
+    /* V25D93-FRONT F3: height por role per Ivan spec:
+       GK 56px (portero grande — un solo player, special status)
+       DEF 48px (4 defenders en formacion tipica)
+       MID 44px (4-5 mids, mas pequenos pq son mas por fila)
+       FW  48px (2-3 forwards)
+       Overrides the default .player-marker { height: 48px }. */
+    .player-marker.color-gk { height: 56px; }
+    .player-marker.color-def { height: 48px; }
+    .player-marker.color-mid { height: 44px; }
+    .player-marker.color-att { height: 48px; }
 
     .player-marker .player-number {
       min-width: 18px;
@@ -1219,7 +1326,11 @@ import { SessionPlayer } from '../../shared/models/player.model';
     }
 
     .player-marker .player-role-label {
-      font-size: 0.6rem;
+      /* V25D93-FRONT F4: bumped font-size 0.6rem → 0.65rem per parent spec.
+         Mas legible desde lejos. Ademas padding ajustado para que role
+         labels como "GK"/"CB"/"CM"/"ST" se vean claros dentro del marker
+         con la nueva altura variable (44-56px). */
+      font-size: 0.65rem;
       font-weight: 700;
       color: #fff;
       padding: 1px 5px;
@@ -1481,15 +1592,14 @@ import { SessionPlayer } from '../../shared/models/player.model';
       }
 
       .field {
-        /* V25D58 (Sprint C18): cap 380px para mobile. min(380,100%) shrinkea
-           a 360px en viewports de 375-414px donde el modal mide 98vw. */
-        max-width: min(380px, 100%);
-        /* V25D57 (Sprint C17b): aspect-ratio del campo en mobile. Antes
-           max-height:50vh sobreescribia el aspect-ratio y dejaba el field
-           aplastado. Ahora max-height hereda del default (100% del
-           field-container). */
-        aspect-ratio: 1 / 1.4;
-        height: auto;
+        /* V25D94-FRONT: mobile max-width y aspect-ratio. Flip a 1.15/1
+           square-ish (mismo aspect que desktop). En mobile viewport
+           (<600px), el field-container h es chico (90vh - chrome).
+           Sin el max-width cap que existia (V25D58 = 380px para portrait),
+           el field en 375-414vw tendria h~200-220 y w~230-250. */
+        max-width: 100%;
+        aspect-ratio: 1.15 / 1;
+        height: 100%;
       }
 
       /* Mobile chips keep visible — shrink font-size + padding so they
@@ -1521,13 +1631,11 @@ import { SessionPlayer } from '../../shared/models/player.model';
       }
 
       .field {
-        /* V25D57 (Sprint C17b): aspect-ratio del campo en tablet.
-           Antes no tenia aspect-ratio y quedaba horizontal slab. */
-        aspect-ratio: 1 / 1.4;
-        height: auto;
-        /* V25D58 (Sprint C18): cap 450px para tablet. min(450,100%) shrinkea
-           a 360px en viewports de 600-700px donde el modal mide 90vw. */
-        max-width: min(450px, 100%);
+        /* V25D94-FRONT: tablet max-width y aspect-ratio. Flip a 1.15/1
+           square-ish (mismo aspect que desktop). */
+        aspect-ratio: 1.15 / 1;
+        height: 100%;
+        max-width: 100%;
       }
 
       .player-chip {
@@ -1553,12 +1661,11 @@ import { SessionPlayer } from '../../shared/models/player.model';
         max-width: 98vw;
       }
 
-      .field {
-        /* V25D58 (Sprint C18): cap 600px para large desktop. min(600,100%)
-           mantiene 600px en viewports de 1600-1900px y shrinkea a 500px
-           en viewports borderline 1440-1599px si el modal mide 1200px. */
-        max-width: min(600px, 100%);
-      }
+      /* V25D93.5-FRONT: removed .field max-width: min(600px, 100%) override.
+         El field ahora es height-driven landscape 1.4:1 (definido en
+         regla base) y no necesita un cap horizontal — width se calcula
+         por aspect-ratio a partir de height. El cap 600 era de la era
+         portrait 0.71:1 (V25D58) y ahora no aplica. */
     }
   `]
 })
