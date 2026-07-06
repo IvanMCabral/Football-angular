@@ -184,7 +184,6 @@ import { SessionPlayer } from '../../shared/models/player.model';
              [id]="FIELD_DROP_LIST_ID"
              [cdkDropListData]="'field'"
              [cdkDropListConnectedTo]="allDropListIds"
-             [cdkDropListSortingDisabled]="true"
              (cdkDropListDropped)="handleFieldDrop($event)">
           <!-- Etiquetas de zonas -->
           <div class="zone-label zone-attack-label">ATAQUE</div>
@@ -253,8 +252,9 @@ import { SessionPlayer } from '../../shared/models/player.model';
                        [style.top.%]="sub.top"
                        [style.width.%]="sub.width"
                        [style.height.%]="sub.height"
-                      [class.occupied]="isSlotOccupied(sub)"
-                      [class.missing-player]="isMissingPlayer(sub)"
+[class.occupied]="isSlotOccupied(sub)"
+                     [class.abandoned]="isSlotAbandonedByOverride(sub)"
+                     [class.missing-player]="isMissingPlayer(sub)"
                       (click)="onSlotClick(sub)">
                   <!-- V25D91-FRONT-F3: slot-id label removida (era debug-only
                        desde V25D47 C11b). Ahora el slot es clickeable sin
@@ -304,6 +304,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
                      [style.height.%]="sub.height"
                      [class.occupied]="isSlotOccupied(sub)"
                      [class.recommended]="isRecommendedSlot(sub) && !isSlotAbandonedByOverride(sub)"
+                     [class.abandoned]="isSlotAbandonedByOverride(sub)"
                      [class.missing-player]="isMissingPlayer(sub)"
                      [class.attack]="sub.zone === 'ATTACK'"
                      [class.midfield]="sub.zone === 'MIDFIELD'"
@@ -1385,6 +1386,18 @@ import { SessionPlayer } from '../../shared/models/player.model';
          selector del template (slot-gk class aplicada en cdkDropList). */
       background: transparent;
       border: none;
+    }
+
+    /* V25D98.6-FRONT: abandoned slot (player free-positioned elsewhere)
+       is fully inert — no pointer-events (mouse passes through), no
+       cursor change, no hover effect. Iván reported 'deja pasar el mouse
+       por arriba' on the V25D98.5 fix. Combined with onSlotClick's
+       early-return, the slot is now a pure visual ghost until the user
+       drag-drops the marker back onto it (handleSlotDrop restores
+       slotPlayerMap + removes .abandoned). */
+    .slot.abandoned {
+      pointer-events: none;
+      cursor: default;
     }
 
     .slot.recommended {
