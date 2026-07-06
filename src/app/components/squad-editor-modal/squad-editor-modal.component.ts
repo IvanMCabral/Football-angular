@@ -325,7 +325,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
                slotId is in the active formation (defense-in-depth: the
                primary fix is the loadSquadFromBackend validation that
                clears stale slotIds). -->
-<ng-container *ngFor="let player of homePlayers; let i = index">
+<ng-container *ngFor="let player of homePlayers; trackBy: trackByPlayer; let i = index">
               <!-- V25D99.5-FRONT: removed isSlotInActiveFormation from *ngIf.
                    Ivan reported 'los jugadores no se ven cuando los movemos'.
                    Root cause: in custom-lineup mode + free-positioned player,
@@ -336,7 +336,19 @@ import { SessionPlayer } from '../../shared/models/player.model';
                    moved player appeared 'invisible'. The marker MUST render
                    whenever the player has a slotId; the slot-formation check
                    was a defensive gate that became a foot-gun for free
-                   positioning. Removed. -->
+                   positioning. Removed.
+
+                   V25D99.8-FRONT: added trackBy: trackByPlayer. Without
+                   trackBy, every homePlayers$.next() (which we emit at the
+                   end of handleMarkerDragEnd) would cause *ngFor to
+                   DESTROY and RECREATE the marker DOM elements. CDK's drag
+                   state is bound to the DOM element — recreating the
+                   element mid-drag or right after drag end loses the
+                   cdkDrag reference and produces 'first drag fails,
+                   second works' symptoms (Ivan: 'la primera vez falla, la
+                   segunda funciona'). trackBy: trackByPlayer uses the
+                   playerId as the identity, so the same player object
+                   keeps the same DOM element across emissions. -->
               <div *ngIf="player.slotId"
                    class="player-marker"
                    cdkDrag
@@ -2624,6 +2636,21 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     return !!this.slotPlayerMap[sub.subdivisionId];
   }
 
+  /**
+   * V25D99.8-FRONT: trackBy for the marker *ngFor. Uses the playerId as
+   * the identity so the same player object keeps the same DOM element
+   * across homePlayers$ emissions. Without trackBy, Angular's default
+   * object-identity tracking combined with our `homePlayers$.next([...
+   * homePlayers$.value])` re-emission (in handleMarkerDragEnd) would
+   * cause *ngFor to destroy and recreate the marker DOM elements on
+   * every drag end. CDK's drag state is bound to the DOM element —
+   * recreating it mid-drag or right after drag end loses the cdkDrag
+   * reference and produces 'first drag fails, second works' symptoms.
+   */
+  trackByPlayer(index: number, player: PlayerOnFieldDto): string {
+    return player.playerId;
+  }
+
   /** Obtiene el jugador en un slot */
   getPlayerInSlot(sub: FieldSubdivisionDTO): PlayerOnFieldDto | undefined {
     return this.slotPlayerMap[sub.subdivisionId];
@@ -3016,25 +3043,34 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
     const dropX = event.dropPoint?.x ?? rect.left;
     const dropY = event.dropPoint?.y ?? rect.top;
 
-    // 2. Drop target decision (V25D99.7: BEST OF BOTH WORLDS):
-    //    a) cursor over a bench-player card → move to bench
-    //    b) cursor over a slot                → swap/move into that slot
-    //    c) cursor anywhere else in field    → FREE POSITIONING (xPercent,
-    //                                              yPercent set; the original
-    //                                              slot becomes empty + invisible)
-    //    d) cursor outside field             → clamp xPct/yPct to [0,100]
-    //                                              and treat as free position
+    // V25D99.8-FRONT: drop decision tree simplified per Ivan's feedback.
+    // Ivan: 'movi el jugador al lugar punteado, y se pone a la derecha ...
+    // si apreto el lugar punteado es como si estuviera ahi, pero la imagen
+    // quedo en otro lado'.
     //
-    // Ivan (post-V25D99.6): 'me gustaba lo de free posicion, pero que sea
-    // solo dentro del campo, y que eso afecte a que porcentaje de cada
-    // lugar esta precisamente. ... sigue quedando el espacio marcado donde
-    // se inicio el jugador no se porque'.
+    // Root cause analysis: pre-V25D99.8 the snap-to-slot branch in this
+    // handler caused the marker to teleport to slot center when the user
+    // dropped NEAR a slot (but not at the slot center). The user thought
+    // they were dropping in free space but the snap kicked in. Plus, CDK
+    // might leave an inline `transform: translate3d(dragX, dragY, 0)` on
+    // the element after drag end, which adds the drag-delta on top of
+    // the marker's CSS transform `translate(-50%, -50%)`, offsetting the
+    // marker visually.
     //
-    // Re-enables free positioning (V25D98 original) but ONLY inside the
-    // field bounds. Outside-field drops clamp to [0, 100]. The original
-    // slot is invisible by default (.slot base CSS — see CSS) so the user
-    // sees the player at the new free position with NO ghost at the old
-    // slot position.
+    // V25D99.8 fix: REMOVE the snap-to-slot branch entirely. Every drop
+    // inside the field goes to FREE POSITIONING (xPercent/yPercent set).
+    // If the user wants the marker at a slot, they drop it AT that
+    // slot's pixel location — no more 'salta a otro' (jumps to another).
+    // Plus: explicit transform clear at the end of the handler so CDK's
+    // leftover drag transform doesn't offset the marker visually.
+    //
+    // Bench still works (move-to-bench via cursor over a bench card).
+    //
+    // a) cursor over a bench-player card  → movePlayerToBench
+    // b) cursor anywhere else in field    → FREE POSITIONING (xPct/yPct set,
+    //                                          original slot becomes empty)
+    // c) cursor outside field             → clamp xPct/yPct to [0, 100] and
+    //                                          treat as free position
 
     // 2a. Bench hit-test (strict: only over a SPECIFIC bench-player card).
     const benchCards = document.querySelectorAll('.bench-container .bench-player');
@@ -3056,38 +3092,19 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
       return;
     }
 
-    // 2b+c+d. Compute field-relative percentages (clamped to [0, 100]).
+    // 2b. FREE POSITIONING. xPct/yPct ALWAYS set to the drop coords.
+    // No more snap-to-slot. The marker visually stays where the user
+    // dropped it.
     const xPct = Math.max(0, Math.min(100, ((dropX - rect.left) / rect.width) * 100));
     const yPct = Math.max(0, Math.min(100, ((dropY - rect.top) / rect.height) * 100));
 
-    // 2b. Slot snap (exact match only — no snap-to-nearest margin).
-    const targetSlot = this.findSlotAtPosition(xPct, yPct);
-    if (targetSlot) {
-      if (player.slotId === targetSlot.subdivisionId) {
-        return; // same slot → no-op
-      }
-      const occupant = this.slotPlayerMap[targetSlot.subdivisionId] ?? null;
-      this.applySlotAssignment(player, player.slotId, targetSlot.subdivisionId, occupant);
-      return;
-    }
-
-    // 2c. FREE POSITIONING (the V25D98 feature Ivan liked, restored).
-    // Drop in field but NOT on a slot → player stays at (xPct, yPct).
-    // Original slot becomes empty + invisible.
-    //
     // For bench players (no slotId): promote them to the closest subdivision
-    // so they participate in chemistry preview. The visual position is
-    // still (xPct, yPct) — chemistry doesn't depend on slot alignment.
+    // so they participate in chemistry preview.
     if (!player.slotId || player.slotId === '') {
       const closest = this.findClosestSubdivision(xPct, yPct);
       if (closest) { player.slotId = closest.subdivisionId; }
     }
 
-    // V25D99.7: the KEY invariant — player.xPercent/yPercent ALWAYS reflect
-    // the drop position. The marker template binds [style.left.%] to
-    // getMarkerX(player) which prefers xPercent over slot center. So the
-    // marker visually stays EXACTLY where the user dropped it (clamped to
-    // [0, 100] so always on the field).
     player.xPercent = xPct;
     player.yPercent = yPct;
     // Clear the slot — the player has left it for the free position.
@@ -3101,6 +3118,30 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
     this.homePlayers$.next([...this.homePlayers$.value]);
     this.cdr.markForCheck();
     this.cdr.detectChanges();
+
+    // V25D99.8-FRONT: defensive transform clear. After drag end, CDK
+    // normally clears the inline `transform: translate3d(dragX, dragY, 0)`
+    // on the root element in its `_endDragSequence()`. But in some
+    // edge cases (browser-specific timing, ngZone re-entry) the
+    // transform might persist. Explicitly clear it so the marker
+    // visually lands at the new style.left/top WITHOUT being offset by
+    // a leftover drag-delta transform.
+    const dragRef = (event.source as any)?._dragRef;
+    if (dragRef) {
+      // DragRef.reset() removes preview/placeholder and clears internal
+      // state. Public CdkDrag.reset() also clears the root element
+      // transform. Use CdkDrag.reset() (the public API on CdkDrag).
+      if (typeof event.source?.reset === 'function') {
+        event.source.reset();
+      }
+      // Belt-and-suspenders: explicitly clear the root element's inline
+      // transform (in case CdkDrag.reset() didn't catch it).
+      const rootEl = dragRef.rootElement;
+      if (rootEl && rootEl.style) {
+        rootEl.style.transform = '';
+        rootEl.style.webkitTransform = '';
+      }
+    }
   }
 
   /**
