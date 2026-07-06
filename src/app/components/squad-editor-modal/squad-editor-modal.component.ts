@@ -184,6 +184,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
              [id]="FIELD_DROP_LIST_ID"
              [cdkDropListData]="'field'"
              [cdkDropListConnectedTo]="allDropListIds"
+             [cdkDropListSortingDisabled]="true"
              (cdkDropListDropped)="handleFieldDrop($event)">
           <!-- Etiquetas de zonas -->
           <div class="zone-label zone-attack-label">ATAQUE</div>
@@ -265,15 +266,27 @@ import { SessionPlayer } from '../../shared/models/player.model';
                        percentage when formationEffectiveness has data. The
                        pre-existing slot-eff-badge was removed from this slot since
                        the chip-level badge replaces its visual function. -->
-<div *ngIf="getPlayerInSlot(sub) as player"
-                        class="player-chip"
-                        cdkDrag
-                        [cdkDragData]="player"
-                        [class.eff-good]="getChipEffectivenessClass(sub.subdivisionId) === 'eff-good'"
-                        [class.eff-warning]="getChipEffectivenessClass(sub.subdivisionId) === 'eff-warning'"
-                        [class.eff-bad]="getChipEffectivenessClass(sub.subdivisionId) === 'eff-bad'">
-                     <span class="player-chip-name">{{player.name | slice:0:10}}</span>
-                   </div>
+<ng-container *ngIf="getPlayerInSlot(sub) as player">
+                  <div *ngIf="!hasOverridePosition(player)"
+                       class="player-chip"
+                       cdkDrag
+                       [cdkDragData]="player"
+                       [class.eff-good]="getChipEffectivenessClass(sub.subdivisionId) === 'eff-good'"
+                       [class.eff-warning]="getChipEffectivenessClass(sub.subdivisionId) === 'eff-warning'"
+                       [class.eff-bad]="getChipEffectivenessClass(sub.subdivisionId) === 'eff-bad'">
+                    <span class="player-chip-name">{{player.name | slice:0:10}}</span>
+                  </div>
+                </ng-container>
+                  <!-- V25D98.1-FRONT: si el slot está ocupado PERO el player
+                       fue free-positioned (xPercent/yPercent set), oculta el
+                       chip — si no quedaría duplicando el nombre del player
+                       en la posición vieja mientras el marker está en la
+                       override. El slot entonces queda visualmente vacío
+                       (mostrando el role en .missing-indicator via la nueva
+                       helper isSlotOverridden). -->
+                  <div *ngIf="isSlotOverridden(sub)" class="missing-indicator missing-indicator-overridden">
+                    {{getRecommendedRole(sub)}}
+                  </div>
                   <div *ngIf="isMissingPlayer(sub)" class="missing-indicator">
                     {{getRecommendedRole(sub)}}
                   </div>
@@ -304,7 +317,8 @@ import { SessionPlayer } from '../../shared/models/player.model';
                        See the slot-gk block above for full details on the
                        eff-good/eff-warning/eff-bad classification and the
                        embedded eff-badge. -->
-<div *ngIf="getPlayerInSlot(sub) as player"
+<ng-container *ngIf="getPlayerInSlot(sub) as player">
+                    <div *ngIf="!hasOverridePosition(player)"
                          class="player-chip"
                          cdkDrag
                          [cdkDragData]="player"
@@ -314,6 +328,11 @@ import { SessionPlayer } from '../../shared/models/player.model';
                          [attr.title]="player.name + ' (' + player.role + ') · OVR ' + player.overall + ' · eff. ' + (getEffectivenessColor(sub.subdivisionId) || 'unknown')">
                       <span class="player-chip-name">{{player.name | slice:0:10}}</span>
                     </div>
+                  </ng-container>
+                   <!-- V25D98.1-FRONT: ver bloque equivalente en slot-gk arriba -->
+                   <div *ngIf="isSlotOverridden(sub)" class="missing-indicator missing-indicator-overridden">
+                     {{getRecommendedRole(sub)}}
+                   </div>
                    <div *ngIf="isMissingPlayer(sub)" class="missing-indicator">
                      {{getRecommendedRole(sub)}}
                    </div>
@@ -1402,6 +1421,20 @@ import { SessionPlayer } from '../../shared/models/player.model';
       border-radius: 3px;
       margin-top: 1px;
       text-transform: uppercase;
+    }
+
+    /* V25D98.1-FRONT: cuando el slot está lógicamente ocupado pero el
+       player fue free-positioned (xPercent/yPercent override), el chip
+       se oculta para no duplicar el nombre del player en la posición
+       vieja. El slot entonces muestra el role via .missing-indicator
+       en una variante amber/sutil — Iván sabe que ese slot sigue
+       vinculado a un player (no es missing realmente), solo que está
+       visualmente desplazado. Color ámbar para distinguirlo del
+       missing real (rojo). */
+    .missing-indicator-overridden {
+      color: #fbbf24;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px dashed rgba(251, 191, 36, 0.45);
     }
 
     .player-chip {
@@ -2607,6 +2640,30 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   /** Verifica si falta jugador en un slot recomendado */
   isMissingPlayer(sub: FieldSubdivisionDTO): boolean {
     return this.isRecommendedSlot(sub) && !this.isSlotOccupied(sub);
+  }
+
+  /**
+   * V25D98.1-FRONT: true cuando el slot está lógicamente ocupado pero el
+   * player fue free-positioned (xPercent/yPercent override). Usado por el
+   * template para:
+   * - ocultar el chip interno (que duplicaría el nombre en la posición
+   *   vieja mientras el marker está en la override)
+   * - mostrar el .missing-indicator con el role, así Iván ve qué slot
+   *   sigue vinculado al player aunque el marker esté visualmente en
+   *   otro pixel.
+   */
+  isSlotOverridden(sub: FieldSubdivisionDTO): boolean {
+    const player = this.slotPlayerMap[sub.subdivisionId];
+    return !!player && this.hasOverridePosition(player);
+  }
+
+  /**
+   * V25D98.1-FRONT: true si el player tiene al menos una coordenada de
+   * override (free positioning). El template del chip usa esto para
+   * ocultarse cuando el player ya está free-positioned.
+   */
+  hasOverridePosition(player: PlayerOnFieldDto): boolean {
+    return typeof player.xPercent === 'number' || typeof player.yPercent === 'number';
   }
 
   /** Obtiene el rol del jugador recomendado para un slot */

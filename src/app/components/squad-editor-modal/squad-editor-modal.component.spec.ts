@@ -3780,4 +3780,42 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
       done();
     }, 30);
   });
+
+  /**
+   * V25D98.1-FRONT: regression — after free positioning, the legacy
+   * `.player-chip` rendered INSIDE the slot must be hidden so it doesn't
+   * duplicate the player name at the original slot position while the
+   * marker is at the override. Verify:
+   *  1. hasOverridePosition(player) returns true once xPercent/yPercent set.
+   *  2. isSlotOverridden(sub) returns true for the player's original slot.
+   *  3. The DOM has no .player-chip with the player's name in that slot.
+   *  4. The DOM has a .missing-indicator-overridden showing the role.
+   */
+  it('V25D98.1: chip is hidden in the original slot after free drop (no ghost name)', (done) => {
+    setTimeout(() => {
+      const pDef = (component as any).slotPlayerMap['S22-1'];
+      expect(pDef).toBeTruthy('fixture must seed a CB in S22-1');
+      // baseline: chip visible in the slot.
+      const slotS22 = fixture.nativeElement.querySelector('#slot-S22-1');
+      let chipBefore = slotS22?.querySelector('.player-chip');
+      expect(chipBefore).toBeTruthy('pre-drop: chip should be visible in S22-1');
+
+      // Free drop: assign xPercent=80, yPercent=40 to pDef.
+      pDef.xPercent = 80;
+      pDef.yPercent = 40;
+      (component as any).homePlayers$.next([...((component as any).homePlayers$.value)]);
+      fixture.detectChanges();
+
+      // V25D98.1: chip should be hidden, overridden indicator visible.
+      expect((component as any).hasOverridePosition(pDef)).toBeTrue();
+      const overridden = (component as any).isSlotOverridden((component as any).subdivisions.find((s: any) => s.subdivisionId === 'S22-1'));
+      expect(overridden).withContext('S22-1 must report as overridden').toBeTrue();
+      const chipAfter = slotS22?.querySelector('.player-chip');
+      expect(chipAfter).toBeFalsy('post-drop: chip must be hidden to avoid ghost');
+      const overriddenIndicator = slotS22?.querySelector('.missing-indicator-overridden');
+      expect(overriddenIndicator).toBeTruthy('post-drop: slot should show overridden indicator');
+      expect(overriddenIndicator?.textContent?.trim()).toBe('CB', 'overridden indicator must show the recommended role (CB)');
+      done();
+    }, 30);
+  });
 });
