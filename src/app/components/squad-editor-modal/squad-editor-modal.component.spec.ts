@@ -3690,28 +3690,30 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
     fixture.detectChanges();
   });
 
-  it('getMarkerX/Y: always returns slot center (V25D99.6 slot-only model)', (done) => {
-    // V25D99.6: free positioning was removed. Marker position is always
-    // the slot center. xPercent/yPercent fields still exist on the player
-    // DTO for backend compat but are NOT used by getMarkerX/Y.
+  it('getMarkerX/Y: returns xPercent when set (free positioning), else slot center (V25D99.7)', (done) => {
+    // V25D99.7: free positioning restored. After a free drop, the marker
+    // is at (xPercent, yPercent). When xPercent/yPercent are unset, the
+    // marker is at the slot center.
     setTimeout(() => {
       const pDef = (component as any).slotPlayerMap['S22-1'];
+      // baseline: no override → returns slot center
       const baseX = (component as any).getMarkerX(pDef);
       const baseY = (component as any).getMarkerY(pDef);
       expect(baseX).toBe((component as any).getSlotCenterX('S22-1'));
       expect(baseY).toBe((component as any).getSlotCenterY('S22-1'));
-      // Even if xPercent/yPercent are set (legacy data), they're ignored.
+      // override: returns custom %
       pDef.xPercent = 60;
       pDef.yPercent = 35;
-      expect((component as any).getMarkerX(pDef)).toBe((component as any).getSlotCenterX('S22-1'));
-      expect((component as any).getMarkerY(pDef)).toBe((component as any).getSlotCenterY('S22-1'));
+      expect((component as any).getMarkerX(pDef)).toBe(60);
+      expect((component as any).getMarkerY(pDef)).toBe(35);
       done();
     }, 30);
   });
 
-  it('V25D99.6 handleMarkerDragEnd: drop outside any slot is a no-op', (done) => {
-    // V25D99.6: no free positioning. Drop at coords that don't land on
-    // any subdivision → no state change, xPercent/yPercent NEVER set.
+  it('V25D99.7 handleMarkerDragEnd: drop in field but not on slot → FREE POSITIONING (xPct/yPct set)', (done) => {
+    // V25D99.7: free positioning restored (Ivan liked it). Drop at coords
+    // that don't land on a subdivision → marker stays at the free
+    // position (xPct, yPct). The original slot becomes empty + invisible.
     setTimeout(() => {
       const pDef = (component as any).slotPlayerMap['S22-1'];
       const fieldEl: HTMLElement = fixture.nativeElement.querySelector('.field');
@@ -3720,16 +3722,15 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
         x: 0, y: 0, toJSON: () => ({})
       });
       (component as any).fieldContainer = { nativeElement: fieldEl };
-      // Drop at (600, 600) → xPct=60, yPct=75 → no subdivision matches.
+      // Drop at (600, 600) → xPct=60, yPct=75 → no subdivision at these coords.
       (component as any).handleMarkerDragEnd({ dropPoint: { x: 600, y: 600 } } as any, pDef);
-      // Slot unchanged.
-      expect(pDef.slotId).toBe('S22-1');
-      // xPercent/yPercent NOT set (free positioning removed).
-      expect(pDef.xPercent).toBeUndefined();
-      expect(pDef.yPercent).toBeUndefined();
-      // Marker stays at slot center.
-      expect((component as any).getMarkerX(pDef)).toBe((component as any).getSlotCenterX('S22-1'));
-      expect((component as any).getMarkerY(pDef)).toBe((component as any).getSlotCenterY('S22-1'));
+      // V25D99.7: free positioning — marker stays at the drop position.
+      expect(pDef.xPercent).toBe(60);
+      expect(pDef.yPercent).toBe(75);
+      expect((component as any).getMarkerX(pDef)).toBe(60);
+      expect((component as any).getMarkerY(pDef)).toBe(75);
+      // Original slot cleared.
+      expect((component as any).slotPlayerMap['S22-1']).toBeUndefined();
       done();
     }, 30);
   });
@@ -3850,13 +3851,14 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
    * Verify the marker keeps cdk-drag after override + handleFieldDrop
    * re-applies xPercent/yPercent on each call (subsequent drags update).
    */
-  it('V25D99.6: handleMarkerDragEnd is idempotent + drag onto slot swaps occupants', (done) => {
-    // V25D99.6 slot-only model: every drag either lands on a slot (snap)
-    // or is cancelled (no state change). Verify:
-    //  1. Multiple drags to the same slot are no-ops.
-    //  2. Drag to a DIFFERENT slot swaps the occupants.
-    //  3. Drag to FREE FIELD (no slot) is a no-op — marker stays at
-    //     original slot (no xPercent/yPercent set, no free positioning).
+  it('V25D99.7: handleMarkerDragEnd free positioning + slot snap + bench move', (done) => {
+    // V25D99.7: BEST OF BOTH WORLDS — drop in field (not on slot) goes to
+    // free positioning (xPercent/yPercent). Drop on a slot swaps. Drop on
+    // a bench card moves to bench. Verify:
+    //  1. Drop on own slot → no-op.
+    //  2. Drop on another (occupied) slot → swap.
+    //  3. Drop in field but not on slot → FREE POSITIONING (xPct/yPct).
+    //  4. Marker stays at the new free position (visible via getMarkerX/Y).
     setTimeout(() => {
       const pDef = (component as any).slotPlayerMap['S22-1'];
       const pMid = (component as any).slotPlayerMap['S13-2'];
@@ -3868,33 +3870,28 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
       (component as any).fieldContainer = { nativeElement: fieldEl };
       const mkEvt = (x: number, y: number) => ({ dropPoint: { x, y } } as any);
 
-      // 1. Drag pDef to its OWN slot (S22-1 in fixture at top=70, left=12,
-      // width=10, height=12 → center at (170, 608)). Drop on it = no-op.
+      // 1. Drop on own slot (S22-1 in fixture at top=70, left=12, w=10, h=12 → center at (170, 608)).
       (component as any).handleMarkerDragEnd(mkEvt(170, 608), pDef);
       expect(pDef.slotId).toBe('S22-1', 'no-op when dropped on own slot');
-      expect((component as any).slotPlayerMap['S22-1']).toBe(pDef);
-      expect(pDef.xPercent).toBeUndefined();
-      expect(pDef.yPercent).toBeUndefined();
+      expect(pDef.xPercent).toBeUndefined('own-slot drop: no free positioning');
 
-      // 2. Drag pDef onto pMid's slot (S13-2 at top=45, left=45, width=10,
-      // height=12 → center at (500, 408)). Should SWAP.
+      // 2. Drop on pMid's slot (S13-2 at top=45, left=45, w=10, h=12 → center at (500, 408)).
       (component as any).handleMarkerDragEnd(mkEvt(500, 408), pDef);
-      expect(pDef.slotId).toBe('S13-2', 'player moved to S13-2');
+      expect(pDef.slotId).toBe('S13-2', 'swap into S13-2');
       expect(pMid.slotId).toBe('S22-1', 'previous occupant swapped to S22-1');
-      expect((component as any).slotPlayerMap['S13-2']).toBe(pDef);
-      expect((component as any).slotPlayerMap['S22-1']).toBe(pMid);
+      expect(pDef.xPercent).toBeUndefined('slot-snap drop: no free positioning');
 
-      // 3. Drag pDef to FREE FIELD (between slots). Should be a no-op.
-      // Free space at (300, 400) → xPct=30, yPct=50 — no slot at these coords.
+      // 3. Drop in field at (300, 400) → xPct=30, yPct=50 — no slot here.
+      // V25D99.7: FREE POSITIONING — player goes to (30%, 50%).
       (component as any).handleMarkerDragEnd(mkEvt(300, 400), pDef);
-      expect(pDef.slotId).toBe('S13-2', 'no state change on free-field drop');
-      expect(pDef.xPercent).toBeUndefined('free positioning removed: xPercent never set');
-      expect(pDef.yPercent).toBeUndefined('free positioning removed: yPercent never set');
+      expect(pDef.xPercent).toBe(30, 'free drop: xPercent set');
+      expect(pDef.yPercent).toBe(50, 'free drop: yPercent set');
+      // Original slot (S13-2) becomes empty + invisible.
+      expect((component as any).slotPlayerMap['S13-2']).toBeUndefined('free drop: slot cleared from slotPlayerMap');
 
-      // 4. Marker stays at slot center (slot-only model).
-      const s132 = (component as any).subdivisions.find((s: any) => s.subdivisionId === 'S13-2');
-      expect((component as any).getMarkerX(pDef)).toBe(s132.left + s132.width / 2);
-      expect((component as any).getMarkerY(pDef)).toBe(s132.top + s132.height / 2);
+      // 4. Marker visually stays at the new free position.
+      expect((component as any).getMarkerX(pDef)).toBe(30);
+      expect((component as any).getMarkerY(pDef)).toBe(50);
       done();
     }, 30);
   });
@@ -3918,13 +3915,15 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
    *  - resetCustomPositions() must RESTORE the slotPlayerMap entry
    *    so the chip reappears in the slot on snap-back.
    */
-  it('V25D99.6: drop outside any slot is a no-op (slot-only model, no free positioning)', (done) => {
-    // V25D99.6: Ivan: 'tienen que cada jugador que movemos quedarse dentro
-    // de alguna de las coordenadas que hay en la cancha'. The marker MUST
-    // stay at a slot. Drops that don't land exactly on a slot are no-ops:
-    //  1. slotPlayerMap[slotId] unchanged.
-    //  2. player.xPercent/yPercent NEVER set (no free positioning).
-    //  3. Marker visually stays at the original slot center.
+  it('V25D99.7: drop in field but not on a slot triggers FREE POSITIONING', (done) => {
+    // V25D99.7: Ivan: 'me gustaba lo de free posicion, pero que sea solo
+    // dentro del campo'. Drops that don't land on a slot now result in
+    // free positioning — the marker stays at (xPct, yPct) where the user
+    // dropped it (clamped to [0, 100]).
+    //  1. slotPlayerMap[slotId] cleared (player left the slot).
+    //  2. player.xPercent/yPercent SET to the drop coords.
+    //  3. The original slot is invisible (.slot base CSS).
+    //  4. Marker visually stays at the new free position.
     setTimeout(() => {
       const pDef = (component as any).slotPlayerMap['S22-1'];
       const slotS22 = (component as any).subdivisions.find((s: any) => s.subdivisionId === 'S22-1');
@@ -3934,23 +3933,22 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
         x: 0, y: 0, toJSON: () => ({})
       });
 
-      // Baseline: player is at S22-1.
+      // Baseline: player at S22-1.
       expect((component as any).slotPlayerMap['S22-1']).toBe(pDef);
-      expect((component as any).isSlotOccupied(slotS22)).toBeTrue();
 
       // Drop at (700, 350) → xPct=70, yPct=43.75 → no slot at these coords.
       (component as any).fieldContainer = { nativeElement: fieldEl };
       (component as any).handleMarkerDragEnd({ dropPoint: { x: 700, y: 350 } } as any, pDef);
 
-      // V25D99.6: no state change. The player stays in slotPlayerMap.
-      expect((component as any).slotPlayerMap['S22-1']).toBe(pDef, 'no-op drop: player stays in slotPlayerMap');
-      expect((component as any).isSlotOccupied(slotS22)).withContext('no-op drop: slot stays occupied').toBeTrue();
-      // xPercent/yPercent NEVER set in slot-only model.
-      expect(pDef.xPercent).toBeUndefined('slot-only model: xPercent never set');
-      expect(pDef.yPercent).toBeUndefined('slot-only model: yPercent never set');
-      // Marker stays at slot center.
-      expect((component as any).getMarkerX(pDef)).toBe(slotS22.left + slotS22.width / 2);
-      expect((component as any).getMarkerY(pDef)).toBe(slotS22.top + slotS22.height / 2);
+      // V25D99.7: free positioning — slot cleared, xPct/yPct set.
+      expect((component as any).slotPlayerMap['S22-1']).toBeUndefined('free drop: slot cleared from slotPlayerMap');
+      expect((component as any).isSlotOccupied(slotS22)).withContext('free drop: slot is now empty').toBeFalse();
+      expect(pDef.xPercent).toBe(70, 'free drop: xPercent set');
+      expect(pDef.yPercent).toBe(43.75, 'free drop: yPercent set');
+
+      // Marker visually at the free position.
+      expect((component as any).getMarkerX(pDef)).toBe(70);
+      expect((component as any).getMarkerY(pDef)).toBe(43.75);
       done();
     }, 30);
   });
