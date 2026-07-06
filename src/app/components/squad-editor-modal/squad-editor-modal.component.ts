@@ -361,6 +361,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
                    cdkDrag
                    [cdkDragData]="player"
                    (cdkDragEnded)="handleMarkerDragEnd($event, player)"
+                   (click)="onMarkerClick(player)"
                    [style.left.%]="getMarkerX(player)"
                    [style.top.%]="getMarkerY(player)"
                    [class.gk-player]="player.role === 'GK'"
@@ -1544,23 +1545,39 @@ import { SessionPlayer } from '../../shared/models/player.model';
        que muestra squad-number (1-22) arriba, nombre truncado en el
        medio, y role badge color-codeado por familia. Mismo scheme que
        V25D90 PartidoModal (yellow GK / blue DEF / green MID / red ATT). */
-    .player-marker {
-      position: absolute;
-      /* V25D93-FRONT F3: width fijo 70px (suficiente para nombres largos en 2
-         lineas). Height VARIA por role per Ivan spec — ver los selectores
-         .color-gk/.color-def/.color-mid/.color-att abajo.
+.player-marker {
+       position: absolute;
+       /* V25D93-FRONT F3: width fijo 70px (suficiente para nombres largos en 2
+          lineas). Height VARIA por role per Ivan spec — ver los selectores
+          .color-gk/.color-def/.color-mid/.color-att abajo.
 
-         V25D95.1-FRONT F4: z-index 20 → 10. El hierarchy final es
-         .field-slots=1, .field-line=2, .player-marker=10, .tactical-number=11.
-         El marker queda encima de slots + markings pero el dorsal flota
-         externo en z:11. Antes z:20 era muy alto — el assignment panel
-         (z:100) y los warnings (z:100) ya estaban muy por encima, asi que
-         bajar a 10 no afecta ningun overlay del modal. */
-      width: 70px;
-      height: 48px;
-      transform: translate(-50%, -50%);
-      z-index: 10;
-      pointer-events: none;
+          V25D95.1-FRONT F4: z-index 20 → 10. El hierarchy final es
+          .field-slots=1, .field-line=2, .player-marker=10, .tactical-number=11.
+          El marker queda encima de slots + markings pero el dorsal flota
+          externo en z:11. Antes z:20 era muy alto — el assignment panel
+          (z:100) y los warnings (z:100) ya estaban muy por encima, asi que
+          bajar a 10 no afecta ningun overlay del modal.
+
+          V25D99-FRONT: pointer-events: auto (was: none). Pre-V25D99 the
+          marker was purely visual — the slot's cdkDropList captured drag
+          events. V25D99 moved drag capture to (cdkDragEnded) on the
+          marker itself. pointer-events: none blocked ALL mouse events
+          on the marker so cdkDrag never started — Ivan reported 'no
+          deja hacer cambio de nada'. Re-enabling pointer events here
+          makes the marker the drag handle as intended by the V25D99
+          rewrite. The inner .player-chip-name text inherits pointer
+          events normally; the slot is still clickable (pointer-events
+          pass through to siblings, but the marker sits ON TOP of slots
+          so clicks land on the marker, which uses cdkDrag to start a
+          drag). The marker template also forwards click to onSlotClick
+          via the (click) on the .field element — but since the marker
+          has its own cdkDrag, plain clicks would be CDK-initiated
+          drags; for click-to-assign UX see the assignment-panel flow. */
+       width: 70px;
+       height: 48px;
+       transform: translate(-50%, -50%);
+       z-index: 10;
+       pointer-events: auto;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -2722,6 +2739,23 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     this.selectedSlot = sub;
     this.selectedPlayerToAssign = '';
     this.cdr.detectChanges();
+  }
+
+  /**
+   * V25D99-FRONT: click handler on the marker itself. V25D99 made the
+   * marker pointer-events: auto so it can capture cdkDragEnded — which
+   * means clicks on the marker no longer fall through to the underlying
+   * slot. To preserve the click-to-show-player-info UX (which previously
+   * worked via slot's onSlotClick), we add a (click) handler on the
+   * marker that opens the assignment panel for the player's slotId.
+   * CDK drag-vs-tap distinguishes by movement threshold (~5px); tap
+   * (no drag) fires this click handler, drag fires cdkDragEnded.
+   */
+  onMarkerClick(player: PlayerOnFieldDto): void {
+    if (!player.slotId) { return; }
+    const sub = this.subdivisions.find(s => s.subdivisionId === player.slotId);
+    if (!sub) { return; }
+    this.onSlotClick(sub);
   }
 
   /** Asigna un jugador al slot seleccionado */
