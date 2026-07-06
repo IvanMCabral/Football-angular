@@ -328,7 +328,18 @@ import { SessionPlayer } from '../../shared/models/player.model';
                primary fix is the loadSquadFromBackend validation that
                clears stale slotIds). -->
 <ng-container *ngFor="let player of homePlayers; let i = index">
-              <div *ngIf="player.slotId && isSlotInActiveFormation(player.slotId)"
+              <!-- V25D99.5-FRONT: removed isSlotInActiveFormation from *ngIf.
+                   Ivan reported 'los jugadores no se ven cuando los movemos'.
+                   Root cause: in custom-lineup mode + free-positioned player,
+                   isSlotInActiveFormation(slotId) was returning false (because
+                   slotPlayerMap[slotId] is deleted after free drop, and the
+                   slot might or might not be in canonical formationPositions).
+                   When false, the *ngIf removed the marker DOM element → the
+                   moved player appeared 'invisible'. The marker MUST render
+                   whenever the player has a slotId; the slot-formation check
+                   was a defensive gate that became a foot-gun for free
+                   positioning. Removed. -->
+              <div *ngIf="player.slotId"
                    class="player-marker"
                    cdkDrag
                    [cdkDragData]="player"
@@ -3018,14 +3029,36 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     // 2. Decide drop target by inspecting the drop point against each
     // candidate region. Order matters: bench first (since the bench
     // area is below the field), then slots, then free field.
-    const benchEl = document.querySelector('.bench-container') as HTMLElement | null;
-    if (benchEl) {
-      const benchRect = benchEl.getBoundingClientRect();
-      if (dropX >= benchRect.left && dropX <= benchRect.right
-          && dropY >= benchRect.top && dropY <= benchRect.bottom) {
-        this.movePlayerToBench(player);
-        return;
+    //
+    // V25D99.5-FRONT: bench hit-test is now STRICT — only move to bench
+    // when the cursor is over a SPECIFIC .bench-player card, NOT just
+    // anywhere inside .bench-container (which includes the 'Banca (N)'
+    // header + padding + empty area). Ivan reported that his drags were
+    // silently moving players to the bench when he intended free
+    // positioning near the field's bottom edge (cursor landed in the
+    // bench-container's padding/header zone → unintended bench move).
+    // Now: cursor must overlap a bench-player card by at least 50% of
+    // the card's area to trigger the move. Otherwise fall through to
+    // the slot / free-positioning branches.
+    const benchCards = document.querySelectorAll('.bench-container .bench-player');
+    let overBenchCard = false;
+    for (const card of Array.from(benchCards)) {
+      const cr = (card as HTMLElement).getBoundingClientRect();
+      // 50% overlap check: cursor must be inside the central 50%×50%
+      // rectangle of the card.
+      const insetLeft = cr.left + cr.width * 0.25;
+      const insetRight = cr.right - cr.width * 0.25;
+      const insetTop = cr.top + cr.height * 0.25;
+      const insetBottom = cr.bottom - cr.height * 0.25;
+      if (dropX >= insetLeft && dropX <= insetRight
+          && dropY >= insetTop && dropY <= insetBottom) {
+        overBenchCard = true;
+        break;
       }
+    }
+    if (overBenchCard) {
+      this.movePlayerToBench(player);
+      return;
     }
 
 const targetSlot = this.findSlotAtPosition(xPct, yPct);
@@ -3266,18 +3299,32 @@ const targetSlot = this.findSlotAtPosition(xPct, yPct);
    * V25D98-FRONT: marker X position with V25D98 free-positioning override.
    * Returns the player's stored xPercent if set (after a field drop),
    * otherwise the canonical slot center.
+   *
+   * V25D99.5-FRONT: defensive NaN/Infinity guard. Ivan reported that after
+   * free drop the marker was invisible. Root cause hypothesis: invalid
+   * percentage value (NaN, negative, > 100, undefined-cast-as-number) was
+   * silently passed to [style.left.%], producing an invalid CSS value that
+   * Chromium would treat as 'auto' — making the marker flow into the
+   * natural DOM position instead of the intended absolute location. Now:
+   * always return a valid [0, 100] number, clamping on entry. Same for Y.
    */
   getMarkerX(player: PlayerOnFieldDto): number {
-    if (typeof player.xPercent === 'number') { return player.xPercent; }
+    if (typeof player.xPercent === 'number' && isFinite(player.xPercent)) {
+      return Math.max(0, Math.min(100, player.xPercent));
+    }
     if (!player.slotId) { return 50; }
-    return this.getSlotCenterX(player.slotId);
+    const cx = this.getSlotCenterX(player.slotId);
+    return isFinite(cx) ? cx : 50;
   }
 
   /** V25D98-FRONT: marker Y position with override (see {@link getMarkerX}). */
   getMarkerY(player: PlayerOnFieldDto): number {
-    if (typeof player.yPercent === 'number') { return player.yPercent; }
+    if (typeof player.yPercent === 'number' && isFinite(player.yPercent)) {
+      return Math.max(0, Math.min(100, player.yPercent));
+    }
     if (!player.slotId) { return 50; }
-    return this.getSlotCenterY(player.slotId);
+    const cy = this.getSlotCenterY(player.slotId);
+    return isFinite(cy) ? cy : 50;
   }
 
   /**
