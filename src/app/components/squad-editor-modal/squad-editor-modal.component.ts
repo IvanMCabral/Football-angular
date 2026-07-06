@@ -225,20 +225,15 @@ import { SessionPlayer } from '../../shared/models/player.model';
                        percentage when formationEffectiveness has data. The
                        pre-existing slot-eff-badge was removed from this slot since
                        the chip-level badge replaces its visual function. -->
-                  <div *ngIf="getPlayerInSlot(sub) as player"
-                       class="player-chip"
-                       cdkDrag
-                       [cdkDragData]="player"
-                       [class.eff-good]="getChipEffectivenessClass(sub.subdivisionId) === 'eff-good'"
-                       [class.eff-warning]="getChipEffectivenessClass(sub.subdivisionId) === 'eff-warning'"
-                       [class.eff-bad]="getChipEffectivenessClass(sub.subdivisionId) === 'eff-bad'">
-                    <span class="player-chip-name">{{player.name | slice:0:10}}</span>
-                    <span *ngIf="getEffectivenessForSlot(sub.subdivisionId) as eff"
-                          class="eff-badge"
-                          [title]="'Effectiveness: ' + (eff * 100).toFixed(0) + '%'">
-                      {{ (eff * 100).toFixed(0) }}%
-                    </span>
-                  </div>
+<div *ngIf="getPlayerInSlot(sub) as player"
+                        class="player-chip"
+                        cdkDrag
+                        [cdkDragData]="player"
+                        [class.eff-good]="getChipEffectivenessClass(sub.subdivisionId) === 'eff-good'"
+                        [class.eff-warning]="getChipEffectivenessClass(sub.subdivisionId) === 'eff-warning'"
+                        [class.eff-bad]="getChipEffectivenessClass(sub.subdivisionId) === 'eff-bad'">
+                     <span class="player-chip-name">{{player.name | slice:0:10}}</span>
+                   </div>
                   <div *ngIf="isMissingPlayer(sub)" class="missing-indicator">
                     {{getRecommendedRole(sub)}}
                   </div>
@@ -269,21 +264,16 @@ import { SessionPlayer } from '../../shared/models/player.model';
                        See the slot-gk block above for full details on the
                        eff-good/eff-warning/eff-bad classification and the
                        embedded eff-badge. -->
-                   <div *ngIf="getPlayerInSlot(sub) as player"
-                        class="player-chip"
-                        cdkDrag
-                        [cdkDragData]="player"
-                        [class.eff-good]="getChipEffectivenessClass(sub.subdivisionId) === 'eff-good'"
-                        [class.eff-warning]="getChipEffectivenessClass(sub.subdivisionId) === 'eff-warning'"
-                        [class.eff-bad]="getChipEffectivenessClass(sub.subdivisionId) === 'eff-bad'"
-                        [attr.title]="player.name + ' (' + player.role + ') · OVR ' + player.overall + ' · eff. ' + (getEffectivenessColor(sub.subdivisionId) || 'unknown')">
-                     <span class="player-chip-name">{{player.name | slice:0:10}}</span>
-                     <span *ngIf="getEffectivenessForSlot(sub.subdivisionId) as eff"
-                           class="eff-badge"
-                           [title]="'Effectiveness: ' + (eff * 100).toFixed(0) + '%'">
-                       {{ (eff * 100).toFixed(0) }}%
-                     </span>
-                   </div>
+<div *ngIf="getPlayerInSlot(sub) as player"
+                         class="player-chip"
+                         cdkDrag
+                         [cdkDragData]="player"
+                         [class.eff-good]="getChipEffectivenessClass(sub.subdivisionId) === 'eff-good'"
+                         [class.eff-warning]="getChipEffectivenessClass(sub.subdivisionId) === 'eff-warning'"
+                         [class.eff-bad]="getChipEffectivenessClass(sub.subdivisionId) === 'eff-bad'"
+                         [attr.title]="player.name + ' (' + player.role + ') · OVR ' + player.overall + ' · eff. ' + (getEffectivenessColor(sub.subdivisionId) || 'unknown')">
+                      <span class="player-chip-name">{{player.name | slice:0:10}}</span>
+                    </div>
                    <div *ngIf="isMissingPlayer(sub)" class="missing-indicator">
                      {{getRecommendedRole(sub)}}
                    </div>
