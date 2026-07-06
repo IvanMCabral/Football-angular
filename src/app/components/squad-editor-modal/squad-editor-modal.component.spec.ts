@@ -3690,49 +3690,28 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
     fixture.detectChanges();
   });
 
-  it('getMarkerX/Y: returns xPercent/yPercent override when set, else slot center', (done) => {
+  it('getMarkerX/Y: always returns slot center (V25D99.6 slot-only model)', (done) => {
+    // V25D99.6: free positioning was removed. Marker position is always
+    // the slot center. xPercent/yPercent fields still exist on the player
+    // DTO for backend compat but are NOT used by getMarkerX/Y.
     setTimeout(() => {
       const pDef = (component as any).slotPlayerMap['S22-1'];
-      // baseline: no override → returns slot center
       const baseX = (component as any).getMarkerX(pDef);
       const baseY = (component as any).getMarkerY(pDef);
       expect(baseX).toBe((component as any).getSlotCenterX('S22-1'));
       expect(baseY).toBe((component as any).getSlotCenterY('S22-1'));
-      // override: returns custom %
+      // Even if xPercent/yPercent are set (legacy data), they're ignored.
       pDef.xPercent = 60;
       pDef.yPercent = 35;
-      expect((component as any).getMarkerX(pDef)).toBe(60);
-      expect((component as any).getMarkerY(pDef)).toBe(35);
+      expect((component as any).getMarkerX(pDef)).toBe((component as any).getSlotCenterX('S22-1'));
+      expect((component as any).getMarkerY(pDef)).toBe((component as any).getSlotCenterY('S22-1'));
       done();
     }, 30);
   });
 
-  it('V25D99 handleMarkerDragEnd: assigns xPercent/yPercent from drop point', (done) => {
-    setTimeout(() => {
-      const pDef = (component as any).slotPlayerMap['S22-1'];
-      const fieldEl: HTMLElement = fixture.nativeElement.querySelector('.field');
-      // Stub bounding rect to 1000×800 at offset (100, 100).
-      fieldEl.getBoundingClientRect = () => ({
-        left: 100, top: 100, right: 1100, bottom: 900, width: 1000, height: 800,
-        x: 100, y: 100, toJSON: () => ({})
-      });
-      // ViewChild resolution: assign the fieldContainer ref directly.
-      (component as any).fieldContainer = { nativeElement: fieldEl };
-      // Drop at clientX=600, clientY=500 → fieldX=500, fieldY=400 → (50%, 50%).
-      // 50%/50% is OUTSIDE all subdivisions (S13-2 is at top=45, h=12 → 45-57,
-      // S22-1 at top=70 → 70-82) so this is treated as a free drop, not a
-      // slot snap. With field offset (100,100) + size (1000,800) → 50% = 500.
-      // We pick clientY=600 (fieldY=500 → yPct=62.5) to be safely outside
-      // any subdivision.
-      const evt: any = { dropPoint: { x: 600, y: 600 } };
-      (component as any).handleMarkerDragEnd(evt, pDef);
-      expect(pDef.xPercent).toBe(50);
-      expect(pDef.yPercent).toBe(62.5);
-      done();
-    }, 30);
-  });
-
-  it('V25D99 handleMarkerDragEnd: clamps xPercent/yPercent to [0, 100]', (done) => {
+  it('V25D99.6 handleMarkerDragEnd: drop outside any slot is a no-op', (done) => {
+    // V25D99.6: no free positioning. Drop at coords that don't land on
+    // any subdivision → no state change, xPercent/yPercent NEVER set.
     setTimeout(() => {
       const pDef = (component as any).slotPlayerMap['S22-1'];
       const fieldEl: HTMLElement = fixture.nativeElement.querySelector('.field');
@@ -3741,10 +3720,16 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
         x: 0, y: 0, toJSON: () => ({})
       });
       (component as any).fieldContainer = { nativeElement: fieldEl };
-      // Drop far off the field → clamped to bounds.
-      (component as any).handleMarkerDragEnd({ dropPoint: { x: -500, y: 5000 } } as any, pDef);
-      expect(pDef.xPercent).toBe(0);
-      expect(pDef.yPercent).toBe(100);
+      // Drop at (600, 600) → xPct=60, yPct=75 → no subdivision matches.
+      (component as any).handleMarkerDragEnd({ dropPoint: { x: 600, y: 600 } } as any, pDef);
+      // Slot unchanged.
+      expect(pDef.slotId).toBe('S22-1');
+      // xPercent/yPercent NOT set (free positioning removed).
+      expect(pDef.xPercent).toBeUndefined();
+      expect(pDef.yPercent).toBeUndefined();
+      // Marker stays at slot center.
+      expect((component as any).getMarkerX(pDef)).toBe((component as any).getSlotCenterX('S22-1'));
+      expect((component as any).getMarkerY(pDef)).toBe((component as any).getSlotCenterY('S22-1'));
       done();
     }, 30);
   });
@@ -3793,38 +3778,32 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
    *     the previous override position — Iván's "solo 1 vez" symptom).
    *  6. handleBenchDrop must clear xPercent/yPercent too.
    */
-  it('V25D99.4: free drop uses marker-only model (no chip, no missing-indicator) + override cleared on slot/bench drop', (done) => {
-    // V25D99.4 PROFESSIONAL REWRITE: chip + missing-indicator were REMOVED.
-    // The .player-marker IS the player. After a free drop, the original
-    // slot is just empty space (no chip, no missing-indicator), and the
-    // marker is rendered at the new xPercent/yPercent position via the
-    // marker's [style.left/top] binding. This test verifies:
-    //  1. hasOverridePosition(player) returns true once xPercent/yPercent set.
-    //  2. The DOM has NO .player-chip ANYWHERE (chip was removed).
-    //  3. The DOM has NO .missing-indicator ANYWHERE (indicator was removed).
-    //  4. The marker DOM is rendered ONCE per player (no duplication).
-    //  5. handleSlotDrop must clear xPercent/yPercent on the dropped player.
-    //  6. handleBenchDrop must clear xPercent/yPercent too.
+  it('V25D99.6: slot-only model — marker IS the player, no chip, no missing-indicator, no abandoned', (done) => {
+    // V25D99.6 PROFESSIONAL FINAL: chip + missing-indicator + abandoned
+    // class were ALL removed. The .player-marker IS the player. Players
+    // live at slot centers (no free positioning, no xPercent/yPercent
+    // override). Drop outside a slot is a no-op (marker snaps back).
+    // This test verifies:
+    //  1. The DOM has NO .player-chip anywhere.
+    //  2. The DOM has NO .missing-indicator anywhere.
+    //  3. The marker DOM renders ONCE per player.
+    //  4. handleSlotDrop swap logic still works (slot-to-slot).
+    //  5. handleBenchDrop still works (slot-to-bench).
     setTimeout(() => {
       const pDef = (component as any).slotPlayerMap['S22-1'];
       expect(pDef).toBeTruthy('fixture must seed a CB in S22-1');
 
-      // Free drop: assign xPercent=80, yPercent=40 to pDef.
-      pDef.xPercent = 80;
-      pDef.yPercent = 40;
-      (component as any).homePlayers$.next([...((component as any).homePlayers$.value)]);
-      fixture.detectChanges();
-
-      // V25D99.4: chip and missing-indicator must NOT exist in the DOM
-      // anywhere — chip was removed (marker IS the player) and the
-      // missing-indicator was removed (no more "ST" fantasma).
+      // No chip or missing-indicator anywhere.
       const allChips = fixture.nativeElement.querySelectorAll('.player-chip');
-      expect(allChips.length).withContext('V25D99.4: no .player-chip elements should exist anywhere').toBe(0);
+      expect(allChips.length).withContext('V25D99.6: no .player-chip elements should exist anywhere').toBe(0);
       const allMissing = fixture.nativeElement.querySelectorAll('.missing-indicator');
-      expect(allMissing.length).withContext('V25D99.4: no .missing-indicator elements should exist anywhere').toBe(0);
+      expect(allMissing.length).withContext('V25D99.6: no .missing-indicator elements should exist anywhere').toBe(0);
 
-      // Marker renders ONCE per player — count markers with the same
-      // playerId and assert no duplication.
+      // No .slot.abandoned class anywhere (concept removed).
+      const abandoned = fixture.nativeElement.querySelectorAll('.slot.abandoned');
+      expect(abandoned.length).withContext('V25D99.6: no .slot.abandoned should exist (concept removed)').toBe(0);
+
+      // Marker renders ONCE per player.
       const allMarkers = fixture.nativeElement.querySelectorAll('.player-marker');
       const defPlayerIds: string[] = [];
       allMarkers.forEach((m: HTMLElement) => {
@@ -3832,28 +3811,29 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
           defPlayerIds.push(pDef.playerId);
         }
       });
-      expect(defPlayerIds.length).withContext('V25D99.4: marker must render once per player (no duplication)').toBe(1);
+      expect(defPlayerIds.length).withContext('V25D99.6: marker must render once per player (no duplication)').toBe(1);
 
-      // V25D99.4: handleSlotDrop must clear overrides so subsequent moves work.
+      // handleSlotDrop swap: S22-1 → S05-2. S05-2 is occupied in fixture so
+      // the occupant gets swapped to S22-1 (no empty slot remains).
       (component as any).handleSlotDrop({
         item: { data: pDef },
         previousContainer: { id: 'slot-S22-1' },
         container: { id: 'slot-S05-2' }
       } as any);
-      expect(pDef.xPercent).toBeUndefined();
-      expect(pDef.yPercent).toBeUndefined();
       expect(pDef.slotId).toBe('S05-2');
+      expect((component as any).slotPlayerMap['S05-2']).toBe(pDef);
+      // S22-1 now has the previous S05-2 occupant (swap, not empty).
+      expect((component as any).slotPlayerMap['S22-1']).toBeTruthy();
+      expect((component as any).slotPlayerMap['S22-1']).not.toBe(pDef);
 
-      // Re-free-drop and then bench-drop to verify handleBenchDrop clears overrides.
-      pDef.xPercent = 25;
-      pDef.yPercent = 75;
+      // handleBenchDrop: S05-2 → bench.
       (component as any).handleBenchDrop({
         item: { data: pDef },
         previousContainer: { id: 'slot-S05-2' },
         container: { id: (component as any).BENCH_DROP_LIST_ID }
       } as any);
-      expect(pDef.xPercent).toBeUndefined();
-      expect(pDef.yPercent).toBeUndefined();
+      expect(pDef.slotId).toBe('');
+      expect((component as any).slotPlayerMap['S05-2']).toBeUndefined();
       done();
     }, 30);
   });
@@ -3870,9 +3850,16 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
    * Verify the marker keeps cdk-drag after override + handleFieldDrop
    * re-applies xPercent/yPercent on each call (subsequent drags update).
    */
-  it('V25D99 marker stays draggable + handleMarkerDragEnd is idempotent across multiple calls', (done) => {
+  it('V25D99.6: handleMarkerDragEnd is idempotent + drag onto slot swaps occupants', (done) => {
+    // V25D99.6 slot-only model: every drag either lands on a slot (snap)
+    // or is cancelled (no state change). Verify:
+    //  1. Multiple drags to the same slot are no-ops.
+    //  2. Drag to a DIFFERENT slot swaps the occupants.
+    //  3. Drag to FREE FIELD (no slot) is a no-op — marker stays at
+    //     original slot (no xPercent/yPercent set, no free positioning).
     setTimeout(() => {
       const pDef = (component as any).slotPlayerMap['S22-1'];
+      const pMid = (component as any).slotPlayerMap['S13-2'];
       const fieldEl: HTMLElement = fixture.nativeElement.querySelector('.field');
       fieldEl.getBoundingClientRect = () => ({
         left: 0, top: 0, right: 1000, bottom: 800, width: 1000, height: 800,
@@ -3881,40 +3868,33 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
       (component as any).fieldContainer = { nativeElement: fieldEl };
       const mkEvt = (x: number, y: number) => ({ dropPoint: { x, y } } as any);
 
-      // First drop → 80%, 50%.
-      (component as any).handleMarkerDragEnd(mkEvt(800, 400), pDef);
-      expect(pDef.xPercent).toBe(80);
-      expect(pDef.yPercent).toBe(50);
-      expect((component as any).getMarkerX(pDef)).toBe(80);
-      expect((component as any).getMarkerY(pDef)).toBe(50);
-      fixture.detectChanges();
+      // 1. Drag pDef to its OWN slot (S22-1 in fixture at top=70, left=12,
+      // width=10, height=12 → center at (170, 608)). Drop on it = no-op.
+      (component as any).handleMarkerDragEnd(mkEvt(170, 608), pDef);
+      expect(pDef.slotId).toBe('S22-1', 'no-op when dropped on own slot');
+      expect((component as any).slotPlayerMap['S22-1']).toBe(pDef);
+      expect(pDef.xPercent).toBeUndefined();
+      expect(pDef.yPercent).toBeUndefined();
 
-      // Verify the marker DOM element still has cdk-drag after first drop.
-      const markers = fixture.nativeElement.querySelectorAll('.player-marker');
-      let pDefMarker: HTMLElement | null = null;
-      markers.forEach((m: any) => {
-        if (m.textContent.includes('Rudiger')) { pDefMarker = m; }
-      });
-      expect(pDefMarker).toBeTruthy('pDef marker must still render after first drop');
-      expect(pDefMarker!.classList.contains('cdk-drag')).withContext('marker must remain cdk-drag after first drop').toBeTrue();
+      // 2. Drag pDef onto pMid's slot (S13-2 at top=45, left=45, width=10,
+      // height=12 → center at (500, 408)). Should SWAP.
+      (component as any).handleMarkerDragEnd(mkEvt(500, 408), pDef);
+      expect(pDef.slotId).toBe('S13-2', 'player moved to S13-2');
+      expect(pMid.slotId).toBe('S22-1', 'previous occupant swapped to S22-1');
+      expect((component as any).slotPlayerMap['S13-2']).toBe(pDef);
+      expect((component as any).slotPlayerMap['S22-1']).toBe(pMid);
 
-      // Second drop → 30%, 20% (different position to prove update worked).
-      (component as any).handleMarkerDragEnd(mkEvt(300, 160), pDef);
-      expect(pDef.xPercent).toBe(30);
-      expect(pDef.yPercent).toBe(20);
-      expect((component as any).getMarkerX(pDef)).toBe(30);
-      expect((component as any).getMarkerY(pDef)).toBe(20);
-      fixture.detectChanges();
+      // 3. Drag pDef to FREE FIELD (between slots). Should be a no-op.
+      // Free space at (300, 400) → xPct=30, yPct=50 — no slot at these coords.
+      (component as any).handleMarkerDragEnd(mkEvt(300, 400), pDef);
+      expect(pDef.slotId).toBe('S13-2', 'no state change on free-field drop');
+      expect(pDef.xPercent).toBeUndefined('free positioning removed: xPercent never set');
+      expect(pDef.yPercent).toBeUndefined('free positioning removed: yPercent never set');
 
-      // Third drop → 60%, 80% — to confirm repeatability.
-      (component as any).handleMarkerDragEnd(mkEvt(600, 640), pDef);
-      expect(pDef.xPercent).toBe(60);
-      expect(pDef.yPercent).toBe(80);
-
-      // V25D98.3: even after the free drops, the slot should NOT have
-      // .recommended class (which would render the yellow box-shadow).
-      const slotS22After = fixture.nativeElement.querySelector('#slot-S22-1');
-      expect(slotS22After?.classList.contains('recommended')).withContext('overridden slot must not have .recommended class (no yellow box-shadow)').toBeFalse();
+      // 4. Marker stays at slot center (slot-only model).
+      const s132 = (component as any).subdivisions.find((s: any) => s.subdivisionId === 'S13-2');
+      expect((component as any).getMarkerX(pDef)).toBe(s132.left + s132.width / 2);
+      expect((component as any).getMarkerY(pDef)).toBe(s132.top + s132.height / 2);
       done();
     }, 30);
   });
@@ -3938,7 +3918,13 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
    *  - resetCustomPositions() must RESTORE the slotPlayerMap entry
    *    so the chip reappears in the slot on snap-back.
    */
-  it('V25D98.4: free drop removes player from slotPlayerMap + slot abandoned by override', (done) => {
+  it('V25D99.6: drop outside any slot is a no-op (slot-only model, no free positioning)', (done) => {
+    // V25D99.6: Ivan: 'tienen que cada jugador que movemos quedarse dentro
+    // de alguna de las coordenadas que hay en la cancha'. The marker MUST
+    // stay at a slot. Drops that don't land exactly on a slot are no-ops:
+    //  1. slotPlayerMap[slotId] unchanged.
+    //  2. player.xPercent/yPercent NEVER set (no free positioning).
+    //  3. Marker visually stays at the original slot center.
     setTimeout(() => {
       const pDef = (component as any).slotPlayerMap['S22-1'];
       const slotS22 = (component as any).subdivisions.find((s: any) => s.subdivisionId === 'S22-1');
@@ -3948,46 +3934,23 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
         x: 0, y: 0, toJSON: () => ({})
       });
 
-      // Baseline: player IS in slotPlayerMap (canonical position).
+      // Baseline: player is at S22-1.
       expect((component as any).slotPlayerMap['S22-1']).toBe(pDef);
       expect((component as any).isSlotOccupied(slotS22)).toBeTrue();
 
-      // Free drop the player to (700, 350).
+      // Drop at (700, 350) → xPct=70, yPct=43.75 → no slot at these coords.
       (component as any).fieldContainer = { nativeElement: fieldEl };
       (component as any).handleMarkerDragEnd({ dropPoint: { x: 700, y: 350 } } as any, pDef);
 
-      // V25D98.4: slotPlayerMap MUST NOT contain the player anymore.
-      expect((component as any).slotPlayerMap['S22-1']).toBeUndefined();
-      // isSlotOccupied returns false → slot click would show "Sin asignar"
-      // + bench dropdown instead of the player's name.
-      expect((component as any).isSlotOccupied(slotS22)).withContext('slot must be logically empty after free drop').toBeFalse();
-      // getPlayerInSlot returns undefined → assignment panel shows "Sin asignar".
-      expect((component as any).getPlayerInSlot(slotS22)).toBeUndefined();
-
-      // V25D98.4: isSlotAbandonedByOverride must return true so the
-      // .missing-indicator (red role label) does NOT render on the
-      // abandoned slot.
-      expect((component as any).isSlotAbandonedByOverride(slotS22)).toBeTrue();
-      expect((component as any).isMissingPlayer(slotS22)).withContext('abandoned slot must not render as missing').toBeFalse();
-
-      // Marker still renders at the override (this was already covered
-      // by V25D98.3 but verify here too as part of the same flow).
-      expect(pDef.xPercent).toBe(70);
-      expect(pDef.yPercent).toBe(43.75);
-      expect((component as any).getMarkerX(pDef)).toBe(70);
-      expect((component as any).getMarkerY(pDef)).toBe(43.75);
-      fixture.detectChanges();
-
-      // Player.slotId is preserved for chemistry preview.
-      expect(pDef.slotId).toBe('S22-1');
-
-      // V25D98.4: resetCustomPositions() must restore slotPlayerMap so
-      // the chip reappears in the slot on snap-back.
-      (component as any).resetCustomPositions();
-      expect((component as any).slotPlayerMap['S22-1']).toBe(pDef);
-      expect(pDef.xPercent).toBeUndefined();
-      expect(pDef.yPercent).toBeUndefined();
-      expect((component as any).isSlotOccupied(slotS22)).toBeTrue();
+      // V25D99.6: no state change. The player stays in slotPlayerMap.
+      expect((component as any).slotPlayerMap['S22-1']).toBe(pDef, 'no-op drop: player stays in slotPlayerMap');
+      expect((component as any).isSlotOccupied(slotS22)).withContext('no-op drop: slot stays occupied').toBeTrue();
+      // xPercent/yPercent NEVER set in slot-only model.
+      expect(pDef.xPercent).toBeUndefined('slot-only model: xPercent never set');
+      expect(pDef.yPercent).toBeUndefined('slot-only model: yPercent never set');
+      // Marker stays at slot center.
+      expect((component as any).getMarkerX(pDef)).toBe(slotS22.left + slotS22.width / 2);
+      expect((component as any).getMarkerY(pDef)).toBe(slotS22.top + slotS22.height / 2);
       done();
     }, 30);
   });
@@ -4004,39 +3967,41 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
    * Verify: onSlotClick returns early when slot is abandoned and
    * selectedSlot stays null (popup never renders).
    */
-  it('V25D98.5: onSlotClick is inert on abandoned slot (no popup at all)', (done) => {
+  it('V25D99.6: empty slot is invisible (no abandoned class, no chip, no missing-indicator)', (done) => {
+    // V25D99.6: 'tiene que desaparecer donde estaba antes'. When a player
+    // moves out of a slot, the slot must be visually empty (no chip, no
+    // missing-indicator, no .abandoned class, no amber outline). With the
+    // slot-only model, the only way to empty a slot is via slot-swap
+    // (where the displaced occupant fills the source slot — no empty
+    // slot remains) or via bench-move (which removes the player from
+    // homePlayers entirely — the slot no longer exists in the user's
+    // view because shouldRenderSlot filters empty non-recommended slots).
+    //
+    // This test verifies: after a slot-swap, the source slot has a new
+    // occupant (not empty). After a bench-move, the slot no longer
+    // renders (filtered by shouldRenderSlot). No "ghost" amber outline
+    // appears on any empty slot.
     setTimeout(() => {
       const pDef = (component as any).slotPlayerMap['S22-1'];
-      const slotS22 = (component as any).subdivisions.find((s: any) => s.subdivisionId === 'S22-1');
-      const fieldEl = fixture.nativeElement.querySelector('.field');
-      fieldEl.getBoundingClientRect = () => ({
-        left: 0, top: 0, right: 1000, bottom: 800, width: 1000, height: 800,
-        x: 0, y: 0, toJSON: () => ({})
-      });
+      const pMid = (component as any).slotPlayerMap['S13-2'];
 
-      // Sanity: before free drop the slot is occupied and clickable.
-      (component as any).onSlotClick(slotS22);
-      expect((component as any).selectedSlot).toBe(slotS22);
-      // Reset selectedSlot for the next assertion.
-      (component as any).selectedSlot = null;
+      // Move pDef to bench. Source slot S22-1 should not have any visual
+      // indicator (chip, missing-indicator, abandoned) — only the
+      // shouldRenderSlot filter keeps it from rendering at all.
+      (component as any).movePlayerToBench(pDef);
       fixture.detectChanges();
 
-      // Free drop the player out of the slot. Pick coords that DO NOT land
-      // inside any subdivision (subdivisions are at left=[10,40,45],
-      // top=[10,45,70,88] with widths 10-30). xPct=70, yPct=43.75 →
-      // neither S05-2 (top=10-20), S13-2 (top=45-57), S22-1 (top=70-82),
-      // nor GK-1 (top=88-98).
-      (component as any).fieldContainer = { nativeElement: fieldEl };
-      (component as any).handleMarkerDragEnd({ dropPoint: { x: 700, y: 350 } } as any, pDef);
-      expect((component as any).isSlotAbandonedByOverride(slotS22)).toBeTrue();
-
-      // V25D98.5: clicking the abandoned slot must NOT set selectedSlot
-      // (no popup, not even "Sin asignar").
-      (component as any).onSlotClick(slotS22);
-      expect((component as any).selectedSlot).withContext('abandoned slot must be inert — no popup rendered').toBeNull();
-      fixture.detectChanges();
-      const popup = fixture.nativeElement.querySelector('.assignment-panel');
-      expect(popup).toBeFalsy('assignment-panel must NOT render for abandoned slot click');
+      // S22-1 no longer in slotPlayerMap.
+      expect((component as any).slotPlayerMap['S22-1']).toBeUndefined();
+      // No .abandoned class anywhere.
+      const abandonedSlots = fixture.nativeElement.querySelectorAll('.slot.abandoned');
+      expect(abandonedSlots.length).withContext('V25D99.6: no .slot.abandoned elements (concept removed)').toBe(0);
+      // No chip + no missing-indicator (already verified in earlier test,
+      // but checking again as part of the no-ghost invariant).
+      const chips = fixture.nativeElement.querySelectorAll('.player-chip');
+      expect(chips.length).toBe(0);
+      const missing = fixture.nativeElement.querySelectorAll('.missing-indicator');
+      expect(missing.length).toBe(0);
       done();
     }, 30);
   });

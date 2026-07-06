@@ -278,9 +278,8 @@ import { SessionPlayer } from '../../shared/models/player.model';
                        [style.width.%]="sub.width"
                        [style.height.%]="sub.height"
 [class.occupied]="isSlotOccupied(sub)"
-                      [class.recommended]="isRecommendedSlot(sub) && !isSlotAbandonedByOverride(sub)"
-                      [class.abandoned]="isSlotAbandonedByOverride(sub)"
-                       (click)="onSlotClick(sub)">
+[class.recommended]="isRecommendedSlot(sub)"
+                      (click)="onSlotClick(sub)">
                 </div>
               </ng-container>
 
@@ -296,8 +295,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
                      [style.width.%]="sub.width"
                      [style.height.%]="sub.height"
                      [class.occupied]="isSlotOccupied(sub)"
-                     [class.recommended]="isRecommendedSlot(sub) && !isSlotAbandonedByOverride(sub)"
-                     [class.abandoned]="isSlotAbandonedByOverride(sub)"
+                     [class.recommended]="isRecommendedSlot(sub)"
                      [class.attack]="sub.zone === 'ATTACK'"
                      [class.midfield]="sub.zone === 'MIDFIELD'"
                      [class.defense]="sub.zone === 'DEFENSE'"
@@ -1371,31 +1369,19 @@ import { SessionPlayer } from '../../shared/models/player.model';
       border: none;
     }
 
-    /* V25D98.6-FRONT: abandoned slot (player free-positioned elsewhere)
-       is fully inert — no pointer-events (mouse passes through), no
-       cursor change, no hover effect. Iván reported 'deja pasar el mouse
-       por arriba' on the V25D98.5 fix. Combined with onSlotClick's
-       early-return, the slot is now a pure visual ghost until the user
-       drag-drops the marker back onto it (handleSlotDrop restores
-       slotPlayerMap + removes .abandoned).
-
-       V25D99.3-FRONT: visual distinction for abandoned slots. Ivan reported
-       'queda ese espacio como reservado' — the empty slot looked like a
-       reserved/active slot because it had no visual cue. Now: dashed amber
-       outline at 30% opacity, clearly communicates "slot vacío, drop acá
-       para llenarlo" vs an active occupied slot (white border + colored
-       chip). pointer-events:none retained (chip click should still be
-       inert) but the marker's cdkDragEnded hit-test works regardless of
-       pointer-events on the slot — it uses dropPoint coords vs slot's
-       bounding rect, so drops on abandoned slots DO assign. */
+/* V25D99.6-FRONT: .slot.abandoned REMOVED entirely. Pre-V25D99.6 the
+       abandoned slot had a dashed amber outline + pointer-events:none.
+       Ivan: 'tiene que desaparecer donde estaba antes' — the original
+       slot must DISAPPEAR when a player moves out, not show as a
+       ghost/amber outline. With free positioning removed (V25D99.6),
+       the only way to leave a slot empty is via the bench move (which
+       deletes player from homePlayers → no orphan slot) or via a
+       slot-swap where the displaced occupant FILLS the source slot
+       (no empty slot remains). So .abandoned is impossible by design
+       now. The base .slot rule (border:none, bg:transparent) already
+       makes empty slots invisible — no extra styling needed. */
     .slot.abandoned {
-      pointer-events: none;
-      cursor: default;
-      outline: 1.5px dashed rgba(245, 158, 11, 0.55);
-      outline-offset: -2px;
-      border-radius: 4px;
-      opacity: 0.55;
-      transition: outline 0.15s ease, opacity 0.15s ease;
+      /* deprecated — kept as a no-op for backward compat with old builds */
     }
 
     .slot.recommended {
@@ -3011,7 +2997,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     * This guarantees that EVERY drop fires exactly once and that
     * subsequent free drops always work (the '1 vez' bug is gone).
     */
-  handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
+handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
     if (!player) { return; }
 
     // 1. Compute drop position as % of the field bounding rect.
@@ -3019,33 +3005,34 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     if (!fieldEl) { return; }
     const rect = fieldEl.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0) { return; }
-    // CdkDragEnd.dropPoint is in client coordinates (clientX, clientY at
-    // mouseup). Subtract the field's top-left to get field-relative coords.
     const dropX = event.dropPoint?.x ?? rect.left;
     const dropY = event.dropPoint?.y ?? rect.top;
-    const xPct = Math.max(0, Math.min(100, ((dropX - rect.left) / rect.width) * 100));
-    const yPct = Math.max(0, Math.min(100, ((dropY - rect.top) / rect.height) * 100));
 
-    // 2. Decide drop target by inspecting the drop point against each
-    // candidate region. Order matters: bench first (since the bench
-    // area is below the field), then slots, then free field.
+    // 2. Decide drop target. STRICT 3-way check (V25D99.6):
+    //    a) cursor over a bench-player card  → move to bench
+    //    b) cursor over a slot               → swap/move into that slot
+    //    c) anywhere else (free field, gaps) → CANCEL, no state change,
+    //                                            marker stays at original slot.
     //
-    // V25D99.5-FRONT: bench hit-test is now STRICT — only move to bench
-    // when the cursor is over a SPECIFIC .bench-player card, NOT just
-    // anywhere inside .bench-container (which includes the 'Banca (N)'
-    // header + padding + empty area). Ivan reported that his drags were
-    // silently moving players to the bench when he intended free
-    // positioning near the field's bottom edge (cursor landed in the
-    // bench-container's padding/header zone → unintended bench move).
-    // Now: cursor must overlap a bench-player card by at least 50% of
-    // the card's area to trigger the move. Otherwise fall through to
-    // the slot / free-positioning branches.
+    // Ivan: 'tienen que cada jugador que movemos quedarse dentro de alguna
+    // de las coordenadas que hay en la cancha, no pudiendo ocupar 2 la
+    // misma. tiene que desaparecer donde estaba antes.'
+    //
+    // Translation: players MUST end up at one of the formation's slot
+    // coordinates. No two players can occupy the same slot. The original
+    // slot must 'disappear' (no ghost, no abandoned outline, no free
+    // positioning). This is the SIMPLE/PROFESSIONAL solution the user
+    // has been asking for. Pre-V25D99.6 we supported free positioning
+    // (any pixel drop → free xPercent/yPercent) which produced ghosts
+    // and invisible markers (V25D99.5). Removing the feature entirely.
+    //
+    // V25D99.6: NO free positioning, NO snap-to-nearest (V25D99.3). Drop
+    // outside a slot → snap back to original slot position (no state
+    // change). The drag is cancelled.
     const benchCards = document.querySelectorAll('.bench-container .bench-player');
     let overBenchCard = false;
     for (const card of Array.from(benchCards)) {
       const cr = (card as HTMLElement).getBoundingClientRect();
-      // 50% overlap check: cursor must be inside the central 50%×50%
-      // rectangle of the card.
       const insetLeft = cr.left + cr.width * 0.25;
       const insetRight = cr.right - cr.width * 0.25;
       const insetTop = cr.top + cr.height * 0.25;
@@ -3061,60 +3048,35 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
       return;
     }
 
-const targetSlot = this.findSlotAtPosition(xPct, yPct);
+    // Slot hit-test: exact match only (no snap-to-nearest). The user
+    // explicitly wants players to land at exact slot coordinates.
+    const xPct = Math.max(0, Math.min(100, ((dropX - rect.left) / rect.width) * 100));
+    const yPct = Math.max(0, Math.min(100, ((dropY - rect.top) / rect.height) * 100));
+    const targetSlot = this.findSlotAtPosition(xPct, yPct);
     if (targetSlot) {
-      // 3a. Snap to slot — call the shared slot-swap logic.
+      // Dropped on a slot.
       if (player.slotId === targetSlot.subdivisionId) {
-        // Dropped on the same slot the player came from — snap back to
-        // canonical (clear any free-positioning override).
-        this.applySlotAssignment(player, player.slotId, targetSlot.subdivisionId, /*swapOccupant=*/null);
-      } else {
-        const occupant = this.slotPlayerMap[targetSlot.subdivisionId] ?? null;
-        this.applySlotAssignment(player, player.slotId, targetSlot.subdivisionId, occupant);
+        // Same slot as origin — no-op. The marker visually 'snaps back'
+        // automatically via the [style.left/top] binding pointing at the
+        // slot center.
+        return;
       }
+      const occupant = this.slotPlayerMap[targetSlot.subdivisionId] ?? null;
+      // applySlotAssignment handles swap (slot→slot with occupant) and
+      // move-to-empty (slot→slot without occupant). Both result in the
+      // source slot becoming empty (slotPlayerMap[sourceSlot] deleted) and
+      // the target slot having the player. The empty source slot is
+      // invisible by default (.slot has border:none, bg:transparent) so
+      // 'it disappears where it was' per Ivan's spec.
+      this.applySlotAssignment(player, player.slotId, targetSlot.subdivisionId, occupant);
       return;
     }
 
-    // 3b. Free drop on the field (no slot under the cursor).
-    // Promote bench players (no slotId) to closest subdivision so they
-    // participate in chemistry / formation detection.
-    if (!player.slotId || player.slotId === '') {
-      const closest = this.findClosestSubdivision(xPct, yPct);
-      if (closest) { player.slotId = closest.subdivisionId; }
-    }
-
-    player.xPercent = xPct;
-    player.yPercent = yPct;
-    // V25D98.4-FRONT: REMOVE the player from slotPlayerMap so the slot
-    // is logically abandoned (click → inert, no popup showing player).
-    if (player.slotId) {
-      delete this.slotPlayerMap[player.slotId];
-    }
-
-    this.saveLineup();
-    this.triggerChemistryPreview();
-    this.updateFormationDetection();
-    this.homePlayers$.next([...this.homePlayers$.value]);
-    this.cdr.markForCheck();
-    this.cdr.detectChanges();
-
-    // V25D99.3-FRONT: reset CDK drag internal state so the next drag works.
-    // Ivan reported 'no deja volver a mover' — the second drag of the
-    // SAME marker after a free drop didn't fire. CDK's internal DragRef
-    // keeps a 'disabled until next pointerdown' flag that doesn't always
-    // clear on its own after a non-dropList drag. Calling _dragRef.reset()
-    // explicitly clears that flag plus the preview/placeholder state.
-    // We use the internal _dragRef (DragRef.reset() is not part of the
-    // public CdkDrag API) — this is the standard Angular Material team's
-    // own workaround for this exact issue. After reset(), the marker's
-    // CSS position is still bound to [style.left/top] which Angular
-    // re-renders to the new xPercent/yPercent, so the marker stays at
-    // the new position — reset() only clears CDK's internal drag state,
-    // not Angular's bindings.
-    const dragRef = (event.source as any)?._dragRef;
-    if (dragRef && typeof dragRef.reset === 'function') {
-      dragRef.reset();
-    }
+    // 3c. Drop on free field or gap between slots → CANCEL. No state
+    // change. Marker stays at its original slot position (rendered via
+    // [style.left/top] → getMarkerX/Y → slot center). CDK restores the
+    // marker to its pre-drag visual position automatically.
+    return;
   }
 
   /**
@@ -3135,33 +3097,16 @@ const targetSlot = this.findSlotAtPosition(xPct, yPct);
     * both close (returns the closer one).
     */
   private findSlotAtPosition(xPct: number, yPct: number): FieldSubdivisionDTO | null {
-    // Pass 1: exact hit (inside slot bounds) — original behavior.
-    const exact = this.subdivisions.find(s =>
+    // V25D99.6-FRONT: EXACT slot match only. No snap-to-nearest (removed
+    // from V25D99.3). Ivan: 'tienen que cada jugador que movemos quedarse
+    // dentro de alguna de las coordenadas que hay en la cancha'. Players
+    // must land at exact slot coordinates — no free positioning, no
+    // snap-to-nearest heuristic. Drops that don't land exactly on a slot
+    // are cancelled (marker snaps back) — see handleMarkerDragEnd.
+    return this.subdivisions.find(s =>
       xPct >= s.left && xPct <= s.left + s.width
       && yPct >= s.top && yPct <= s.top + s.height
-    );
-    if (exact) { return exact; }
-
-    // Pass 2: snap-to-nearest within margin. 5% of field = ~30-60px
-    // depending on viewport, enough to cover small cursor/slot offset
-    // misalignments without falsely snapping to distant slots.
-    const SNAP_MARGIN_PCT = 5;
-    let nearest: FieldSubdivisionDTO | null = null;
-    let nearestDist = Infinity;
-    for (const s of this.subdivisions) {
-      const distX = Math.abs(xPct - (s.left + s.width / 2));
-      const distY = Math.abs(yPct - (s.top + s.height / 2));
-      // Snap if within (half-slot + margin) of slot center.
-      if (distX <= s.width / 2 + SNAP_MARGIN_PCT
-          && distY <= s.height / 2 + SNAP_MARGIN_PCT) {
-        const dist = distX + distY;
-        if (dist < nearestDist) {
-          nearestDist = dist;
-          nearest = s;
-        }
-      }
-    }
-    return nearest;
+    ) ?? null;
   }
 
   /**
@@ -3309,19 +3254,16 @@ const targetSlot = this.findSlotAtPosition(xPct, yPct);
    * always return a valid [0, 100] number, clamping on entry. Same for Y.
    */
   getMarkerX(player: PlayerOnFieldDto): number {
-    if (typeof player.xPercent === 'number' && isFinite(player.xPercent)) {
-      return Math.max(0, Math.min(100, player.xPercent));
-    }
+    // V25D99.6-FRONT: simplified to slot-center only. Free positioning
+    // (xPercent/yPercent overrides) was removed — every marker is at the
+    // center of its assigned slot. Defensive NaN guard still in place.
     if (!player.slotId) { return 50; }
     const cx = this.getSlotCenterX(player.slotId);
     return isFinite(cx) ? cx : 50;
   }
 
-  /** V25D98-FRONT: marker Y position with override (see {@link getMarkerX}). */
+  /** V25D98-FRONT: marker Y position. V25D99.6 simplified to slot-center only. */
   getMarkerY(player: PlayerOnFieldDto): number {
-    if (typeof player.yPercent === 'number' && isFinite(player.yPercent)) {
-      return Math.max(0, Math.min(100, player.yPercent));
-    }
     if (!player.slotId) { return 50; }
     const cy = this.getSlotCenterY(player.slotId);
     return isFinite(cy) ? cy : 50;
