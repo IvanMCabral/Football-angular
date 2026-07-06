@@ -152,6 +152,16 @@ import { SessionPlayer } from '../../shared/models/player.model';
             </span>
           </div>
           </div>
+          <!-- V25D98-FRONT: reset button visible only when at least one
+               player has a custom (free) position. Snaps every marker
+               back to its canonical slot center. -->
+          <button mat-stroked-button
+                  (click)="resetCustomPositions()"
+                  class="reset-positions-btn"
+                  *ngIf="hasCustomPositions()"
+                  title="Volver a las posiciones canónicas de la formación">
+            ↺ Reset posiciones
+          </button>
           <button mat-icon-button (click)="close()" class="close-btn" title="Cerrar">✕</button>
         </div>
       </div>
@@ -163,7 +173,18 @@ import { SessionPlayer } from '../../shared/models/player.model';
 
       <!-- Field Canvas - Vertical Orientation -->
       <div class="field-container">
-        <div class="field">
+        <!-- V25D98-FRONT: cdkDropList a nivel field para free positioning.
+             Cuando el user dropea a un player FUERA de cualquier slot (sobre
+             el espacio libre del campo), este drop list captura el evento y
+             handleFieldDrop() guarda la posición exacta como xPercent/yPercent
+             en el player. Los slots internos siguen siendo cdkDropList propios
+             (handleSlotDrop) y CDK los prefiere cuando el drop cae adentro. -->
+        <div class="field"
+             cdkDropList
+             [id]="FIELD_DROP_LIST_ID"
+             [cdkDropListData]="'field'"
+             [cdkDropListConnectedTo]="allDropListIds"
+             (cdkDropListDropped)="handleFieldDrop($event)">
           <!-- Etiquetas de zonas -->
           <div class="zone-label zone-attack-label">ATAQUE</div>
           <div class="zone-label zone-midfield-label">MEDIO</div>
@@ -224,13 +245,13 @@ import { SessionPlayer } from '../../shared/models/player.model';
 <div class="slot slot-gk"
                       cdkDropList
                       [id]="'slot-' + sub.subdivisionId"
-                      [cdkDropListConnectedTo]="slotDropListIds.concat([BENCH_DROP_LIST_ID])"
-                      [cdkDropListData]="sub"
-                      (cdkDropListDropped)="handleSlotDrop($event)"
-                      [style.left.%]="sub.left"
-                      [style.top.%]="sub.top"
-                      [style.width.%]="sub.width"
-                      [style.height.%]="sub.height"
+[cdkDropListConnectedTo]="allDropListIds"
+                       [cdkDropListData]="sub"
+                       (cdkDropListDropped)="handleSlotDrop($event)"
+                       [style.left.%]="sub.left"
+                       [style.top.%]="sub.top"
+                       [style.width.%]="sub.width"
+                       [style.height.%]="sub.height"
                       [class.occupied]="isSlotOccupied(sub)"
                       [class.missing-player]="isMissingPlayer(sub)"
                       (click)="onSlotClick(sub)">
@@ -264,7 +285,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
                 <div class="slot"
                      cdkDropList
                      [id]="'slot-' + sub.subdivisionId"
-                     [cdkDropListConnectedTo]="slotDropListIds.concat([BENCH_DROP_LIST_ID])"
+                     [cdkDropListConnectedTo]="allDropListIds"
                      [cdkDropListData]="sub"
                      (cdkDropListDropped)="handleSlotDrop($event)"
                      [style.left.%]="sub.left"
@@ -326,8 +347,8 @@ import { SessionPlayer } from '../../shared/models/player.model';
                   class="player-marker"
                   cdkDrag
                   [cdkDragData]="player"
-                  [style.left.%]="getSlotCenterX(player.slotId)"
-                  [style.top.%]="getSlotCenterY(player.slotId)"
+                  [style.left.%]="getMarkerX(player)"
+                  [style.top.%]="getMarkerY(player)"
                    [class.gk-player]="player.role === 'GK'"
                    [class.off-role]="isOffRole(player)"
                    [class.eff-green]="getChipEffectivenessClass(player.slotId) === 'eff-good'"
@@ -555,6 +576,22 @@ import { SessionPlayer } from '../../shared/models/player.model';
       align-items: center;
       gap: 0.5rem;
       flex-shrink: 0;
+    }
+
+    /* V25D98-FRONT: reset-positions button — visible only when at least one
+       marker has a custom (free) position. Compact pill style so it
+       fits in the header next to the chemistry preview stack. */
+    .reset-positions-btn {
+      font-size: 0.78rem;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      color: #fff;
+      background: rgba(245, 158, 11, 0.18);
+      transition: background 0.15s ease;
+    }
+    .reset-positions-btn:hover {
+      background: rgba(245, 158, 11, 0.32);
     }
 
     .squad-header h2 {
@@ -2676,8 +2713,21 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     return (this.subdivisions || []).map(s => 'slot-' + s.subdivisionId);
   }
 
+  /**
+   * V25D98-FRONT: ids used by both field-level and slot-level drop lists as
+   * the connectedTo set. Includes every slot + bench + the field itself so
+   * CDK lets any drag item be dropped on any drop target.
+   */
+  get allDropListIds(): string[] {
+    return this.slotDropListIds.concat([this.BENCH_DROP_LIST_ID, this.FIELD_DROP_LIST_ID]);
+  }
+
   /** Constant id for the bench drop list (separate from per-slot ids). */
   readonly BENCH_DROP_LIST_ID = 'bench-list';
+
+  /** V25D98-FRONT: id for the field-level drop list (captures free drops
+   *  outside any slot). */
+  readonly FIELD_DROP_LIST_ID = 'field-drop-area';
 
   /** Slot id (without 'slot-' prefix) → player currently in that slot. */
   get playerInTargetSlot(): { [subdivisionId: string]: PlayerOnFieldDto } {
@@ -2829,6 +2879,132 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   private subdivisionIdFromDropListId(dropListId: string): string | null {
     if (!dropListId || !dropListId.startsWith('slot-')) { return null; }
     return dropListId.substring('slot-'.length);
+  }
+
+  /**
+   * V25D98-FRONT: handle a CDK drop onto the field-level drop list
+   * (i.e., the player was dropped on the field but NOT inside any slot).
+   *
+   * <p>Computes the (xPercent, yPercent) of the drop point relative to the
+   * field element and stores those values on the player. The marker
+   * template will render at this position instead of the slot center.
+   *
+   * <p>The player's slotId is preserved (it's still in the canonical
+   * formation, just visually offset). This keeps the chemistry / off-role
+   * calculations valid while letting the user express their tactical tweak.
+   *
+   * <p>If the drag started from the bench and was dropped on the field,
+   * we auto-promote the player to the closest subdivision slot to give
+   * them a sensible slotId (otherwise they'd render at the drop point but
+   * not contribute to formation detection / chemistry preview).
+   */
+  handleFieldDrop(event: CdkDragDrop<any>): void {
+    const player = event.item.data as PlayerOnFieldDto | undefined;
+    if (!player) { return; }
+
+    // Compute drop position as % of the field bounding rect.
+    const fieldEl = (event.container.element?.nativeElement) as HTMLElement | undefined;
+    if (!fieldEl) { return; }
+    const rect = fieldEl.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) { return; }
+    // CdkDragDrop.dropPoint is in client coordinates. Subtract the field's
+    // top-left to get field-relative coords, then clamp to [0, 100].
+    const dropX = (event.dropPoint?.x ?? rect.left);
+    const dropY = (event.dropPoint?.y ?? rect.top);
+    const xPct = Math.max(0, Math.min(100, ((dropX - rect.left) / rect.width) * 100));
+    const yPct = Math.max(0, Math.min(100, ((dropY - rect.top) / rect.height) * 100));
+
+    // If the player came from the bench, promote them to the closest
+    // subdivision slot so they participate in chemistry / formation
+    // detection. Without this they'd render visually but contribute 0.
+    if (!player.slotId || player.slotId === '') {
+      const closest = this.findClosestSubdivision(xPct, yPct);
+      if (closest) { player.slotId = closest.subdivisionId; }
+    }
+
+    player.xPercent = xPct;
+    player.yPercent = yPct;
+
+    // Mark this player as in the slotPlayerMap so the slot shows them (if
+    // they were promoted from the bench above).
+    if (player.slotId) {
+      this.slotPlayerMap[player.slotId] = player;
+    }
+
+    this.saveLineup();
+    this.triggerChemistryPreview();
+    // V25D96-FRONT F2: re-detect formation; free positioning flips lineup
+    // to "Formación del User" since the markers are no longer snapping
+    // exactly to canonical subdivisions.
+    this.updateFormationDetection();
+    // V25D95.1-FRONT F2b: re-emit homePlayers$ with new array reference so
+    // the *ngFor re-evaluates the marker positions.
+    this.homePlayers$.next([...this.homePlayers$.value]);
+    this.cdr.markForCheck();
+    this.cdr.detectChanges();
+  }
+
+  /**
+   * V25D98-FRONT: find the subdivision whose center is closest to the
+   * given (xPercent, yPercent) drop point. Used when a bench player is
+   * dropped onto the field and needs a sensible slotId to anchor the
+   * chemistry/formation calculations.
+   */
+  private findClosestSubdivision(xPct: number, yPct: number): FieldSubdivisionDTO | null {
+    let best: FieldSubdivisionDTO | null = null;
+    let bestDist = Infinity;
+    for (const sub of this.subdivisions) {
+      const cx = sub.left + sub.width / 2;
+      const cy = sub.top + sub.height / 2;
+      const dx = cx - xPct;
+      const dy = cy - yPct;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < bestDist) { bestDist = dist; best = sub; }
+    }
+    return best;
+  }
+
+  /**
+   * V25D98-FRONT: marker X position with V25D98 free-positioning override.
+   * Returns the player's stored xPercent if set (after a field drop),
+   * otherwise the canonical slot center.
+   */
+  getMarkerX(player: PlayerOnFieldDto): number {
+    if (typeof player.xPercent === 'number') { return player.xPercent; }
+    if (!player.slotId) { return 50; }
+    return this.getSlotCenterX(player.slotId);
+  }
+
+  /** V25D98-FRONT: marker Y position with override (see {@link getMarkerX}). */
+  getMarkerY(player: PlayerOnFieldDto): number {
+    if (typeof player.yPercent === 'number') { return player.yPercent; }
+    if (!player.slotId) { return 50; }
+    return this.getSlotCenterY(player.slotId);
+  }
+
+  /**
+   * V25D98-FRONT: clear all customX/customY overrides on the current
+   * lineup, snapping every marker back to its canonical slot center.
+   * Does not touch the bench.
+   */
+  resetCustomPositions(): void {
+    for (const player of this.homePlayers$.value) {
+      delete player.xPercent;
+      delete player.yPercent;
+    }
+    this.homePlayers$.next([...this.homePlayers$.value]);
+    this.saveLineup();
+    this.triggerChemistryPreview();
+    this.updateFormationDetection();
+    this.cdr.markForCheck();
+    this.cdr.detectChanges();
+  }
+
+  /** V25D98-FRONT: true when any player on the field has a custom
+   *  position override (used to enable/disable the Reset button). */
+  hasCustomPositions(): boolean {
+    return this.homePlayers$.value.some(p =>
+      typeof p.xPercent === 'number' || typeof p.yPercent === 'number');
   }
 
   /**
@@ -3432,10 +3608,18 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     this.errorMessage$.next('');
 
     // Construir body para /manual-select con los slots actuales (playerId + subdivisionId).
+    // V25D98-FRONT: incluye customXPercent/customYPercent si el player tiene
+    // posición libre (free positioning por drag en field fuera de slots).
+    // El back puede ignorar estos campos por backward compat.
     const playerIds: string[] = this.homePlayers.map(p => p.playerId);
     const slots: LineupSlotDTO[] = this.homePlayers
       .filter(p => !!p.slotId)
-      .map(p => ({ playerId: p.playerId, subdivisionId: p.slotId }));
+      .map(p => {
+        const dto: LineupSlotDTO = { playerId: p.playerId, subdivisionId: p.slotId };
+        if (typeof p.xPercent === 'number') { dto.customXPercent = p.xPercent; }
+        if (typeof p.yPercent === 'number') { dto.customYPercent = p.yPercent; }
+        return dto;
+      });
 
     // Paso 1: persistir la subdivision map vía /manual-select.
     this.http.post<{warnings?: LineupWarningDTO[]}>(

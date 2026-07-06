@@ -3601,3 +3601,183 @@ describe('SquadEditorModalComponent — V25D96 free-formation + drag-drop cross-
     }, 30);
   });
 });
+
+/**
+ * V25D98-FRONT — free positioning via field-level drop list.
+ *
+ * <p>Adds the ability to drop a player on the field OUTSIDE any canonical
+ * slot — the marker then renders at the exact drop position (as a
+ * percentage of the field bounding rect). The player's {@code slotId} is
+ * preserved so chemistry / off-role calculations stay valid, but the
+ * visual position is decoupled from the subdivision grid.
+ */
+describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', () => {
+  let component: SquadEditorModalComponent;
+  let fixture: ComponentFixture<SquadEditorModalComponent>;
+  let httpClientSpy: jasmine.SpyObj<HttpClient>;
+  let dialogRefSpy: jasmine.SpyObj<MatDialogRef<SquadEditorModalComponent>>;
+
+  /** Local copy of the V25D96 mock data (4-slot minimal field). */
+  const SUBDIVISIONS_RESPONSE = [
+    { subdivisionId: 'GK-1', isGoalkeeper: true,  sector: 26, subIndex: 1, left: 35, top: 88, width: 30, height: 10, zone: 'GK' },
+    { subdivisionId: 'S22-1', isGoalkeeper: false, sector: 22, subIndex: 1, left: 10, top: 70, width: 25, height: 12, zone: 'DEFENSE' },
+    { subdivisionId: 'S13-2', isGoalkeeper: false, sector: 13, subIndex: 2, left: 40, top: 45, width: 20, height: 12, zone: 'MIDFIELD' },
+    { subdivisionId: 'S05-2', isGoalkeeper: false, sector:  5, subIndex: 2, left: 45, top: 10, width: 10, height: 10, zone: 'ATTACK' }
+  ];
+
+  const FORMATIONS_RESPONSE = [
+    {
+      name: '4-4-2', description: '4-4-2',
+      defenders: 1, midfielders: 1, attackers: 1, outfieldPlayers: 3,
+      positions: [
+        { index: 0, role: 'GK',  xPercent: 50, yPercent: 93, actionRangePercent: 5, subdivisionId: 'GK-1' },
+        { index: 1, role: 'CB',  xPercent: 20, yPercent: 75, actionRangePercent: 7, subdivisionId: 'S22-1' },
+        { index: 2, role: 'CM',  xPercent: 50, yPercent: 50, actionRangePercent: 7, subdivisionId: 'S13-2' },
+        { index: 3, role: 'ST',  xPercent: 50, yPercent: 10, actionRangePercent: 6, subdivisionId: 'S05-2' }
+      ]
+    }
+  ];
+
+  function buildCurrentLineup(chemistryScore: number | null, slots: any[] = []): any {
+    return {
+      formation: '4-4-2',
+      players: [
+        { playerId: 'p-gk',  name: 'GK',  position: 'GK',  overall: 80, energy: 100, injured: false },
+        { playerId: 'p-def', name: 'Rudiger', position: 'CB', overall: 85, energy: 100, injured: false },
+        { playerId: 'p-mid', name: 'Valverde', position: 'CM', overall: 86, energy: 100, injured: false },
+        { playerId: 'p-att', name: 'Mbappé', position: 'ST', overall: 92, energy: 100, injured: false }
+      ],
+      confirmed: true,
+      warnings: [],
+      slots,
+      chemistryScore
+    };
+  }
+
+  beforeEach(async () => {
+    httpClientSpy = jasmine.createSpyObj('HttpClient', ['get', 'post']);
+    dialogRefSpy = jasmine.createSpyObj('MatDialogRef', ['close']);
+
+    httpClientSpy.get.and.callFake(((url: string) => {
+      if (url.includes('/editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
+      if (url.includes('/editor/formations'))  return of(FORMATIONS_RESPONSE);
+      if (url.includes('/career/lineup/current')) return of(buildCurrentLineup(85));
+      return of([]);
+    }) as any);
+
+    httpClientSpy.post.and.callFake(((url: string, _body: any) => {
+      if (url.includes('/career/lineup/preview-chemistry')) {
+        return of({ score: 91, breakdown: { positionGroups: {}, maxSkillByType: {}, coveragePercentage: 10 },
+                    maxSkillByType: {}, coveragePercentage: 10 });
+      }
+      if (url.includes('/career/lineup/manual-select')) {
+        return of({ players: [], warnings: [] });
+      }
+      if (url.includes('/career/lineup/confirm')) {
+        return of({ confirmed: true, warnings: [] });
+      }
+      return of({});
+    }) as any);
+
+    await TestBed.configureTestingModule({
+      imports: [SquadEditorModalComponent, NoopAnimationsModule],
+      providers: [
+        { provide: HttpClient, useValue: httpClientSpy },
+        { provide: MatDialogRef, useValue: dialogRefSpy },
+        { provide: MAT_DIALOG_DATA, useValue: { careerId: 'c1', matchId: null, squad: [] } }
+      ],
+    }).compileComponents();
+    fixture = TestBed.createComponent(SquadEditorModalComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+  });
+
+  it('getMarkerX/Y: returns xPercent/yPercent override when set, else slot center', (done) => {
+    setTimeout(() => {
+      const pDef = (component as any).slotPlayerMap['S22-1'];
+      // baseline: no override → returns slot center
+      const baseX = (component as any).getMarkerX(pDef);
+      const baseY = (component as any).getMarkerY(pDef);
+      expect(baseX).toBe((component as any).getSlotCenterX('S22-1'));
+      expect(baseY).toBe((component as any).getSlotCenterY('S22-1'));
+      // override: returns custom %
+      pDef.xPercent = 60;
+      pDef.yPercent = 35;
+      expect((component as any).getMarkerX(pDef)).toBe(60);
+      expect((component as any).getMarkerY(pDef)).toBe(35);
+      done();
+    }, 30);
+  });
+
+  it('handleFieldDrop: assigns xPercent/yPercent from drop point', (done) => {
+    setTimeout(() => {
+      const pDef = (component as any).slotPlayerMap['S22-1'];
+      const fieldEl = fixture.nativeElement.querySelector('.field');
+      // Stub bounding rect to 1000×800 at offset (100, 100).
+      fieldEl.getBoundingClientRect = () => ({
+        left: 100, top: 100, right: 1100, bottom: 900, width: 1000, height: 800,
+        x: 100, y: 100, toJSON: () => ({})
+      });
+      // Drop at clientX=600, clientY=500 → fieldX=500, fieldY=400 → (50%, 50%).
+      const evt: any = {
+        item: { data: pDef },
+        previousContainer: { id: 'slot-S22-1' },
+        container: { id: 'field-drop-area', element: { nativeElement: fieldEl } },
+        dropPoint: { x: 600, y: 500 }
+      };
+      (component as any).handleFieldDrop(evt);
+      expect(pDef.xPercent).toBe(50);
+      expect(pDef.yPercent).toBe(50);
+      done();
+    }, 30);
+  });
+
+  it('handleFieldDrop: clamps xPercent/yPercent to [0, 100]', (done) => {
+    setTimeout(() => {
+      const pDef = (component as any).slotPlayerMap['S22-1'];
+      const fieldEl = fixture.nativeElement.querySelector('.field');
+      fieldEl.getBoundingClientRect = () => ({
+        left: 0, top: 0, right: 1000, bottom: 800, width: 1000, height: 800,
+        x: 0, y: 0, toJSON: () => ({})
+      });
+      // Drop far off the field → clamped to bounds.
+      (component as any).handleFieldDrop({
+        item: { data: pDef },
+        previousContainer: { id: 'slot-S22-1' },
+        container: { id: 'field-drop-area', element: { nativeElement: fieldEl } },
+        dropPoint: { x: -500, y: 5000 }
+      } as any);
+      expect(pDef.xPercent).toBe(0);
+      expect(pDef.yPercent).toBe(100);
+      done();
+    }, 30);
+  });
+
+  it('resetCustomPositions: clears xPercent/yPercent on all home players', (done) => {
+    setTimeout(() => {
+      const home = (component as any).homePlayers$.value.slice();
+      home.forEach((p: any) => { p.xPercent = 25; p.yPercent = 75; });
+      (component as any).homePlayers$.next([...home]);
+      expect((component as any).hasCustomPositions()).toBeTrue();
+      (component as any).resetCustomPositions();
+      expect((component as any).hasCustomPositions()).toBeFalse();
+      (component as any).homePlayers$.value.forEach((p: any) => {
+        expect(p.xPercent).toBeUndefined();
+        expect(p.yPercent).toBeUndefined();
+      });
+      done();
+    }, 30);
+  });
+
+  it('hasCustomPositions: returns false when no player has overrides', (done) => {
+    setTimeout(() => {
+      // baseline: no overrides → false
+      expect((component as any).hasCustomPositions()).toBeFalse();
+      const home = (component as any).homePlayers$.value.slice();
+      home[0].xPercent = 50;
+      (component as any).homePlayers$.next([...home]);
+      expect((component as any).hasCustomPositions()).toBeTrue();
+      done();
+    }, 30);
+  });
+});
