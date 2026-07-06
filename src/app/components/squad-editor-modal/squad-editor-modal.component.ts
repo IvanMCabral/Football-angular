@@ -303,7 +303,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
                      [style.width.%]="sub.width"
                      [style.height.%]="sub.height"
                      [class.occupied]="isSlotOccupied(sub)"
-                     [class.recommended]="isRecommendedSlot(sub) && !isSlotOverridden(sub)"
+                     [class.recommended]="isRecommendedSlot(sub) && !isSlotAbandonedByOverride(sub)"
                      [class.missing-player]="isMissingPlayer(sub)"
                      [class.attack]="sub.zone === 'ATTACK'"
                      [class.midfield]="sub.zone === 'MIDFIELD'"
@@ -2624,7 +2624,28 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
 
   /** Verifica si falta jugador en un slot recomendado */
   isMissingPlayer(sub: FieldSubdivisionDTO): boolean {
-    return this.isRecommendedSlot(sub) && !this.isSlotOccupied(sub);
+    // V25D98.4-FRONT: también ocultamos la role label cuando el slot fue
+    // abandonado por un free-positioned player (slotPlayerMap vacío pero
+    // algún player tiene slotId===sub.subdivisionId con override). Sin
+    // este check el slot se vería como "missing CM" después del free
+    // drop, sugiriendo que el slot todavía reclama al player.
+    return this.isRecommendedSlot(sub)
+      && !this.isSlotOccupied(sub)
+      && !this.isSlotAbandonedByOverride(sub);
+  }
+
+  /**
+   * V25D98.4-FRONT: true cuando el slot NO tiene player en slotPlayerMap
+   * pero algún player en homePlayers$.value tiene ese slotId y un
+   * override (xPercent/yPercent). Usado por isMissingPlayer para no
+   * mostrar la role label "missing CM" en un slot abandonado por
+   * free-positioning — el player no está missing, está en otro pixel.
+   */
+  isSlotAbandonedByOverride(sub: FieldSubdivisionDTO): boolean {
+    if (this.slotPlayerMap[sub.subdivisionId]) { return false; }
+    const abandoned = this.homePlayers$.value.find(p =>
+      p.slotId === sub.subdivisionId && this.hasOverridePosition(p));
+    return !!abandoned;
   }
 
   /**
@@ -2979,10 +3000,20 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     player.xPercent = xPct;
     player.yPercent = yPct;
 
-    // Mark this player as in the slotPlayerMap so the slot shows them (if
-    // they were promoted from the bench above).
+    // V25D98.4-FRONT: REMOVE the player from slotPlayerMap on free drop
+    // (delete any prior entry for the slot). The marker renders at the
+    // override via getMarkerX/Y (which checks xPercent first), and the
+    // player.slotId is preserved for chemistry preview — but the slot
+    // itself is now LOGICALLY abandoned. If we kept slotPlayerMap[slotId]
+    // = player, clicking the empty slot would still pop up the
+    // assignment panel with the player's name ("Slot: S17-1 / Malaga B 2
+    // CAM #6784") and Iván would read it as "the slot still owns the
+    // player". Removing from the map makes the slot truly empty
+    // (click → "Sin asignar" + bench dropdown) so the player feels free
+    // to keep moving. The Reset button restores the slotPlayerMap entry
+    // when snapping back to canonical positions.
     if (player.slotId) {
-      this.slotPlayerMap[player.slotId] = player;
+      delete this.slotPlayerMap[player.slotId];
     }
 
     this.saveLineup();
@@ -3042,9 +3073,19 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
    * Does not touch the bench.
    */
   resetCustomPositions(): void {
+    // V25D98.4-FRONT: when snapping back to canonical, also restore the
+    // slotPlayerMap entry for each player (handleFieldDrop intentionally
+    // removed it so the slot looked truly empty). Without this restore
+    // the markers would snap to slot centers but the slots would remain
+    // "unoccupied" in the slotPlayerMap → isSlotOccupied would return
+    // false → chips would NOT reappear in slots. Reverse the V25D98.4
+    // removal: re-add player to slotPlayerMap[player.slotId].
     for (const player of this.homePlayers$.value) {
       delete player.xPercent;
       delete player.yPercent;
+      if (player.slotId) {
+        this.slotPlayerMap[player.slotId] = player;
+      }
     }
     this.homePlayers$.next([...this.homePlayers$.value]);
     this.saveLineup();

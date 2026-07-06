@@ -3910,4 +3910,81 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
       done();
     }, 30);
   });
+
+  /**
+   * V25D98.4-FRONT: regression — Ivan reported 'el problema va por otro
+   * lado, los movi 1 vez y no me deja, es como si quedaran arraigado al
+   * del 4-4-2'. The root cause was that handleFieldDrop was RE-ADDING
+   * the player to slotPlayerMap[slotId] AFTER setting the override, so
+   * the slot still logically owned the player. When Ivan clicked the
+   * empty slot, the assignment panel popped up showing the player's
+   * name ('Slot: S17-1 / Malaga B 2 CAM #6784') and he read it as 'the
+   * slot still claims the player'. Fix: handleFieldDrop does NOT touch
+   * slotPlayerMap anymore (player leaves the slot for real). The slot
+   * becomes truly empty (click → 'Sin asignar' + bench dropdown).
+   *
+   * Additionally:
+   *  - isSlotAbandonedByOverride(sub) must return true for the
+   *    abandoned slot so isMissingPlayer returns false (no red role
+   *    label claiming the slot still wants that role).
+   *  - resetCustomPositions() must RESTORE the slotPlayerMap entry
+   *    so the chip reappears in the slot on snap-back.
+   */
+  it('V25D98.4: free drop removes player from slotPlayerMap + slot abandoned by override', (done) => {
+    setTimeout(() => {
+      const pDef = (component as any).slotPlayerMap['S22-1'];
+      const slotS22 = (component as any).subdivisions.find((s: any) => s.subdivisionId === 'S22-1');
+      const fieldEl = fixture.nativeElement.querySelector('.field');
+      fieldEl.getBoundingClientRect = () => ({
+        left: 0, top: 0, right: 1000, bottom: 800, width: 1000, height: 800,
+        x: 0, y: 0, toJSON: () => ({})
+      });
+
+      // Baseline: player IS in slotPlayerMap (canonical position).
+      expect((component as any).slotPlayerMap['S22-1']).toBe(pDef);
+      expect((component as any).isSlotOccupied(slotS22)).toBeTrue();
+
+      // Free drop the player to (700, 350).
+      (component as any).handleFieldDrop({
+        item: { data: pDef },
+        previousContainer: { id: 'slot-S22-1' },
+        container: { id: 'field-drop-area', element: { nativeElement: fieldEl } },
+        dropPoint: { x: 700, y: 350 }
+      } as any);
+
+      // V25D98.4: slotPlayerMap MUST NOT contain the player anymore.
+      expect((component as any).slotPlayerMap['S22-1']).toBeUndefined();
+      // isSlotOccupied returns false → slot click would show "Sin asignar"
+      // + bench dropdown instead of the player's name.
+      expect((component as any).isSlotOccupied(slotS22)).withContext('slot must be logically empty after free drop').toBeFalse();
+      // getPlayerInSlot returns undefined → assignment panel shows "Sin asignar".
+      expect((component as any).getPlayerInSlot(slotS22)).toBeUndefined();
+
+      // V25D98.4: isSlotAbandonedByOverride must return true so the
+      // .missing-indicator (red role label) does NOT render on the
+      // abandoned slot.
+      expect((component as any).isSlotAbandonedByOverride(slotS22)).toBeTrue();
+      expect((component as any).isMissingPlayer(slotS22)).withContext('abandoned slot must not render as missing').toBeFalse();
+
+      // Marker still renders at the override (this was already covered
+      // by V25D98.3 but verify here too as part of the same flow).
+      expect(pDef.xPercent).toBe(70);
+      expect(pDef.yPercent).toBe(43.75);
+      expect((component as any).getMarkerX(pDef)).toBe(70);
+      expect((component as any).getMarkerY(pDef)).toBe(43.75);
+      fixture.detectChanges();
+
+      // Player.slotId is preserved for chemistry preview.
+      expect(pDef.slotId).toBe('S22-1');
+
+      // V25D98.4: resetCustomPositions() must restore slotPlayerMap so
+      // the chip reappears in the slot on snap-back.
+      (component as any).resetCustomPositions();
+      expect((component as any).slotPlayerMap['S22-1']).toBe(pDef);
+      expect(pDef.xPercent).toBeUndefined();
+      expect(pDef.yPercent).toBeUndefined();
+      expect((component as any).isSlotOccupied(slotS22)).toBeTrue();
+      done();
+    }, 30);
+  });
 });
