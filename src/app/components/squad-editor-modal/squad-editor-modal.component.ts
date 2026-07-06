@@ -17,7 +17,7 @@ import { PlayerOnFieldDto } from '../../shared/models/lineup/player-on-field.dto
 import { LineupSlotDTO } from '../../shared/models/lineup/lineup-slot.dto';
 import { ChemistryDetailDTO } from '../../shared/models/lineup/lineup.dto';
 import { FormationEffectivenessDTO, effectivenessColor } from '../../shared/models/lineup/formation-effectiveness.dto';
-import { ALL_FORMATIONS } from '../../shared/constants/formations';
+import { ALL_FORMATIONS, USER_FORMATION_LABEL } from '../../shared/constants/formations';
 import { ChemistryPreviewService } from '../../core/services/chemistry-preview.service';
 import { SessionPlayer } from '../../shared/models/player.model';
 
@@ -60,11 +60,30 @@ import { SessionPlayer } from '../../shared/models/player.model';
                escuchando a (formationChangeComplete). El padre squad-management
                (squad-management.component.ts) no subscribe a ese Output, asi que
                antes el select quedaba permanentemente disabled tras el primer
-               cambio. -->
-          <select [(ngModel)]="selectedFormation"
-                  (ngModelChange)="onFormationChange($event)"
-                  [disabled]="isFormationChanging">
+               cambio.
+
+               V25D96-FRONT F3: the dropdown displays user-formation pseudo-state
+               (the disabled 'Formación del User' option is selected after a
+               cross-role drop). Two-way [(ngModel)] would overwrite the canonical
+               selectedFormation whenever the dropdown value matches the disabled
+               user-formation string, breaking the backend contract (POST
+               /career/lineup/manual-select only accepts canonical formations).
+               [ngModel] one-way + (ngModelChange) keeps the same Angular
+               SelectControlValueAccessor wiring but does NOT re-sync to the DOM
+               when the bound getter changes mid-lifecycle. To bridge that gap
+               we use a property-template-ref + direct select.value write via
+               a (DOMContentLoaded-style) approach: instead of [ngModel] we
+               use the native [value] attribute which writes through to the
+               select element's value after every CD cycle. Combined with the
+               appended disabled 'Formación del User' option, the select
+               reflects the user-formation state visually without losing the
+               canonical model. -->
+          <select [value]="dropdownFormationValue"
+                  (change)="onFormationSelect($any($event.target).value)"
+                  [disabled]="isFormationChanging"
+                  [title]="(_isCustomLineup ? 'Tu lineup personalizado no coincide con una formación canónica' : '')">
             <option *ngFor="let f of formations" [value]="f">{{f}}</option>
+            <option [value]="userFormationLabel" [disabled]="true">Formación del User</option>
           </select>
           <span *ngIf="isFormationChanging" class="formation-change-blocked">(espera...)</span>
         </div>
@@ -303,14 +322,14 @@ import { SessionPlayer } from '../../shared/models/player.model';
                primary fix is the loadSquadFromBackend validation that
                clears stale slotIds). -->
 <ng-container *ngFor="let player of homePlayers; let i = index">
-            <div *ngIf="player.slotId && isSlotInActiveFormation(player.slotId)"
-                 class="player-marker"
-                 cdkDrag
-                 [cdkDragData]="player"
-                 [style.left.%]="getSlotCenterX(player.slotId)"
-                 [style.top.%]="getSlotCenterY(player.slotId)"
-                 [class.gk-player]="player.role === 'GK'"
-                 [ngClass]="getMarkerRoleClasses(player.role)">
+             <div *ngIf="player.slotId && isSlotInActiveFormation(player.slotId)"
+                  class="player-marker"
+                  cdkDrag
+                  [cdkDragData]="player"
+                  [style.left.%]="getSlotCenterX(player.slotId)"
+                  [style.top.%]="getSlotCenterY(player.slotId)"
+                  [class.gk-player]="player.role === 'GK'"
+                  [ngClass]="getMarkerRoleClasses(player.role)">
               <!-- V25D95.5-FRONT: removed [class.eff-green/yellow/red] bindings
                    + V25D95.3 tactical-number badge. The marker now shows
                    ONLY role family color (yellow GK / blue DEF / green MID /
@@ -321,10 +340,10 @@ import { SessionPlayer } from '../../shared/models/player.model';
                    only the hidden chip had cdkDrag, so users saw the marker
                    on top but couldn't grab it (clicking the marker did
                    nothing). Now drag-drop works directly on the marker card. -->
-              <div class="player-number">{{i + 1}}</div>
-              <div class="player-name-label">{{player.name}}</div>
-              <div class="player-role-label">{{player.role}}</div>
-            </div>
+               <div class="player-number">{{i + 1}}</div>
+               <div class="player-name-label">{{player.name}}</div>
+               <div class="player-role-label">{{player.role}}</div>
+             </div>
           </ng-container>
 
           <!-- Spinner de carga -->
@@ -1948,8 +1967,50 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
    * — faltaban las 5 nuevas de V25D54-C15 (3-5-2-CDM, 5-4-1, 3-4-1-2,
    * 4-2-2-2, 4-3-3-1). Ahora el dropdown muestra las 12 formations que el
    * back-end reconoce.
+   *
+   * <p>V25D96: the dropdown also needs to render the disabled
+   * {@code 'Formación del User'} option (when the user has drag-dropped
+   * players to non-canonical positions). The dropdown's effective options
+   * for display are {@link ALL_FORMATIONS} + the {@link USER_FORMATION_LABEL}
+   * (UI-only label, not selectable). Keep {@code formations} as the canonical
+   * list; the template appends the user-formation pseudo-option separately
+   * via a sibling option element.
    */
   formations: readonly string[] = ALL_FORMATIONS;
+
+  /**
+   * V25D96-FRONT: true when the current lineup does not match any canonical
+   * formation (i.e. the user has rearranged players to non-canonical slots
+   * via drag-drop). Drives {@code dropdownFormationValue} and
+   * {@code isSlotInActiveFormation} (so non-canonical slots with players
+   * still render their markers). Set automatically by
+   * {@code detectFormation()} — never bind directly.
+   */
+  private _isCustomLineup = false;
+
+  /**
+   * V25D96-FRONT F3: value displayed in the formation `<select>`. Equals
+   * {@code selectedFormation} when the lineup matches a canonical; equals
+   * {@link USER_FORMATION_LABEL} when {@code _isCustomLineup} is true.
+   *
+   * <p>Why a getter (not a new property): both the canonical selected value
+   * AND the user-formation pseudo-value flow through the same `<select>`.
+   * A backing field would lose sync with the underlying lineup state on
+   * every drag-drop / auto-select cycle. The getter derives the displayed
+   * value lazily from the flag.
+   */
+  get dropdownFormationValue(): string {
+    return this._isCustomLineup ? USER_FORMATION_LABEL : this.selectedFormation;
+  }
+
+  /**
+   * V25D96-FRONT F3: true when the lineup is in user-formation mode. Used
+   * by the template to render the user-formation pseudo-option (and any
+   * helper text). Mirrors the internal {@code _isCustomLineup} flag.
+   */
+  isCustomLineup(): boolean {
+    return this._isCustomLineup;
+  }
 
   /** Cache de posiciones de formación */
   private formationPositions: { [key: string]: FormationPositionDTO[] } = {};
@@ -2406,6 +2467,14 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
    */
   isSlotInActiveFormation(subdivisionId: string | undefined): boolean {
     if (!subdivisionId) { return false; }
+    // V25D96-FRONT F5: in user-formation mode (lineup doesn't match any
+    // canonical), the user can drag-drop to slots outside the canonical
+    // positions. The marker MUST render at whatever slot the player is in,
+    // otherwise the drag-drop appears to "vanish". The canonical-mode
+    // behavior below is preserved as the default.
+    if (this._isCustomLineup && this.slotPlayerMap[subdivisionId]) {
+      return true;
+    }
     const positions = this.formationPositions[this.selectedFormation];
     if (!positions || positions.length === 0) { return false; }
     return positions.some(pos => pos.subdivisionId === subdivisionId);
@@ -2498,6 +2567,11 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     this.saveLineup();
     // V25D45 (Sprint C10): trigger chemistry preview (debounced in pipeline).
     this.triggerChemistryPreview();
+    // V25D96-FRONT F2: re-detect formation after click-assign. Same flow as
+    // handleSlotDrop — if the click-assign puts a player into an off-role
+    // slot (e.g. assigning a CB to a MID slot via the assign panel), we want
+    // the dropdown + marker visibility to flip into user-formation mode.
+    this.updateFormationDetection();
     this.cdr.detectChanges();
   }
 
@@ -2516,6 +2590,9 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     this.saveLineup();
     // V25D45 (Sprint C10): trigger chemistry preview (debounced in pipeline).
     this.triggerChemistryPreview();
+    // V25D96-FRONT F2: re-detect after removing a player (lineup might become
+    // incomplete < 11 → flips to user-formation mode automatically).
+    this.updateFormationDetection();
     this.cdr.detectChanges();
   }
 
@@ -2627,6 +2704,13 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     // POST /preview-chemistry for the new lineup.
     this.saveLineup();
     this.triggerChemistryPreview();
+    // V25D96-FRONT F2: re-detect the formation after the drop. If the new
+    // lineup doesn't match any canonical formation (e.g. user dragged a
+    // DEF into a MID slot), this flips _isCustomLineup to true so the
+    // dropdown shows 'Formación del User' as the selected option AND
+    // isSlotInActiveFormation lets the marker render at its (possibly
+    // non-canonical) target slot. updateFormationDetection sets _isCustomLineup.
+    this.updateFormationDetection();
     // V25D95.1-FRONT F2b: re-emit homePlayers with a new array reference
     // so the .player-marker *ngFor sees a fresh array and re-evaluates the
     // per-marker bindings (getSlotCenterX/Y → player.slotId). Pre-V25D95.1
@@ -2668,6 +2752,9 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     // the *ngFor re-evaluates after the move-to-bench.
     this.homePlayers$.next([...this.homePlayers$.value]);
     this.benchPlayers$.next([...this.benchPlayers$.value]);
+    // V25D96-FRONT F2: re-detect formation after the move (may flip
+    // _isCustomLineup if a slot was emptied making the lineup incomplete).
+    this.updateFormationDetection();
     this.cdr.markForCheck();
     this.cdr.detectChanges();
   }
@@ -2810,6 +2897,133 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     if (['CM', 'CDM', 'CAM', 'LM', 'RM', 'MID'].includes(role)) return 'MID';
     if (['ST', 'LW', 'RW', 'CF', 'ATT', 'WINGER'].includes(role)) return 'ATT';
     return null;
+  }
+
+  /**
+   * V25D96-FRONT F2: count role-family occurrences in the supplied list of
+   * role strings. Used by {@link detectFormation} to compare the current
+   * lineup's role distribution against each canonical formation's role
+   * distribution (also derived from {@link FormationPositionDTO.role}
+   * passed through {@link getRoleFamily}).
+   *
+   * <p>Why family-level (not exact role): a user's 4-4-2 lineup with all CBs
+   * in the DEF slots and a couple of CMs in the MID slots is indistinguishable
+   * from a user lineup with LB/CB in DEF slots — both families (4 DEF + 4 MID)
+   * match. The family-level count keeps the comparison consistent across
+   * formation variants (4-3-3 with 3 LW/CF/RW should still resolve to '4-3-3').
+   */
+  private countRoleFamily(roles: string[]): { gk: number; def: number; mid: number; att: number } {
+    let gk = 0, def = 0, mid = 0, att = 0;
+    for (const role of roles) {
+      const family = this.getRoleFamily(role);
+      if (family === 'GK') gk++;
+      else if (family === 'DEF') def++;
+      else if (family === 'MID') mid++;
+      else if (family === 'ATT') att++;
+    }
+    return { gk, def, mid, att };
+  }
+
+  /**
+   * V25D96-FRONT F2: detect which canonical formation (if any) the current
+   * lineup matches. Counts players by role family on the field and compares
+   * with each canonical formation's expected role counts.
+   *
+   * <p>Returns the canonical formation name (e.g. '4-4-2') when the lineup
+   * matches one of {@link ALL_FORMATIONS} EXACTLY on family counts. Returns
+   * {@link USER_FORMATION_LABEL} when:
+   * <ul>
+   *   <li>the lineup role counts don't match any canonical, OR</li>
+   *   <li>the lineup is incomplete (< 11 players on field).</li>
+   * </ul>
+   *
+   * <p>Side effect: updates {@code _isCustomLineup} so the template re-renders
+   * the dropdown + marker visibility flags in the same CD pass.
+   *
+   * <p>Why a single combined check (incomplete OR non-canonical): an
+   * incomplete lineup can never be a canonical match (canonical always
+   * requires 11 players); shortcutting through that path avoids spurious
+   * canonical matches when the lineup is e.g. 6 players matching a phantom
+   * formation (defense-only mocks in some tests).
+   */
+  detectFormation(): string {
+    const players = this.homePlayers.filter(p => !!p.slotId);
+    const lineupCounts = this.countRoleFamily(players.map(p => p.role));
+
+    if (players.length < 11) {
+      this._isCustomLineup = true;
+      return USER_FORMATION_LABEL;
+    }
+
+    for (const f of ALL_FORMATIONS) {
+      const positions = this.formationPositions[f] || [];
+      const canonicalCounts = this.countRoleFamily(positions.map(p => p.role));
+      if (lineupCounts.gk === canonicalCounts.gk &&
+          lineupCounts.def === canonicalCounts.def &&
+          lineupCounts.mid === canonicalCounts.mid &&
+          lineupCounts.att === canonicalCounts.att) {
+        this._isCustomLineup = false;
+        return f;
+      }
+    }
+
+    this._isCustomLineup = true;
+    return USER_FORMATION_LABEL;
+  }
+
+  /**
+   * V25D96-FRONT helper: re-run {@link detectFormation} after a lineup
+   * mutation (drop, assign, remove, bench-move) and trigger a re-render.
+   * Doesn't return the formation name; only the side effect (updating
+   * {@code _isCustomLineup} and refreshing the CD pipeline) is needed
+   * at the call sites in {@code handleSlotDrop} / {@code assignPlayerToSlot}
+   * / {@code removePlayerFromSlot}. The dropdown's {@code [ngModel]} binding
+   * to {@code dropdownFormationValue} will pick up the new flag value on
+   * the next CD pass; we explicitly markForCheck to make sure
+   * OnPush-friendly consumers see the update.
+   */
+  updateFormationDetection(): void {
+    this.detectFormation();
+    this.cdr.markForCheck();
+  }
+
+  /**
+   * V25D96-FRONT F3: the formation dropdown uses `[ngModel]` (one-way) +
+   * `(ngModelChange)` rather than two-way `[(ngModel)]` because the display
+   * value can be the {@link USER_FORMATION_LABEL} pseudo-value (when the
+   * lineup doesn't match any canonical). Two-way binding would either:
+   * (a) try to write USER_FORMATION_LABEL back into {@code selectedFormation}
+   * breaking the canonical assumption, or
+   * (b) overwrite the user's custom display value on every CD cycle.
+   *
+   * <p>This handler ignores USER_FORMATION_LABEL (defensive: it should never
+   * fire since the option is `[disabled]="true"`, but if a future change
+   * introduces a programmatic select that triggers this handler, we don't
+   * want to crash). Everything else delegates to {@link onFormationChange}
+   * which runs the auto-select HTTP and updates {@code selectedFormation}
+   * + the underlying formation state. All the existing V25D91.5-FRONT F6
+   * timeout + cd rules live inside {@code onFormationChange}.
+   */
+  onFormationSelect(newValue: string): void {
+    if (newValue === USER_FORMATION_LABEL || !newValue) {
+      // Disabled pseudo-option click. Force-restore the displayed value via
+      // CD so the select visually re-syncs (some browsers briefly swap the
+      // label into the select before re-rendering).
+      this.cdr.detectChanges();
+      return;
+    }
+    // Delegate to the canonical formation-change handler which performs the
+    // POST /career/lineup/auto-select + applyLineupToSlots + clears isFormationChanging.
+    this.onFormationChange(newValue);
+  }
+
+  /**
+   * V25D96-FRONT: expose the {@link USER_FORMATION_LABEL} constant so the
+   * template can reference it for the disabled `<option>` value. Template
+   * binding doesn't see module-level imports directly.
+   */
+  get userFormationLabel(): string {
+    return USER_FORMATION_LABEL;
   }
 
   /**
@@ -3011,6 +3225,13 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     this.homePlayers$.next(allPlayers.filter(p => p.slotId));
     this.benchPlayers$.next(allPlayers.filter(p => !p.slotId));
 
+    // V25D96-FRONT F2: auto-select always produces a canonical lineup (the
+    // backend applies the formation-role matching), but we still re-run
+    // detectFormation to (a) flip _isCustomLineup back to false after a
+    // user-driven formation change and (b) be defensive against any future
+    // backend anomaly that returns < 11 players or off-role slots.
+    this.detectFormation();
+
     // V25D91.5-FRONT F6 fix: markForCheck + detectChanges. El template
     // itera sobre homePlayers (getter sobre BehaviorSubject) sin async
     // pipe, así que necesita change detection explícita para repintar
@@ -3047,6 +3268,12 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
       next: (response) => {
         this.loadingFormation$.next(false);
         this.applyLineupToSlots(newFormation, response?.players || []);
+        // V25D96-FRONT F2: an auto-select ALWAYS produces a canonical lineup
+        // (the back ensures this), so this should always flip
+        // _isCustomLineup back to false. We still call detectFormation
+        // rather than blindly setting the flag to be defensive in case the
+        // backend misbehaves (drops below 11 players, returns off-role slots).
+        this.detectFormation();
         // MVP1-lineup-cancha-1.5 FIX (F4, defensivo): persistir los slots
         // después del auto-select. Si F1 (back) está bien implementado,
         // el back ya persistió el subdivision map; este saveLineup es

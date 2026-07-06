@@ -45,3 +45,22 @@ export const ALL_FORMATIONS = [
  * is added to the array but not consumed anywhere.
  */
 export type FormationCode = typeof ALL_FORMATIONS[number];
+
+/**
+ * V25D96 (Sprint V25D96): label used for the "user-custom formation"
+ * pseudo-option in the formation dropdown. When the user drag-drops players
+ * to non-canonical positions, {@code SquadEditorModalComponent.detectFormation}
+ * does not find a match against the 12 canonical formations and the dropdown
+ * shows this label as selected.
+ *
+ * <p>This value is NEVER sent to the backend (POST /career/lineup/manual-select
+ * still uses the last canonical {@code selectedFormation}) — the backend would
+ * reject it (not in {@link ALL_FORMATIONS}). The persisted lineup is whatever
+ * canonical formation the user started from (e.g. 4-4-2) plus the player→slot
+ * slotMap; the "user" label is a UI-only artifact.
+ *
+ * <p>Why a constant here instead of inline in the component: it's displayed in
+ * tests (the dropdown selected option text) and referenced by
+ * {@code onFormationSelect} as a guard against accidental selection.
+ */
+export const USER_FORMATION_LABEL = 'Formación del User';
