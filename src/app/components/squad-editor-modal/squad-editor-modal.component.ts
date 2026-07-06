@@ -302,28 +302,26 @@ import { SessionPlayer } from '../../shared/models/player.model';
                slotId is in the active formation (defense-in-depth: the
                primary fix is the loadSquadFromBackend validation that
                clears stale slotIds). -->
-          <ng-container *ngFor="let player of homePlayers; let i = index">
+<ng-container *ngFor="let player of homePlayers; let i = index">
             <div *ngIf="player.slotId && isSlotInActiveFormation(player.slotId)"
                  class="player-marker"
+                 cdkDrag
+                 [cdkDragData]="player"
                  [style.left.%]="getSlotCenterX(player.slotId)"
                  [style.top.%]="getSlotCenterY(player.slotId)"
                  [class.gk-player]="player.role === 'GK'"
-                 [ngClass]="getMarkerRoleClasses(player.role)"
-                 [class.eff-green]="getEffectivenessColor(player.slotId) === 'green'"
-                 [class.eff-yellow]="getEffectivenessColor(player.slotId) === 'yellow'"
-                 [class.eff-red]="getEffectivenessColor(player.slotId) === 'red'">
-               <!-- V25D93-FRONT F4: tooltip moved to .player-chip (line 211+)
-                    which has pointer-events:auto by default. The marker itself
-                    has pointer-events:none for click-passthrough, so the [title]
-                    attribute on the marker would never fire. Removing for clarity.
-
-                    V25D95-FRONT F3: tactical number badge (small 14x14) que
-                    flota en el top-right corner EXTERNO del marker. Absolute
-                    top:-10 right:-8, semi-transparent, numero de dorsal 1-11.
-                    Complementa .player-number (INTERNO, mas grande) — la
-                    combinacion da legibilidad "tactica" desde lejos, similar
-                    a dorsales en broadcasts de TV. -->
-<div class="player-number">{{i + 1}}</div>
+                 [ngClass]="getMarkerRoleClasses(player.role)">
+              <!-- V25D95.5-FRONT: removed [class.eff-green/yellow/red] bindings
+                   + V25D95.3 tactical-number badge. The marker now shows
+                   ONLY role family color (yellow GK / blue DEF / green MID /
+                   red ATT) and the dorsal. The effectiveness tint now lives
+                   on the underlying .player-chip (subtle chip border), not
+                   on the marker border ring. V25D95.5 also adds cdkDrag +
+                   cdkDragData so the marker IS the drag handle — previously
+                   only the hidden chip had cdkDrag, so users saw the marker
+                   on top but couldn't grab it (clicking the marker did
+                   nothing). Now drag-drop works directly on the marker card. -->
+              <div class="player-number">{{i + 1}}</div>
               <div class="player-name-label">{{player.name}}</div>
               <div class="player-role-label">{{player.role}}</div>
             </div>
