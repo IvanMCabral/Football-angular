@@ -35,3 +35,42 @@ input, select, textarea {
     font-size: 14px;
   }
 }
+
+/* V25D92-FRONT F1 v2: Force squad-editor-modal dialog overlay pane to 98vw.
+   Material's CDK defines:
+     .cdk-overlay-pane.mat-mdc-dialog-panel {
+       max-width: var(--mat-dialog-container-max-width, 560px);
+     }
+   That 560px cap OVERRIDES the dialog.open({width: '95vw'}) inline style.
+   Without this override, the squad-editor modal stays at 560px regardless
+   of viewport width (see V25D92 self-test diagnostic via Playwright
+   DOM inspect — computed width=560 max-width=560 even on 1280vw viewport).
+
+   V25D92.6-FRONT F1: bumped 95vw → 98vw to eliminate las "franjas blancas"
+   a los lados del modal @ 1600vw viewport. Con 95vw a 1600vw, el modal
+   era 1520px con 40px de gap a cada lado mostrando el body bg del
+   squad-management page (#f5f5f5 light gray) — Ivan: "no parte blanca
+   a la derecha, feo". 98vw = 1568px, gap lateral total 32px (16 cada lado),
+   mucho menos visible.
+
+   Adding panelClass='squad-editor-panel' in squad-management.component.ts
+   lets us target the right pane without affecting other dialogs (e.g.
+   the create-career modal which legitimately uses ~560px).
+
+   !important is needed because the Material CSS rule has equal specificity
+   but loads later in the cascade order (loaded via CDK overlay's
+   @layer cdk-overlay). Layered CSS needs !important to override
+   nested layer rules from outside the same layer. */
+.cdk-overlay-pane.squad-editor-panel {
+  width: 98vw !important;
+  max-width: 98vw !important;
+  min-width: 0 !important;
+}
+
+.mat-mdc-dialog-container.squad-editor-panel {
+  /* Belt-and-suspenders: same override on the inner mat-mdc-dialog-container
+     in case Material adds per-class max-width in the future. */
+  max-width: 98vw !important;
+  min-width: 0 !important;
+}
+

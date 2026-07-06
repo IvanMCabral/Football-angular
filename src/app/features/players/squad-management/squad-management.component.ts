@@ -507,7 +507,7 @@ openVisualEditor(): void {
           // causing the parent/dialog desync — parent 5-4-1, dialog 4-4-2).
           currentFormation: this.selectedFormation$.value
         },
-        width: '95vw',
+        width: '98vw',
         height: '90vh',
         disableClose: false,
         panelClass: 'squad-editor-panel'
