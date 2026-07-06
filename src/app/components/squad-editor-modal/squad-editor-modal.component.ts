@@ -189,6 +189,17 @@ import { SessionPlayer } from '../../shared/models/player.model';
                when a real drag occurs. -->
           <div class="field-slots">
             <ng-container *ngFor="let sub of subdivisions; let i = index">
+              <!-- V25D95.1-FRONT F2: skip slots that are not in the active
+                   formation AND have no player assigned. Pre-V25D95.1 the
+                   .slot div rendered for ALL 82 subdivisions, which caused
+                   "ghost slots" (dashed "Empty slot" rectangles + the 100%
+                   effectiveness badge) to appear at positions inherited from
+                   a previous formation (e.g., CAM from 4-2-3-1 persisted
+                   after switching back to 4-4-2). Filter at the template
+                   level for defense-in-depth — the loadSquadFromBackend
+                   validation is the primary fix, this prevents ghost UI
+                   even if backend returns stale slots. -->
+              <ng-container *ngIf="shouldRenderSlot(sub)">
               <!-- Slot de arquero (sector 26) -->
               <ng-container *ngIf="sub.isGoalkeeper">
                 <div class="slot slot-gk"
@@ -284,6 +295,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
                    </div>
                  </div>
                </ng-container>
+              </ng-container>
              </ng-container>
            </div>
 
@@ -294,9 +306,20 @@ import { SessionPlayer } from '../../shared/models/player.model';
                squad number (1-22) on top, the player name truncated to
                ~10 chars in the middle, and a role badge color-coded by
                family (yellow GK / blue DEF / green MID / red ATT — same
-               palette as V25D90 PartidoModal). -->
+               palette as V25D90 PartidoModal).
+
+               V25D95.1-FRONT F2: filter out markers whose slotId is not
+               in the active formation. Pre-V25D95.1 a player persisted in
+               a 3-5-2 lineup (e.g., CAM at the center MID slot) would
+               still render a marker at that position after the user
+               switched to 4-4-2 — overlapping with the 4-4-2 players at
+               the surrounding MID slots and looking like a "ghost" or
+               "stacked" marker. Now the marker only renders if the
+               slotId is in the active formation (defense-in-depth: the
+               primary fix is the loadSquadFromBackend validation that
+               clears stale slotIds). -->
           <ng-container *ngFor="let player of homePlayers; let i = index">
-            <div *ngIf="player.slotId"
+            <div *ngIf="player.slotId && isSlotInActiveFormation(player.slotId)"
                  class="player-marker"
                  [style.left.%]="getSlotCenterX(player.slotId)"
                  [style.top.%]="getSlotCenterY(player.slotId)"
@@ -975,13 +998,17 @@ import { SessionPlayer } from '../../shared/models/player.model';
     .zone-midfield-label { top: 35%; color: #99ff99; }
     .zone-defense-label { top: 68%; color: #99bbff; }
 
-    /* Field Markings */
-    /* V25D95-FRONT F2: base .field-line con thickness bumped from 2px a
-       2-2.5px variable segun element spec. Border default white alpha 0.85
-       (vs old 0.7) per TV broadcast visual. */
+    /* V25D95.1-FRONT F4: markings sit ABOVE the .field-slots layer (z:1)
+       but BELOW the .player-markers (z:10) so the slot dashed borders
+       and chips don't cover the field lines, and the markers always
+       sit on top of both. Pre-V25D95.1 the markings had no explicit
+       z-index, so the slot chip (z:1) occasionally drew over the
+       halfway line — subtle but visible at the seam where the
+       dashed slot border crossed a white line. */
     .field-line {
       position: absolute;
       border: 2px solid rgba(255, 255, 255, 0.85);
+      z-index: 2;
     }
 
     /* V25D95-FRONT F2: halfway line — bumped to 2.5px height + alpha 0.95
@@ -1212,14 +1239,19 @@ import { SessionPlayer } from '../../shared/models/player.model';
       border-radius: 8% 8% 0 0;
     }
 
-    /* Slots Layer */
+    /* V25D95.1-FRONT F4: z-index hierarchy. .field-slots sits BELOW the
+       markings so the dashed "Empty slot" rectangles don't draw over the
+       field lines, and BELOW the player-markers so chips/markers appear
+       on top. Pre-V25D95.1 the value was 5 which competed with the
+       markings (also default 0) and made the dashed border occasionally
+       clip the penalty-area line. */
     .field-slots {
       position: absolute;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
-      z-index: 5;
+      z-index: 1;
     }
 
     /* Individual Slot */
@@ -1398,11 +1430,18 @@ import { SessionPlayer } from '../../shared/models/player.model';
       position: absolute;
       /* V25D93-FRONT F3: width fijo 70px (suficiente para nombres largos en 2
          lineas). Height VARIA por role per Ivan spec — ver los selectores
-         .color-gk/.color-def/.color-mid/.color-att abajo. */
+         .color-gk/.color-def/.color-mid/.color-att abajo.
+
+         V25D95.1-FRONT F4: z-index 20 → 10. El hierarchy final es
+         .field-slots=1, .field-line=2, .player-marker=10, .tactical-number=11.
+         El marker queda encima de slots + markings pero el dorsal flota
+         externo en z:11. Antes z:20 era muy alto — el assignment panel
+         (z:100) y los warnings (z:100) ya estaban muy por encima, asi que
+         bajar a 10 no afecta ningun overlay del modal. */
       width: 70px;
       height: 48px;
       transform: translate(-50%, -50%);
-      z-index: 20;
+      z-index: 10;
       pointer-events: none;
       display: flex;
       flex-direction: column;
@@ -1461,8 +1500,9 @@ import { SessionPlayer } from '../../shared/models/player.model';
        y opaco) sin distraer. Background alpha 0.4 (semi-transparent
        black) para legibilidad sobre cualquier field background. Border-
        radius:50% lo hace circular como dorsales en TV broadcast.
-       z-index:21 encima del marker (z:20) — sin esto el border-radius:6px
-       del .player-marker lo cortaria visualmente. */
+
+       V25D95.1-FRONT F4: z-index 21 → 11 (matches the new hierarchy
+       where .player-marker is z:10 and the badges float one above). */
     .player-marker .tactical-number {
       position: absolute;
       top: -10px;
@@ -1479,7 +1519,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
       justify-content: center;
       line-height: 1;
       pointer-events: none;
-      z-index: 21;
+      z-index: 11;
     }
 
     .player-marker .player-name-label {
@@ -2245,6 +2285,69 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
           }
         }
 
+        // V25D95.1-FRONT F2: defensive validation — clear any slotId that
+        // is NOT in the active formation. Pre-V25D95.1 the persisted slots
+        // were applied verbatim, so a player placed in a 3-5-2 CAM slot
+        // would keep that slotId after switching back to 4-4-2 (which has
+        // no CAM position). The .player-marker would render at the CAM
+        // position (ghost marker), AND if 2 players happened to share
+        // that stale subdivisionId they would stack on top of each other
+        // (the "Mbappé / Rodrygo" overlap Ivan reported — actually a load-
+        // time bug where 2 GKs from the same squad shared the GK slotId
+        // when the persisted lineup came from a 3-5-2 session with 2
+        // GKs at the same coord).
+        //
+        // Strategy: for any player whose slotId is not in the active
+        // formation, clear the slotId AND try to re-assign them via
+        // role-match. If no role-match slot is available, the player
+        // goes to the bench. The slotPlayerMap is kept consistent
+        // (no stale references to players that no longer "live" in
+        // that slot).
+        for (const player of allPlayers) {
+          if (!player.slotId) { continue; }
+          if (this.isSlotInActiveFormation(player.slotId)) { continue; }
+          // stale slotId from a previous formation — free it
+          delete this.slotPlayerMap[player.slotId];
+          player.slotId = '';
+        }
+        // Re-run role-match for the displaced players (those whose
+        // slotId was just cleared). They take any still-available
+        // formation position that matches their role.
+        for (const player of allPlayers) {
+          if (player.slotId) { continue; }
+          for (let i = 0; i < positions.length; i++) {
+            if (assignedPositions.has(i)) { continue; }
+            const posRole = positions[i].role;
+            if (this.rolesMatch(player.position, posRole)) {
+              const slotId = positions[i].subdivisionId;
+              player.slotId = slotId;
+              this.slotPlayerMap[slotId] = player;
+              assignedPositions.add(i);
+              break;
+            }
+          }
+        }
+
+        // V25D95.1-FRONT F2: final dedup pass. Even after the role-match
+        // rerun, two players could end up with the same slotId if the
+        // backend's persisted slots use different subdivisionIds that
+        // map to the same visual position (e.g., 2 GKs sharing the GK
+        // coord in a 3-5-2 lineup that was migrated to 4-4-2). For each
+        // duplicated slotId, the second player (and beyond) is sent to
+        // the bench. The first one keeps the slot. This is what the
+        // user sees: 1 marker per slot, never stacked duplicates.
+        const seenSubdivisionIds = new Set<string>();
+        for (const player of allPlayers) {
+          if (!player.slotId) { continue; }
+          if (seenSubdivisionIds.has(player.slotId)) {
+            // Duplicate — clear the slotId, the player will go to bench.
+            delete this.slotPlayerMap[player.slotId];
+            player.slotId = '';
+            continue;
+          }
+          seenSubdivisionIds.add(player.slotId);
+        }
+
         this.homePlayers$.next(allPlayers.filter(p => p.slotId));
         this.benchPlayers$.next(allPlayers.filter(p => !p.slotId));
 
@@ -2284,6 +2387,48 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     if (!positions) return false;
 
     return positions.some(pos => pos.subdivisionId === sub.subdivisionId);
+  }
+
+  /**
+   * V25D95.1-FRONT F2: returns true if the subdivisionId is one of the
+   * active formation's positions. Used to:
+   *   1. Filter the .player-marker loop so stale persisted slots (from
+   *      a previous formation) don't render ghosts at positions not in
+   *      the current 4-4-2 / 5-3-2 / etc.
+   *   2. Filter the .slot loop via {@link shouldRenderSlot} so empty
+   *      slots outside the active formation don't render dashed
+   *      "Empty slot" rectangles.
+   *
+   * <p>If the active formation has no loaded positions yet (still loading
+   * /editor/formations), returns false for safety — no slot gets rendered
+   * until we know what the formation looks like.
+   */
+  isSlotInActiveFormation(subdivisionId: string | undefined): boolean {
+    if (!subdivisionId) { return false; }
+    const positions = this.formationPositions[this.selectedFormation];
+    if (!positions || positions.length === 0) { return false; }
+    return positions.some(pos => pos.subdivisionId === subdivisionId);
+  }
+
+  /**
+   * V25D95.1-FRONT F2: gate for the .slot div render. Returns true if
+   * either:
+   *   - the slot is in the active formation (so it should render with
+   *     its empty/occupied styling), OR
+   *   - the slot currently has a player assigned (even if it's a stale
+   *     slot from a previous formation — we still need to render the
+   *     draggable chip so the user can drag it back).
+   *
+   * <p>Returns false for slots that are neither in the active formation
+   * NOR have a player — those are the "ghost" slots that V25D95.1 hides
+   * to prevent the dashed "Empty slot" rectangles from appearing at
+   * positions inherited from another formation (e.g., CAM from 4-2-3-1
+   * persisting after switching to 4-4-2).
+   */
+  shouldRenderSlot(sub: FieldSubdivisionDTO): boolean {
+    if (this.isRecommendedSlot(sub)) { return true; }
+    if (this.isSlotOccupied(sub)) { return true; }
+    return false;
   }
 
   /** Verifica si falta jugador en un slot recomendado */
@@ -2481,6 +2626,17 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     // POST /preview-chemistry for the new lineup.
     this.saveLineup();
     this.triggerChemistryPreview();
+    // V25D95.1-FRONT F2b: re-emit homePlayers with a new array reference
+    // so the .player-marker *ngFor sees a fresh array and re-evaluates the
+    // per-marker bindings (getSlotCenterX/Y → player.slotId). Pre-V25D95.1
+    // the handler mutated player.slotId in place but did NOT re-emit
+    // homePlayers, so on rare CD edge cases the *ngFor kept the old
+    // iteration vars and the .player-marker stayed at the OLD slotId
+    // (the "Mbappé se queda en el mismo slot / Rodrygo stacked behind"
+    // symptom Ivan reported). With the re-emit, the *ngFor rebuilds
+    // markers from scratch and reads the fresh slotIds.
+    this.homePlayers$.next([...this.homePlayers$.value]);
+    this.cdr.markForCheck();
     this.cdr.detectChanges();
   }
 
@@ -2507,6 +2663,11 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
 
     this.saveLineup();
     this.triggerChemistryPreview();
+    // V25D95.1-FRONT F2b: re-emit both lists with new array references so
+    // the *ngFor re-evaluates after the move-to-bench.
+    this.homePlayers$.next([...this.homePlayers$.value]);
+    this.benchPlayers$.next([...this.benchPlayers$.value]);
+    this.cdr.markForCheck();
     this.cdr.detectChanges();
   }
 

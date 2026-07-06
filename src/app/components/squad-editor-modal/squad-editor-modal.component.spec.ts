@@ -2961,8 +2961,323 @@ describe('SquadEditorModalComponent — V25D91.5-FRONT F6 formation change updat
       expect(rule).toMatch(/width:\s*14px/);
       expect(rule).toMatch(/height:\s*14px/);
       expect(rule).toMatch(/border-radius:\s*50%/);
-      // z-index:21 encima del marker (z:20) para no ser cortado.
-      expect(rule).toMatch(/z-index:\s*21/);
+      // z-index:11 encima del marker (z:10) para no ser cortado por el
+      // border-radius:6px del .player-marker. V25D95.1-FRONT F4 spec
+      // cambio el hierarchy a .field-slots=1 / .field-line=2 /
+      // .player-marker=10 / .tactical-number=11 (era 5/0/20/21 pre-fix).
+      expect(rule).toMatch(/z-index:\s*11/);
     });
+  });
+});
+
+/**
+ * V25D95.1 (post-V25D95): ghost slot rendering + drag-drop player overlap.
+ *
+ * <p>Two visual bugs reported by Ivan after V25D95-FRONT merged:
+ * <ul>
+ *   <li><b>Issue A — Ghost slots:</b> dashed "Empty slot" rectangles appeared
+ *       at positions NOT in the active formation. Root cause: persisted
+ *       slots from a previous formation (e.g., CAM in 4-2-3-1) were applied
+ *       verbatim even after switching to 4-4-2, and the .slot loop rendered
+ *       ALL 82 subdivisions (so dashed rects at CAM stayed visible). Fix:
+ *       validate persisted slots in {@code loadSquadFromBackend} +
+ *       {@code shouldRenderSlot} + filter .player-marker by
+ *       {@code isSlotInActiveFormation}.</li>
+ *   <li><b>Issue B — Player overlap:</b> when Ivan moved Mbappé to a slot
+ *       with another player, both players rendered at the same coords
+ *       (Mbappé in front, Rodrygo stacked behind). Root cause: actually a
+ *       load-time dedup bug where 2 GKs in the persisted lineup shared
+ *       the same subdivisionId (a 3-5-2 → 4-4-2 migration edge case).
+ *       Fix: final dedup pass in {@code loadSquadFromBackend} that clears
+ *       duplicate slotIds (the second occurrence is sent to bench). Also
+ *       a defensive re-emit of homePlayers$ after every drag-drop so the
+ *       .player-marker *ngFor re-evaluates the per-marker bindings.</li>
+ * </ul>
+ *
+ * <p>5 specs in this block:
+ * <ol>
+ *   <li>{@code isSlotInActiveFormation} returns true for subdivisionIds
+ *       in formationPositions[selectedFormation], false otherwise.</li>
+ *   <li>{@code shouldRenderSlot} returns true for slots in the active
+ *       formation OR slots with a player, false for ghost slots.</li>
+ *   <li>loadSquadFromBackend drops persisted slots that are not in the
+ *       active formation (the primary fix for Issue A).</li>
+ *   <li>loadSquadFromBackend deduplicates slotIds (the primary fix for
+ *       Issue B / "stacked markers").</li>
+ *   <li>{@code handleSlotDrop} re-emits homePlayers$ with a new array
+ *       reference so the .player-marker *ngFor rebuilds (defensive fix
+ *       for the CD edge case Ivan observed).</li>
+ * </ol>
+ */
+describe('SquadEditorModalComponent — V25D95.1 ghost slots + drag-drop overlap', () => {
+  let component: SquadEditorModalComponent;
+  let fixture: ComponentFixture<SquadEditorModalComponent>;
+  let httpClientSpy: jasmine.SpyObj<HttpClient>;
+  let dialogRefSpy: jasmine.SpyObj<MatDialogRef<SquadEditorModalComponent>>;
+
+  // Minimal field with 6 slots: 1 GK + 2 outfield. The 2 outfield slots
+  // are S22-1 and S13-2, both in the 4-4-2 formation. S99-OUTSIDE is
+  // a slot that is NOT in 4-4-2 (the "ghost" position from a previous
+  // formation like 4-2-3-1's CAM).
+  const SUBDIVISIONS_RESPONSE = [
+    { subdivisionId: 'GK-1', isGoalkeeper: true,  sector: 26, subIndex: 1, left: 35, top: 88, width: 30, height: 10, zone: 'GK' },
+    { subdivisionId: 'S22-1', isGoalkeeper: false, sector: 22, subIndex: 1, left: 10, top: 70, width: 25, height: 12, zone: 'DEFENSE' },
+    { subdivisionId: 'S13-2', isGoalkeeper: false, sector: 13, subIndex: 2, left: 40, top: 45, width: 20, height: 12, zone: 'MIDFIELD' },
+    { subdivisionId: 'S99-OUTSIDE', isGoalkeeper: false, sector: 99, subIndex: 1, left: 50, top: 30, width: 20, height: 12, zone: 'MIDFIELD' }
+  ];
+
+  const FORMATIONS_RESPONSE = [
+    {
+      name: '4-4-2', description: '4-4-2',
+      defenders: 1, midfielders: 1, attackers: 0, outfieldPlayers: 2,
+      positions: [
+        { index: 0, role: 'GK',  xPercent: 50, yPercent: 93, actionRangePercent: 5, subdivisionId: 'GK-1' },
+        { index: 1, role: 'DEF', xPercent: 20, yPercent: 75, actionRangePercent: 7, subdivisionId: 'S22-1' },
+        { index: 2, role: 'MID', xPercent: 50, yPercent: 50, actionRangePercent: 7, subdivisionId: 'S13-2' }
+      ]
+    }
+  ];
+
+  function buildCurrentLineupWithPersistedSlots(
+    persistedSlots: Array<{ playerId: string; subdivisionId: string }>,
+    players: Array<any>
+  ): any {
+    return {
+      formation: '4-4-2',
+      players,
+      confirmed: true,
+      warnings: [],
+      slots: persistedSlots,
+      chemistryScore: 85,
+      formationEffectiveness: null
+    };
+  }
+
+  beforeEach(async () => {
+    httpClientSpy = jasmine.createSpyObj('HttpClient', ['get', 'post']);
+    dialogRefSpy = jasmine.createSpyObj('MatDialogRef', ['close']);
+
+    httpClientSpy.get.and.callFake(((url: string) => {
+      if (url.includes('/editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
+      if (url.includes('/editor/formations'))  return of(FORMATIONS_RESPONSE);
+      if (url.includes('/career/lineup/current')) {
+        // Default: 3 players (p-gk, p-def, p-mid) so that loadSquadFromBackend
+        // populates slotPlayerMap with GK-1, S22-1, S13-2 for the drag-drop
+        // tests. Without these, allPlayers is empty and slotPlayerMap has
+        // no players to swap.
+        return of(buildCurrentLineupWithPersistedSlots(
+          [
+            { playerId: 'p-gk',  subdivisionId: 'GK-1' },
+            { playerId: 'p-def', subdivisionId: 'S22-1' },
+            { playerId: 'p-mid', subdivisionId: 'S13-2' }
+          ],
+          [
+            { playerId: 'p-gk',  name: 'GK',  position: 'GK',  overall: 80, energy: 100, injured: false },
+            { playerId: 'p-def', name: 'DEF', position: 'DEF', overall: 80, energy: 100, injured: false },
+            { playerId: 'p-mid', name: 'MID', position: 'MID', overall: 80, energy: 100, injured: false }
+          ]
+        ));
+      }
+      return of([]);
+    }) as any);
+
+    httpClientSpy.post.and.callFake(((_url: string, _body: any) => {
+      if (_url.includes('/career/lineup/preview-chemistry')) {
+        return of({ score: 80, breakdown: {}, maxSkillByType: {}, coveragePercentage: 10 });
+      }
+      if (_url.includes('/career/lineup/manual-select')) {
+        return of({ players: [], warnings: [] });
+      }
+      if (_url.includes('/career/lineup/confirm')) {
+        return of({ confirmed: true, warnings: [] });
+      }
+      return of({});
+    }) as any);
+
+    await TestBed.configureTestingModule({
+      imports: [SquadEditorModalComponent, NoopAnimationsModule],
+      providers: [
+        { provide: MAT_DIALOG_DATA, useValue: { careerId: 'c1', matchId: null } },
+        { provide: MatDialogRef, useValue: dialogRefSpy },
+        { provide: HttpClient, useValue: httpClientSpy }
+      ]
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(SquadEditorModalComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+  });
+
+  // ---- F2 / Issue A: ghost slot filter helpers ----
+
+  it('isSlotInActiveFormation returns true for slots in the active formation, false for others', (done) => {
+    // V25D95.1-FRONT F2: the helper must identify "ghost" subdivisionIds
+    // (e.g., 'S99-OUTSIDE' that represents a CAM position from 4-2-3-1
+    // persisting after the user switched to 4-4-2) and exclude them from
+    // any rendering decision.
+    setTimeout(() => {
+      expect((component as any).isSlotInActiveFormation('GK-1')).toBe(true, 'GK-1 is in 4-4-2');
+      expect((component as any).isSlotInActiveFormation('S22-1')).toBe(true, 'S22-1 is in 4-4-2');
+      expect((component as any).isSlotInActiveFormation('S13-2')).toBe(true, 'S13-2 is in 4-4-2');
+      expect((component as any).isSlotInActiveFormation('S99-OUTSIDE')).toBe(false, 'S99-OUTSIDE is NOT in 4-4-2 — it is the ghost position');
+      expect((component as any).isSlotInActiveFormation('')).toBe(false, 'empty subdivisionId is never in the formation');
+      expect((component as any).isSlotInActiveFormation(undefined)).toBe(false, 'undefined subdivisionId is never in the formation');
+      done();
+    }, 30);
+  });
+
+  it('shouldRenderSlot returns true for active-formation slots or occupied slots, false otherwise', (done) => {
+    // V25D95.1-FRONT F2: template guard for the .slot div. Slots that
+    // are neither in the active formation nor occupied by a player
+    // (e.g., an empty CAM subdivision from a 4-2-3-1 persisted lineup
+    // that doesn't fit 4-4-2) MUST be filtered out so the dashed
+    // "Empty slot" rectangle doesn't render at a ghost position.
+    setTimeout(() => {
+      const subs = (component as any).subdivisions;
+      const gk = subs.find((s: any) => s.subdivisionId === 'GK-1');
+      const def = subs.find((s: any) => s.subdivisionId === 'S22-1');
+      const mid = subs.find((s: any) => s.subdivisionId === 'S13-2');
+      const ghost = subs.find((s: any) => s.subdivisionId === 'S99-OUTSIDE');
+
+      // In 4-4-2: GK-1, S22-1, S13-2 are all in the formation →
+      // shouldRenderSlot returns true.
+      expect((component as any).shouldRenderSlot(gk)).toBe(true, 'GK-1 in 4-4-2 → render');
+      expect((component as any).shouldRenderSlot(def)).toBe(true, 'S22-1 in 4-4-2 → render');
+      expect((component as any).shouldRenderSlot(mid)).toBe(true, 'S13-2 in 4-4-2 → render');
+
+      // S99-OUTSIDE is NOT in 4-4-2 and has no player → ghost, must hide.
+      expect((component as any).shouldRenderSlot(ghost)).toBe(false, 'S99-OUTSIDE ghost (no player, not in 4-4-2) → HIDE');
+
+      // Even if S99-OUTSIDE had a player (stale persisted slot), the
+      // shouldRenderSlot logic keeps it visible (occupied branch) so
+      // the user can drag the player back. We simulate by adding to
+      // slotPlayerMap directly.
+      (component as any).slotPlayerMap['S99-OUTSIDE'] = { playerId: 'p-ghost', name: 'Ghost', position: 'CAM', slotId: 'S99-OUTSIDE' };
+      expect((component as any).shouldRenderSlot(ghost)).toBe(true, 'occupied S99-OUTSIDE → render (so user can drag back)');
+      done();
+    }, 30);
+  });
+
+  // ---- F2 / Issue A: loadSquadFromBackend drops stale persisted slots ----
+
+  it('loadSquadFromBackend drops persisted slots that are not in the active formation', (done) => {
+    // V25D95.1-FRONT F2 (primary fix for Issue A): when the backend
+    // returns persisted slots for a previous formation (e.g., 4-2-3-1's
+    // CAM at 'S99-OUTSIDE'), the loadSquadFromBackend must clear those
+    // stale slotIds so the .player-marker doesn't render a ghost at
+    // the CAM position after the user has switched to 4-4-2.
+    //
+    // We use role 'WINGER' (ATT family) for the ghost player so it
+    // does NOT match any of the 3 formation positions (GK/DEF/MID) —
+    // otherwise the role-match re-run would re-assign them to a valid
+    // slot and the test wouldn't verify the ghost-slot clearing.
+    httpClientSpy.get.and.callFake(((url: string) => {
+      if (url.includes('/editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
+      if (url.includes('/editor/formations'))  return of(FORMATIONS_RESPONSE);
+      if (url.includes('/career/lineup/current')) {
+        return of(buildCurrentLineupWithPersistedSlots(
+          [{ playerId: 'p-ghost', subdivisionId: 'S99-OUTSIDE' }],   // ghost: not in 4-4-2
+          [{ playerId: 'p-ghost', name: 'GhostW', position: 'WINGER', overall: 80, energy: 100, injured: false }]
+        ));
+      }
+      return of([]);
+    }) as any);
+    fixture = TestBed.createComponent(SquadEditorModalComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+
+    setTimeout(() => {
+      // The ghost slot must be cleared and the player must be on the bench.
+      expect((component as any).slotPlayerMap['S99-OUTSIDE']).toBeUndefined(
+        'slotPlayerMap[ghost] must be cleared by loadSquadFromBackend'
+      );
+      const homeIds = (component as any).homePlayers.map((p: any) => p.playerId);
+      const benchIds = (component as any).benchPlayers.map((p: any) => p.playerId);
+      expect(homeIds).not.toContain('p-ghost', 'p-ghost must NOT be in homePlayers (S99-OUTSIDE is not a valid 4-4-2 slot)');
+      expect(benchIds).toContain('p-ghost', 'p-ghost goes to bench (WINGER is ATT family, no ATT position in the 3-slot 4-4-2 mock)');
+      done();
+    }, 30);
+  });
+
+  // ---- F2 / Issue B: loadSquadFromBackend dedupes slotIds ----
+
+  it('loadSquadFromBackend deduplicates slotIds when two players share a subdivisionId', (done) => {
+    // V25D95.1-FRONT F2 (primary fix for Issue B / "stacked markers"):
+    // if the backend's persisted slots have 2 different subdivisionIds
+    // that map to the same visual position (e.g., 2 GKs from a 3-5-2
+    // migration), only the first player keeps the slot. The second
+    // one is sent to bench. The .player-marker loop then renders 1
+    // marker per slot, never stacked duplicates.
+    httpClientSpy.get.and.callFake(((url: string) => {
+      if (url.includes('/editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
+      if (url.includes('/editor/formations'))  return of(FORMATIONS_RESPONSE);
+      if (url.includes('/career/lineup/current')) {
+        return of(buildCurrentLineupWithPersistedSlots(
+          [
+            { playerId: 'p-gk1', subdivisionId: 'GK-1' },
+            { playerId: 'p-gk2', subdivisionId: 'GK-1' }   // duplicate subdivisionId
+          ],
+          [
+            { playerId: 'p-gk1', name: 'GK1', position: 'GK', overall: 80, energy: 100, injured: false },
+            { playerId: 'p-gk2', name: 'GK2', position: 'GK', overall: 80, energy: 100, injured: false }
+          ]
+        ));
+      }
+      return of([]);
+    }) as any);
+    fixture = TestBed.createComponent(SquadEditorModalComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+
+    setTimeout(() => {
+      // Only one GK at GK-1; the other is on the bench.
+      const gkSlot = (component as any).slotPlayerMap['GK-1'];
+      expect(gkSlot).toBeTruthy('one GK is assigned to GK-1');
+      const homeIds = (component as any).homePlayers.map((p: any) => p.playerId);
+      const benchIds = (component as any).benchPlayers.map((p: any) => p.playerId);
+      expect(homeIds.length).toBe(1, 'only 1 home player (no stacked markers)');
+      expect(benchIds).toContain('p-gk2', 'the duplicate GK is on the bench');
+      done();
+    }, 30);
+  });
+
+  // ---- F2b / Issue B: drag-drop re-emits homePlayers$ ----
+
+  it('handleSlotDrop re-emits homePlayers$ with a fresh array reference after a move', (done) => {
+    // V25D95.1-FRONT F2b: the drag-drop handler must emit a new
+    // homePlayers$ array (not just mutate the existing one) so the
+    // .player-marker *ngFor rebuilds and the marker re-renders at
+    // the new slotId. Pre-V25D95.1 on rare CD edge cases the *ngFor
+    // kept the old iteration vars and the marker visually "stayed"
+    // in the source slot while a duplicate was rendered at the target.
+    //
+    // The default loadSquadFromBackend maps 4 players to 4 slots
+    // (p-gk→GK-1, p-def→S22-1, p-mid→S13-2 — but with only 3 positions
+    // in the V25D95.1 mock, p-att has no slot and goes to bench).
+    // We swap p-mid and p-def to exercise the SWAP branch of
+    // handleSlotDrop and verify the re-emit happens.
+    setTimeout(() => {
+      // Spy on homePlayers$ next to assert it's called with a NEW array
+      // reference (not the same one in, not undefined).
+      const nextSpy = spyOn((component as any).homePlayers$, 'next').and.callThrough();
+      const beforeArray = (component as any).homePlayers$.value;
+
+      // Move p-mid from S13-2 to S22-1 (occupied by p-def) → SWAP.
+      const pMid = (component as any).slotPlayerMap['S13-2'];
+      expect(pMid).toBeTruthy('p-mid must be at S13-2 in the default loadSquadFromBackend');
+      (component as any).handleSlotDrop({
+        item: { data: pMid },
+        previousContainer: { id: 'slot-S13-2' },
+        container: { id: 'slot-S22-1' }
+      } as any);
+
+      // Verify the re-emit happened with a new array reference.
+      const reemitCalls = nextSpy.calls.allArgs().filter((args: any[]) =>
+        Array.isArray(args[0]) && args[0] !== beforeArray
+      );
+      expect(reemitCalls.length).toBeGreaterThan(0,
+        'handleSlotDrop must call homePlayers$.next with a NEW array (spread) so *ngFor rebuilds');
+      done();
+    }, 30);
   });
 });
