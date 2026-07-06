@@ -277,17 +277,14 @@ import { SessionPlayer } from '../../shared/models/player.model';
                     <span class="player-chip-name">{{player.name | slice:0:10}}</span>
                   </div>
                 </ng-container>
-                  <!-- V25D98.1-FRONT: si el slot está ocupado PERO el player
-                       fue free-positioned (xPercent/yPercent set), oculta el
-                       chip — si no quedaría duplicando el nombre del player
-                       en la posición vieja mientras el marker está en la
-                       override. El slot entonces queda visualmente vacío
-                       (mostrando el role en .missing-indicator via la nueva
-                       helper isSlotOverridden). -->
-                  <div *ngIf="isSlotOverridden(sub)" class="missing-indicator missing-indicator-overridden">
-                    {{getRecommendedRole(sub)}}
-                  </div>
-                  <div *ngIf="isMissingPlayer(sub)" class="missing-indicator">
+                  <!-- V25D98.2-FRONT: ya no mostramos .missing-indicator-overridden
+                       (era el ámbar con role que Iván veía como 'el espacio
+                       sigue claiming al player'). El slot ahora se ve
+                       completamente vacío cuando el player está free-positioned:
+                       sin chip, sin role label, sin missing indicator. Iván
+                       lo lee como "este slot ya no es de nadie" y el marker
+                       en la override position es el dueño real. -->
+                  <div *ngIf="isMissingPlayer(sub) && !isSlotOverridden(sub)" class="missing-indicator">
                     {{getRecommendedRole(sub)}}
                   </div>
                 </div>
@@ -329,11 +326,8 @@ import { SessionPlayer } from '../../shared/models/player.model';
                       <span class="player-chip-name">{{player.name | slice:0:10}}</span>
                     </div>
                   </ng-container>
-                   <!-- V25D98.1-FRONT: ver bloque equivalente en slot-gk arriba -->
-                   <div *ngIf="isSlotOverridden(sub)" class="missing-indicator missing-indicator-overridden">
-                     {{getRecommendedRole(sub)}}
-                   </div>
-                   <div *ngIf="isMissingPlayer(sub)" class="missing-indicator">
+                   <!-- V25D98.2-FRONT: ver bloque equivalente en slot-gk arriba -->
+                   <div *ngIf="isMissingPlayer(sub) && !isSlotOverridden(sub)" class="missing-indicator">
                      {{getRecommendedRole(sub)}}
                    </div>
                  </div>
@@ -1422,20 +1416,11 @@ import { SessionPlayer } from '../../shared/models/player.model';
       margin-top: 1px;
       text-transform: uppercase;
     }
-
-    /* V25D98.1-FRONT: cuando el slot está lógicamente ocupado pero el
-       player fue free-positioned (xPercent/yPercent override), el chip
-       se oculta para no duplicar el nombre del player en la posición
-       vieja. El slot entonces muestra el role via .missing-indicator
-       en una variante amber/sutil — Iván sabe que ese slot sigue
-       vinculado a un player (no es missing realmente), solo que está
-       visualmente desplazado. Color ámbar para distinguirlo del
-       missing real (rojo). */
-    .missing-indicator-overridden {
-      color: #fbbf24;
-      background: rgba(0, 0, 0, 0.35);
-      border: 1px dashed rgba(251, 191, 36, 0.45);
-    }
+    /* V25D98.2-FRONT: .missing-indicator-overridden eliminado. Iván
+       reportó que ver el role del slot original después del free drop
+       hacía sentir que el slot "seguía claiming al player". Ahora el
+       slot se ve completamente vacío (ni chip ni role indicator)
+       cuando el player está free-positioned. */
 
     .player-chip {
       font-size: 0.5rem;
@@ -2844,6 +2829,13 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     // Step 2: place player into target.
     player.slotId = targetSubdivisionId;
     this.slotPlayerMap[targetSubdivisionId] = player;
+    // V25D98.2-FRONT: clear any free-positioning override so the marker
+    // snaps to the new slot center. Without this, a player who was
+    // free-dropped (xPercent/yPercent set) then dragged to a slot would
+    // stay visually pinned at the OLD override position — Iván's
+    // "me deja mover 1 vez y nada mas" symptom.
+    delete player.xPercent;
+    delete player.yPercent;
 
     // Step 3: handle the displaced occupant.
     if (occupant && occupant.playerId !== player.playerId) {
@@ -2911,6 +2903,11 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
 
     delete this.slotPlayerMap[player.slotId];
     player.slotId = '';
+    // V25D98.2-FRONT: clear any free-positioning override too. A bench
+    // player that comes back to the field via free drop should not
+    // re-appear at a stale override.
+    delete player.xPercent;
+    delete player.yPercent;
 
     this.homePlayers$.next(
       this.homePlayers$.value.filter(p => p.playerId !== player.playerId)
