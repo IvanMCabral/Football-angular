@@ -202,22 +202,19 @@ import { SessionPlayer } from '../../shared/models/player.model';
               <ng-container *ngIf="shouldRenderSlot(sub)">
               <!-- Slot de arquero (sector 26) -->
               <ng-container *ngIf="sub.isGoalkeeper">
-                <div class="slot slot-gk"
-                     cdkDropList
-                     [id]="'slot-' + sub.subdivisionId"
-                     [cdkDropListConnectedTo]="slotDropListIds.concat([BENCH_DROP_LIST_ID])"
-                     [cdkDropListData]="sub"
-                     (cdkDropListDropped)="handleSlotDrop($event)"
-                     [style.left.%]="sub.left"
-                     [style.top.%]="sub.top"
-                     [style.width.%]="sub.width"
-                     [style.height.%]="sub.height"
-                     [class.occupied]="isSlotOccupied(sub)"
-                     [class.missing-player]="isMissingPlayer(sub)"
-                     [class.eff-green]="getEffectivenessColor(sub.subdivisionId) === 'green'"
-                     [class.eff-yellow]="getEffectivenessColor(sub.subdivisionId) === 'yellow'"
-                     [class.eff-red]="getEffectivenessColor(sub.subdivisionId) === 'red'"
-                     (click)="onSlotClick(sub)">
+<div class="slot slot-gk"
+                      cdkDropList
+                      [id]="'slot-' + sub.subdivisionId"
+                      [cdkDropListConnectedTo]="slotDropListIds.concat([BENCH_DROP_LIST_ID])"
+                      [cdkDropListData]="sub"
+                      (cdkDropListDropped)="handleSlotDrop($event)"
+                      [style.left.%]="sub.left"
+                      [style.top.%]="sub.top"
+                      [style.width.%]="sub.width"
+                      [style.height.%]="sub.height"
+                      [class.occupied]="isSlotOccupied(sub)"
+                      [class.missing-player]="isMissingPlayer(sub)"
+                      (click)="onSlotClick(sub)">
                   <!-- V25D91-FRONT-F3: slot-id label removida (era debug-only
                        desde V25D47 C11b). Ahora el slot es clickeable sin
                        saturar visualmente el campo con 82 labels SBX-Y. -->
@@ -266,9 +263,6 @@ import { SessionPlayer } from '../../shared/models/player.model';
                      [class.attack]="sub.zone === 'ATTACK'"
                      [class.midfield]="sub.zone === 'MIDFIELD'"
                      [class.defense]="sub.zone === 'DEFENSE'"
-                     [class.eff-green]="getEffectivenessColor(sub.subdivisionId) === 'green'"
-                     [class.eff-yellow]="getEffectivenessColor(sub.subdivisionId) === 'yellow'"
-                     [class.eff-red]="getEffectivenessColor(sub.subdivisionId) === 'red'"
                      (click)="onSlotClick(sub)">
                   <!-- V25D91-FRONT-F3: slot-id label removida (era debug-only). -->
                   <!-- V25D51 (Sprint C13): chip-level effectiveness feedback.
@@ -884,18 +878,31 @@ import { SessionPlayer } from '../../shared/models/player.model';
     }
 
     /* V25D47 (Sprint C11b): effectiveness color bands applied to slots
-       (subtle background tint) + player markers (border ring). */
-    .slot.eff-green {
+       (subtle background tint) + player markers (border ring).
+       V25D95.2-FRONT: only show the tint when the slot is EMPTY
+       (.missing-player) or being hovered. When OCCUPIED, the .player-marker
+       already conveys the effectiveness via its own border ring — showing
+       a second tinted tile behind the marker was perceived as a "ghost
+       rectangle" by Ivan (V25D95.1 review). */
+    .slot.eff-green:not(.occupied) {
       background: rgba(72, 187, 120, 0.15);
       border-color: rgba(72, 187, 120, 0.5);
     }
-    .slot.eff-yellow {
+    .slot.eff-yellow:not(.occupied) {
       background: rgba(234, 179, 8, 0.15);
       border-color: rgba(234, 179, 8, 0.5);
     }
-    .slot.eff-red {
+    .slot.eff-red:not(.occupied) {
       background: rgba(197, 48, 48, 0.2);
       border-color: rgba(197, 48, 48, 0.6);
+    }
+    /* V25D95.2-FRONT: occupied slots render with NO background tint AND
+       NO border. The .player-marker on top is the only visible indication
+       of who is in the slot. The slot itself stays as an invisible
+       cdk-drop-list target so drag-drop still works. */
+    .slot.occupied {
+      background: transparent !important;
+      border: none !important;
     }
 
     /* CDK drag-drop polish: highlight drop targets on hover/active. */
