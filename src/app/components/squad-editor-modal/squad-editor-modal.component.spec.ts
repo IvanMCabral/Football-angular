@@ -734,25 +734,37 @@ describe('SquadEditorModalComponent — V25D47 (C11b) drag-drop + effectiveness'
     }, 30);
   });
 
-  it('should color-code slots by per-player effectiveness', (done) => {
-    // V25D47: per the mocked perPlayerEffectiveness:
-    //   GK-1  = 1.0  → green
-    //   S22-1 = 0.85 → green  (threshold is >= 0.85)
-    //   S13-2 = 0.7  → yellow
-    //   S05-2 = 1.0  → green
+  it('should color-code markers by per-player effectiveness (V25D95.7)', (done) => {
+    // V25D95.7: V25D47 originally color-coded `.slot` elements via eff-green/
+    // yellow/red classes. V25D95.2 hid the ghost slot tiles, then V25D95.7
+    // removed the chip-level border (it was bleeding out of the marker card).
+    // The chemistry visual feedback now lives on the .player-marker itself
+    // via drop-shadow filter (see .player-marker.eff-green/-yellow/-red
+    // below line 1626 in component.ts).
+    //
+    // Thresholds match getChipEffectivenessClass (V25D51 chip-tier):
+    //   eff >= 0.9 → green
+    //   0.7 <= eff < 0.9 → yellow
+    //   eff < 0.7 → red
+    //
+    // Per the mocked perPlayerEffectiveness:
+    //   GK-1  = 1.0  → green  (eff-good)
+    //   S22-1 = 0.85 → yellow (eff-warning, 0.7-0.9)
+    //   S13-2 = 0.7  → yellow (eff-warning, boundary inclusive)
+    //   S05-2 = 1.0  → green  (eff-good)
     setTimeout(() => {
       fixture.detectChanges();
-      const slots = fixture.nativeElement.querySelectorAll('.slot');
+      const markers = fixture.nativeElement.querySelectorAll('.player-marker');
       let greenCount = 0, yellowCount = 0, redCount = 0;
-      slots.forEach((s: HTMLElement) => {
+      markers.forEach((s: HTMLElement) => {
         if (s.classList.contains('eff-green'))  greenCount++;
         if (s.classList.contains('eff-yellow')) yellowCount++;
         if (s.classList.contains('eff-red'))    redCount++;
       });
-      // GK-1 + S22-1 + S05-2 = 3 green; S13-2 = 1 yellow.
-      expect(greenCount).toBe(3, '3 slots should be green (effectiveness >= 0.85)');
-      expect(yellowCount).toBe(1, '1 slot should be yellow (0.5 <= eff < 0.85)');
-      expect(redCount).toBe(0, 'no slots should be red');
+      // GK-1 + S05-2 = 2 green; S22-1 + S13-2 = 2 yellow.
+      expect(greenCount).toBe(2, '2 markers should be green (eff >= 0.9)');
+      expect(yellowCount).toBe(2, '2 markers should be yellow (0.7 <= eff < 0.9)');
+      expect(redCount).toBe(0, 'no markers should be red');
       done();
     }, 30);
   });
@@ -1098,22 +1110,17 @@ describe('SquadEditorModalComponent — V25D51 chip-level effectiveness feedback
     }, 30);
   });
 
-  it('renders the corner eff-badge inside each chip with the percentage', (done) => {
+  it('does NOT render chip-level eff-badge (removed in V25D95.4)', (done) => {
+    // V25D95.4 removed the chip-level eff-badge ("100%" / "95%" / etc. anchored
+    // to the chip's top-right). V25D95.7 then removed the chip-level border too.
+    // Chemistry feedback now lives on the .player-marker via drop-shadow filter
+    // (eff-green/yellow/red) — see `.player-marker.eff-green` rules in component.ts.
+    // This test asserts the badge div is gone from the chip template.
     setTimeout(() => {
       fixture.detectChanges();
       const badges = fixture.nativeElement.querySelectorAll('.player-chip .eff-badge');
-      // 5 chips with effectiveness data → 5 badges rendered.
-      expect(badges.length).toBe(5,
-        `expected 5 eff-badges (one per chip with effectiveness data), got ${badges.length}`);
-      // Spot-check one badge content. Array.from on NodeList → Element[];
-      // map returns string[] (textContent is `string | null`, the empty string
-      // fallback handles any non-text node edge cases).
-      const badgeTexts: string[] = Array.from(badges as NodeListOf<HTMLElement>)
-        .map((b: HTMLElement) => (b.textContent || '').trim());
-      expect(badgeTexts).toContain('100%');
-      expect(badgeTexts).toContain('95%');
-      expect(badgeTexts).toContain('70%');
-      expect(badgeTexts).toContain('50%');
+      expect(badges.length).toBe(0,
+        `expected 0 eff-badges inside chips after V25D95.4 removed them, got ${badges.length}`);
       done();
     }, 30);
   });

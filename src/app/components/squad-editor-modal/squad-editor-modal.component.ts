@@ -328,13 +328,27 @@ import { SessionPlayer } from '../../shared/models/player.model';
                   [cdkDragData]="player"
                   [style.left.%]="getSlotCenterX(player.slotId)"
                   [style.top.%]="getSlotCenterY(player.slotId)"
-                  [class.gk-player]="player.role === 'GK'"
-                  [class.off-role]="isOffRole(player)"
-                  [ngClass]="getMarkerRoleClasses(player.role)">
-              <!-- V25D95.5-FRONT: removed [class.eff-green/yellow/red] bindings
-                   + V25D95.3 tactical-number badge. The marker now shows
-                   ONLY role family color (yellow GK / blue DEF / green MID /
-                   red ATT) and the dorsal. The effectiveness tint now lives
+                   [class.gk-player]="player.role === 'GK'"
+                   [class.off-role]="isOffRole(player)"
+                   [class.eff-green]="getChipEffectivenessClass(player.slotId) === 'eff-good'"
+                   [class.eff-yellow]="getChipEffectivenessClass(player.slotId) === 'eff-warning'"
+                   [class.eff-red]="getChipEffectivenessClass(player.slotId) === 'eff-bad'"
+                   [ngClass]="getMarkerRoleClasses(player.role)">
+               <!-- V25D95.7-FRONT: chemistry feedback moved from .player-chip
+                    (which had green bleed-out around the marker card in
+                    V25D95.6) to .player-marker via drop-shadow filter.
+                    The .player-marker.eff-green/-yellow/-red CSS rules
+                    (below) apply a glowing border via drop-shadow that
+                    hugs the marker card exactly — no bleed. The marker
+                    also keeps its role-family color (yellow GK, blue DEF,
+                    green MID, red ATT) as its base color; eff-* is an
+                    additive glow overlay for high/low chemistry.
+                    V25D95.5 removed these earlier but V25D95.7 restores
+                    them now that the chemistry visual has a clean home. -->
+               <!-- V25D95.5-FRONT: removed [class.eff-green/yellow/red] bindings
+                    + V25D95.3 tactical-number badge. The marker now shows
+                    ONLY role family color (yellow GK / blue DEF / green MID /
+                    red ATT) and the dorsal. The effectiveness tint now lives
                    on the underlying .player-chip (subtle chip border), not
                    on the marker border ring. V25D95.5 also adds cdkDrag +
                    cdkDragData so the marker IS the drag handle — previously
@@ -1417,17 +1431,24 @@ import { SessionPlayer } from '../../shared/models/player.model';
         eff-warning y eff-bad a 2px para simetría visual con eff-good y con
         substitution-modal (que ya usaba 2px en C23). Pre-C24 warning/bad
         estaban en 1px — ahora las 3 clases son 2px simétricas.
-        Mismo patron que V25D63-C23 en substitution-modal.component.css. */
+        Mismo patron que V25D63-C23 en substitution-modal.component.css.
+        V25D95.7-FRONT: border del chip removido. El chip es invisible
+        (V25D95.6 transparent bg) y el border verde se "sangraba" hacia
+        afuera del marker card (que es más chico), mostrando un recuadro
+        verde fantasma alrededor de Courtois en el GK slot (que es 180px
+        ancho vs 70px del marker). La chemistry eff-* ring ahora vive
+        en .player-marker.eff-good/warning/bad abajo — el border rodea
+        el marker card directamente, sin bleed. */
      .player-chip.eff-warning {
-       border: 2px solid #f59e0b !important; /* amber-500 */
+       /* border removed V25D95.7 */
        box-sizing: border-box;
      }
      .player-chip.eff-bad {
-       border: 2px solid #dc2626 !important; /* red-600 */
+       /* border removed V25D95.7 */
        box-sizing: border-box;
      }
      .player-chip.eff-good {
-       border: 2px solid #10b981 !important; /* emerald-500 */
+       /* border removed V25D95.7 */
        box-sizing: border-box;
      }
     /* V25D51 (Sprint C13): corner badge anchored to the chip's top-right.
