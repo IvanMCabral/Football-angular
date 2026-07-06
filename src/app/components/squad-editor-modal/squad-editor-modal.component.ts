@@ -303,7 +303,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
                      [style.width.%]="sub.width"
                      [style.height.%]="sub.height"
                      [class.occupied]="isSlotOccupied(sub)"
-                     [class.recommended]="isRecommendedSlot(sub)"
+                     [class.recommended]="isRecommendedSlot(sub) && !isSlotOverridden(sub)"
                      [class.missing-player]="isMissingPlayer(sub)"
                      [class.attack]="sub.zone === 'ATTACK'"
                      [class.midfield]="sub.zone === 'MIDFIELD'"

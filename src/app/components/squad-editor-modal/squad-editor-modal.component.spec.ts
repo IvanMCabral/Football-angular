@@ -3845,4 +3845,69 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
       done();
     }, 30);
   });
+
+  /**
+   * V25D98.3-FRONT: regression — Ivan reported "me deja mover 1 vez y nada
+   * mas" + "el jugador queda ahi infinitamente". Two things must work
+   * after the first free drop:
+   *  1. The marker's DOM element is STILL cdk-drag enabled.
+   *  2. handleFieldDrop called a second time (with new coords) updates
+   *     the marker position. This was the bug: somehow the second drop
+   *     was being silently ignored OR the override was being preserved
+   *     by the drop-list logic.
+   * Verify the marker keeps cdk-drag after override + handleFieldDrop
+   * re-applies xPercent/yPercent on each call (subsequent drags update).
+   */
+  it('V25D98.3: marker stays draggable + handleFieldDrop is idempotent across multiple calls', (done) => {
+    setTimeout(() => {
+      const pDef = (component as any).slotPlayerMap['S22-1'];
+      const fieldEl = fixture.nativeElement.querySelector('.field');
+      fieldEl.getBoundingClientRect = () => ({
+        left: 0, top: 0, right: 1000, bottom: 800, width: 1000, height: 800,
+        x: 0, y: 0, toJSON: () => ({})
+      });
+      const mkEvt = (x: number, y: number) => ({
+        item: { data: pDef },
+        previousContainer: { id: 'slot-S22-1' },
+        container: { id: 'field-drop-area', element: { nativeElement: fieldEl } },
+        dropPoint: { x, y }
+      } as any);
+
+      // First drop → 80%, 50%.
+      (component as any).handleFieldDrop(mkEvt(800, 400));
+      expect(pDef.xPercent).toBe(80);
+      expect(pDef.yPercent).toBe(50);
+      expect((component as any).getMarkerX(pDef)).toBe(80);
+      expect((component as any).getMarkerY(pDef)).toBe(50);
+      fixture.detectChanges();
+
+      // Verify the marker DOM element still has cdk-drag after first drop.
+      const markers = fixture.nativeElement.querySelectorAll('.player-marker');
+      let pDefMarker: HTMLElement | null = null;
+      markers.forEach((m: any) => {
+        if (m.textContent.includes('Rudiger')) { pDefMarker = m; }
+      });
+      expect(pDefMarker).toBeTruthy('pDef marker must still render after first drop');
+      expect(pDefMarker!.classList.contains('cdk-drag')).withContext('marker must remain cdk-drag after first drop').toBeTrue();
+
+      // Second drop → 30%, 20% (different position to prove update worked).
+      (component as any).handleFieldDrop(mkEvt(300, 160));
+      expect(pDef.xPercent).toBe(30);
+      expect(pDef.yPercent).toBe(20);
+      expect((component as any).getMarkerX(pDef)).toBe(30);
+      expect((component as any).getMarkerY(pDef)).toBe(20);
+      fixture.detectChanges();
+
+      // Third drop → 60%, 80% — to confirm repeatability.
+      (component as any).handleFieldDrop(mkEvt(600, 640));
+      expect(pDef.xPercent).toBe(60);
+      expect(pDef.yPercent).toBe(80);
+
+      // V25D98.3: even after the free drops, the slot should NOT have
+      // .recommended class (which would render the yellow box-shadow).
+      const slotS22After = fixture.nativeElement.querySelector('#slot-S22-1');
+      expect(slotS22After?.classList.contains('recommended')).withContext('overridden slot must not have .recommended class (no yellow box-shadow)').toBeFalse();
+      done();
+    }, 30);
+  });
 });
