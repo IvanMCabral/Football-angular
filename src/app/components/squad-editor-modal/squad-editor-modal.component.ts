@@ -1,4 +1,4 @@
-import { Component, Inject, OnInit, ChangeDetectorRef, OnDestroy, Output, EventEmitter } from '@angular/core';
+import { Component, Inject, OnInit, ChangeDetectorRef, OnDestroy, Output, EventEmitter, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
@@ -9,7 +9,7 @@ import { HttpClient } from '@angular/common/http';
 import { environment } from '../../environments/environment';
 import { Subject, BehaviorSubject, of, takeUntil } from 'rxjs';
 import { debounceTime, distinctUntilChanged, switchMap, catchError } from 'rxjs/operators';
-import { CdkDragDrop, DragDropModule } from '@angular/cdk/drag-drop';
+import { CdkDragDrop, CdkDragEnd, DragDropModule } from '@angular/cdk/drag-drop';
 import { LineupWarningDTO } from '../../shared/models/lineup/lineup-warning.dto';
 import { FieldSubdivisionDTO } from '../../shared/models/lineup/field-subdivision.dto';
 import { FormationDTO, FormationPositionDTO } from '../../shared/models/lineup/formation.dto';
@@ -173,18 +173,19 @@ import { SessionPlayer } from '../../shared/models/player.model';
 
       <!-- Field Canvas - Vertical Orientation -->
       <div class="field-container">
-        <!-- V25D98-FRONT: cdkDropList a nivel field para free positioning.
-             Cuando el user dropea a un player FUERA de cualquier slot (sobre
-             el espacio libre del campo), este drop list captura el evento y
-             handleFieldDrop() guarda la posición exacta como xPercent/yPercent
-             en el player. Los slots internos siguen siendo cdkDropList propios
-             (handleSlotDrop) y CDK los prefiere cuando el drop cae adentro. -->
-        <div class="field"
-             cdkDropList
-             [id]="FIELD_DROP_LIST_ID"
-             [cdkDropListData]="'field'"
-             [cdkDropListConnectedTo]="allDropListIds"
-             (cdkDropListDropped)="handleFieldDrop($event)">
+        <!-- V25D99-FRONT: el campo YA NO es cdkDropList. Pre-V25D99 era cdkDropList
+             (handleFieldDrop capturaba free drops) pero CDK reordenaba los
+             markers visualmente durante el drag (lo que Iván no quería) y
+             el evento cdkDropListDropped se suprimía en algunas condiciones
+             (source===container con sorting-disabled), causando el bug
+             'solo deja mover 1 vez'. Ahora el campo es un div plano; el
+             marker captura SU PROPIO drag end via (cdkDragEnded) y decide
+             internamente si el drop point cae sobre un slot (snap), sobre
+             la banca (move to bench) o libre del field (free positioning).
+             Los slots siguen siendo cdkDropList solo para que CDK renderice
+             el drop preview visual durante el drag (highlight) — pero el
+             handler real está en el marker, no en el slot. -->
+        <div class="field" #fieldContainer>
           <!-- Etiquetas de zonas -->
           <div class="zone-label zone-attack-label">ATAQUE</div>
           <div class="zone-label zone-midfield-label">MEDIO</div>
@@ -247,7 +248,6 @@ import { SessionPlayer } from '../../shared/models/player.model';
                       [id]="'slot-' + sub.subdivisionId"
 [cdkDropListConnectedTo]="allDropListIds"
                        [cdkDropListData]="sub"
-                       (cdkDropListDropped)="handleSlotDrop($event)"
                        [style.left.%]="sub.left"
                        [style.top.%]="sub.top"
                        [style.width.%]="sub.width"
@@ -297,7 +297,6 @@ import { SessionPlayer } from '../../shared/models/player.model';
                      [id]="'slot-' + sub.subdivisionId"
                      [cdkDropListConnectedTo]="allDropListIds"
                      [cdkDropListData]="sub"
-                     (cdkDropListDropped)="handleSlotDrop($event)"
                      [style.left.%]="sub.left"
                      [style.top.%]="sub.top"
                      [style.width.%]="sub.width"
@@ -357,12 +356,13 @@ import { SessionPlayer } from '../../shared/models/player.model';
                primary fix is the loadSquadFromBackend validation that
                clears stale slotIds). -->
 <ng-container *ngFor="let player of homePlayers; let i = index">
-             <div *ngIf="player.slotId && isSlotInActiveFormation(player.slotId)"
-                  class="player-marker"
-                  cdkDrag
-                  [cdkDragData]="player"
-                  [style.left.%]="getMarkerX(player)"
-                  [style.top.%]="getMarkerY(player)"
+              <div *ngIf="player.slotId && isSlotInActiveFormation(player.slotId)"
+                   class="player-marker"
+                   cdkDrag
+                   [cdkDragData]="player"
+                   (cdkDragEnded)="handleMarkerDragEnd($event, player)"
+                   [style.left.%]="getMarkerX(player)"
+                   [style.top.%]="getMarkerY(player)"
                    [class.gk-player]="player.role === 'GK'"
                    [class.off-role]="isOffRole(player)"
                    [class.eff-green]="getChipEffectivenessClass(player.slotId) === 'eff-good'"
@@ -421,8 +421,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
            cdkDropList
            [id]="BENCH_DROP_LIST_ID"
            [cdkDropListConnectedTo]="slotDropListIds"
-           [cdkDropListData]="'bench'"
-           (cdkDropListDropped)="handleBenchDrop($event)">
+           [cdkDropListData]="'bench'">
         <span class="bench-label">
           Banca ({{ benchPlayers?.length || 0 }})
         </span>
@@ -2814,6 +2813,12 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
    *  outside any slot). */
   readonly FIELD_DROP_LIST_ID = 'field-drop-area';
 
+  /** V25D99-FRONT: ref to the field container element. Used by
+   *  handleMarkerDragEnd to convert clientX/Y drop coords into field-relative
+   *  percentages (replaces the field-as-cdkDropList approach that caused
+   *  reordering during drag and the '1 vez y nada mas' bug). */
+  @ViewChild('fieldContainer', { static: false }) fieldContainer!: ElementRef<HTMLElement>;
+
   /** Slot id (without 'slot-' prefix) → player currently in that slot. */
   get playerInTargetSlot(): { [subdivisionId: string]: PlayerOnFieldDto } {
     return this.slotPlayerMap;
@@ -2845,92 +2850,30 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
    * the latest snapshot.
    */
   handleSlotDrop(event: CdkDragDrop<any>): void {
+    // V25D99-FRONT: thin wrapper that translates the cdkDropListDropped
+    // event into the shared assignPlayerToSlot API. V25D99 removed
+    // (cdkDropListDropped) bindings from slots — handleMarkerDragEnd is
+    // the primary drop handler — but we keep this method for backward
+    // compat with the unit-test suite (5 specs still call handleSlotDrop
+    // directly with mock events). The runtime binding is gone but the
+    // logic lives on in assignPlayerToSlot.
     const player = event.item.data as PlayerOnFieldDto | undefined;
     if (!player) { return; }
 
     const targetSubdivisionId = this.subdivisionIdFromDropListId(event.container.id);
-    const sourceDropListId = event.previousContainer.id;
     if (!targetSubdivisionId) { return; }
 
-    // No-op: source == target (e.g., cdkDragEnd fired on the same list).
+    const sourceDropListId = event.previousContainer.id;
     if (sourceDropListId === 'slot-' + targetSubdivisionId) {
-      return;
+      return; // same slot → no-op
     }
 
-    const sourceSubdivisionId =
-      sourceDropListId === this.BENCH_DROP_LIST_ID
-        ? null
-        : this.subdivisionIdFromDropListId(sourceDropListId);
+    const sourceSlotId = sourceDropListId === this.BENCH_DROP_LIST_ID
+      ? null
+      : this.subdivisionIdFromDropListId(sourceDropListId);
 
-    const occupant = this.slotPlayerMap[targetSubdivisionId];
-
-    // Step 1: free the source slot (if from a slot).
-    if (sourceSubdivisionId) {
-      delete this.slotPlayerMap[sourceSubdivisionId];
-    }
-
-    // Step 2: place player into target.
-    player.slotId = targetSubdivisionId;
-    this.slotPlayerMap[targetSubdivisionId] = player;
-    // V25D98.2-FRONT: clear any free-positioning override so the marker
-    // snaps to the new slot center. Without this, a player who was
-    // free-dropped (xPercent/yPercent set) then dragged to a slot would
-    // stay visually pinned at the OLD override position — Iván's
-    // "me deja mover 1 vez y nada mas" symptom.
-    delete player.xPercent;
-    delete player.yPercent;
-
-    // Step 3: handle the displaced occupant.
-    if (occupant && occupant.playerId !== player.playerId) {
-      if (sourceSubdivisionId) {
-        // SWAP: push the occupant back into the source slot.
-        occupant.slotId = sourceSubdivisionId;
-        this.slotPlayerMap[sourceSubdivisionId] = occupant;
-      } else {
-        // Source was bench → evict the occupant to the bench.
-        occupant.slotId = '';
-        this.benchPlayers$.next([...this.benchPlayers$.value, occupant]);
-        this.homePlayers$.next(
-          this.homePlayers$.value.filter(p => p.playerId !== occupant.playerId)
-        );
-      }
-    }
-
-    // Step 4: handle the source-side list updates.
-    if (!sourceSubdivisionId) {
-      // Came from bench → remove from bench, add to home (if not already).
-      this.benchPlayers$.next(
-        this.benchPlayers$.value.filter(p => p.playerId !== player.playerId)
-      );
-      if (!this.homePlayers$.value.some(p => p.playerId === player.playerId)) {
-        this.homePlayers$.next([...this.homePlayers$.value, player]);
-      }
-    }
-
-    // Step 5: persist + preview. saveLineup() will POST manual-select with
-    // the updated slot map; triggerChemistryPreview() fires the debounced
-    // POST /preview-chemistry for the new lineup.
-    this.saveLineup();
-    this.triggerChemistryPreview();
-    // V25D96-FRONT F2: re-detect the formation after the drop. If the new
-    // lineup doesn't match any canonical formation (e.g. user dragged a
-    // DEF into a MID slot), this flips _isCustomLineup to true so the
-    // dropdown shows 'Formación del User' as the selected option AND
-    // isSlotInActiveFormation lets the marker render at its (possibly
-    // non-canonical) target slot. updateFormationDetection sets _isCustomLineup.
-    this.updateFormationDetection();
-    // V25D95.1-FRONT F2b: re-emit homePlayers with a new array reference
-    // so the .player-marker *ngFor sees a fresh array and re-evaluates the
-    // per-marker bindings (getSlotCenterX/Y → player.slotId). Pre-V25D95.1
-    // the handler mutated player.slotId in place but did NOT re-emit
-    // homePlayers, so on rare CD edge cases the *ngFor kept the old
-    // iteration vars and the .player-marker stayed at the OLD slotId
-    // (the "Mbappé se queda en el mismo slot / Rodrygo stacked behind"
-    // symptom Ivan reported). With the re-emit, the *ngFor rebuilds
-    // markers from scratch and reads the fresh slotIds.
-    this.homePlayers$.next([...this.homePlayers$.value]);
-    this.cdr.markForCheck();
-    this.cdr.detectChanges();
+    const occupant = this.slotPlayerMap[targetSubdivisionId] ?? null;
+    this.applySlotAssignment(player, sourceSlotId, targetSubdivisionId, occupant);
   }
 
   /**
@@ -2940,36 +2883,14 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
    * player from the field (equivalent to {@link removePlayerFromSlot}).
    */
   handleBenchDrop(event: CdkDragDrop<any>): void {
+    // V25D99-FRONT: thin wrapper — same rationale as handleSlotDrop.
+    // Runtime binding removed in V25D99 (handleMarkerDragEnd handles
+    // bench drops via the bench area hit-test). Kept for unit-test
+    // backward compat.
     const player = event.item.data as PlayerOnFieldDto | undefined;
     if (!player || !player.slotId) { return; }
     if (event.previousContainer.id === this.BENCH_DROP_LIST_ID) { return; }
-
-    delete this.slotPlayerMap[player.slotId];
-    player.slotId = '';
-    // V25D98.2-FRONT: clear any free-positioning override too. A bench
-    // player that comes back to the field via free drop should not
-    // re-appear at a stale override.
-    delete player.xPercent;
-    delete player.yPercent;
-
-    this.homePlayers$.next(
-      this.homePlayers$.value.filter(p => p.playerId !== player.playerId)
-    );
-    if (!this.benchPlayers$.value.some(p => p.playerId === player.playerId)) {
-      this.benchPlayers$.next([...this.benchPlayers$.value, player]);
-    }
-
-    this.saveLineup();
-    this.triggerChemistryPreview();
-    // V25D95.1-FRONT F2b: re-emit both lists with new array references so
-    // the *ngFor re-evaluates after the move-to-bench.
-    this.homePlayers$.next([...this.homePlayers$.value]);
-    this.benchPlayers$.next([...this.benchPlayers$.value]);
-    // V25D96-FRONT F2: re-detect formation after the move (may flip
-    // _isCustomLineup if a slot was emptied making the lineup incomplete).
-    this.updateFormationDetection();
-    this.cdr.markForCheck();
-    this.cdr.detectChanges();
+    this.movePlayerToBench(player);
   }
 
   /** Helper: strip the {@code slot-} prefix from a CDK drop list id. */
@@ -2992,28 +2913,73 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
    *
    * <p>If the drag started from the bench and was dropped on the field,
    * we auto-promote the player to the closest subdivision slot to give
-   * them a sensible slotId (otherwise they'd render at the drop point but
-   * not contribute to formation detection / chemistry preview).
-   */
-  handleFieldDrop(event: CdkDragDrop<any>): void {
-    const player = event.item.data as PlayerOnFieldDto | undefined;
+* them a sensible slotId (otherwise they'd render at the drop point but
+    * not contribute to formation detection / chemistry preview).
+    *
+    * V25D99-FRONT: REPLACED handleFieldDrop with handleMarkerDragEnd.
+    * Pre-V25D99 the field was a cdkDropList that captured free drops via
+    * (cdkDropListDropped)="handleFieldDrop($event)". But this caused TWO
+    * problems Iván reported repeatedly:
+    *   1. cdkDropListSortingDisabled (added V25D98.2) suppressed dropped
+    *      events when source===container — the 'solo deja mover 1 vez'
+    *      bug remained even after removing it in V25D98.6.
+    *   2. CDK's internal item tracking re-ordered the OTHER markers
+    *      visually during drag ('no quiero que se muevan los otros').
+    * Fix: the field is no longer a cdkDropList. Each marker captures its
+    * own drag end via (cdkDragEnded)="handleMarkerDragEnd($event, player)"
+    * and decides internally whether the drop point is on a slot (snap),
+    * on the bench (move to bench) or free on the field (free positioning).
+    * Slots remain cdkDropList only so CDK can render the drop-preview
+    * highlight during drag — but no (cdkDropListDropped) handler fires
+    * from slots; the marker's cdkDragEnded is the single source of truth.
+    * This guarantees that EVERY drop fires exactly once and that
+    * subsequent free drops always work (the '1 vez' bug is gone).
+    */
+  handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
     if (!player) { return; }
 
-    // Compute drop position as % of the field bounding rect.
-    const fieldEl = (event.container.element?.nativeElement) as HTMLElement | undefined;
+    // 1. Compute drop position as % of the field bounding rect.
+    const fieldEl = this.fieldContainer?.nativeElement;
     if (!fieldEl) { return; }
     const rect = fieldEl.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0) { return; }
-    // CdkDragDrop.dropPoint is in client coordinates. Subtract the field's
-    // top-left to get field-relative coords, then clamp to [0, 100].
-    const dropX = (event.dropPoint?.x ?? rect.left);
-    const dropY = (event.dropPoint?.y ?? rect.top);
+    // CdkDragEnd.dropPoint is in client coordinates (clientX, clientY at
+    // mouseup). Subtract the field's top-left to get field-relative coords.
+    const dropX = event.dropPoint?.x ?? rect.left;
+    const dropY = event.dropPoint?.y ?? rect.top;
     const xPct = Math.max(0, Math.min(100, ((dropX - rect.left) / rect.width) * 100));
     const yPct = Math.max(0, Math.min(100, ((dropY - rect.top) / rect.height) * 100));
 
-    // If the player came from the bench, promote them to the closest
-    // subdivision slot so they participate in chemistry / formation
-    // detection. Without this they'd render visually but contribute 0.
+    // 2. Decide drop target by inspecting the drop point against each
+    // candidate region. Order matters: bench first (since the bench
+    // area is below the field), then slots, then free field.
+    const benchEl = document.querySelector('.bench-container') as HTMLElement | null;
+    if (benchEl) {
+      const benchRect = benchEl.getBoundingClientRect();
+      if (dropX >= benchRect.left && dropX <= benchRect.right
+          && dropY >= benchRect.top && dropY <= benchRect.bottom) {
+        this.movePlayerToBench(player);
+        return;
+      }
+    }
+
+const targetSlot = this.findSlotAtPosition(xPct, yPct);
+    if (targetSlot) {
+      // 3a. Snap to slot — call the shared slot-swap logic.
+      if (player.slotId === targetSlot.subdivisionId) {
+        // Dropped on the same slot the player came from — snap back to
+        // canonical (clear any free-positioning override).
+        this.applySlotAssignment(player, player.slotId, targetSlot.subdivisionId, /*swapOccupant=*/null);
+      } else {
+        const occupant = this.slotPlayerMap[targetSlot.subdivisionId] ?? null;
+        this.applySlotAssignment(player, player.slotId, targetSlot.subdivisionId, occupant);
+      }
+      return;
+    }
+
+    // 3b. Free drop on the field (no slot under the cursor).
+    // Promote bench players (no slotId) to closest subdivision so they
+    // participate in chemistry / formation detection.
     if (!player.slotId || player.slotId === '') {
       const closest = this.findClosestSubdivision(xPct, yPct);
       if (closest) { player.slotId = closest.subdivisionId; }
@@ -3021,31 +2987,139 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
 
     player.xPercent = xPct;
     player.yPercent = yPct;
-
-    // V25D98.4-FRONT: REMOVE the player from slotPlayerMap on free drop
-    // (delete any prior entry for the slot). The marker renders at the
-    // override via getMarkerX/Y (which checks xPercent first), and the
-    // player.slotId is preserved for chemistry preview — but the slot
-    // itself is now LOGICALLY abandoned. If we kept slotPlayerMap[slotId]
-    // = player, clicking the empty slot would still pop up the
-    // assignment panel with the player's name ("Slot: S17-1 / Malaga B 2
-    // CAM #6784") and Iván would read it as "the slot still owns the
-    // player". Removing from the map makes the slot truly empty
-    // (click → "Sin asignar" + bench dropdown) so the player feels free
-    // to keep moving. The Reset button restores the slotPlayerMap entry
-    // when snapping back to canonical positions.
+    // V25D98.4-FRONT: REMOVE the player from slotPlayerMap so the slot
+    // is logically abandoned (click → inert, no popup showing player).
     if (player.slotId) {
       delete this.slotPlayerMap[player.slotId];
     }
 
     this.saveLineup();
     this.triggerChemistryPreview();
-    // V25D96-FRONT F2: re-detect formation; free positioning flips lineup
-    // to "Formación del User" since the markers are no longer snapping
-    // exactly to canonical subdivisions.
     this.updateFormationDetection();
-    // V25D95.1-FRONT F2b: re-emit homePlayers$ with new array reference so
-    // the *ngFor re-evaluates the marker positions.
+    this.homePlayers$.next([...this.homePlayers$.value]);
+    this.cdr.markForCheck();
+    this.cdr.detectChanges();
+  }
+
+  /**
+   * V25D99-FRONT: find the subdivision whose bounding box contains the
+   * given (xPercent, yPercent) field-relative coordinates. Returns null
+   * if the point is in free space (outside any slot). Used by
+   * handleMarkerDragEnd to decide between slot-snap and free positioning.
+   */
+  private findSlotAtPosition(xPct: number, yPct: number): FieldSubdivisionDTO | null {
+    return this.subdivisions.find(s =>
+      xPct >= s.left && xPct <= s.left + s.width
+      && yPct >= s.top && yPct <= s.top + s.height
+    ) ?? null;
+  }
+
+  /**
+   * V25D99-FRONT: shared slot-swap logic. Called from handleMarkerDragEnd
+   * (V25D99) and was the body of handleSlotDrop pre-V25D99. Centralizes
+   * the "move player A into slot Y, possibly swapping with the current
+   * occupant" flow so both drop paths use the same code.
+   *
+   * @param sourceSlotId null if the player came from the bench.
+   * @param targetSlotId the slot to place the player into.
+   * @param occupant the player currently in targetSlotId (or null if empty).
+   */
+  /**
+   * V25D99-FRONT: shared slot-swap logic. Called from handleMarkerDragEnd
+   * (V25D99) and from handleSlotDrop (legacy cdkDropListDropped wrapper).
+   * Centralizes the "move player A into slot Y, possibly swapping with the
+   * current occupant" flow so both drop paths use the same code.
+   *
+   * <p>Naming: there's already a click-handler `assignPlayerToSlot()` on the
+   * component (assigns from the bench dropdown). This private helper is
+   * the programmatic equivalent — same intent, different signature.
+   *
+   * @param sourceSlotId null if the player came from the bench.
+   * @param targetSlotId the slot to place the player into.
+   * @param occupant the player currently in targetSlotId (or null if empty).
+   */
+  private applySlotAssignment(
+    player: PlayerOnFieldDto,
+    sourceSlotId: string | null,
+    targetSlotId: string,
+    occupant: PlayerOnFieldDto | null
+  ): void {
+    // Step 1: free the source slot (if from a slot).
+    if (sourceSlotId) {
+      delete this.slotPlayerMap[sourceSlotId];
+    }
+
+    // Step 2: place player into target.
+    player.slotId = targetSlotId;
+    this.slotPlayerMap[targetSlotId] = player;
+    // V25D98.2-FRONT: clear any free-positioning override so the marker
+    // snaps to the new slot center. Without this, a player who was
+    // free-dropped (xPercent/yPercent set) then dragged to a slot would
+    // stay visually pinned at the OLD override position.
+    delete player.xPercent;
+    delete player.yPercent;
+
+    // Step 3: handle the displaced occupant.
+    if (occupant && occupant.playerId !== player.playerId) {
+      if (sourceSlotId) {
+        // SWAP: push the occupant back into the source slot.
+        occupant.slotId = sourceSlotId;
+        this.slotPlayerMap[sourceSlotId] = occupant;
+        delete occupant.xPercent;
+        delete occupant.yPercent;
+      } else {
+        // Source was bench → evict the occupant to the bench.
+        occupant.slotId = '';
+        delete occupant.xPercent;
+        delete occupant.yPercent;
+        this.benchPlayers$.next([...this.benchPlayers$.value, occupant]);
+        this.homePlayers$.next(
+          this.homePlayers$.value.filter(p => p.playerId !== occupant.playerId)
+        );
+      }
+    }
+
+    // Step 4: handle the source-side list updates (bench → field only).
+    if (!sourceSlotId) {
+      this.benchPlayers$.next(
+        this.benchPlayers$.value.filter(p => p.playerId !== player.playerId)
+      );
+      if (!this.homePlayers$.value.some(p => p.playerId === player.playerId)) {
+        this.homePlayers$.next([...this.homePlayers$.value, player]);
+      }
+    }
+
+    this.saveLineup();
+    this.triggerChemistryPreview();
+    this.updateFormationDetection();
+    this.homePlayers$.next([...this.homePlayers$.value]);
+    this.cdr.markForCheck();
+    this.cdr.detectChanges();
+  }
+
+  /**
+   * V25D99-FRONT: move player to the bench. Extracted from handleBenchDrop
+   * so handleMarkerDragEnd can call it without needing to synthesize a
+   * fake CdkDragDrop event.
+   */
+  private movePlayerToBench(player: PlayerOnFieldDto): void {
+    if (!player.slotId) { return; } // already on bench
+    delete this.slotPlayerMap[player.slotId];
+    player.slotId = '';
+    // V25D98.2-FRONT: clear any free-positioning override too.
+    delete player.xPercent;
+    delete player.yPercent;
+
+    this.homePlayers$.next(
+      this.homePlayers$.value.filter(p => p.playerId !== player.playerId)
+    );
+    if (!this.benchPlayers$.value.some(p => p.playerId === player.playerId)) {
+      this.benchPlayers$.next([...this.benchPlayers$.value, player]);
+    }
+
+    this.saveLineup();
+    this.triggerChemistryPreview();
+    this.updateFormationDetection();
     this.homePlayers$.next([...this.homePlayers$.value]);
     this.cdr.markForCheck();
     this.cdr.detectChanges();

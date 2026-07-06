@@ -3709,44 +3709,42 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
     }, 30);
   });
 
-  it('handleFieldDrop: assigns xPercent/yPercent from drop point', (done) => {
+  it('V25D99 handleMarkerDragEnd: assigns xPercent/yPercent from drop point', (done) => {
     setTimeout(() => {
       const pDef = (component as any).slotPlayerMap['S22-1'];
-      const fieldEl = fixture.nativeElement.querySelector('.field');
+      const fieldEl: HTMLElement = fixture.nativeElement.querySelector('.field');
       // Stub bounding rect to 1000×800 at offset (100, 100).
       fieldEl.getBoundingClientRect = () => ({
         left: 100, top: 100, right: 1100, bottom: 900, width: 1000, height: 800,
         x: 100, y: 100, toJSON: () => ({})
       });
+      // ViewChild resolution: assign the fieldContainer ref directly.
+      (component as any).fieldContainer = { nativeElement: fieldEl };
       // Drop at clientX=600, clientY=500 → fieldX=500, fieldY=400 → (50%, 50%).
-      const evt: any = {
-        item: { data: pDef },
-        previousContainer: { id: 'slot-S22-1' },
-        container: { id: 'field-drop-area', element: { nativeElement: fieldEl } },
-        dropPoint: { x: 600, y: 500 }
-      };
-      (component as any).handleFieldDrop(evt);
+      // 50%/50% is OUTSIDE all subdivisions (S13-2 is at top=45, h=12 → 45-57,
+      // S22-1 at top=70 → 70-82) so this is treated as a free drop, not a
+      // slot snap. With field offset (100,100) + size (1000,800) → 50% = 500.
+      // We pick clientY=600 (fieldY=500 → yPct=62.5) to be safely outside
+      // any subdivision.
+      const evt: any = { dropPoint: { x: 600, y: 600 } };
+      (component as any).handleMarkerDragEnd(evt, pDef);
       expect(pDef.xPercent).toBe(50);
-      expect(pDef.yPercent).toBe(50);
+      expect(pDef.yPercent).toBe(62.5);
       done();
     }, 30);
   });
 
-  it('handleFieldDrop: clamps xPercent/yPercent to [0, 100]', (done) => {
+  it('V25D99 handleMarkerDragEnd: clamps xPercent/yPercent to [0, 100]', (done) => {
     setTimeout(() => {
       const pDef = (component as any).slotPlayerMap['S22-1'];
-      const fieldEl = fixture.nativeElement.querySelector('.field');
+      const fieldEl: HTMLElement = fixture.nativeElement.querySelector('.field');
       fieldEl.getBoundingClientRect = () => ({
         left: 0, top: 0, right: 1000, bottom: 800, width: 1000, height: 800,
         x: 0, y: 0, toJSON: () => ({})
       });
+      (component as any).fieldContainer = { nativeElement: fieldEl };
       // Drop far off the field → clamped to bounds.
-      (component as any).handleFieldDrop({
-        item: { data: pDef },
-        previousContainer: { id: 'slot-S22-1' },
-        container: { id: 'field-drop-area', element: { nativeElement: fieldEl } },
-        dropPoint: { x: -500, y: 5000 }
-      } as any);
+      (component as any).handleMarkerDragEnd({ dropPoint: { x: -500, y: 5000 } } as any, pDef);
       expect(pDef.xPercent).toBe(0);
       expect(pDef.yPercent).toBe(100);
       done();
@@ -3858,23 +3856,19 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
    * Verify the marker keeps cdk-drag after override + handleFieldDrop
    * re-applies xPercent/yPercent on each call (subsequent drags update).
    */
-  it('V25D98.3: marker stays draggable + handleFieldDrop is idempotent across multiple calls', (done) => {
+  it('V25D99 marker stays draggable + handleMarkerDragEnd is idempotent across multiple calls', (done) => {
     setTimeout(() => {
       const pDef = (component as any).slotPlayerMap['S22-1'];
-      const fieldEl = fixture.nativeElement.querySelector('.field');
+      const fieldEl: HTMLElement = fixture.nativeElement.querySelector('.field');
       fieldEl.getBoundingClientRect = () => ({
         left: 0, top: 0, right: 1000, bottom: 800, width: 1000, height: 800,
         x: 0, y: 0, toJSON: () => ({})
       });
-      const mkEvt = (x: number, y: number) => ({
-        item: { data: pDef },
-        previousContainer: { id: 'slot-S22-1' },
-        container: { id: 'field-drop-area', element: { nativeElement: fieldEl } },
-        dropPoint: { x, y }
-      } as any);
+      (component as any).fieldContainer = { nativeElement: fieldEl };
+      const mkEvt = (x: number, y: number) => ({ dropPoint: { x, y } } as any);
 
       // First drop → 80%, 50%.
-      (component as any).handleFieldDrop(mkEvt(800, 400));
+      (component as any).handleMarkerDragEnd(mkEvt(800, 400), pDef);
       expect(pDef.xPercent).toBe(80);
       expect(pDef.yPercent).toBe(50);
       expect((component as any).getMarkerX(pDef)).toBe(80);
@@ -3891,7 +3885,7 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
       expect(pDefMarker!.classList.contains('cdk-drag')).withContext('marker must remain cdk-drag after first drop').toBeTrue();
 
       // Second drop → 30%, 20% (different position to prove update worked).
-      (component as any).handleFieldDrop(mkEvt(300, 160));
+      (component as any).handleMarkerDragEnd(mkEvt(300, 160), pDef);
       expect(pDef.xPercent).toBe(30);
       expect(pDef.yPercent).toBe(20);
       expect((component as any).getMarkerX(pDef)).toBe(30);
@@ -3899,7 +3893,7 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
       fixture.detectChanges();
 
       // Third drop → 60%, 80% — to confirm repeatability.
-      (component as any).handleFieldDrop(mkEvt(600, 640));
+      (component as any).handleMarkerDragEnd(mkEvt(600, 640), pDef);
       expect(pDef.xPercent).toBe(60);
       expect(pDef.yPercent).toBe(80);
 
@@ -3945,12 +3939,8 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
       expect((component as any).isSlotOccupied(slotS22)).toBeTrue();
 
       // Free drop the player to (700, 350).
-      (component as any).handleFieldDrop({
-        item: { data: pDef },
-        previousContainer: { id: 'slot-S22-1' },
-        container: { id: 'field-drop-area', element: { nativeElement: fieldEl } },
-        dropPoint: { x: 700, y: 350 }
-      } as any);
+      (component as any).fieldContainer = { nativeElement: fieldEl };
+      (component as any).handleMarkerDragEnd({ dropPoint: { x: 700, y: 350 } } as any, pDef);
 
       // V25D98.4: slotPlayerMap MUST NOT contain the player anymore.
       expect((component as any).slotPlayerMap['S22-1']).toBeUndefined();
@@ -4017,13 +4007,13 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
       (component as any).selectedSlot = null;
       fixture.detectChanges();
 
-      // Free drop the player out of the slot.
-      (component as any).handleFieldDrop({
-        item: { data: pDef },
-        previousContainer: { id: 'slot-S22-1' },
-        container: { id: 'field-drop-area', element: { nativeElement: fieldEl } },
-        dropPoint: { x: 700, y: 350 }
-      } as any);
+      // Free drop the player out of the slot. Pick coords that DO NOT land
+      // inside any subdivision (subdivisions are at left=[10,40,45],
+      // top=[10,45,70,88] with widths 10-30). xPct=70, yPct=43.75 →
+      // neither S05-2 (top=10-20), S13-2 (top=45-57), S22-1 (top=70-82),
+      // nor GK-1 (top=88-98).
+      (component as any).fieldContainer = { nativeElement: fieldEl };
+      (component as any).handleMarkerDragEnd({ dropPoint: { x: 700, y: 350 } } as any, pDef);
       expect((component as any).isSlotAbandonedByOverride(slotS22)).toBeTrue();
 
       // V25D98.5: clicking the abandoned slot must NOT set selectedSlot
