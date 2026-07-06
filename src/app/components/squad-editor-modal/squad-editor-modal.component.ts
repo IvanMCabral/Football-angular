@@ -872,7 +872,10 @@ import { SessionPlayer } from '../../shared/models/player.model';
       display: flex;
       justify-content: center;
       align-items: center;
-      padding: 20px;
+      /* V25D93.5-FRONT: padding 20px → 8px para dar mas espacio al field
+         landscape. Vertical space es limited (modal h = 90vh - header/bench),
+         asi que reducir padding vertical maximiza el field height. */
+      padding: 8px;
       overflow: hidden;
       /* V25D58 (Sprint C18): min-height:0 allows the flex child (.field) to
          honor its aspect-ratio without being constrained by the container's
@@ -885,23 +888,22 @@ import { SessionPlayer } from '../../shared/models/player.model';
     /* Field */
     .field {
       position: relative;
-      width: 100%;
-      /* V25D58 (Sprint C18): cap progresivo via min(cap, 100%). En desktop
-         mantiene los 500px del default anterior; en viewports chicos
-         permite shrink porque el cap nunca excede el ancho disponible.
-         Era max-width: 500px (fijo) lo que dejaba gap visual en modales
-         menores a 500px de field-container. */
-      max-width: min(500px, 100%);
-      /* V25D57 (Sprint C17b): aspect-ratio del campo de futbol.
-         Antes height: 100% aplastaba el field a horizontal slab en
-         viewports desktop/tablet. height: auto + aspect-ratio 1/1.4
-         garantiza que height = 1.4 * width (campo vertical). */
-      height: auto;
-      /* V25D58 (Sprint C18): max-height: 100% en lugar del cap fijo de 700px
-         para que el field NUNCA exceda el alto del field-container (que
-         es 90vh del squad-editor-container menos header/footer/bench). */
-      max-height: 100%;
-      aspect-ratio: 1 / 1.4;
+      /* V25D93.5-FRONT: aspect ratio flip. Pre-V25D93.5 era portrait 1/1.4
+         (alto > ancho) — Ivan: "estan mas a la izquierda que a la derecha,
+         no tiene sentido la formacion". Una cancha de futbol real es
+         landscape (105m x 68m = ~1.54:1 ancho). Flip a 1.4/1 (width:height =
+         1.4:1, ancho > alto). */
+
+      /* Height-driven landscape: field usa el maximo height disponible del
+         field-container, width se ajusta via aspect-ratio. */
+      height: 100%;
+      width: auto;
+      max-width: 100%;
+      aspect-ratio: 1.4 / 1;
+      /* V25D93.5-FRONT: removed max-width: min(500px, 100%) cap from V25D93.
+         Landscape field necesita full width disponible, no 500px cap (que
+         era para portrait 0.71:1 donde field se cuadraba con 500w × 700h).
+         Ahora field llena horizontalmente lo que el aspect permite. */
       background: linear-gradient(180deg, #4a8c5c 0%, #5a9c6c 50%, #4a8c5c 100%);
       border: 3px solid #fff;
       border-radius: 4px;
@@ -939,28 +941,31 @@ import { SessionPlayer } from '../../shared/models/player.model';
     }
 
     .center-circle {
-      /* V25D93-FRONT F2: center circle ~9% of field width per parent spec.
-         En field 500x700px → diameter 90px (radius 45px). Pre-V25D93 era
-         80px diameter, ligeramente chico. */
+      /* V25D93.5-FRONT: center circle converted to %-based for landscape.
+         Pre-V25D93.5 era 90x90 absolute px (tuned for 500w portrait field).
+         En landscape field (~700w+), 90px queda chico proporcional al
+         field. Ahora width:13% + aspect-ratio:1 — circle cuyo diameter
+         es 13% del field width. En 700w field = 91px (similar al portrait).
+         En 1200w field = 156px (escala con field). Border-radius:50% lo
+         mantiene circular. */
       top: 50%;
       left: 50%;
-      width: 90px;
-      height: 90px;
+      width: 13%;
+      aspect-ratio: 1;
       transform: translate(-50%, -50%);
       border-radius: 50%;
     }
 
-    /* V25D93-FRONT F2: Penalty areas rectangulares per Ivan spec
-       (16% ancho x 30% profundidad). En field 500x700px → 80w x 210h.
-       Pre-V25D93 eran 120x60 (24% x 8.5%) — muy anchas y nada profundas
-       comparadas con un campo real (~16% ancho, ~60% profundidad real
-       pero Ivan pidio 30% en este render vertical). bottom:0 para own
+    /* V25D93-FRONT F2: Penalty areas rectangulares per Ivan spec original
+       (16% ancho x 30% profundidad). V25D93.5 mantuvo estos %s — los %
+       escalan correctamente en landscape porque parent aspect cambia solo
+       el contenedor, no las proporciones internas. bottom:0 para own
        penalty area (porteria del usuario abajo del field). */
     .left-penalty-area {
       bottom: 0;
       left: 50%;
-      width: 16%;            /* 80px en 500px field — antes era 120px (24%) */
-      height: 30%;           /* 210px en 700px field — antes era 60px (8.5%) */
+      width: 16%;
+      height: 30%;
       transform: translateX(-50%);
       /* V25D93: solo top + lados. El bottom coincide con la goal-line, asi
          que el rectangulo se conecta visualmente con el borde del field
@@ -984,8 +989,8 @@ import { SessionPlayer } from '../../shared/models/player.model';
     .left-goal-area {
       bottom: 0;
       left: 50%;
-      width: 8%;             /* 40px en 500px field */
-      height: 12%;           /* 84px en 700px field — antes era 20px (2.9%) */
+      width: 8%;
+      height: 12%;
       transform: translateX(-50%);
       border-bottom: none;
     }
@@ -999,14 +1004,15 @@ import { SessionPlayer } from '../../shared/models/player.model';
       border-top: none;
     }
 
-    /* V25D93-FRONT F2: Penalty spots (puntitos blancos). En cancha real estan
-       a 11m del goal-line. Per Ivan spec: dentro del penalty area, alineados
-       al centro horizontal. Border-radius 50% + bg blanco. */
+    /* V25D93.5-FRONT: Penalty spots convertidos a %-based. Pre-V25D93.5 eran
+       5x5 absolute (constante, no escalada). En landscape field, 5x5 queda
+       diminuto. Ahora width:0.8% aspect-ratio:1 — dot proporcional al field.
+       En 700w field = 5.6px (similar), en 1200w field = 9.6px (scaling up). */
     .left-penalty-spot {
-      bottom: 11%;            /* 77px en 700px field */
+      bottom: 11%;
       left: 50%;
-      width: 5px;
-      height: 5px;
+      width: 0.8%;
+      aspect-ratio: 1;
       border-radius: 50%;
       background: rgba(255, 255, 255, 0.85);
       transform: translateX(-50%);
@@ -1016,31 +1022,23 @@ import { SessionPlayer } from '../../shared/models/player.model';
     .right-penalty-spot {
       top: 11%;
       left: 50%;
-      width: 5px;
-      height: 5px;
+      width: 0.8%;
+      aspect-ratio: 1;
       border-radius: 50%;
       background: rgba(255, 255, 255, 0.85);
       transform: translateX(-50%);
       border: none;
     }
 
-    /* V25D93-FRONT F2: Penalty arcs (semicirculos fuera del penalty area
-       rival). En cancha real radio 9.15m desde el penalty spot, solo la
-       mitad que queda fuera del area. Per Ivan: agregamos como div semicircle
-       approximado via border + clip. SVG seria mas preciso pero div approach
-       evita inline-svg complexity. */
+    /* V25D93.5-FRONT: Penalty arcs convertidos a %-based (10% w + aspect 1).
+       Pre-V25D93.5 eran 90px absolute — ahora escalan con field width. */
     .left-penalty-arc {
-      /* Own area esta en bottom. El arc del opponent side (top) deberia
-         ser el unico visible per FIFA rules, pero Ivan pidio "penalty arc
-         semicirculo fuera del area rival" — interpretamos que ambos lados
-         tienen arc visible. Para el own side (bottom), el arc va encima
-         del penalty area, hacia el field interior. */
       bottom: 11%;
       left: 50%;
-      width: 90px;
-      height: 90px;
+      width: 10%;
+      aspect-ratio: 1;
       border-radius: 50%;
-      transform: translate(-50%, 35%);  /* desplazar para que la mitad visible salga del area */
+      transform: translate(-50%, 35%);
       border: 2px solid rgba(255, 255, 255, 0.7);
       border-bottom-color: transparent;
       border-left-color: transparent;
@@ -1050,8 +1048,8 @@ import { SessionPlayer } from '../../shared/models/player.model';
     .right-penalty-arc {
       top: 11%;
       left: 50%;
-      width: 90px;
-      height: 90px;
+      width: 10%;
+      aspect-ratio: 1;
       border-radius: 50%;
       transform: translate(-50%, -35%);
       border: 2px solid rgba(255, 255, 255, 0.7);
@@ -1599,15 +1597,16 @@ import { SessionPlayer } from '../../shared/models/player.model';
       }
 
       .field {
-        /* V25D58 (Sprint C18): cap 380px para mobile. min(380,100%) shrinkea
-           a 360px en viewports de 375-414px donde el modal mide 98vw. */
-        max-width: min(380px, 100%);
-        /* V25D57 (Sprint C17b): aspect-ratio del campo en mobile. Antes
-           max-height:50vh sobreescribia el aspect-ratio y dejaba el field
-           aplastado. Ahora max-height hereda del default (100% del
-           field-container). */
-        aspect-ratio: 1 / 1.4;
-        height: auto;
+        /* V25D93.5-FRONT: mobile max-width y aspect-ratio. La regla base
+           ahora es height:100% + aspect-ratio 1.4/1 landscape. En mobile
+           viewport (<600px), el field-container h es chico (90vh - chrome).
+           Sin el max-width cap que existia (V25D58 = 380px para portrait),
+           el field landscape en 375-414vw tendria h~250-300 y w~350-420
+           (ajustado por aspect 1.4:1). Quitamos el cap heredado de
+           portrait era. */
+        max-width: 100%;
+        aspect-ratio: 1.4 / 1;
+        height: 100%;
       }
 
       /* Mobile chips keep visible — shrink font-size + padding so they
@@ -1639,13 +1638,12 @@ import { SessionPlayer } from '../../shared/models/player.model';
       }
 
       .field {
-        /* V25D57 (Sprint C17b): aspect-ratio del campo en tablet.
-           Antes no tenia aspect-ratio y quedaba horizontal slab. */
-        aspect-ratio: 1 / 1.4;
-        height: auto;
-        /* V25D58 (Sprint C18): cap 450px para tablet. min(450,100%) shrinkea
-           a 360px en viewports de 600-700px donde el modal mide 90vw. */
-        max-width: min(450px, 100%);
+        /* V25D93.5-FRONT: tablet max-width y aspect-ratio. Flip a landscape
+           para consistencia con desktop. Same approach: height:100% + aspect
+           1.4/1 + max-width 100%. */
+        aspect-ratio: 1.4 / 1;
+        height: 100%;
+        max-width: 100%;
       }
 
       .player-chip {
@@ -1671,12 +1669,11 @@ import { SessionPlayer } from '../../shared/models/player.model';
         max-width: 98vw;
       }
 
-      .field {
-        /* V25D58 (Sprint C18): cap 600px para large desktop. min(600,100%)
-           mantiene 600px en viewports de 1600-1900px y shrinkea a 500px
-           en viewports borderline 1440-1599px si el modal mide 1200px. */
-        max-width: min(600px, 100%);
-      }
+      /* V25D93.5-FRONT: removed .field max-width: min(600px, 100%) override.
+         El field ahora es height-driven landscape 1.4:1 (definido en
+         regla base) y no necesita un cap horizontal — width se calcula
+         por aspect-ratio a partir de height. El cap 600 era de la era
+         portrait 0.71:1 (V25D58) y ahora no aplica. */
     }
   `]
 })
