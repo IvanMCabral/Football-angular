@@ -1327,7 +1327,14 @@ import { SessionPlayer } from '../../shared/models/player.model';
     .player-chip {
       font-size: 0.5rem;
       color: #fff;
-      background: rgba(0, 0, 0, 0.5);
+      /* V25D95.6-FRONT: chip is now invisible (transparent bg). The visible
+         card is the .player-marker on top. The chip stays as an invisible
+         cdk-drop-list child so drag-drop logic still works (chip + marker
+         both have cdkDrag, marker is the primary visual handle). The
+         eff-good/warning/bad class still applies a colored border that
+         leaks through the marker (subtle 1px ring around the marker card)
+         as a chem-status indicator. */
+      background: transparent;
       padding: 1px 4px;
       border-radius: 3px;
       margin-top: 1px;
