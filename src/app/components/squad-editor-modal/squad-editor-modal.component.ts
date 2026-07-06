@@ -392,8 +392,15 @@ import { SessionPlayer } from '../../shared/models/player.model';
   styles: [`
     /* Container */
     .squad-editor-container {
+      /* V25D92-FRONT-F1: full-width modal. Pre-V25D92 the max-width: 900px cap
+         forced the container to 900px even on viewport >= 1280px where the
+         cdk-overlay-pane is 1216px (95vw) — leaving 316px of empty space
+         to the right of the dark green gradient background. Replaced the
+         900px cap with max-width: 95vw so the container matches the pane
+         width (consistent with the V25D89.4 PartidoModal full-width fix
+         + the dialog.open(width: 95vw) config in squad-management). */
       width: 95vw;
-      max-width: 900px;
+      max-width: 95vw;
       height: 90vh;
       background: linear-gradient(180deg, #1a472a 0%, #2d5a3d 100%);
       border-radius: 12px;
@@ -680,10 +687,19 @@ import { SessionPlayer } from '../../shared/models/player.model';
       cursor: grabbing;
     }
     .bench-player-name {
-      /* V25D91-FRONT-F2: allow multi-line wrap with tight line-height so
-         full names render without truncation. text-align:center for centered
-         wrap. overflow:visible (was hidden) y text-overflow:clip (was
-         ellipsis) para que no corte con \"…\". */
+      /* V25D91-FRONT-F2 + V25D92-FRONT-F2: allow multi-line wrap with
+         tight line-height so full names render without truncation.
+         text-align:center for centered wrap.
+
+         V25D92 changed word-break: break-word to
+         word-break: normal; overflow-wrap: anywhere:
+         - word-break: normal => NO mid-word break by default (preserves
+           "Kepa Arrizabalaga" as a unit)
+         - overflow-wrap: anywhere => only break a word IF the entire line
+           would otherwise overflow the container (graceful fallback for
+           extreme names like super-long surnames)
+
+         Mantiene overflow:visible + text-overflow:clip (no ellipsis). */
       font-size: 0.75rem;
       color: #fff;
       font-weight: 600;
@@ -693,7 +709,8 @@ import { SessionPlayer } from '../../shared/models/player.model';
       text-overflow: clip;
       max-width: 100%;
       text-align: center;
-      word-break: break-word;
+      word-break: normal;
+      overflow-wrap: anywhere;
     }
     .bench-player-pos {
       font-size: 0.65rem;
@@ -1082,6 +1099,19 @@ import { SessionPlayer } from '../../shared/models/player.model';
     }
 
     .player-marker .player-name-label {
+      /* V25D92-FRONT-F2: allow wrap mid-line so nombres completos no se corten.
+         Cambio white-space:nowrap → normal, overflow:hidden → visible,
+         text-overflow:ellipsis → clip. Mantiene max-width:70px (mismo que
+         marker card) y font-size:0.6rem.
+
+         word-break:normal + overflow-wrap:anywhere:
+         - normal → no mid-word break por default (preserva el nombre completo)
+         - anywhere → solo rompe si la palabra no entra en el container
+           (caso nombres muy largos como "Arrizabalaga" en un marker de 70px)
+
+         Como el marker es de 70x56px y el name-label tiene max-width:70px,
+         generalmente caben nombres de hasta ~12-14 chars en una linea; los
+         mas largos hacen wrap a 2 lineas sin romper mid-word. */
       font-size: 0.6rem;
       font-weight: 700;
       color: #fff;
@@ -1089,9 +1119,11 @@ import { SessionPlayer } from '../../shared/models/player.model';
       padding: 1px 4px;
       border-radius: 3px;
       max-width: 70px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      overflow: visible;
+      text-overflow: clip;
+      white-space: normal;
+      word-break: normal;
+      overflow-wrap: anywhere;
       text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
       line-height: 1.2;
     }
