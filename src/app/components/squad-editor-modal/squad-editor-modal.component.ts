@@ -888,22 +888,17 @@ import { SessionPlayer } from '../../shared/models/player.model';
     /* Field */
     .field {
       position: relative;
-      /* V25D93.5-FRONT: aspect ratio flip. Pre-V25D93.5 era portrait 1/1.4
-         (alto > ancho) — Ivan: "estan mas a la izquierda que a la derecha,
-         no tiene sentido la formacion". Una cancha de futbol real es
-         landscape (105m x 68m = ~1.54:1 ancho). Flip a 1.4/1 (width:height =
-         1.4:1, ancho > alto). */
+      /* V25D94-FRONT: aspect ratio 1.4/1 → 1.15/1 (mas cuadrado, parecido a
+         TV broadcast real). V25D93.5 estaba demasiado landscape (1.4:1);
+         Ivan pidio "la cancha se vea como cancha no tan ancha". 1.15/1
+         matches real TV broadcast aspect (16:9 cropped to ~1.15-1.2). */
 
-      /* Height-driven landscape: field usa el maximo height disponible del
+      /* Height-driven: field usa el maximo height disponible del
          field-container, width se ajusta via aspect-ratio. */
       height: 100%;
       width: auto;
       max-width: 100%;
-      aspect-ratio: 1.4 / 1;
-      /* V25D93.5-FRONT: removed max-width: min(500px, 100%) cap from V25D93.
-         Landscape field necesita full width disponible, no 500px cap (que
-         era para portrait 0.71:1 donde field se cuadraba con 500w × 700h).
-         Ahora field llena horizontalmente lo que el aspect permite. */
+      aspect-ratio: 1.15 / 1;
       background: linear-gradient(180deg, #4a8c5c 0%, #5a9c6c 50%, #4a8c5c 100%);
       border: 3px solid #fff;
       border-radius: 4px;
@@ -1597,15 +1592,13 @@ import { SessionPlayer } from '../../shared/models/player.model';
       }
 
       .field {
-        /* V25D93.5-FRONT: mobile max-width y aspect-ratio. La regla base
-           ahora es height:100% + aspect-ratio 1.4/1 landscape. En mobile
-           viewport (<600px), el field-container h es chico (90vh - chrome).
+        /* V25D94-FRONT: mobile max-width y aspect-ratio. Flip a 1.15/1
+           square-ish (mismo aspect que desktop). En mobile viewport
+           (<600px), el field-container h es chico (90vh - chrome).
            Sin el max-width cap que existia (V25D58 = 380px para portrait),
-           el field landscape en 375-414vw tendria h~250-300 y w~350-420
-           (ajustado por aspect 1.4:1). Quitamos el cap heredado de
-           portrait era. */
+           el field en 375-414vw tendria h~200-220 y w~230-250. */
         max-width: 100%;
-        aspect-ratio: 1.4 / 1;
+        aspect-ratio: 1.15 / 1;
         height: 100%;
       }
 
@@ -1638,10 +1631,9 @@ import { SessionPlayer } from '../../shared/models/player.model';
       }
 
       .field {
-        /* V25D93.5-FRONT: tablet max-width y aspect-ratio. Flip a landscape
-           para consistencia con desktop. Same approach: height:100% + aspect
-           1.4/1 + max-width 100%. */
-        aspect-ratio: 1.4 / 1;
+        /* V25D94-FRONT: tablet max-width y aspect-ratio. Flip a 1.15/1
+           square-ish (mismo aspect que desktop). */
+        aspect-ratio: 1.15 / 1;
         height: 100%;
         max-width: 100%;
       }
