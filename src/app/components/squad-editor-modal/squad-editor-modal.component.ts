@@ -2937,9 +2937,35 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
    * known good values.
    */
   private fetchRatingsPreview(): void {
+    // V25D99.17-FRONT: include customXPercent/customYPercent on every
+    // slot that has a free-positioning override, so the back can apply
+    // the SubdivisionEffectivenessCalculator distance penalty to the
+    // player's ACTUAL drop point instead of the canonical slot center.
+    // Pre-V25D99.17, the body only carried subdivisionId — identical
+    // payloads for free drops meant the backend returned identical
+    // ratings (UI stayed stale after drag).
+    //
+    // The backend currently ignores these optional fields; this commit
+    // is forward-compatible with the V25D99.17-BACK change that will
+    // thread them through coordsBySubdivision. Until that lands, the
+    // behavior is unchanged for the user (the panel still updates on
+    // every slot-to-slot drop via applySlotAssignment).
     const slots = this.homePlayers
       .filter(p => !!p.slotId)
-      .map(p => ({ playerId: p.playerId, subdivisionId: p.slotId }));
+      .map(p => {
+        const dto: { playerId: string; subdivisionId: string;
+                     customXPercent?: number; customYPercent?: number } = {
+          playerId: p.playerId,
+          subdivisionId: p.slotId,
+        };
+        if (typeof p.xPercent === 'number' && isFinite(p.xPercent)) {
+          dto.customXPercent = p.xPercent;
+        }
+        if (typeof p.yPercent === 'number' && isFinite(p.yPercent)) {
+          dto.customYPercent = p.yPercent;
+        }
+        return dto;
+      });
     const body = { formation: this.selectedFormation, slots };
     this.http.post<{ attackRating: number; midfieldRating: number; defenseRating: number }>(
       `${environment.apiUrl}/career/lineup/preview-ratings`, body)
