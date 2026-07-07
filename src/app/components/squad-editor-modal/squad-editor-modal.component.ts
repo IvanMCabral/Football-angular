@@ -171,6 +171,209 @@ import { SessionPlayer } from '../../shared/models/player.model';
            Keeps the chemistry preview stack and close-btn visually anchored
            to the right of the header, no big empty middle as pre-V25D92.6. -->
 
+      <!-- V25D99.13-FRONT: main area wraps the Team Stats panel (left) and
+           the field+bench column (right) in a 2-col flex layout. Pre-V25D99.13
+           the field + bench were direct siblings of squad-header inside
+           .squad-editor-container, with the empty left half of the modal
+           going unused. Ivan: "a la izquierda de la cancha en ese espacio
+           vacio, una tabla con las caracteristicas del equipo y como cambia
+           todo porcentaje en tiempo real segun formacion". -->
+      <div class="main-area">
+        <aside class="team-stats-panel" aria-label="Team stats panel">
+          <!-- V25D99.13-FRONT: Team stats panel. All values computed from
+               homePlayers$ + formationEffectiveness$ via getters so they
+               update reactively on every drag-drop / formation change. -->
+
+          <!-- 1. Match preview / how next match would be played -->
+          <section class="tsp-section">
+            <h3 class="tsp-title">📊 Match preview</h3>
+            <div class="tsp-formation-row">
+              <span class="tsp-formation-label">Formación:</span>
+              <span class="tsp-formation-value"
+                    [class.is-custom]="isCustomLineup()">
+                {{ dropdownFormationValue }}
+              </span>
+              <span class="tsp-coverage">{{ homePlayers.length }}/11</span>
+            </div>
+            <div class="tsp-style-tags" *ngIf="styleTags?.length">
+              <span *ngFor="let tag of styleTags" class="tsp-tag">{{ tag }}</span>
+            </div>
+            <div class="tsp-style-tags" *ngIf="!styleTags?.length">
+              <span class="tsp-tag-empty">Lineup incompleto</span>
+            </div>
+          </section>
+
+          <!-- 2. Top metrics: chemistry, eff, stamina, injured -->
+          <section class="tsp-section">
+            <h3 class="tsp-title">⚛ Chemistry</h3>
+            <div class="tsp-chem-row">
+              <span class="tsp-chem-value"
+                    [class.high]="(chemistryScore ?? 0) >= 80"
+                    [class.mid]="(chemistryScore ?? 0) >= 60 && (chemistryScore ?? 0) < 80"
+                    [class.low]="(chemistryScore ?? 0) < 60">
+                {{ chemistryScore ?? '—' }}<span class="tsp-chem-max">/99</span>
+              </span>
+              <span *ngIf="teamAverage !== null && teamAverage < 1.0"
+                    class="tsp-eff-weight"
+                    [title]="'Eff. team: ' + (teamAverage * 100).toFixed(0) + '%'">
+                ×{{ (teamAverage * 100).toFixed(0) }}%
+              </span>
+            </div>
+            <div class="tsp-bar-bg">
+              <div class="tsp-bar-fg"
+                   [class.high]="(chemistryScore ?? 0) >= 80"
+                   [class.mid]="(chemistryScore ?? 0) >= 60 && (chemistryScore ?? 0) < 80"
+                   [class.low]="(chemistryScore ?? 0) < 60"
+                   [style.width.%]="chemistryScore ?? 0"></div>
+            </div>
+            <div class="tsp-stats-row">
+              <div class="tsp-stat">
+                <span class="tsp-stat-label">Stamina avg</span>
+                <span class="tsp-stat-val"
+                      [class.high]="avgStamina >= 70"
+                      [class.low]="avgStamina < 30">{{ avgStamina }}%</span>
+              </div>
+              <div class="tsp-stat">
+                <span class="tsp-stat-label">Eff. team</span>
+                <span class="tsp-stat-val"
+                      [class.high]="(teamAverage ?? 0) >= 0.85"
+                      [class.mid]="(teamAverage ?? 0) >= 0.5 && (teamAverage ?? 0) < 0.85"
+                      [class.low]="(teamAverage ?? 0) < 0.5">
+                  {{ teamAverage !== null ? (teamAverage * 100).toFixed(0) + '%' : '—' }}
+                </span>
+              </div>
+              <div class="tsp-stat">
+                <span class="tsp-stat-label">Injured</span>
+                <span class="tsp-stat-val"
+                      [class.danger]="injuredCount > 0">{{ injuredCount }}</span>
+              </div>
+            </div>
+          </section>
+
+          <!-- 3. Combat ratings: ATT / MID / DEF as percentages -->
+          <section class="tsp-section">
+            <h3 class="tsp-title">⚔ Attack vs Defense</h3>
+            <div class="tsp-rating-row">
+              <div class="tsp-rating-col">
+                <span class="tsp-rating-label">ATT</span>
+                <span class="tsp-rating-val"
+                      [class.high]="attackRating >= 70"
+                      [class.mid]="attackRating >= 50 && attackRating < 70"
+                      [class.low]="attackRating < 50">
+                  {{ attackRating }}%
+                </span>
+                <div class="tsp-bar-bg">
+                  <div class="tsp-bar-fg"
+                       [class.high]="attackRating >= 70"
+                       [class.mid]="attackRating >= 50 && attackRating < 70"
+                       [class.low]="attackRating < 50"
+                       [style.width.%]="attackRating"></div>
+                </div>
+              </div>
+              <div class="tsp-rating-col">
+                <span class="tsp-rating-label">MID</span>
+                <span class="tsp-rating-val"
+                      [class.high]="midfieldRating >= 70"
+                      [class.mid]="midfieldRating >= 50 && midfieldRating < 70"
+                      [class.low]="midfieldRating < 50">
+                  {{ midfieldRating }}%
+                </span>
+                <div class="tsp-bar-bg">
+                  <div class="tsp-bar-fg"
+                       [class.high]="midfieldRating >= 70"
+                       [class.mid]="midfieldRating >= 50 && midfieldRating < 70"
+                       [class.low]="midfieldRating < 50"
+                       [style.width.%]="midfieldRating"></div>
+                </div>
+              </div>
+              <div class="tsp-rating-col">
+                <span class="tsp-rating-label">DEF</span>
+                <span class="tsp-rating-val"
+                      [class.high]="defenseRating >= 70"
+                      [class.mid]="defenseRating >= 50 && defenseRating < 70"
+                      [class.low]="defenseRating < 50">
+                  {{ defenseRating }}%
+                </span>
+                <div class="tsp-bar-bg">
+                  <div class="tsp-bar-fg"
+                       [class.high]="defenseRating >= 70"
+                       [class.mid]="defenseRating >= 50 && defenseRating < 70"
+                       [class.low]="defenseRating < 50"
+                       [style.width.%]="defenseRating"></div>
+                </div>
+              </div>
+            </div>
+            <div class="tsp-net-row">
+              <span class="tsp-net-label">Balance</span>
+              <span class="tsp-net-val"
+                    [class.attack-leaning]="attackRating > defenseRating + 5"
+                    [class.defense-leaning]="defenseRating > attackRating + 5">
+                <ng-container *ngIf="attackRating > defenseRating + 5">Ofensivo +{{ attackRating - defenseRating }}</ng-container>
+                <ng-container *ngIf="defenseRating > attackRating + 5">Defensivo +{{ defenseRating - attackRating }}</ng-container>
+                <ng-container *ngIf="attackRating <= defenseRating + 5 && defenseRating <= attackRating + 5">Equilibrado</ng-container>
+              </span>
+            </div>
+          </section>
+
+          <!-- 4. Playing characteristics: pace / technique / mentality -->
+          <section class="tsp-section">
+            <h3 class="tsp-title">🎯 Características</h3>
+            <div class="tsp-attr-row">
+              <span class="tsp-attr-label">⚡ Pace</span>
+              <div class="tsp-bar-bg">
+                <div class="tsp-bar-fg neutral" [style.width.%]="paceRating"></div>
+              </div>
+              <span class="tsp-attr-val">{{ paceRating }}</span>
+            </div>
+            <div class="tsp-attr-row">
+              <span class="tsp-attr-label">🧠 Technique</span>
+              <div class="tsp-bar-bg">
+                <div class="tsp-bar-fg neutral" [style.width.%]="techniqueRating"></div>
+              </div>
+              <span class="tsp-attr-val">{{ techniqueRating }}</span>
+            </div>
+            <div class="tsp-attr-row">
+              <span class="tsp-attr-label">🧱 Mentality</span>
+              <div class="tsp-bar-bg">
+                <div class="tsp-bar-fg neutral" [style.width.%]="mentalityRating"></div>
+              </div>
+              <span class="tsp-attr-val">{{ mentalityRating }}</span>
+            </div>
+          </section>
+
+          <!-- 5. Zone breakdown table -->
+          <section class="tsp-section">
+            <h3 class="tsp-title">📋 Zonas</h3>
+            <table class="tsp-table">
+              <thead>
+                <tr>
+                  <th class="tsp-th-zone">Zona</th>
+                  <th class="tsp-th-num">N</th>
+                  <th class="tsp-th-num">OVR</th>
+                  <th class="tsp-th-num">Eff</th>
+                  <th class="tsp-th-num">%</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let row of zoneBreakdown"
+                    [class.empty-row]="row.count === 0">
+                  <td class="tsp-zone-cell">{{ row.zone }}</td>
+                  <td class="tsp-num-cell">{{ row.count }}</td>
+                  <td class="tsp-num-cell">{{ row.count === 0 ? '—' : row.avgOverall }}</td>
+                  <td class="tsp-num-cell"
+                      [class.high]="row.avgEff >= 85"
+                      [class.mid]="row.avgEff >= 50 && row.avgEff < 85"
+                      [class.low]="row.avgEff < 50 && row.count > 0">
+                    {{ row.count === 0 ? '—' : row.avgEff + '%' }}
+                  </td>
+                  <td class="tsp-num-cell">{{ row.contributionPct }}%</td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+        </aside>
+
+        <div class="field-and-bench">
       <!-- Field Canvas - Vertical Orientation -->
       <div class="field-container">
         <!-- V25D99-FRONT: el campo YA NO es cdkDropList. Pre-V25D99 era cdkDropList
@@ -434,6 +637,8 @@ import { SessionPlayer } from '../../shared/models/player.model';
           </span>
         </div>
       </div>
+        </div><!-- /.field-and-bench -->
+      </div><!-- /.main-area -->
 
       <!-- Info Footer -->
       <div class="squad-footer">
@@ -996,6 +1201,282 @@ import { SessionPlayer } from '../../shared/models/player.model';
     }
 
     /* Field Container */
+    /* V25D99.13-FRONT: 2-col layout for the field area. Panel on the left,
+       field+bench column on the right. flex:1 so the main-area takes the
+       remaining vertical space between header and footer. */
+    .main-area {
+      flex: 1;
+      display: flex;
+      flex-direction: row;
+      align-items: stretch;
+      gap: 8px;
+      padding: 0 8px;
+      min-height: 0;
+    }
+    .field-and-bench {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      min-height: 0;
+    }
+    .team-stats-panel {
+      flex: 0 0 280px;
+      width: 280px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 10px;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 8px;
+      color: #fff;
+      font-size: 0.78rem;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+    }
+    .team-stats-panel::-webkit-scrollbar { width: 6px; }
+    .team-stats-panel::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.3);
+      border-radius: 3px;
+    }
+
+    /* V25D99.13-FRONT: Team stats panel internals. Sectioned layout with
+       thin dividers between sections. Color-band conventions used across
+       all rating bars: green ≥ 70% (good), mid 50-69% (yellow),
+       low < 50% (red). The same thresholds apply to chemistry, eff
+       and the ATT/MID/DEF combat ratings so the panel reads consistently. */
+    .tsp-section {
+      padding: 6px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .tsp-section:last-child { border-bottom: none; }
+    .tsp-title {
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.7);
+      margin: 0 0 6px 0;
+    }
+    .tsp-formation-row {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+    .tsp-formation-label {
+      font-size: 0.7rem;
+      color: rgba(255, 255, 255, 0.55);
+    }
+    .tsp-formation-value {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #fff;
+    }
+    .tsp-formation-value.is-custom {
+      color: #f59e0b;
+      font-style: italic;
+    }
+    .tsp-coverage {
+      margin-left: auto;
+      font-size: 0.7rem;
+      color: rgba(255, 255, 255, 0.55);
+      font-weight: 600;
+    }
+    .tsp-style-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 4px;
+    }
+    .tsp-tag {
+      display: inline-block;
+      padding: 2px 8px;
+      background: rgba(72, 187, 120, 0.18);
+      border: 1px solid rgba(72, 187, 120, 0.5);
+      border-radius: 999px;
+      font-size: 0.65rem;
+      color: #b4f0c2;
+      font-weight: 600;
+    }
+    .tsp-tag-empty {
+      font-size: 0.65rem;
+      color: rgba(255, 255, 255, 0.4);
+      font-style: italic;
+    }
+    .tsp-chem-row {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+    .tsp-chem-value {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: -0.5px;
+    }
+    .tsp-chem-max {
+      font-size: 0.75rem;
+      color: rgba(255, 255, 255, 0.5);
+      font-weight: 400;
+      margin-left: 2px;
+    }
+    .tsp-eff-weight {
+      font-size: 0.7rem;
+      color: rgba(255, 255, 255, 0.6);
+      padding: 1px 6px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 4px;
+    }
+    .tsp-bar-bg {
+      width: 100%;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+      overflow: hidden;
+      margin: 4px 0;
+    }
+    .tsp-bar-fg {
+      height: 100%;
+      background: #48bb78;
+      border-radius: 3px;
+      transition: width 0.18s ease, background 0.18s ease;
+    }
+    .tsp-bar-fg.neutral { background: rgba(255, 255, 255, 0.6); }
+    .tsp-bar-fg.high { background: #48bb78; }
+    .tsp-bar-fg.mid { background: #eab308; }
+    .tsp-bar-fg.low { background: #c53030; }
+    .tsp-stats-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 6px;
+      margin-top: 6px;
+    }
+    .tsp-stat {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding: 4px 6px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 4px;
+    }
+    .tsp-stat-label {
+      font-size: 0.6rem;
+      color: rgba(255, 255, 255, 0.5);
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    .tsp-stat-val {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #fff;
+    }
+    .tsp-stat-val.high { color: #48bb78; }
+    .tsp-stat-val.mid { color: #eab308; }
+    .tsp-stat-val.low { color: #c53030; }
+    .tsp-stat-val.danger { color: #fc8181; }
+    .tsp-rating-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .tsp-rating-col {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .tsp-rating-label {
+      font-size: 0.65rem;
+      color: rgba(255, 255, 255, 0.55);
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+    .tsp-rating-val {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #fff;
+    }
+    .tsp-rating-val.high { color: #48bb78; }
+    .tsp-rating-val.mid { color: #eab308; }
+    .tsp-rating-val.low { color: #c53030; }
+    .tsp-net-row {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      margin-top: 4px;
+      padding: 4px 6px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 4px;
+    }
+    .tsp-net-label {
+      font-size: 0.65rem;
+      color: rgba(255, 255, 255, 0.55);
+      text-transform: uppercase;
+    }
+    .tsp-net-val {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: rgba(255, 255, 255, 0.85);
+    }
+    .tsp-net-val.attack-leaning { color: #f59e0b; }
+    .tsp-net-val.defense-leaning { color: #3b82f6; }
+    .tsp-attr-row {
+      display: grid;
+      grid-template-columns: 70px 1fr 30px;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+    .tsp-attr-label {
+      font-size: 0.7rem;
+      color: rgba(255, 255, 255, 0.75);
+      font-weight: 600;
+    }
+    .tsp-attr-val {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #fff;
+      text-align: right;
+    }
+    .tsp-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.72rem;
+    }
+    .tsp-table th {
+      text-align: right;
+      padding: 2px 4px;
+      color: rgba(255, 255, 255, 0.5);
+      font-weight: 600;
+      font-size: 0.62rem;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .tsp-table th.tsp-th-zone { text-align: left; }
+    .tsp-table td {
+      padding: 3px 4px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      color: #fff;
+    }
+    .tsp-zone-cell {
+      font-weight: 700;
+      color: #a0d4a8;
+    }
+    .tsp-num-cell {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+    .tsp-num-cell.high { color: #48bb78; font-weight: 700; }
+    .tsp-num-cell.mid { color: #eab308; }
+    .tsp-num-cell.low { color: #c53030; }
+    tr.empty-row td { color: rgba(255, 255, 255, 0.3); font-style: italic; }
+
     .field-container {
       flex: 1;
       display: flex;
@@ -2224,6 +2705,240 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
    */
   isCustomLineup(): boolean {
     return this._isCustomLineup;
+  }
+
+  /**
+   * V25D99.13-FRONT: convenience getter for the template. Mirrors
+   * {@code getDisplayedChemistryScore()} but unwraps the null as
+   * {@code null} for the panel's `?? '—'` fallback chain.
+   */
+  get chemistryScore(): number | null {
+    return this.getDisplayedChemistryScore();
+  }
+
+  /**
+   * V25D99.13-FRONT: average stamina across the on-field players.
+   * Returns an integer percentage in [0, 100]. When no players are
+   * on the field returns 100 (no players to be tired).
+   */
+  get avgStamina(): number {
+    const ps = this.homePlayers;
+    if (ps.length === 0) { return 100; }
+    const sum = ps.reduce((acc, p) => acc + (typeof p.stamina === 'number' ? p.stamina : 100), 0);
+    return Math.round(sum / ps.length);
+  }
+
+  /**
+   * V25D99.13-FRONT: count of injured players currently on the field.
+   */
+  get injuredCount(): number {
+    return this.homePlayers.filter(p => !!p.injured).length;
+  }
+
+  /**
+   * V25D99.13-FRONT: average of a given per-attribute field across the
+   * on-field players, falling back to `overall` when the attribute is
+   * not populated (auto-select response path doesn't carry per-attribute
+   * data). Returns an integer percentage in [0, 100].
+   */
+  private computeAvgAttribute(players: PlayerOnFieldDto[], attr: 'attack' | 'defense' | 'technique' | 'speed' | 'mentality'): number {
+    if (players.length === 0) { return 0; }
+    let sum = 0;
+    let count = 0;
+    for (const p of players) {
+      const v = (p as any)[attr];
+      const rating = typeof v === 'number' && isFinite(v)
+        ? v
+        : (typeof p.overall === 'number' ? p.overall : 70);
+      sum += rating;
+      count++;
+    }
+    return count === 0 ? 0 : Math.round(sum / count);
+  }
+
+  /**
+   * V25D99.13-FRONT: compute an attack/defense/midfield rating for a
+   * role-family zone, weighted by the per-subdivision effectiveness from
+   * the backend's {@link FormationEffectivenessDTO}.
+   *
+   * <p>Formula: for each player in the zone, take their per-attribute
+   * rating (attack / defense / technique as applicable), multiply by
+   * `formationEffectiveness.perPlayerEffectiveness[player.slotId]`
+   * (1.0 when missing), average across the zone, round to integer [0, 100].
+   */
+  private computeZoneRating(
+    zone: 'GK' | 'DEF' | 'MID' | 'ATT',
+    players: PlayerOnFieldDto[],
+    attr: 'attack' | 'defense' | 'technique' | 'speed' | 'mentality',
+  ): number {
+    const ps = players.filter(p => this.getPositionRoleFamily(p) === zone);
+    if (ps.length === 0) { return 0; }
+    const fe = this.formationEffectiveness$.value;
+    const effMap = (fe && fe.perPlayerEffectiveness) || {};
+    let sum = 0;
+    for (const p of ps) {
+      const v = (p as any)[attr];
+      const rating = typeof v === 'number' && isFinite(v)
+        ? v
+        : (typeof p.overall === 'number' ? p.overall : 70);
+      const eff = (p.slotId && typeof effMap[p.slotId] === 'number')
+        ? effMap[p.slotId]
+        : 1.0;
+      sum += rating * eff;
+    }
+    return Math.round(sum / ps.length);
+  }
+
+  get attackRating(): number {
+    return this.computeZoneRating('ATT', this.homePlayers, 'attack');
+  }
+  get midfieldRating(): number {
+    return this.computeZoneRating('MID', this.homePlayers, 'technique');
+  }
+  get defenseRating(): number {
+    // Defense rating = avg of GK + DEF players (defenders and the keeper
+    // are the two role families with strong 'defense' attribute).
+    const ps = this.homePlayers.filter(p => {
+      const fam = this.getPositionRoleFamily(p);
+      return fam === 'GK' || fam === 'DEF';
+    });
+    if (ps.length === 0) { return 0; }
+    const fe = this.formationEffectiveness$.value;
+    const effMap = (fe && fe.perPlayerEffectiveness) || {};
+    let sum = 0;
+    for (const p of ps) {
+      const v = (p as any)['defense'];
+      const rating = typeof v === 'number' && isFinite(v)
+        ? v
+        : (typeof p.overall === 'number' ? p.overall : 70);
+      const eff = (p.slotId && typeof effMap[p.slotId] === 'number')
+        ? effMap[p.slotId]
+        : 1.0;
+      sum += rating * eff;
+    }
+    return Math.round(sum / ps.length);
+  }
+
+  get paceRating(): number {
+    return this.computeAvgAttribute(this.homePlayers, 'speed');
+  }
+  get techniqueRating(): number {
+    return this.computeAvgAttribute(this.homePlayers, 'technique');
+  }
+  get mentalityRating(): number {
+    return this.computeAvgAttribute(this.homePlayers, 'mentality');
+  }
+
+  /**
+   * V25D99.13-FRONT: derive a few short style tags from the detected
+   * formation label + on-field role distribution. Used by the Match
+   * preview section. Examples:
+   * - '4-3-3' -> [Possession + Wing Play, Creative mids]
+   * - '5-4-1' -> [Ultra Defensive, Counter-Attack, Compact Midfield]
+   * - custom  -> [Custom formation]
+   */
+  deriveStyleTags(formationLabel: string, players: PlayerOnFieldDto[]): string[] {
+    const tags: string[] = [];
+    const roleCounts: Record<string, number> = {};
+    for (const p of players) {
+      const role = (p.role || '').toUpperCase();
+      roleCounts[role] = (roleCounts[role] || 0) + 1;
+    }
+    const has = (k: string) => (roleCounts[k] || 0) > 0;
+    const count = (k: string) => roleCounts[k] || 0;
+
+    // Formation-shape tags first.
+    switch (formationLabel) {
+      case '4-3-3': tags.push('Possession + Wing Play', 'Creative mids'); break;
+      case '4-4-2': tags.push('Balanced', 'Direct Attack'); break;
+      case '3-5-2': tags.push('Midfield Dominance', 'Wing-Back Overlap'); break;
+      case '5-3-2': tags.push('Defensive', 'Counter-Attack'); break;
+      case '4-5-1': tags.push('Defensive Midfield', 'Counter-Attack'); break;
+      case '5-4-1': tags.push('Ultra Defensive', 'Compact Midfield'); break;
+      case '3-4-3': tags.push('Attacking Wing Play', 'High Press'); break;
+      case '4-2-3-1': tags.push('Tactical + Creative', 'Holding Midfield'); break;
+      case '4-1-4-1': tags.push('Compact Defensive', 'Counter-Attack'); break;
+      case '3-5-1-1': tags.push('Midfield Dominance', 'False Nine'); break;
+      default:
+        // Custom / unrecognized.
+        if (players.length >= 11) { tags.push('Custom Formation'); }
+    }
+
+    // Role-based overlay tags (additive on top of formation-shape).
+    if (has('CAM') && !tags.some(t => t.includes('Creative'))) { tags.push('Creative mid'); }
+    if (has('CDM') && !tags.some(t => t.includes('Holding'))) { tags.push('Holding mid'); }
+    if ((has('LW') || has('RW')) && !tags.some(t => t.includes('Wing'))) { tags.push('Wing Play'); }
+    if (count('CB') >= 4 && !tags.some(t => t.includes('Defensive'))) { tags.push('Defensive Line'); }
+    if (count('ST') >= 3 && !tags.some(t => t.includes('Direct'))) { tags.push('Direct Attack'); }
+    if (players.length < 11) { tags.length = 0; tags.push('Lineup incompleto'); }
+
+    return tags;
+  }
+
+  /**
+   * V25D99.13-FRONT: expose style tags as a getter for the template
+   * (ngFor over `styleTags`). Recomputes on every change-detection cycle
+   * because the underlying BehaviorSubjects (homePlayers$, formationEffectiveness$)
+   * trigger CD on emit.
+   */
+  get styleTags(): string[] {
+    return this.deriveStyleTags(this.dropdownFormationValue, this.homePlayers);
+  }
+
+  /**
+   * V25D99.13-FRONT: compute the per-zone breakdown for the table.
+   * Returns 4 rows (GK / DEF / MID / ATT) regardless of player count;
+   * empty rows show '—' in the template.
+   *
+   * Each row has:
+   * - zone label
+   * - count (players in the zone)
+   * - avgOverall (raw overall, no eff weight)
+   * - avgEff (avg of formationEffectiveness.perPlayerEffectiveness for
+   *   the zone's players, in percent [0, 100]; 100 when no eff data)
+   * - contributionPct (N * avgOverall * avgEff / sum_total normalized
+   *   to 100)
+   */
+  get zoneBreakdown(): Array<{
+    zone: string;
+    count: number;
+    avgOverall: number;
+    avgEff: number;
+    contributionPct: number;
+  }> {
+    const zones: Array<'GK' | 'DEF' | 'MID' | 'ATT'> = ['GK', 'DEF', 'MID', 'ATT'];
+    const fe = this.formationEffectiveness$.value;
+    const effMap = (fe && fe.perPlayerEffectiveness) || {};
+    const players = this.homePlayers;
+
+    const rows = zones.map(zone => {
+      const zonePlayers = players.filter(p => this.getPositionRoleFamily(p) === zone);
+      const count = zonePlayers.length;
+      const avgOverall = count === 0
+        ? 0
+        : Math.round(zonePlayers.reduce((acc, p) => acc + (p.overall || 70), 0) / count);
+      const avgEff = count === 0
+        ? 0
+        : Math.round(
+            (zonePlayers.reduce((acc, p) => {
+              const e = (p.slotId && typeof effMap[p.slotId] === 'number') ? effMap[p.slotId] : 1;
+              return acc + e;
+            }, 0) / count) * 100
+          );
+      const contributionScore = count * avgOverall * (avgEff / 100);
+      return { zone, count, avgOverall, avgEff, contributionScore };
+    });
+
+    const totalContribution = rows.reduce((acc, r) => acc + r.contributionScore, 0);
+    return rows.map(r => ({
+      zone: r.zone,
+      count: r.count,
+      avgOverall: r.avgOverall,
+      avgEff: r.avgEff,
+      contributionPct: totalContribution === 0
+        ? 0
+        : Math.round((r.contributionScore / totalContribution) * 100),
+    }));
   }
 
   /** Cache de posiciones de formación */
@@ -3984,7 +4699,19 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
           position: sp.position,
           overall: sp.attack ?? 70,
           energy: sp.energy ?? 100,
-          injured: sp.injured ?? false
+          injured: sp.injured ?? false,
+          // V25D99.13-FRONT: carry the per-attribute ratings from
+          // SessionPlayer into the modal-internal DTO so the Team Stats
+          // panel can compute ATT/DEF/MID ratings and pace/technique/
+          // mentality without an extra round trip. Falls back to
+          // 'overall' (or 70) when the SessionPlayer record is missing
+          // an attribute (defensive players historically don't carry
+          // 'attack', etc.).
+          attack: sp.attack ?? 70,
+          defense: sp.defense ?? 70,
+          technique: sp.technique ?? 70,
+          speed: sp.speed ?? 70,
+          mentality: sp.mentality ?? 70
         }))
       : playersList;
 
@@ -3998,7 +4725,13 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
       slotId: '',
       stamina: p.energy || 100,
       active: !p.injured,
-      isEmpty: false
+      isEmpty: false,
+      // V25D99.13-FRONT: per-attribute pass-through (see PlayerOnFieldDto).
+      attack: typeof p.attack === 'number' ? p.attack : undefined,
+      defense: typeof p.defense === 'number' ? p.defense : undefined,
+      technique: typeof p.technique === 'number' ? p.technique : undefined,
+      speed: typeof p.speed === 'number' ? p.speed : undefined,
+      mentality: typeof p.mentality === 'number' ? p.mentality : undefined
     }));
 
     // Asignar slots según posición EXACTA del jugador

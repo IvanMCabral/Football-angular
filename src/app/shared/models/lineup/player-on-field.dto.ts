@@ -35,4 +35,17 @@ export interface PlayerOnFieldDto {
   xPercent?: number;
   /** V25D98-FRONT: override de posición Y (en % del field height, [0..100]). */
   yPercent?: number;
+  /**
+   * V25D99.13-FRONT: per-attribute ratings [0..100], populated from
+   * SessionPlayer when the squad is passed via dialog data. Used by the
+   * Team Stats panel (left of the field) to compute offensive / defensive /
+   * midfield / pace / mentality ratings. Optional because the
+   * auto-select response (PlayerLineupDTO) doesn't carry them — when
+   * absent the panel falls back to `overall`.
+   */
+  attack?: number;
+  defense?: number;
+  technique?: number;
+  speed?: number;
+  mentality?: number;
 }
