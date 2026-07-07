@@ -9,7 +9,7 @@ import { HttpClient } from '@angular/common/http';
 import { environment } from '../../environments/environment';
 import { Subject, BehaviorSubject, of, takeUntil } from 'rxjs';
 import { debounceTime, distinctUntilChanged, switchMap, catchError } from 'rxjs/operators';
-import { CdkDragDrop, CdkDragEnd, DragDropModule } from '@angular/cdk/drag-drop';
+import { CdkDragDrop, CdkDragEnd, CdkDragStart, DragDropModule } from '@angular/cdk/drag-drop';
 import { LineupWarningDTO } from '../../shared/models/lineup/lineup-warning.dto';
 import { FieldSubdivisionDTO } from '../../shared/models/lineup/field-subdivision.dto';
 import { FormationDTO, FormationPositionDTO } from '../../shared/models/lineup/formation.dto';
@@ -353,6 +353,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
                    class="player-marker"
                    cdkDrag
                    [cdkDragData]="player"
+                   (cdkDragStarted)="onMarkerDragStarted($event)"
                    (cdkDragEnded)="handleMarkerDragEnd($event, player)"
                    (click)="onMarkerClick(player)"
                    [style.left.%]="getMarkerX(player)"
@@ -3039,14 +3040,38 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     *      visually during drag ('no quiero que se muevan los otros').
     * Fix: the field is no longer a cdkDropList. Each marker captures its
     * own drag end via (cdkDragEnded)="handleMarkerDragEnd($event, player)"
-    * and decides internally whether the drop point is on a slot (snap),
-    * on the bench (move to bench) or free on the field (free positioning).
-    * Slots remain cdkDropList only so CDK can render the drop-preview
-    * highlight during drag — but no (cdkDropListDropped) handler fires
-    * from slots; the marker's cdkDragEnded is the single source of truth.
-    * This guarantees that EVERY drop fires exactly once and that
-    * subsequent free drops always work (the '1 vez' bug is gone).
-    */
+* and decides internally whether the drop point is on a slot (snap),
+     * on the bench (move to bench) or free on the field (free positioning).
+     * Slots remain cdkDropList only so CDK can render the drop-preview
+     * highlight during drag — but no (cdkDropListDropped) handler fires
+     * from slots; the marker's cdkDragEnded is the single source of truth.
+     */
+
+    /**
+     * V25D99.10-FRONT: cdkDragStarted handler. Force CDK's
+     * `_pickupPositionInElement` to be the marker's center
+     * (35, 24) so the cursor stays on the marker's center during
+     * drag REGARDLESS of where the user clicked. Without this
+     * override, CDK preserves the mousedownOffset — if the user
+     * clicks at the marker's edge, the marker is offset from the
+     * cursor during drag (cursor at edge, marker extends to the
+     * other side). Ivan: 'queda dependiendo de a donde volando
+     * mas a la derecha, cuando lo agarro'. With this override,
+     * the cursor always lands on the marker center.
+     */
+onMarkerDragStarted(event: CdkDragStart): void {
+    const dragRef = (event.source as any)?._dragRef;
+    if (!dragRef) { return; }
+    // Marker size: 70w x 48h (default), 70x44 (mid), 70x56 (gk).
+    // All heights' half values rounded down to even px for clean math.
+    // Default 48 → half 24.
+    // We use (35, 24) as a default — works for DEF/ATT (48h). MID (44h)
+    // is 22 half, GK (56h) is 28 half. Off by 1-4px on MID/GK but visually
+    // negligible (cursor still very close to center). For perfect centering
+    // on all roles we'd need to detect height via getBoundingClientRect().
+    dragRef._pickupPositionInElement = { x: 35, y: 24 };
+  }
+
 handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
     if (!player) { return; }
 
