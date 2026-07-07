@@ -257,61 +257,131 @@ import { SessionPlayer } from '../../shared/models/player.model';
               <div class="tsp-rating-col">
                 <span class="tsp-rating-label">ATT</span>
                 <span class="tsp-rating-val"
-                      [class.high]="attackRating >= 70"
-                      [class.mid]="attackRating >= 50 && attackRating < 70"
-                      [class.low]="attackRating < 50">
-                  {{ attackRating }}%
+                      [class.high]="attackRatingV2 >= 70"
+                      [class.mid]="attackRatingV2 >= 50 && attackRatingV2 < 70"
+                      [class.low]="attackRatingV2 < 50">
+                  {{ attackRatingV2 }}%
                 </span>
                 <div class="tsp-bar-bg">
                   <div class="tsp-bar-fg"
-                       [class.high]="attackRating >= 70"
-                       [class.mid]="attackRating >= 50 && attackRating < 70"
-                       [class.low]="attackRating < 50"
-                       [style.width.%]="attackRating"></div>
+                       [class.high]="attackRatingV2 >= 70"
+                       [class.mid]="attackRatingV2 >= 50 && attackRatingV2 < 70"
+                       [class.low]="attackRatingV2 < 50"
+                       [style.width.%]="attackRatingV2"></div>
                 </div>
               </div>
               <div class="tsp-rating-col">
                 <span class="tsp-rating-label">MID</span>
                 <span class="tsp-rating-val"
-                      [class.high]="midfieldRating >= 70"
-                      [class.mid]="midfieldRating >= 50 && midfieldRating < 70"
-                      [class.low]="midfieldRating < 50">
-                  {{ midfieldRating }}%
+                      [class.high]="midfieldRatingV2 >= 70"
+                      [class.mid]="midfieldRatingV2 >= 50 && midfieldRatingV2 < 70"
+                      [class.low]="midfieldRatingV2 < 50">
+                  {{ midfieldRatingV2 }}%
                 </span>
                 <div class="tsp-bar-bg">
                   <div class="tsp-bar-fg"
-                       [class.high]="midfieldRating >= 70"
-                       [class.mid]="midfieldRating >= 50 && midfieldRating < 70"
-                       [class.low]="midfieldRating < 50"
-                       [style.width.%]="midfieldRating"></div>
+                       [class.high]="midfieldRatingV2 >= 70"
+                       [class.mid]="midfieldRatingV2 >= 50 && midfieldRatingV2 < 70"
+                       [class.low]="midfieldRatingV2 < 50"
+                       [style.width.%]="midfieldRatingV2"></div>
                 </div>
               </div>
               <div class="tsp-rating-col">
                 <span class="tsp-rating-label">DEF</span>
                 <span class="tsp-rating-val"
-                      [class.high]="defenseRating >= 70"
-                      [class.mid]="defenseRating >= 50 && defenseRating < 70"
-                      [class.low]="defenseRating < 50">
-                  {{ defenseRating }}%
+                      [class.high]="defenseRatingV2 >= 70"
+                      [class.mid]="defenseRatingV2 >= 50 && defenseRatingV2 < 70"
+                      [class.low]="defenseRatingV2 < 50">
+                  {{ defenseRatingV2 }}%
                 </span>
                 <div class="tsp-bar-bg">
                   <div class="tsp-bar-fg"
-                       [class.high]="defenseRating >= 70"
-                       [class.mid]="defenseRating >= 50 && defenseRating < 70"
-                       [class.low]="defenseRating < 50"
-                       [style.width.%]="defenseRating"></div>
+                       [class.high]="defenseRatingV2 >= 70"
+                       [class.mid]="defenseRatingV2 >= 50 && defenseRatingV2 < 70"
+                       [class.low]="defenseRatingV2 < 50"
+                       [style.width.%]="defenseRatingV2"></div>
                 </div>
               </div>
             </div>
             <div class="tsp-net-row">
               <span class="tsp-net-label">Balance</span>
               <span class="tsp-net-val"
-                    [class.attack-leaning]="attackRating > defenseRating + 5"
-                    [class.defense-leaning]="defenseRating > attackRating + 5">
-                <ng-container *ngIf="attackRating > defenseRating + 5">Ofensivo +{{ attackRating - defenseRating }}</ng-container>
-                <ng-container *ngIf="defenseRating > attackRating + 5">Defensivo +{{ defenseRating - attackRating }}</ng-container>
-                <ng-container *ngIf="attackRating <= defenseRating + 5 && defenseRating <= attackRating + 5">Equilibrado</ng-container>
+                    [class.attack-leaning]="attackRatingV2 > defenseRatingV2 + 5"
+                    [class.defense-leaning]="defenseRatingV2 > attackRatingV2 + 5">
+                <ng-container *ngIf="attackRatingV2 > defenseRatingV2 + 5">Ofensivo +{{ attackRatingV2 - defenseRatingV2 }}</ng-container>
+                <ng-container *ngIf="defenseRatingV2 > attackRatingV2 + 5">Defensivo +{{ defenseRatingV2 - attackRatingV2 }}</ng-container>
+                <ng-container *ngIf="attackRatingV2 <= defenseRatingV2 + 5 && defenseRatingV2 <= attackRatingV2 + 5">Equilibrado</ng-container>
               </span>
+            </div>
+          </section>
+
+          <!-- 3b. V25D99.14-FRONT: Off-role players section. Lists each
+               player whose natural role family doesn't match the zone
+               they're placed in. Hidden when everyone is on-role. -->
+          <section class="tsp-section" *ngIf="offRolePlayers?.length">
+            <h3 class="tsp-title">⚠ Penalizaciones ({{ offRolePlayers.length }})</h3>
+            <div class="tsp-offrole-list">
+              <div *ngFor="let o of offRolePlayers"
+                   class="tsp-offrole-row"
+                   [class.severe]="o.penaltyPct >= 25"
+                   [class.warning]="o.penaltyPct >= 10 && o.penaltyPct < 25">
+                <div class="tsp-offrole-name">{{ o.player.name }}</div>
+                <div class="tsp-offrole-detail">
+                  <span class="tsp-offrole-role">{{ o.naturalRole }}</span>
+                  <span class="tsp-offrole-arrow">→</span>
+                  <span class="tsp-offrole-zone">{{ o.actualZone }}</span>
+                </div>
+                <div class="tsp-offrole-penalty"
+                     [class.severe]="o.penaltyPct >= 25"
+                     [class.warning]="o.penaltyPct >= 10 && o.penaltyPct < 25">
+                  -{{ o.penaltyPct }}%
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- 3c. V25D99.14-FRONT: Coverage matrix by zone x column.
+               Shows where the field is exposed (empty columns in a zone).
+               Ivan: "que baje la defensa dependiendo el lado que no se
+               cubre de la cancha". -->
+          <section class="tsp-section">
+            <h3 class="tsp-title">🛡️ Cobertura</h3>
+            <table class="tsp-coverage-table">
+              <thead>
+                <tr>
+                  <th class="tsp-cv-zone">Zona</th>
+                  <th class="tsp-cv-col" title="Lateral izquierdo">L</th>
+                  <th class="tsp-cv-col" title="Centro">C</th>
+                  <th class="tsp-cv-col" title="Lateral derecho">R</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let row of coverageMatrix"
+                    [class.cv-all-empty]="row.L === 0 && row.C === 0 && row.R === 0">
+                  <td class="tsp-cv-zone-cell">{{ row.zone }}</td>
+                  <td class="tsp-cv-cell"
+                      [class.empty]="row.L === 0"
+                      [class.low]="row.L === 1"
+                      [class.ok]="row.L >= 2">
+                    {{ row.L }}
+                  </td>
+                  <td class="tsp-cv-cell"
+                      [class.empty]="row.C === 0"
+                      [class.low]="row.C === 1"
+                      [class.ok]="row.C >= 2">
+                    {{ row.C }}
+                  </td>
+                  <td class="tsp-cv-cell"
+                      [class.empty]="row.R === 0"
+                      [class.low]="row.R === 1"
+                      [class.ok]="row.R >= 2">
+                    {{ row.R }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <div *ngIf="coverageWarnings?.length" class="tsp-cv-warnings">
+              <div *ngFor="let w of coverageWarnings" class="tsp-cv-warning">⚠ {{ w }}</div>
             </div>
           </section>
 
@@ -1476,6 +1546,134 @@ import { SessionPlayer } from '../../shared/models/player.model';
     .tsp-num-cell.mid { color: #eab308; }
     .tsp-num-cell.low { color: #c53030; }
     tr.empty-row td { color: rgba(255, 255, 255, 0.3); font-style: italic; }
+
+    /* V25D99.14-FRONT: Off-role player rows. Each row shows the player
+       name, original role, current zone, and the penalty percentage.
+       Color band: 10-24% = yellow warning, 25%+ = red severe. */
+    .tsp-offrole-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .tsp-offrole-row {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 6px;
+      background: rgba(234, 179, 8, 0.08);
+      border-left: 2px solid #eab308;
+      border-radius: 3px;
+    }
+    .tsp-offrole-row.severe {
+      background: rgba(197, 48, 48, 0.12);
+      border-left-color: #c53030;
+    }
+    .tsp-offrole-row.warning {
+      background: rgba(234, 179, 8, 0.1);
+      border-left-color: #eab308;
+    }
+    .tsp-offrole-name {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .tsp-offrole-detail {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.65rem;
+    }
+    .tsp-offrole-role {
+      color: rgba(255, 255, 255, 0.7);
+      font-weight: 600;
+    }
+    .tsp-offrole-arrow { color: rgba(255, 255, 255, 0.4); }
+    .tsp-offrole-zone {
+      color: #a0d4a8;
+      font-weight: 700;
+    }
+    .tsp-offrole-penalty {
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 3px;
+      color: #eab308;
+      background: rgba(234, 179, 8, 0.15);
+      white-space: nowrap;
+    }
+    .tsp-offrole-penalty.severe {
+      color: #fc8181;
+      background: rgba(197, 48, 48, 0.25);
+    }
+    .tsp-offrole-penalty.warning {
+      color: #eab308;
+      background: rgba(234, 179, 8, 0.18);
+    }
+
+    /* V25D99.14-FRONT: Coverage matrix. 3 zones x 3 columns. Cells are
+       color-coded by occupancy: 0 = exposed (red), 1 = low (yellow),
+       2+ = ok (green). */
+    .tsp-coverage-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.7rem;
+      margin-top: 4px;
+    }
+    .tsp-coverage-table th {
+      padding: 2px 4px;
+      font-size: 0.62rem;
+      color: rgba(255, 255, 255, 0.55);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .tsp-coverage-table th.tsp-cv-zone { text-align: left; }
+    .tsp-coverage-table th.tsp-cv-col { text-align: center; width: 25%; }
+    .tsp-coverage-table td {
+      padding: 4px 4px;
+      text-align: center;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+    .tsp-cv-zone-cell {
+      text-align: left !important;
+      color: #a0d4a8;
+      font-weight: 700;
+    }
+    .tsp-cv-cell.empty {
+      background: rgba(197, 48, 48, 0.25);
+      color: #fc8181;
+      border-radius: 3px;
+    }
+    .tsp-cv-cell.low {
+      background: rgba(234, 179, 8, 0.18);
+      color: #eab308;
+      border-radius: 3px;
+    }
+    .tsp-cv-cell.ok {
+      background: rgba(72, 187, 120, 0.18);
+      color: #48bb78;
+      border-radius: 3px;
+    }
+    tr.cv-all-empty td.tsp-cv-cell { background: rgba(197, 48, 48, 0.4); }
+    .tsp-cv-warnings {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      margin-top: 6px;
+    }
+    .tsp-cv-warning {
+      font-size: 0.65rem;
+      color: #fc8181;
+      padding: 2px 4px;
+      background: rgba(197, 48, 48, 0.08);
+      border-radius: 3px;
+    }
 
     .field-container {
       flex: 1;
@@ -2939,6 +3137,206 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
         ? 0
         : Math.round((r.contributionScore / totalContribution) * 100),
     }));
+  }
+
+  /**
+   * V25D99.14-FRONT: list the on-field players whose `player.role` does
+   * NOT match the zone they're currently placed in (per V25D99.12
+   * position-based detection). Ivan: "mostrame en el defensor qe tiene
+   * penalizacion".
+   *
+   * Each entry carries the player's effective `1.0 - eff` penalty so the
+   * panel can render a `-15%` chip and color the row yellow/red. Sorted
+   * by penalty descending so the worst offenders surface first.
+   */
+  get offRolePlayers(): Array<{
+    player: PlayerOnFieldDto;
+    naturalRole: string;
+    actualZone: 'GK' | 'DEF' | 'MID' | 'ATT';
+    penaltyPct: number;
+  }> {
+    const fe = this.formationEffectiveness$.value;
+    const effMap = (fe && fe.perPlayerEffectiveness) || {};
+    const result: Array<{
+      player: PlayerOnFieldDto;
+      naturalRole: string;
+      actualZone: 'GK' | 'DEF' | 'MID' | 'ATT';
+      penaltyPct: number;
+    }> = [];
+    for (const p of this.homePlayers) {
+      const natural = this.getRoleFamily(p.role);
+      const actual = this.getPositionRoleFamily(p);
+      if (!natural || !actual) { continue; }
+      if (natural === actual) { continue; }
+      const eff = (p.slotId && typeof effMap[p.slotId] === 'number') ? effMap[p.slotId] : 1.0;
+      const penaltyPct = Math.max(0, Math.round((1 - eff) * 100));
+      result.push({ player: p, naturalRole: p.role, actualZone: actual, penaltyPct });
+    }
+    result.sort((a, b) => b.penaltyPct - a.penaltyPct);
+    return result;
+  }
+
+  /**
+   * V25D99.14-FRONT: classify a player's xPct into one of three columns:
+   * LEFT (xPct < 33), CENTER (33 ≤ xPct < 67), RIGHT (xPct ≥ 67). The
+   * field's vertical orientation has top% small = ATAQUE and bottom =
+   * DEFENSA, so the X coordinate maps cleanly to "left/right" of the
+   * playing surface as rendered.
+   *
+   * Falls back to player.slotId's subdivisionId center if xPct isn't
+   * set (a freshly-loaded lineup from auto-select).
+   */
+  private getColumn(player: PlayerOnFieldDto): 'L' | 'C' | 'R' {
+    let x: number | undefined;
+    if (typeof player.xPercent === 'number' && isFinite(player.xPercent)) {
+      x = player.xPercent;
+    } else if (player.slotId && this.subdivisions) {
+      const sub = this.subdivisions.find(s => s.subdivisionId === player.slotId);
+      if (sub) {
+        x = sub.left + sub.width / 2;
+      }
+    }
+    if (typeof x !== 'number' || !isFinite(x)) { return 'C'; }
+    if (x < 33) { return 'L'; }
+    if (x < 67) { return 'C'; }
+    return 'R';
+  }
+
+  /**
+   * V25D99.14-FRONT: 12-cell coverage matrix (3 zones x 3 columns).
+   * Each cell holds the count of on-field players in that bucket.
+   * The cell color band: 0 = exposed (red), 1 = low (yellow), 2+ = ok.
+   *
+   * Ivan: "que baje la defensa dependiendo el lado que no se cubre de
+   * la cancha" — when a CB moves up to ATT, the DEF zone now has a hole
+   * in the column they vacated; this matrix surfaces that visually.
+   */
+  get coverageMatrix(): Array<{
+    zone: 'DEF' | 'MID' | 'ATT';
+    L: number;
+    C: number;
+    R: number;
+    warnings: string[];
+  }> {
+    const zones: Array<'DEF' | 'MID' | 'ATT'> = ['DEF', 'MID', 'ATT'];
+    return zones.map(zone => {
+      const inZone = this.homePlayers.filter(p => this.getPositionRoleFamily(p) === zone);
+      const L = inZone.filter(p => this.getColumn(p) === 'L').length;
+      const C = inZone.filter(p => this.getColumn(p) === 'C').length;
+      const R = inZone.filter(p => this.getColumn(p) === 'R').length;
+      const warnings: string[] = [];
+      // Build warnings for empty columns. For DEF zone the threshold is
+      // tighter (no defenders = disaster); for ATT zone a lone striker is
+      // fine but an empty column still shows as exposed.
+      if (L === 0 && C === 0 && R === 0) {
+        warnings.push(`${zone}: zona sin jugadores`);
+      } else {
+        if (L === 0) { warnings.push(`${zone}: lateral izquierdo expuesto`); }
+        if (R === 0) { warnings.push(`${zone}: lateral derecho expuesto`); }
+      }
+      return { zone, L, C, R, warnings };
+    });
+  }
+
+  get coverageWarnings(): string[] {
+    return this.coverageMatrix.flatMap(row => row.warnings);
+  }
+
+  /**
+   * V25D99.14-FRONT: role-match factor for a player placed in a zone
+   * that's not their natural family. Returns:
+   * - 1.0 when natural role family matches the zone they're placed in
+   * - 0.6 when off-role (CB in ATT, ST in DEF, etc.) — a tuned constant
+   *   that approximates "they contribute ~60% of a natural player" so
+   *   dragging a defender up bumps ATT noticeably less than adding a
+   *   real striker. Ivan: "que si haya mejor ataque pero no tanto como
+   *   poner otro delantero".
+   *
+   * The penalty multiplies the per-attribute rating BEFORE the eff
+   * weight, so the off-role hit lands on the rating itself (visible
+   * in the panel) AND propagates into the zone contribution.
+   */
+  private roleMatchFactor(player: PlayerOnFieldDto): number {
+    const natural = this.getRoleFamily(player.role);
+    const actual = this.getPositionRoleFamily(player);
+    if (!natural || !actual) { return 1.0; }
+    return natural === actual ? 1.0 : 0.6;
+  }
+
+  /**
+   * V25D99.14-FRONT: ATT rating with role-match weighting. Same shape
+   * as {@link computeZoneRating} but multiplied by {@link roleMatchFactor}
+   * so a CB dragged into ATT contributes only 60% of their (low) attack
+   * attribute, whereas a ST in ATT contributes 100% of their (high)
+   * attack attribute.
+   */
+  get attackRatingV2(): number {
+    const ps = this.homePlayers.filter(p => this.getPositionRoleFamily(p) === 'ATT');
+    if (ps.length === 0) { return 0; }
+    const fe = this.formationEffectiveness$.value;
+    const effMap = (fe && fe.perPlayerEffectiveness) || {};
+    let sum = 0;
+    for (const p of ps) {
+      const v = (p as any)['attack'];
+      const rating = typeof v === 'number' && isFinite(v)
+        ? v
+        : (typeof p.overall === 'number' ? p.overall : 70);
+      const eff = (p.slotId && typeof effMap[p.slotId] === 'number') ? effMap[p.slotId] : 1.0;
+      const roleFactor = this.roleMatchFactor(p);
+      sum += rating * eff * roleFactor;
+    }
+    return Math.round(sum / ps.length);
+  }
+
+  /**
+   * V25D99.14-FRONT: DEF rating with role-match weighting. Same idea as
+   * attackRatingV2: an attacker dragged into DEF contributes only 60%
+   * of their (low) defense attribute. The function counts GK + DEF
+   * players (keeper + back line) as the defensive cohort.
+   */
+  get defenseRatingV2(): number {
+    const ps = this.homePlayers.filter(p => {
+      const fam = this.getPositionRoleFamily(p);
+      return fam === 'GK' || fam === 'DEF';
+    });
+    if (ps.length === 0) { return 0; }
+    const fe = this.formationEffectiveness$.value;
+    const effMap = (fe && fe.perPlayerEffectiveness) || {};
+    let sum = 0;
+    for (const p of ps) {
+      const v = (p as any)['defense'];
+      const rating = typeof v === 'number' && isFinite(v)
+        ? v
+        : (typeof p.overall === 'number' ? p.overall : 70);
+      const eff = (p.slotId && typeof effMap[p.slotId] === 'number') ? effMap[p.slotId] : 1.0;
+      const roleFactor = this.roleMatchFactor(p);
+      sum += rating * eff * roleFactor;
+    }
+    return Math.round(sum / ps.length);
+  }
+
+  /**
+   * V25D99.14-FRONT: MID rating with role-match weighting. Uses the
+   * technique attribute (passing / possession) as the MID-domain
+   * metric. Same formula as the others; off-role MID players
+   * (CB dragged to MID) get the 0.6 multiplier.
+   */
+  get midfieldRatingV2(): number {
+    const ps = this.homePlayers.filter(p => this.getPositionRoleFamily(p) === 'MID');
+    if (ps.length === 0) { return 0; }
+    const fe = this.formationEffectiveness$.value;
+    const effMap = (fe && fe.perPlayerEffectiveness) || {};
+    let sum = 0;
+    for (const p of ps) {
+      const v = (p as any)['technique'];
+      const rating = typeof v === 'number' && isFinite(v)
+        ? v
+        : (typeof p.overall === 'number' ? p.overall : 70);
+      const eff = (p.slotId && typeof effMap[p.slotId] === 'number') ? effMap[p.slotId] : 1.0;
+      const roleFactor = this.roleMatchFactor(p);
+      sum += rating * eff * roleFactor;
+    }
+    return Math.round(sum / ps.length);
   }
 
   /** Cache de posiciones de formación */
