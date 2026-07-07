@@ -31,6 +31,17 @@ export interface FormationEffectivenessDTO {
   inferredFormation: string;
   perPlayerEffectiveness: Record<string, number>;
   teamAverage: number;
+  /**
+   * V25D99.15-BACK: per-zone team rating × 100. Higher attack = more
+   * dangerous, higher defense = more protection. Range [0, ~200]; 100
+   * = 4-4-2 baseline at median stats. Optional because legacy lineups
+   * (pre-V25D99.15) don't carry these fields — the frontend falls
+   * back to its local heuristic (which is then replaced once the new
+   * engine-computed values arrive from /preview-ratings).
+   */
+  attackRating?: number;
+  midfieldRating?: number;
+  defenseRating?: number;
 }
 
 /**
