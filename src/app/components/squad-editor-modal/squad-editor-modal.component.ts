@@ -3725,6 +3725,12 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
           lineupCounts.mid === canonicalCounts.mid &&
           lineupCounts.att === canonicalCounts.att) {
         this._isCustomLineup = false;
+        // V25D99.12.1-FRONT: keep `selectedFormation` in sync with the
+        // detected canonical so the dropdown label flips (4-4-2 -> 4-3-3
+        // etc) and `saveLineup` sends the new formation name to the back.
+        // Without this line, the dropdown keeps showing the old value even
+        // when the lineup counts actually match a different canonical.
+        this.selectedFormation = f;
         return f;
       }
     }
