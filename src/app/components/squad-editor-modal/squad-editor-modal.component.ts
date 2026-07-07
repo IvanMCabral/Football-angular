@@ -3607,6 +3607,43 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
   }
 
   /**
+   * V25D99.12-FRONT: derive a player's role family from their CURRENT
+   * position on the field (xPct/yPct) via the closest subdivision's
+   * `zone` field, instead of their underlying {@code player.role}.
+   *
+   * <p>Why: the prior {@link detectFormation} counted families based on
+   * {@code player.role} (the skill profile: 'CB', 'ST', etc.). Since
+   * `player.role` does NOT change when the user drags the marker, the
+   * formation label was stable regardless of where the user placed
+   * players. Ivan: 'que cambiar de posicion cambie la formacion'.
+   *
+   * <p>Now: when the user drags a defender forward to the ATT zone, the
+   * closest subdivision's zone is ATTACK → that player contributes to
+   * the ATT family count, not DEF. The 4-4-2 → 3-5-2 → 4-3-3 → non-
+   * canonical progression becomes visible in the formation label.
+   *
+   * <p>Fallback to {@link getRoleFamily} when xPct/yPct are unset
+   * (freshly-loaded lineup, never dragged) — preserves V25D99.11 test
+   * coverage that doesn't set positions.
+   */
+  private getPositionRoleFamily(player: PlayerOnFieldDto): 'GK' | 'DEF' | 'MID' | 'ATT' | null {
+    if (typeof player.xPercent === 'number' && isFinite(player.xPercent) &&
+        typeof player.yPercent === 'number' && isFinite(player.yPercent) &&
+        this.subdivisions && this.subdivisions.length > 0) {
+      const closest = this.findClosestSubdivision(player.xPercent, player.yPercent);
+      if (closest) {
+        const zone = (closest as any).zone ?? '';
+        if (zone === 'GK') return 'GK';
+        if (zone === 'DEFENSE') return 'DEF';
+        if (zone === 'MIDFIELD') return 'MID';
+        if (zone === 'ATTACK') return 'ATT';
+      }
+    }
+    // No position info → fall back to the player's underlying role.
+    return this.getRoleFamily(player.role);
+  }
+
+  /**
    * V25D96-FRONT F2: count role-family occurrences in the supplied list of
    * role strings. Used by {@link detectFormation} to compare the current
    * lineup's role distribution against each canonical formation's role
@@ -3655,16 +3692,34 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
    */
   detectFormation(): string {
     const players = this.homePlayers.filter(p => !!p.slotId);
-    const lineupCounts = this.countRoleFamily(players.map(p => p.role));
 
     if (players.length < 11) {
       this._isCustomLineup = true;
       return USER_FORMATION_LABEL;
     }
 
+    // V25D99.12-FRONT: count role families from the player's CURRENT
+    // position, not their underlying role. This makes the formation
+    // label reflect drag-drop changes (see getPositionRoleFamily).
+    const positions: ('GK' | 'DEF' | 'MID' | 'ATT' | null)[] = players.map(p => this.getPositionRoleFamily(p));
+    const lineupCounts = { gk: 0, def: 0, mid: 0, att: 0 };
+    for (const fam of positions) {
+      if (fam === 'GK') lineupCounts.gk++;
+      else if (fam === 'DEF') lineupCounts.def++;
+      else if (fam === 'MID') lineupCounts.mid++;
+      else if (fam === 'ATT') lineupCounts.att++;
+    }
+
     for (const f of ALL_FORMATIONS) {
-      const positions = this.formationPositions[f] || [];
-      const canonicalCounts = this.countRoleFamily(positions.map(p => p.role));
+      const canonicalRoles = (this.formationPositions[f] || []).map(p => p.role);
+      const canonicalCounts = { gk: 0, def: 0, mid: 0, att: 0 };
+      for (const role of canonicalRoles) {
+        const fam = this.getRoleFamily(role);
+        if (fam === 'GK') canonicalCounts.gk++;
+        else if (fam === 'DEF') canonicalCounts.def++;
+        else if (fam === 'MID') canonicalCounts.mid++;
+        else if (fam === 'ATT') canonicalCounts.att++;
+      }
       if (lineupCounts.gk === canonicalCounts.gk &&
           lineupCounts.def === canonicalCounts.def &&
           lineupCounts.mid === canonicalCounts.mid &&
