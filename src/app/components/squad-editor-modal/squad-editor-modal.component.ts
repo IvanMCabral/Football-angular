@@ -3048,28 +3048,45 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
      */
 
     /**
-     * V25D99.10-FRONT: cdkDragStarted handler. Force CDK's
-     * `_pickupPositionInElement` to be the marker's center
-     * (35, 24) so the cursor stays on the marker's center during
-     * drag REGARDLESS of where the user clicked. Without this
-     * override, CDK preserves the mousedownOffset — if the user
-     * clicks at the marker's edge, the marker is offset from the
-     * cursor during drag (cursor at edge, marker extends to the
-     * other side). Ivan: 'queda dependiendo de a donde volando
-     * mas a la derecha, cuando lo agarro'. With this override,
-     * the cursor always lands on the marker center.
+     * V25D99.11-FRONT: cdkDragStarted handler. Capture CDK's NATURAL
+     * pickup offset (where the user actually clicked relative to the
+     * marker's top-left) so that {@link handleMarkerDragEnd} can
+     * preserve drag-end continuity.
+     *
+     * V25D99.10 had a bug: it FORCED `_pickupPositionInElement` to the
+     * marker's center, which made the marker track cursor with its
+     * CENTER (not its click point). On release, the post-drop math also
+     * re-centered the marker on cursor, which caused a visible "jump"
+     * when the user had clicked anywhere off-center: the marker visually
+     * snapped from the cursor's offset position to a centered-on-cursor
+     * position. Ivan: 'termina el recuadro poniendose al medio de donde
+     * esta la mano ... hace un pequeño salto, tal vez para produccion no
+     * este bueno ese salto.'
+     *
+     * V25D99.11 fix:
+     * 1. PRESERVE the natural pickup (do NOT override it).
+     * 2. In handleMarkerDragEnd, compute new style.left.%/top.% such that
+     *    `source CSS position with margin` = `dropPoint - pickupOffset`.
+     *    This places the source element exactly where CDK's drag-end
+     *    preview was, so when CDK clears the transform, the marker
+     *    doesn't jump.
+     * 3. Force `cdr.detectChanges()` synchronously in the handler so
+     *    the DOM is updated BEFORE CDK clears the inline `transform`
+     *    after our handler returns (otherwise the marker briefly shows
+     *    its old CSS position with transform cleared, then snaps to new).
      */
-onMarkerDragStarted(event: CdkDragStart): void {
+  private markerPickupOffset = new Map<string, { x: number; y: number }>();
+
+  onMarkerDragStarted(event: CdkDragStart): void {
     const dragRef = (event.source as any)?._dragRef;
     if (!dragRef) { return; }
-    // Marker size: 70w x 48h (default), 70x44 (mid), 70x56 (gk).
-    // All heights' half values rounded down to even px for clean math.
-    // Default 48 → half 24.
-    // We use (35, 24) as a default — works for DEF/ATT (48h). MID (44h)
-    // is 22 half, GK (56h) is 28 half. Off by 1-4px on MID/GK but visually
-    // negligible (cursor still very close to center). For perfect centering
-    // on all roles we'd need to detect height via getBoundingClientRect().
-    dragRef._pickupPositionInElement = { x: 35, y: 24 };
+    const data = (event.source as any)?.data as PlayerOnFieldDto | undefined;
+    if (!data?.playerId) { return; }
+    // Save the NATURAL pickup offset that CDK computed from the click.
+    this.markerPickupOffset.set(data.playerId, {
+      x: dragRef._pickupPositionInElement?.x ?? 35,
+      y: dragRef._pickupPositionInElement?.y ?? 24,
+    });
   }
 
 handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
@@ -3132,11 +3149,48 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
       return;
     }
 
-    // 2b. FREE POSITIONING. xPct/yPct ALWAYS set to the drop coords.
-    // No more snap-to-slot. The marker visually stays where the user
-    // dropped it.
-    const xPct = Math.max(0, Math.min(100, ((dropX - rect.left) / rect.width) * 100));
-    const yPct = Math.max(0, Math.min(100, ((dropY - rect.top) / rect.height) * 100));
+    // 2b. FREE POSITIONING with V25D99.11 continuity fix.
+    //
+    // V25D99.10 placed the marker center on cursor (`xPct = (dropX -
+    // rect.left) / rect.width * 100`) — visually correct ONLY when the
+    // user clicked the marker's exact center. If user clicked anywhere
+    // else, the marker snapped to "centered on cursor" at release,
+    // creating a small but visible jump relative to where it had been
+    // during drag.
+    //
+    // V25D99.11: preserve the natural drag semantic — the click point
+    // follows the cursor. To do that, we read the pickup offset CDK
+    // computed when the drag started (saved in onMarkerDragStarted, NOT
+    // overridden) and shift the placement math so the source element's
+    // CSS position (with margin, no transform) lands exactly where the
+    // cdk-drag-preview was at the moment of release.
+    //
+    // Derivation:
+    //   CDK drag-end preview visual = source.cssLeft + transform = source's
+    //     click point on cursor = dropX - pickup.x on X axis
+    //     (and dropY - pickup.y on Y).
+    //   After CDK clears the transform, source visual = source.cssLeft
+    //     (with margin).
+    //   We want: source.cssLeft_with_margin = dropX - pickup.x
+    //           => style.left.% / 100 * rect.width + rect.left - 35
+    //              = dropX - pickup.x
+    //           => style.left.% = (dropX - pickup.x + 35 - rect.left)
+    //              / rect.width * 100
+    //   Same on Y with the marker's actual half-height (which differs by
+    //   role: GK 28, MID 22, DEF/ATT 24).
+    const pickup = this.markerPickupOffset.get(player.playerId) ?? { x: 35, y: 24 };
+    this.markerPickupOffset.delete(player.playerId);
+
+    // V25D99.11-FRONT: read marker's actual half-height from its CSS class.
+    // GK marker is 56px (half 28), MID is 44px (half 22), DEF/ATT is 48px
+    // (half 24). Reading rect.height gives us the rendered height
+    // regardless of which class is applied.
+    const sourceEl = ((event.source as any)?._dragRef?.element?.nativeElement as HTMLElement | undefined);
+    const markerRect = sourceEl?.getBoundingClientRect();
+    const halfHeight = (markerRect?.height ?? 48) / 2;
+
+    const xPct = Math.max(0, Math.min(100, ((dropX - pickup.x + 35 - rect.left) / rect.width) * 100));
+    const yPct = Math.max(0, Math.min(100, ((dropY - pickup.y + halfHeight - rect.top) / rect.height) * 100));
 
     // For bench players (no slotId): promote them to the closest subdivision
     // so they participate in chemistry preview.
