@@ -4179,11 +4179,44 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
       if (closest) { player.slotId = closest.subdivisionId; }
     }
 
-    player.xPercent = xPct;
-    player.yPercent = yPct;
-    // Clear the slot — the player has left it for the free position.
-    if (player.slotId) {
-      delete this.slotPlayerMap[player.slotId];
+    // V25D99.20-FRONT BUG-4a: snap-back to native slot when the drop
+    // lands inside the player's canonical subdivision bounding box. The
+    // V25D99.8 simplification deliberately removed the original snap-to
+    // -slot branch and made every drop free-positioning, which wrote
+    // player.xPercent/yPercent unconditionally. The back's
+    // FormationEffectiveness.resolveSlotCoords then preferred the
+    // customX/Y override over canonical coords, applying a distance
+    // penalty that stuck even when the user dragged the marker back to
+    // the native slot. This branch restores the snap-back semantic for
+    // drops that land inside the player's owning subdivision: clear the
+    // customX/Y override so the back falls back to canonical coords and
+    // the chem score returns to baseline.
+    const owningSlot = player.slotId
+      ? this.subdivisions.find(s => s.subdivisionId === player.slotId)
+      : null;
+    const dropInsideNativeSlot =
+      !!owningSlot &&
+      xPct >= owningSlot.left && xPct <= owningSlot.left + owningSlot.width &&
+      yPct >= owningSlot.top  && yPct <= owningSlot.top  + owningSlot.height;
+
+    if (dropInsideNativeSlot) {
+      // Snap back: clear any existing free-position override and
+      // RESTORE slot occupancy (free positioning may have emptied the
+      // slotPlayerMap entry earlier). Re-claiming the slot ensures the
+      // player's marker renders at canonical coords AND the slot is
+      // treated as occupied downstream.
+      delete player.xPercent;
+      delete player.yPercent;
+      if (player.slotId) {
+        this.slotPlayerMap[player.slotId] = player;
+      }
+    } else {
+      player.xPercent = xPct;
+      player.yPercent = yPct;
+      // Clear the slot — the player has left it for the free position.
+      if (player.slotId) {
+        delete this.slotPlayerMap[player.slotId];
+      }
     }
 
     // V25D99.19-FRONT (BUG-3 fix): refresh the chip ratings BEFORE the

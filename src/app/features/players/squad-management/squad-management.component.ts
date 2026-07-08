@@ -459,8 +459,69 @@ this.squad$ = combineLatest([
      }).format(value);
    }
 
+   /**
+    * V25D99.20-FRONT BUG-4b: handle formation dropdown change.
+    *
+    * <p>Pre-fix behavior (only): update the local {@code selectedFormation$}
+    * BehaviorSubject so the visual editor dialog receives the new formation
+    * label via {@code currentFormation}. The header chem badge and chemistry
+    * score remained stale until the next lineup fetch (which only happens on
+    * modal close, auto-select success, or career-status refresh). Ivan saw
+    * "header says 4-4-2, editor opens with 3-5-2" and read it as the lineup
+    * being random.
+    *
+    * <p>Post-fix behavior: persist the formation to the back via the existing
+    * {@code /career/lineup/manual-select} endpoint with the current lineup's
+    * 11 playerIds + their slots (carrying customX/Y if any), then refetch
+    * {@code /career/lineup/current} so {@code lineupSubject$} reflects the
+    * back's new formation label + recomputed chem. The header chem badge
+    * stays in sync because {@code lineupSubject$} drives the header via the
+    * {@code lineup$ | async} pipe.
+    *
+    * <p>Why /manual-select rather than /auto-select: auto-select rewrites
+    * the 11 player assignments (would lose Ivan's manual lineup changes).
+    * /manual-select with the current playerIds and slots is a label-only
+    * formation change that triggers chem recompute without disturbing the
+    * players.
+    */
    onFormationChange(formation: string): void {
      this.selectedFormation$.next(formation);
+
+     const current = this.lineupSubject$.value;
+     const playerIds: string[] = (current?.players ?? []).map(p => p.playerId);
+     const slots = (current?.slots ?? []).map(s => ({
+       playerId: s.playerId,
+       subdivisionId: s.subdivisionId,
+       customXPercent: s.customXPercent,
+       customYPercent: s.customYPercent,
+     }));
+
+     this.http.post<LineupDTO>(
+       `${environment.apiUrl}/career/lineup/manual-select`,
+       { formation, playerIds, slots }
+     ).subscribe({
+       next: () => {
+         this.http.get<LineupDTO>(`${environment.apiUrl}/career/lineup/current`)
+           .pipe(
+             tap(lineup => {
+               this.lineupSubject$.next(lineup);
+               this.lineupWarning$.next(this.pickLineupWarning(lineup.warnings));
+             }),
+             catchError(err => {
+               this.lineupSubject$.next(null);
+               this.lineupWarning$.next(null);
+               return of(null);
+             })
+           )
+           .subscribe();
+       },
+       error: (err) => {
+         let userMsg = 'Error updating formation';
+         if (err.error?.message) { userMsg = err.error.message; }
+         else if (err.message) { userMsg = err.message; }
+         this.lineupError$.next(userMsg);
+       }
+     });
    }
 
    setActiveTab(tab: 'squad' | 'stats'): void {

@@ -24,7 +24,7 @@ import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { SquadManagementComponent } from './squad-management.component';
 import { SquadEditorModalComponent } from '../../../components/squad-editor-modal/squad-editor-modal.component';
 import { LineupDTO, PlayerLineupDTO, ChemistryBreakdownDTO, SkillCoverageDTO } from 'app/shared/models/lineup/lineup.dto';
@@ -1157,6 +1157,122 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
           done();
         });
       });
+    });
+  });
+
+  /**
+   * V25D99.20-FRONT BUG-4b: onFormationChange persists the formation to
+   * the back and refreshes lineupSubject$, so the squad page header chem
+   * badge stays in sync with the selected formation even without
+   * auto-select.
+   *
+   * <p>Pre-fix (3-line handler at squad-management.component.ts:462-464):
+   * only updated selectedFormation$ locally. The header chem badge and
+   * chemistry score came from lineupSubject$, which only refreshed on
+   * modal close, auto-select success, or career-status refresh. Ivan saw
+   * "header says 4-4-2, editor opens with 3-5-2" and read it as random.
+   *
+   * <p>Post-fix: onFormationChange also POSTs /career/lineup/manual-select
+   * with the current lineup's playerIds + slots, then GETs
+   * /career/lineup/current and emits the result into lineupSubject$.
+   * Why /manual-select instead of /auto-select: auto-select rewrites the
+   * 11 player assignments; /manual-select with the current playerIds is
+   * a label-only formation change that triggers chem recompute.
+   */
+  describe('V25D99.20-BUG-4b: onFormationChange persists + refreshes lineup', () => {
+    it('POSTs /manual-select with current playerIds+slots+new formation, then GETs /current and updates lineupSubject$', () => {
+      const httpSpy = TestBed.inject(HttpClient) as jasmine.SpyObj<HttpClient>;
+      const initialLineup: LineupDTO = {
+        formation: '4-4-2',
+        players: ELEVEN_PLAYERS,
+        confirmed: true,
+        warnings: [],
+        slots: ELEVEN_PLAYERS.map((p, i) => ({
+          playerId: p.playerId,
+          subdivisionId: 'S' + i + '-1',
+          customXPercent: undefined,
+          customYPercent: undefined,
+        })),
+        chemistryScore: 91,
+      };
+      component.lineupSubject$.next(initialLineup);
+
+      const updatedLineup: LineupDTO = {
+        ...initialLineup,
+        formation: '3-5-2',
+        chemistryScore: 78,
+      };
+
+      let postCalls = 0;
+      let postBody: any = null;
+      let getCurrentCalls = 0;
+      httpSpy.post.and.callFake(((url: string, body: any) => {
+        if (String(url).includes('/career/lineup/manual-select')) {
+          postCalls++;
+          postBody = body;
+          return of(initialLineup);
+        }
+        return of(null);
+      }) as any);
+      httpSpy.get.and.callFake(((url: string) => {
+        if (String(url).includes('/career/lineup/current')) {
+          getCurrentCalls++;
+          return of(updatedLineup);
+        }
+        return of(null);
+      }) as any);
+
+      component.onFormationChange('3-5-2');
+
+      // POST was called exactly once with formation + current playerIds + slots.
+      expect(postCalls).withContext('POST /manual-select must be called').toBe(1);
+      expect(postBody.formation).toBe('3-5-2');
+      expect(Array.isArray(postBody.playerIds)).toBe(true);
+      expect(postBody.playerIds.length).toBe(11);
+      expect(postBody.playerIds[0]).toBe('p0');
+      expect(Array.isArray(postBody.slots)).toBe(true);
+      expect(postBody.slots.length).toBe(11);
+      expect(postBody.slots[0].playerId).toBe('p0');
+      expect(postBody.slots[0].subdivisionId).toBe('S0-1');
+
+      // GET /career/lineup/current was called exactly once (post-fix: refetch after POST).
+      expect(getCurrentCalls).withContext('GET /career/lineup/current must be called').toBe(1);
+
+      // lineupSubject$ now reflects the back's updated lineup.
+      const after = component.lineupSubject$.value as LineupDTO;
+      expect(after).toBeTruthy('lineupSubject$ must not be null after successful refresh');
+      expect(after.formation).toBe('3-5-2');
+      expect(after.chemistryScore).toBe(78);
+    });
+
+    it('preserves lineupSubject$ and surfaces lineupError$ when POST /manual-select errors (defensive)', () => {
+      const httpSpy = TestBed.inject(HttpClient) as jasmine.SpyObj<HttpClient>;
+      const initialLineup: LineupDTO = {
+        formation: '4-4-2',
+        players: ELEVEN_PLAYERS,
+        confirmed: true,
+        warnings: [],
+        chemistryScore: 91,
+      };
+      component.lineupSubject$.next(initialLineup);
+
+      // POST /manual-select errors. Our implementation only writes to
+      // lineupError$ in the error branch and does NOT touch lineupSubject$,
+      // so the squad page header keeps showing the last known lineup.
+      httpSpy.post.and.callFake(((url: string, _body: any) => {
+        if (String(url).includes('/career/lineup/manual-select')) {
+          return throwError(() => ({ error: { message: 'formation rejected' } }));
+        }
+        return of(null);
+      }) as any);
+
+      component.onFormationChange('3-5-2');
+
+      const after = component.lineupSubject$.value as LineupDTO;
+      expect(after).toBeTruthy('lineupSubject$ preserved on POST error');
+      expect(after.formation).toBe('4-4-2');
+      expect(after.chemistryScore).toBe(91);
+      expect(component.lineupError$.value).toBe('formation rejected');
     });
   });
 });

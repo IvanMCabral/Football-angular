@@ -3851,20 +3851,19 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
    * Verify the marker keeps cdk-drag after override + handleFieldDrop
    * re-applies xPercent/yPercent on each call (subsequent drags update).
    */
-  it('V25D99.8: ALL drops inside field go to FREE POSITIONING (no snap-to-slot)', (done) => {
-    // V25D99.8: snap-to-slot REMOVED. Ivan: 'movi el jugador al lugar
-    // punteado, y se pone a la derecha' (snap was teleporting the marker
-    // to slot center when the user dropped near a slot). Now ALL drops
-    // inside the field go to free positioning — the marker stays where
-    // the user dropped it, period. To move a player between slots, the
-    // user must use the assignment panel (click an empty slot).
+  it('V25D99.8 (refined by V25D99.20-BUG-4a): drops OUTSIDE any slot go to FREE POSITIONING (snap-back for inside-slot drops is tested separately)', (done) => {
+    // V25D99.8: snap-to-slot REMOVED for the free-field case — Ivan's
+    // complaint was that drops near a slot teleported to its center.
+    // V25D99.20-BUG-4a: snap-back RESTORED for drops that land INSIDE
+    // the player's owning subdivision bbox (so chem restaura a baseline
+    // when the user drags a free-positioned player back onto their slot).
+    // This test covers the free-field branch only — the snap-back
+    // branch has dedicated V25D99.20 BUG-4a tests above.
     //
     // Verify:
-    //  1. Drop on own slot's center → marker goes to that xPct/yPct
-    //     (NOT stays at slot center).
-    //  2. Drop on another slot → marker goes to that xPct/yPct (NOT snap).
-    //  3. Drop in free space → free positioning as before.
-    //  4. Marker visually at the drop coords.
+    //  1. Drop outside any slot bbox → xPercent/yPercent set, slot vacated.
+    //  2. Drop in free space → free positioning as before.
+    //  3. Marker visually at the drop coords.
     setTimeout(() => {
       const pDef = (component as any).slotPlayerMap['S22-1'];
       const pMid = (component as any).slotPlayerMap['S13-2'];
@@ -3876,11 +3875,13 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
       (component as any).fieldContainer = { nativeElement: fieldEl };
       const mkEvt = (x: number, y: number) => ({ dropPoint: { x, y } } as any);
 
-      // 1. Drop at (170, 608) → xPct=17, yPct=76. V25D99.8: free positioning
-      //    (NOT snap to S22-1 center). xPercent is SET, slotPlayerMap[S22-1] cleared.
-      (component as any).handleMarkerDragEnd(mkEvt(170, 608), pDef);
-      expect(pDef.xPercent).toBe(17, 'drop in field: xPercent set');
-      expect(pDef.yPercent).toBe(76, 'drop in field: yPercent set');
+      // 1. Drop at (700, 350) → xPct=70, yPct=43.75 — outside S22-1 bbox
+      //    (xPct 70 > 35 right edge, yPct 43.75 < 70 top edge) AND
+      //    outside S13-2 bbox. Free positioning: xPercent/yPercent set,
+      //    slot vacated. V25D99.20-BUG-4a snap-back does NOT fire here.
+      (component as any).handleMarkerDragEnd(mkEvt(700, 350), pDef);
+      expect(pDef.xPercent).toBe(70, 'drop in free space: xPercent set');
+      expect(pDef.yPercent).toBe(43.75, 'drop in free space: yPercent set');
       expect(pDef.slotId).toBe('S22-1', 'slotId preserved for chemistry preview');
       expect((component as any).slotPlayerMap['S22-1']).toBeUndefined('free drop: slot cleared from slotPlayerMap');
       expect(pMid.slotId).toBe('S13-2', 'other players unaffected');
@@ -3971,6 +3972,86 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
    * Verify: onSlotClick returns early when slot is abandoned and
    * selectedSlot stays null (popup never renders).
    */
+  /**
+   * V25D99.20-FRONT BUG-4a: handleMarkerDragEnd snap-back branch.
+   *
+   * <p>Pre-fix (V25D99.8 simplification): every drop inside the field wrote
+   * player.xPercent/yPercent unconditionally and vacated slotPlayerMap. Even
+   * a drop that landed visually on the canonical slot center produced
+   * slightly off-center xPct/yPct due to mouse jitter + pickup-offset math.
+   * The back's FormationEffectiveness.resolveSlotCoords read those as a
+   * free-positioning override and penalised the distance-from-ideal, so
+   * the chem score stayed low after dragging back to the native slot.
+   *
+   * <p>Post-fix: when the drop pixel coordinates land inside the player's
+   * owning subdivision bounding box, handleMarkerDragEnd clears
+   * xPercent/yPercent and re-claims the slotPlayerMap entry. The back
+   * then computes chem against canonical coords (no override) and the
+   * score returns to baseline.
+   */
+  it('V25D99.20 BUG-4a: drop outside any slot then drag back to native slot bbox → snap-back clears customX/Y and re-claims slot', (done) => {
+    setTimeout(() => {
+      const pDef = (component as any).slotPlayerMap['S22-1'];
+      expect(pDef).toBeTruthy('fixture must seed pDef in S22-1');
+      const fieldEl: HTMLElement = fixture.nativeElement.querySelector('.field');
+      fieldEl.getBoundingClientRect = () => ({
+        left: 0, top: 0, right: 1000, bottom: 800, width: 1000, height: 800,
+        x: 0, y: 0, toJSON: () => ({})
+      });
+      (component as any).fieldContainer = { nativeElement: fieldEl };
+
+      // Step 1: free-positioning drop (mimics Ivan's drag 30px down).
+      // S22-1 bbox is left=10, top=70, width=25, height=12 → bbox x in
+      // [10, 35], y in [70, 82]. Drop at (600, 600) → xPct=60, yPct=75 →
+      // outside any slot bbox.
+      (component as any).handleMarkerDragEnd({ dropPoint: { x: 600, y: 600 } } as any, pDef);
+      expect(pDef.xPercent).toBe(60, 'first drop: free-position xPercent set');
+      expect(pDef.yPercent).toBe(75, 'first drop: free-position yPercent set');
+      expect((component as any).slotPlayerMap['S22-1']).toBeUndefined('first drop: slot vacated by free positioning');
+
+      // Step 2: drag back inside S22-1 bbox (xPct=22.5, yPct=76).
+      (component as any).handleMarkerDragEnd({ dropPoint: { x: 225, y: 610 } } as any, pDef);
+
+      // V25D99.20 BUG-4a: snap-back clears xPercent/yPercent and re-claims
+      // the slotPlayerMap entry. Without these, the back's resolveSlotCoords
+      // would still pick up the override and the chem would stay low.
+      expect(pDef.xPercent).toBeUndefined('snap-back: xPercent cleared');
+      expect(pDef.yPercent).toBeUndefined('snap-back: yPercent cleared');
+      expect((component as any).slotPlayerMap['S22-1']).toBe(pDef, 'snap-back: slot re-claimed');
+
+      // Marker renders at canonical slot center (since override is gone,
+      // getMarkerX/Y fall back to getSlotCenterX/Y).
+      expect((component as any).getMarkerX(pDef)).toBe((component as any).getSlotCenterX('S22-1'));
+      expect((component as any).getMarkerY(pDef)).toBe((component as any).getSlotCenterY('S22-1'));
+      done();
+    }, 30);
+  });
+
+  it('V25D99.20 BUG-4a: drop inside native slot when already at canonical → no customX/Y, slot still occupied', (done) => {
+    setTimeout(() => {
+      const pDef = (component as any).slotPlayerMap['S22-1'];
+      expect(pDef).toBeTruthy('fixture must seed pDef in S22-1');
+      const fieldEl: HTMLElement = fixture.nativeElement.querySelector('.field');
+      fieldEl.getBoundingClientRect = () => ({
+        left: 0, top: 0, right: 1000, bottom: 800, width: 1000, height: 800,
+        x: 0, y: 0, toJSON: () => ({})
+      });
+      (component as any).fieldContainer = { nativeElement: fieldEl };
+
+      // pDef has no override (canonical from /lineup/current load).
+      expect(pDef.xPercent).toBeUndefined();
+      expect(pDef.yPercent).toBeUndefined();
+
+      // Drop inside S22-1 bbox.
+      (component as any).handleMarkerDragEnd({ dropPoint: { x: 225, y: 610 } } as any, pDef);
+
+      expect(pDef.xPercent).toBeUndefined('snap-back on canonical: no xPercent');
+      expect(pDef.yPercent).toBeUndefined('snap-back on canonical: no yPercent');
+      expect((component as any).slotPlayerMap['S22-1']).toBe(pDef, 'snap-back on canonical: slot still occupied');
+      done();
+    }, 30);
+  });
+
   it('V25D99.6: empty slot is invisible (no abandoned class, no chip, no missing-indicator)', (done) => {
     // V25D99.6: 'tiene que desaparecer donde estaba antes'. When a player
     // moves out of a slot, the slot must be visually empty (no chip, no
