@@ -4181,10 +4181,22 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
 
     player.xPercent = xPct;
     player.yPercent = yPct;
-    // Clear the slot â€” the player has left it for the free position.
+    // Clear the slot — the player has left it for the free position.
     if (player.slotId) {
       delete this.slotPlayerMap[player.slotId];
     }
+
+    // V25D99.19-FRONT (BUG-3 fix): refresh the chip ratings BEFORE the
+    // save round-trip so the user sees the engine numbers reflect the new
+    // (xPercent, yPercent) override immediately instead of waiting for
+    // the save to complete. Pre-fix, the chips held the previous drag’s
+    // values when the player was free-positioned with a small offset
+    // (Ivan: drag 1 px = -8 puntos, drag back to natural = +1 punto
+    // instead of +8), because saveLineup’s POST chain runs hundreds of
+    // ms and updateFormationDetection’s debounced preview coalesced
+    // forward+back drags into a no-op.
+    this.captureRatingsFromFormationEffectiveness();
+    this.requestRatingsPreview();
 
     this.saveLineup();
     this.triggerChemistryPreview();
@@ -5079,6 +5091,18 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
         // redundante pero defensivo. Si F1 tiene un bug, este saveLineup
         // asegura persistencia. El guard interno bloquea si lineup < 7.
         this.saveLineup();
+        // V25D99.19-FRONT (BUG-2 fix): refresh the chip ratings (ATT /
+        // MID / DEF) against the new formation baseline. Pre-fix the chips
+        // held the previous formation's values until the next drag-drop
+        // because executeFormationChange called /auto-select + saveLineup
+        // but never /preview-ratings. captureRatingsFromFormationEffectiveness
+        // first because the /current response (already loaded) carries the
+        // formationEffectiveness snapshot for the new formation that the
+        // /auto-select just persisted; then requestRatingsPreview hits
+        // /preview-ratings with the freshly-applied slots to get the
+        // engine-authoritative numbers.
+        this.captureRatingsFromFormationEffectiveness();
+        this.requestRatingsPreview();
         // EMITIR EVENTO AL PADRE con los players directamente (sin esperar backend)
         this.formationChanged.emit({
           formation: newFormation,
