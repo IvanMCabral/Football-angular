@@ -448,6 +448,17 @@
   border-color: #c53030;
 }
 
+/* V25D99.19-FRONT (BUG-1 fix): inline hint shown when a positionGroup
+   has no SkillCoverage entries (e.g. short-handed lineup without
+   matching skills in that category). Italic + muted color so it reads
+   as placeholder content, not data. */
+.group-empty {
+  font-style: italic;
+  color: #a0aec0;
+  font-size: 0.75rem;
+  margin-left: 0.25rem;
+}
+
 /* V25D44 (Sprint C9): contributor popover. Inline below the chip rows, shows
    the contributor of the currently-selected chip. Closes via X button or
    click-outside (HostListener('document:click')). */

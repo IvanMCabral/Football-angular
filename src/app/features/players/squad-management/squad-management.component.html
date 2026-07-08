@@ -259,22 +259,26 @@
             <div *ngIf="lineup.chemistryBreakdown as bd" class="chemistry-breakdown">
               <div class="breakdown-header">
                 Chemistry Breakdown
-                <span class="breakdown-coverage">({{ bd.coveragePercentage }}% coverage)</span>
+                <span class="breakdown-coverage">({{ bd.coveragePercentage ?? 0 }}% coverage)</span>
               </div>
               <div class="breakdown-row"
-                   *ngFor="let group of positionGroupOrder"
-                   [hidden]="!bd.positionGroups[group] || bd.positionGroups[group].length === 0">
+                   *ngFor="let group of positionGroupOrder">
                 <span class="group-label">{{ group }}:</span>
-                <span class="skill-chip"
-                      *ngFor="let sc of bd.positionGroups[group]"
-                      [class.chip-high]="sc.maxLevel >= 80"
-                      [class.chip-mid]="sc.maxLevel >= 50 && sc.maxLevel < 80"
-                      [class.chip-low]="sc.maxLevel < 50"
-                      [class.chip-selected]="isSelectedContributor(sc.contributorId)"
-                      [title]="sc.skill + ' ' + sc.maxLevel + ' (carrier: ' + sc.contributorId + ')'"
-                      (click)="onSkillChipClick(sc.contributorId)">
-                  {{ sc.skill }} {{ sc.maxLevel }}
-                </span>
+                <ng-container *ngIf="bd.positionGroups[group]?.length; else emptyGroup">
+                  <span class="skill-chip"
+                        *ngFor="let sc of bd.positionGroups[group]"
+                        [class.chip-high]="sc.maxLevel >= 80"
+                        [class.chip-mid]="sc.maxLevel >= 50 && sc.maxLevel < 80"
+                        [class.chip-low]="sc.maxLevel < 50"
+                        [class.chip-selected]="isSelectedContributor(sc.contributorId)"
+                        [title]="sc.skill + ' ' + sc.maxLevel + ' (carrier: ' + sc.contributorId + ')'"
+                        (click)="onSkillChipClick(sc.contributorId)">
+                    {{ sc.skill }} {{ sc.maxLevel }}
+                  </span>
+                </ng-container>
+                <ng-template #emptyGroup>
+                  <span class="group-empty">(sin skills mapeados a {{ group }})</span>
+                </ng-template>
               </div>
 
               <!-- V25D44 (Sprint C9): contributor popover — inline below the chips.
