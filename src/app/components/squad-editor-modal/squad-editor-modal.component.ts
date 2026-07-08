@@ -186,7 +186,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
 
           <!-- 1. Match preview / how next match would be played -->
           <section class="tsp-section">
-            <h3 class="tsp-title">ðŸ"Š Match preview</h3>
+            <h3 class="tsp-title">📊 Match preview</h3>
             <div class="tsp-formation-row">
               <span class="tsp-formation-label">Formación:</span>
               <span class="tsp-formation-value"
@@ -205,7 +205,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
 
           <!-- 2. Top metrics: chemistry, eff, stamina, injured -->
           <section class="tsp-section">
-            <h3 class="tsp-title">⚡› Chemistry</h3>
+            <h3 class="tsp-title">⚗ Chemistry</h3>
             <div class="tsp-chem-row">
               <span class="tsp-chem-value"
                     [class.high]="(chemistryScore ?? 0) >= 80"
@@ -252,7 +252,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
 
           <!-- 3. Combat ratings: ATT / MID / DEF (engine values from /preview-ratings) -->
           <section class="tsp-section">
-            <h3 class="tsp-title">⚡" Attack vs Defense</h3>
+            <h3 class="tsp-title">⚔ Attack vs Defense</h3>
             <div class="tsp-rating-row">
               <div class="tsp-rating-col">
                 <span class="tsp-rating-label">ATT</span>
@@ -319,7 +319,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
                player whose natural role family doesn't match the zone
                they're placed in. Hidden when everyone is on-role. -->
           <section class="tsp-section" *ngIf="offRolePlayers?.length">
-            <h3 class="tsp-title">⚡  Penalizaciones ({{ offRolePlayers.length }})</h3>
+            <h3 class="tsp-title">⚠  Penalizaciones ({{ offRolePlayers.length }})</h3>
             <div class="tsp-offrole-list">
               <div *ngFor="let o of offRolePlayers"
                    class="tsp-offrole-row"
@@ -342,23 +342,23 @@ import { SessionPlayer } from '../../shared/models/player.model';
 
           <!-- 4. Playing characteristics: pace / technique / mentality -->
           <section class="tsp-section">
-            <h3 class="tsp-title">ðŸŽ¯ Características</h3>
+            <h3 class="tsp-title">🎯 Características</h3>
             <div class="tsp-attr-row">
-              <span class="tsp-attr-label">⚡¡ Pace</span>
+              <span class="tsp-attr-label">⚡ Pace</span>
               <div class="tsp-bar-bg">
                 <div class="tsp-bar-fg neutral" [style.width.%]="paceRating"></div>
               </div>
               <span class="tsp-attr-val">{{ paceRating }}</span>
             </div>
             <div class="tsp-attr-row">
-              <span class="tsp-attr-label">ðŸ§  Technique</span>
+              <span class="tsp-attr-label">🧠 Technique</span>
               <div class="tsp-bar-bg">
                 <div class="tsp-bar-fg neutral" [style.width.%]="techniqueRating"></div>
               </div>
               <span class="tsp-attr-val">{{ techniqueRating }}</span>
             </div>
             <div class="tsp-attr-row">
-              <span class="tsp-attr-label">ðŸ§± Mentality</span>
+              <span class="tsp-attr-label">🧱 Mentality</span>
               <div class="tsp-bar-bg">
                 <div class="tsp-bar-fg neutral" [style.width.%]="mentalityRating"></div>
               </div>
@@ -368,7 +368,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
 
           <!-- 5. Zone breakdown table -->
           <section class="tsp-section">
-            <h3 class="tsp-title">ðŸ"‹ Zonas</h3>
+            <h3 class="tsp-title">📹 Zonas</h3>
             <table class="tsp-table">
               <thead>
                 <tr>
@@ -5253,11 +5253,11 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
     if (player.injured) {
       this.conditionWarning$.next('⚡ ï¸ Injured player selected. Consider replacing them before confirming.');
     } else if ((player.stamina ?? 100) <= 19) {
-      this.conditionWarning$.next('⚡¡ Exhausted player selected. Starting them may affect performance.');
+      this.conditionWarning$.next('⚡ Exhausted player selected. Starting them may affect performance.');
     } else if ((player.stamina ?? 100) <= 39) {
-      this.conditionWarning$.next('⚡¡ Very tired player selected. Consider resting them.');
+      this.conditionWarning$.next('⚡ Very tired player selected. Consider resting them.');
     } else if ((player.stamina ?? 100) <= 59) {
-      this.conditionWarning$.next('⚡¡ Tired player selected. They may not perform at full capacity.');
+      this.conditionWarning$.next('⚡ Tired player selected. They may not perform at full capacity.');
     } else {
       this.conditionWarning$.next('');
     }
