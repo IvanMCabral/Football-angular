@@ -1,4 +1,4 @@
-﻿import { Component, Inject, OnInit, ChangeDetectorRef, OnDestroy, Output, EventEmitter, ViewChild, ElementRef } from '@angular/core';
+import { Component, Inject, OnInit, ChangeDetectorRef, OnDestroy, Output, EventEmitter, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
@@ -22,10 +22,10 @@ import { ChemistryPreviewService } from '../../core/services/chemistry-preview.s
 import { SessionPlayer } from '../../shared/models/player.model';
 
 /**
- * Modal del Editor de FormaciÃ³n - MODO PRE-PARTIDO
+ * Modal del Editor de Formación - MODO PRE-PARTIDO
  *
  * Usa las 81 subdivisiones del campo como slots interactivos.
- * Cada jugador se coloca en una subdivisiÃ³n especÃ­fica.
+ * Cada jugador se coloca en una subdivisión específica.
  *
  * Estructura del campo:
  * - 27 sectores (1-27), cada uno dividido en 3 sub-espacios
@@ -41,14 +41,14 @@ import { SessionPlayer } from '../../shared/models/player.model';
       <!-- Header -->
       <div class="squad-header">
         <div class="squad-header-left">
-          <h2>Editor de FormaciÃ³n</h2>
+          <h2>Editor de Formación</h2>
           <div class="formation-selector">
-          <label>FormaciÃ³n:</label>
+          <label>Formación:</label>
           <!-- V25D91.5-FRONT F6 fix: use (ngModelChange) en lugar de (change).
                Razon: con [(ngModel)] + (change), el orden de los listeners es
-               incierto â€” Angular puede disparar el handler ANTES de que
+               incierto â€" Angular puede disparar el handler ANTES de que
                NgModel haya actualizado el modelo, por lo que onFormationChange()
-               leÃ­a el valor VIEJO de selectedFormation. El HTTP call iba con
+               leía el valor VIEJO de selectedFormation. El HTTP call iba con
                la formacion anterior â†’ no-op. El markers/header no se actualizaban.
 
                Con (ngModelChange) Angular garantiza que el handler corre
@@ -63,7 +63,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
                cambio.
 
                V25D96-FRONT F3: the dropdown displays user-formation pseudo-state
-               (the disabled 'FormaciÃ³n del User' option is selected after a
+               (the disabled 'Formación del User' option is selected after a
                cross-role drop). Two-way [(ngModel)] would overwrite the canonical
                selectedFormation whenever the dropdown value matches the disabled
                user-formation string, breaking the backend contract (POST
@@ -75,15 +75,15 @@ import { SessionPlayer } from '../../shared/models/player.model';
                a (DOMContentLoaded-style) approach: instead of [ngModel] we
                use the native [value] attribute which writes through to the
                select element's value after every CD cycle. Combined with the
-               appended disabled 'FormaciÃ³n del User' option, the select
+               appended disabled 'Formación del User' option, the select
                reflects the user-formation state visually without losing the
                canonical model. -->
           <select [value]="dropdownFormationValue"
                   (change)="onFormationSelect($any($event.target).value)"
                   [disabled]="isFormationChanging"
-                  [title]="(isCustomLineup() ? 'Tu lineup personalizado no coincide con una formaciÃ³n canÃ³nica' : '')">
+                  [title]="(isCustomLineup() ? 'Tu lineup personalizado no coincide con una formación canónica' : '')">
             <option *ngFor="let f of formations" [value]="f">{{f}}</option>
-            <option [value]="userFormationLabel" [disabled]="true">FormaciÃ³n del User</option>
+            <option [value]="userFormationLabel" [disabled]="true">Formación del User</option>
           </select>
           <span *ngIf="isFormationChanging" class="formation-change-blocked">(espera...)</span>
         </div>
@@ -91,7 +91,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
 
         <!-- V25D45 (Sprint C10): chemistry preview row. Shows the projected
              chemistry of the in-progress lineup (debounced 300ms after the
-             last assignment change). Î” vs the current persisted score.
+             last assignment change). Δ vs the current persisted score.
              Hidden when no preview yet (lineup not complete) or after preview
              call failed.
 
@@ -112,14 +112,14 @@ import { SessionPlayer } from '../../shared/models/player.model';
               </span>
               <span *ngIf="teamAverage !== null && teamAverage < 1.0"
                     class="preview-eff-weight"
-                    [title]="'Ponderado por formaciÃ³n (eff. team ' + (teamAverage * 100).toFixed(0) + '%)'">
+                    [title]="'Ponderado por formación (eff. team ' + (teamAverage * 100).toFixed(0) + '%)'">
                 Ã—{{ (teamAverage * 100).toFixed(0) }}%
               </span>
               <span class="preview-delta"
                     *ngIf="currentChemistryScore !== null"
                     [class.positive]="displayedScore > (currentChemistryScore ?? 0)"
                     [class.negative]="displayedScore < (currentChemistryScore ?? 0)"
-                    [title]="'Î” vs chemistry guardado en backend (' + (currentChemistryScore ?? 0) + '/99)'">
+                    [title]="'Δ vs chemistry guardado en backend (' + (currentChemistryScore ?? 0) + '/99)'">
                 ({{ displayedScore > (currentChemistryScore ?? 0) ? '+' : '' }}{{ displayedScore - (currentChemistryScore ?? 0) }})
               </span>
             </ng-container>
@@ -129,7 +129,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
                 Proyectando chemistry...
               </span>
               <ng-template #previewFailed>
-                <span class="preview-label preview-error">âš  Chemistry preview unavailable</span>
+                <span class="preview-label preview-error">⚡  Chemistry preview unavailable</span>
               </ng-template>
             </ng-template>
           </div>
@@ -140,9 +140,9 @@ import { SessionPlayer } from '../../shared/models/player.model';
                color-coded (green/yellow/red per the same thresholds as
                per-player markers). -->
           <div class="formation-effectiveness-row" *ngIf="formationEffectiveness$ | async as fe">
-            <span class="fe-label">FormaciÃ³n inferida:</span>
+            <span class="fe-label">Formación inferida:</span>
             <span class="fe-formation">{{ fe.inferredFormation }}</span>
-            <span class="fe-sep">Â·</span>
+            <span class="fe-sep">·</span>
             <span class="fe-label">Eff. team:</span>
             <span class="fe-team-avg"
                   [class.high]="fe.teamAverage >= 0.85"
@@ -159,7 +159,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
                   (click)="resetCustomPositions()"
                   class="reset-positions-btn"
                   *ngIf="hasCustomPositions()"
-                  title="Volver a las posiciones canÃ³nicas de la formaciÃ³n">
+                  title="Volver a las posiciones canónicas de la formación">
             â†º Reset posiciones
           </button>
           <button mat-icon-button (click)="close()" class="close-btn" title="Cerrar">âœ•</button>
@@ -186,9 +186,9 @@ import { SessionPlayer } from '../../shared/models/player.model';
 
           <!-- 1. Match preview / how next match would be played -->
           <section class="tsp-section">
-            <h3 class="tsp-title">ðŸ“Š Match preview</h3>
+            <h3 class="tsp-title">ðŸ"Š Match preview</h3>
             <div class="tsp-formation-row">
-              <span class="tsp-formation-label">FormaciÃ³n:</span>
+              <span class="tsp-formation-label">Formación:</span>
               <span class="tsp-formation-value"
                     [class.is-custom]="isCustomLineup()">
                 {{ dropdownFormationValue }}
@@ -205,13 +205,13 @@ import { SessionPlayer } from '../../shared/models/player.model';
 
           <!-- 2. Top metrics: chemistry, eff, stamina, injured -->
           <section class="tsp-section">
-            <h3 class="tsp-title">âš› Chemistry</h3>
+            <h3 class="tsp-title">⚡› Chemistry</h3>
             <div class="tsp-chem-row">
               <span class="tsp-chem-value"
                     [class.high]="(chemistryScore ?? 0) >= 80"
                     [class.mid]="(chemistryScore ?? 0) >= 60 && (chemistryScore ?? 0) < 80"
                     [class.low]="(chemistryScore ?? 0) < 60">
-                {{ chemistryScore ?? 'â€”' }}<span class="tsp-chem-max">/99</span>
+                {{ chemistryScore ?? 'â€"' }}<span class="tsp-chem-max">/99</span>
               </span>
               <span *ngIf="teamAverage !== null && teamAverage < 1.0"
                     class="tsp-eff-weight"
@@ -239,7 +239,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
                       [class.high]="(teamAverage ?? 0) >= 0.85"
                       [class.mid]="(teamAverage ?? 0) >= 0.5 && (teamAverage ?? 0) < 0.85"
                       [class.low]="(teamAverage ?? 0) < 0.5">
-                  {{ teamAverage !== null ? (teamAverage * 100).toFixed(0) + '%' : 'â€”' }}
+                  {{ teamAverage !== null ? (teamAverage * 100).toFixed(0) + '%' : 'â€"' }}
                 </span>
               </div>
               <div class="tsp-stat">
@@ -252,7 +252,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
 
           <!-- 3. Combat ratings: ATT / MID / DEF (engine values from /preview-ratings) -->
           <section class="tsp-section">
-            <h3 class="tsp-title">âš” Attack vs Defense</h3>
+            <h3 class="tsp-title">⚡" Attack vs Defense</h3>
             <div class="tsp-rating-row">
               <div class="tsp-rating-col">
                 <span class="tsp-rating-label">ATT</span>
@@ -260,7 +260,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
                       [class.high]="attackRating >= 100"
                       [class.mid]="attackRating >= 75 && attackRating < 100"
                       [class.low]="attackRating < 75">
-                  {{ attackRating || 'â€”' }}{{ attackRating ? '%' : '' }}
+                  {{ attackRating || 'â€"' }}{{ attackRating ? '%' : '' }}
                 </span>
                 <div class="tsp-bar-bg">
                   <div class="tsp-bar-fg"
@@ -276,7 +276,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
                       [class.high]="midfieldRating >= 100"
                       [class.mid]="midfieldRating >= 75 && midfieldRating < 100"
                       [class.low]="midfieldRating < 75">
-                  {{ midfieldRating || 'â€”' }}{{ midfieldRating ? '%' : '' }}
+                  {{ midfieldRating || 'â€"' }}{{ midfieldRating ? '%' : '' }}
                 </span>
                 <div class="tsp-bar-bg">
                   <div class="tsp-bar-fg"
@@ -292,7 +292,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
                       [class.high]="defenseRating >= 100"
                       [class.mid]="defenseRating >= 75 && defenseRating < 100"
                       [class.low]="defenseRating < 75">
-                  {{ defenseRating || 'â€”' }}{{ defenseRating ? '%' : '' }}
+                  {{ defenseRating || 'â€"' }}{{ defenseRating ? '%' : '' }}
                 </span>
                 <div class="tsp-bar-bg">
                   <div class="tsp-bar-fg"
@@ -319,7 +319,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
                player whose natural role family doesn't match the zone
                they're placed in. Hidden when everyone is on-role. -->
           <section class="tsp-section" *ngIf="offRolePlayers?.length">
-            <h3 class="tsp-title">âš  Penalizaciones ({{ offRolePlayers.length }})</h3>
+            <h3 class="tsp-title">⚡  Penalizaciones ({{ offRolePlayers.length }})</h3>
             <div class="tsp-offrole-list">
               <div *ngFor="let o of offRolePlayers"
                    class="tsp-offrole-row"
@@ -342,9 +342,9 @@ import { SessionPlayer } from '../../shared/models/player.model';
 
           <!-- 4. Playing characteristics: pace / technique / mentality -->
           <section class="tsp-section">
-            <h3 class="tsp-title">ðŸŽ¯ CaracterÃ­sticas</h3>
+            <h3 class="tsp-title">ðŸŽ¯ Características</h3>
             <div class="tsp-attr-row">
-              <span class="tsp-attr-label">âš¡ Pace</span>
+              <span class="tsp-attr-label">⚡¡ Pace</span>
               <div class="tsp-bar-bg">
                 <div class="tsp-bar-fg neutral" [style.width.%]="paceRating"></div>
               </div>
@@ -368,7 +368,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
 
           <!-- 5. Zone breakdown table -->
           <section class="tsp-section">
-            <h3 class="tsp-title">ðŸ“‹ Zonas</h3>
+            <h3 class="tsp-title">ðŸ"‹ Zonas</h3>
             <table class="tsp-table">
               <thead>
                 <tr>
@@ -384,12 +384,12 @@ import { SessionPlayer } from '../../shared/models/player.model';
                     [class.empty-row]="row.count === 0">
                   <td class="tsp-zone-cell">{{ row.zone }}</td>
                   <td class="tsp-num-cell">{{ row.count }}</td>
-                  <td class="tsp-num-cell">{{ row.count === 0 ? 'â€”' : row.avgOverall }}</td>
+                  <td class="tsp-num-cell">{{ row.count === 0 ? 'â€"' : row.avgOverall }}</td>
                   <td class="tsp-num-cell"
                       [class.high]="row.avgEff >= 85"
                       [class.mid]="row.avgEff >= 50 && row.avgEff < 85"
                       [class.low]="row.avgEff < 50 && row.count > 0">
-                    {{ row.count === 0 ? 'â€”' : row.avgEff + '%' }}
+                    {{ row.count === 0 ? 'â€"' : row.avgEff + '%' }}
                   </td>
                   <td class="tsp-num-cell">{{ row.contributionPct }}%</td>
                 </tr>
@@ -403,16 +403,16 @@ import { SessionPlayer } from '../../shared/models/player.model';
       <div class="field-container">
         <!-- V25D99-FRONT: el campo YA NO es cdkDropList. Pre-V25D99 era cdkDropList
              (handleFieldDrop capturaba free drops) pero CDK reordenaba los
-             markers visualmente durante el drag (lo que IvÃ¡n no querÃ­a) y
-             el evento cdkDropListDropped se suprimÃ­a en algunas condiciones
+             markers visualmente durante el drag (lo que Iván no quería) y
+             el evento cdkDropListDropped se suprimía en algunas condiciones
              (source===container con sorting-disabled), causando el bug
              'solo deja mover 1 vez'. Ahora el campo es un div plano; el
              marker captura SU PROPIO drag end via (cdkDragEnded) y decide
              internamente si el drop point cae sobre un slot (snap), sobre
              la banca (move to bench) o libre del field (free positioning).
              Los slots siguen siendo cdkDropList solo para que CDK renderice
-             el drop preview visual durante el drag (highlight) â€” pero el
-             handler real estÃ¡ en el marker, no en el slot. -->
+             el drop preview visual durante el drag (highlight) â€" pero el
+             handler real está en el marker, no en el slot. -->
         <div class="field" #fieldContainer>
           <!-- Etiquetas de zonas -->
           <div class="zone-label zone-attack-label">ATAQUE</div>
@@ -450,11 +450,11 @@ import { SessionPlayer } from '../../shared/models/player.model';
           <div class="goal-post goal-post-top"></div>
           <div class="goal-post goal-post-bottom"></div>
 
-          <!-- SUBDIVISIONES COMO SLOTS (81 + 1 GK) â€” V25D47 (C11b) extended
+          <!-- SUBDIVISIONES COMO SLOTS (81 + 1 GK) â€" V25D47 (C11b) extended
                each slot as a cdkDropList connected to all other slots +
                the bench. The slot's player-chip becomes a cdkDrag so the
                user can drag players between slots. Click is preserved
-               (for opening the assignment panel) â€” CDK suppresses click
+               (for opening the assignment panel) â€" CDK suppresses click
                when a real drag occurs. -->
           <div class="field-slots">
             <ng-container *ngFor="let sub of subdivisions; let i = index">
@@ -465,12 +465,12 @@ import { SessionPlayer } from '../../shared/models/player.model';
                    effectiveness badge) to appear at positions inherited from
                    a previous formation (e.g., CAM from 4-2-3-1 persisted
                    after switching back to 4-4-2). Filter at the template
-                   level for defense-in-depth â€” the loadSquadFromBackend
+                   level for defense-in-depth â€" the loadSquadFromBackend
                    validation is the primary fix, this prevents ghost UI
                    even if backend returns stale slots. -->
 <ng-container *ngIf="shouldRenderSlot(sub)">
               <!-- V25D99.4-FRONT PROFESSIONAL REWRITE: the slot is now a PURE
-                   drop target â€” no chip, no missing-indicator, no visual state.
+                   drop target â€" no chip, no missing-indicator, no visual state.
                    The .player-marker (rendered below as a sibling, outside the
                    slot) is the ONLY visual representation of a player. This
                    eliminates the duplication Ivan reported ('se duplico 1')
@@ -484,14 +484,14 @@ import { SessionPlayer } from '../../shared/models/player.model';
                    - .recommended â†’ slotId is in formationPositions
                                      AND not abandoned (yellow box-shadow)
 
-                   The slot has no (cdkDropListDropped) binding â€” V25D99 removed
+                   The slot has no (cdkDropListDropped) binding â€" V25D99 removed
                    it. Drops are handled by the marker's (cdkDragEnded) via
                    handleMarkerDragEnd which hit-tests against subdivisions.
                    The slot's cdkDropList is kept only so CDK can render the
                    hover drop highlight during drag.
 
                    V25D98.6 .slot.abandoned { pointer-events: none } kept:
-                   IvÃ¡n wants the abandoned slot INERT on click (no popup).
+                   Iván wants the abandoned slot INERT on click (no popup).
                    Drop on abandoned slot DOES still work because the marker
                    hits via dropPoint coords, not pointer-events. -->
               <!-- Slot de arquero (sector 26) -->
@@ -534,20 +534,20 @@ import { SessionPlayer } from '../../shared/models/player.model';
              </ng-container>
             </div>
 
-          <!-- Marcadores de jugadores activos â€” V25D47 (C11b) extended
+          <!-- Marcadores de jugadores activos â€" V25D47 (C11b) extended
                with effectiveness color band. The marker is a visual-only
                overlay (the slot's player-chip is the draggable handle).
                V25D91-FRONT-F1: marker now renders as a card showing the
                squad number (1-22) on top, the player name truncated to
                ~10 chars in the middle, and a role badge color-coded by
-               family (yellow GK / blue DEF / green MID / red ATT â€” same
+               family (yellow GK / blue DEF / green MID / red ATT â€" same
                palette as V25D90 PartidoModal).
 
                V25D95.1-FRONT F2: filter out markers whose slotId is not
                in the active formation. Pre-V25D95.1 a player persisted in
                a 3-5-2 lineup (e.g., CAM at the center MID slot) would
                still render a marker at that position after the user
-               switched to 4-4-2 â€” overlapping with the 4-4-2 players at
+               switched to 4-4-2 â€" overlapping with the 4-4-2 players at
                the surrounding MID slots and looking like a "ghost" or
                "stacked" marker. Now the marker only renders if the
                slotId is in the active formation (defense-in-depth: the
@@ -570,7 +570,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
                    trackBy, every homePlayers$.next() (which we emit at the
                    end of handleMarkerDragEnd) would cause *ngFor to
                    DESTROY and RECREATE the marker DOM elements. CDK's drag
-                   state is bound to the DOM element â€” recreating the
+                   state is bound to the DOM element â€" recreating the
                    element mid-drag or right after drag end loses the
                    cdkDrag reference and produces 'first drag fails,
                    second works' symptoms (Ivan: 'la primera vez falla, la
@@ -597,7 +597,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
                     V25D95.6) to .player-marker via drop-shadow filter.
                     The .player-marker.eff-green/-yellow/-red CSS rules
                     (below) apply a glowing border via drop-shadow that
-                    hugs the marker card exactly â€” no bleed. The marker
+                    hugs the marker card exactly â€" no bleed. The marker
                     also keeps its role-family color (yellow GK, blue DEF,
                     green MID, red ATT) as its base color; eff-* is an
                     additive glow overlay for high/low chemistry.
@@ -609,7 +609,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
                     red ATT) and the dorsal. The effectiveness tint now lives
                    on the underlying .player-chip (subtle chip border), not
                    on the marker border ring. V25D95.5 also adds cdkDrag +
-                   cdkDragData so the marker IS the drag handle â€” previously
+                   cdkDragData so the marker IS the drag handle â€" previously
                    only the hidden chip had cdkDrag, so users saw the marker
                    on top but couldn't grab it (clicking the marker did
                    nothing). Now drag-drop works directly on the marker card. -->
@@ -620,7 +620,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
                     role doesn't match the slot's recommended role in the
                     active canonical formation. The dashed orange border on
                     the parent .player-marker (set when 'off-role' class
-                    applies) is the second visual hint â€” both reinforce that
+                    applies) is the second visual hint â€" both reinforce that
                     the player is in an off-role slot so the manager sees
                     the chemistry penalty even when scanning the field at a
                     glance. -->
@@ -658,7 +658,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
           </div>
           <span *ngIf="!benchPlayers || benchPlayers.length === 0"
                 class="bench-empty">
-            (vacÃ­a â€” todos en cancha)
+            (vacía â€" todos en cancha)
           </span>
         </div>
       </div>
@@ -672,14 +672,14 @@ import { SessionPlayer } from '../../shared/models/player.model';
           <span>{{homeFormation}}</span>
         </div>
         <div class="field-orientation">
-          <span class="orientation-label">â†“ ATAQUE</span>
+          <span class="orientation-label">â†" ATAQUE</span>
         </div>
         <div class="bench-info">
           <span>Slots: {{occupiedSlots}}/11</span>
         </div>
       </div>
 
-      <!-- Panel de asignaciÃ³n (cuando se hace click en un slot) -->
+      <!-- Panel de asignación (cuando se hace click en un slot) -->
       <div *ngIf="selectedSlot" class="assignment-panel">
         <div class="assignment-header">
           <span>Slot: {{selectedSlot.subdivisionId}}</span>
@@ -732,7 +732,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
         <button class="banner-close" (click)="lineupWarning$.next(null)" title="Cerrar">Ã—</button>
       </div>
 
-      <!-- Warning por condiciÃ³n del jugador -->
+      <!-- Warning por condición del jugador -->
       <div *ngIf="conditionWarning" class="condition-warning-message">
         <mat-icon>info</mat-icon>
         <span>{{conditionWarning}}</span>
@@ -744,7 +744,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
     .squad-editor-container {
       /* V25D92-FRONT-F1: full-width modal. Pre-V25D92 the max-width: 900px cap
          forced the container to 900px even on viewport >= 1280px where the
-         cdk-overlay-pane is 1216px (95vw) â€” leaving 316px of empty space
+         cdk-overlay-pane is 1216px (95vw) â€" leaving 316px of empty space
          to the right of the dark green gradient background. Replaced the
          900px cap with max-width: 95vw so the container matches the pane
          width (consistent with the V25D89.4 PartidoModal full-width fix
@@ -754,7 +754,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
          blancas" a los lados del modal @ 1600vw viewport. Pre-V25D92.6, el
          modal era 1520px (95% de 1600vw) con 40px de gap a cada lado. Esos
          40px mostraban el body bg del squad-management page (#f5f5f5 light
-         gray) a traves del cdk-overlay-pane â€” Ivan: "no parte blanca a la
+         gray) a traves del cdk-overlay-pane â€" Ivan: "no parte blanca a la
          derecha, feo". 98vw = 1568px, gap lateral de 16px cada lado, mucho
          menos visible. Si en pantallas mas anchas (1920, 2560) el gap sigue
          siendo perceptible, se puede bumpear a 100vw sin margin. */
@@ -816,7 +816,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
       flex-shrink: 0;
     }
 
-    /* V25D98-FRONT: reset-positions button â€” visible only when at least one
+    /* V25D98-FRONT: reset-positions button â€" visible only when at least one
        marker has a custom (free) position. Compact pill style so it
        fits in the header next to the chemistry preview stack. */
     .reset-positions-btn {
@@ -903,7 +903,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
        via margin-left: auto and stacks them vertically with a small gap.
 
        V25D92.6-FRONT F1: removed margin-left:auto because the parent
-       .squad-header now uses CSS grid (1fr | auto) â€” .header-preview-stack
+       .squad-header now uses CSS grid (1fr | auto) â€" .header-preview-stack
        sits naturally in the 2nd column (.squad-header-right) without
        needing the auto-margin trick. Keeping margin-right:0.5rem for
        visual breathing room from the close button. */
@@ -919,7 +919,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
       flex-shrink: 0;
     }
 
-    /* V25D45 (Sprint C10): chemistry preview row â€” projected chemistry of
+    /* V25D45 (Sprint C10): chemistry preview row â€" projected chemistry of
        in-progress lineup. Sits between the formation selector and the
        close button in the header. */
     .chemistry-preview-row {
@@ -994,7 +994,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
 
     /* V25D47 (Sprint C11b): chemistry preview weight indicator
        (Ã—85% chip next to the score when formationEffectiveness is
-       applied). Subtle, neutral colors â€” not the high/mid/low bands. */
+       applied). Subtle, neutral colors â€" not the high/mid/low bands. */
     .preview-eff-weight {
       font-size: 0.7rem;
       font-weight: 600;
@@ -1052,7 +1052,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
     }
 
     /* V25D47 (Sprint C11b): bench drop list. Horizontal scrollable strip
-       of bench players below the field. Empty state shows "(vacÃ­a)". */
+       of bench players below the field. Empty state shows "(vacía)". */
     .bench-container {
       display: flex;
       align-items: center;
@@ -1074,7 +1074,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
 
          V25D92.6-FRONT F3: bumped minmax(150px â†’ 110px, 1fr). Pre-V25D92.6
          the 150px minimum + max-width:240px cap on .bench-player produced
-         "irregular 8+2 o 5+4+2" layouts at 1280-1600vw â€” Ivan: visual
+         "irregular 8+2 o 5+4+2" layouts at 1280-1600vw â€" Ivan: visual
          inconsistente entre squad sizes. Con minmax(110px, 1fr):
            - 4 bench players @ 1280vw bench-list (1118px): 4 columns Ã— ~280px each
            - 4 bench players @ 1600vw bench-list (1422px): 4 columns Ã— ~355px each
@@ -1186,7 +1186,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
        (subtle background tint) + player markers (border ring).
        V25D95.2-FRONT: only show the tint when the slot is EMPTY
        (.missing-player) or being hovered. When OCCUPIED, the .player-marker
-       already conveys the effectiveness via its own border ring â€” showing
+       already conveys the effectiveness via its own border ring â€" showing
        a second tinted tile behind the marker was perceived as a "ghost
        rectangle" by Ivan (V25D95.1 review). */
     .slot.eff-green:not(.occupied) {
@@ -1630,7 +1630,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
       border-radius: 4px;
       /* NOTA: NO agregamos overflow:hidden al .field porque romperia
          .player-chip .eff-badge (positioned absolute top:-8 right:-8
-         desde el chip â€” sobresale del slot y podria extenderse fuera
+         desde el chip â€" sobresale del slot y podria extenderse fuera
          del field para slots en los extremos como S24-3 / GK). Los
          .corner-arc NO requieren clip: estan completamente dentro del
          field (2.5% Ã— 2.5% anchored en cada esquina). */
@@ -1658,7 +1658,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
        and chips don't cover the field lines, and the markers always
        sit on top of both. Pre-V25D95.1 the markings had no explicit
        z-index, so the slot chip (z:1) occasionally drew over the
-       halfway line â€” subtle but visible at the seam where the
+       halfway line â€" subtle but visible at the seam where the
        dashed slot border crossed a white line. */
     .field-line {
       position: absolute;
@@ -1666,7 +1666,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
       z-index: 2;
     }
 
-    /* V25D95-FRONT F2: halfway line â€” bumped to 2.5px height + alpha 0.95
+    /* V25D95-FRONT F2: halfway line â€" bumped to 2.5px height + alpha 0.95
        (vs old 0.7). Posicionado en yPercent 50% exacto via top:50% +
        translateY(-50%). Background-fill en vez de border (line horizontal
        full-width no necesita 4-border). */
@@ -1694,7 +1694,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
 
     /* V25D95-FRONT F2: Penalty areas per spec TV-broadcast. Bumped from
        16% Ã— 30% a 60% w Ã— 16% h. El "60% del field width" era lo que
-       Ivan queria como "linea mas prominente" â€” V25D93 lo dejo chico
+       Ivan queria como "linea mas prominente" â€" V25D93 lo dejo chico
        (proporciones reales-pitch). V25D95 trade-off: no es 100%
        proporcional real pero se ve "profesional" como TV broadcast.
        Border 2px solid rgba(255,255,255,0.9) per spec. bottom:0 (own)
@@ -1804,7 +1804,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
 
     /* V25D95-FRONT F2 NEW: Corner arcs (4 esquinas del field). Cada uno es
        un cuarto de circulo visible en una esquina. Width 2.5% Ã— height
-       2.5% per spec â€” dimension pequena para no dominar visualmente. Border
+       2.5% per spec â€" dimension pequena para no dominar visualmente. Border
        2px solid rgba(255,255,255,0.9). El "quarter visible only" trick:
        usamos border-radius:100% SOLO en la esquina que debe ser redonda;
        las otras 3 esquinas quedan en border-radius:0 (sharp). Tambien
@@ -1916,7 +1916,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
          slots se renderizaba como rectangulo con border rgba(255,255,255,0.3)
          + bg rgba(255,255,255,0.05) tinted por role family (red attack, green
          midfield, blue defense). Con soccer markings reales en V25D93 esa
-         grilla es ruido â€” Ivan: "cruces rojas adentro, feo". Fix:
+         grilla es ruido â€" Ivan: "cruces rojas adentro, feo". Fix:
          border:none + background:transparent. .slot.missing-player mantiene
          su tinted bg para que el user sepa DONDE falta asignar (info util,
          no debug clutter). Slots siguen siendo cdkDropList/cdkDrag targets,
@@ -1940,14 +1940,14 @@ import { SessionPlayer } from '../../shared/models/player.model';
       /* V25D99.9-FRONT: REMOVED the dashed outline. Ivan: 'si paso por
          una casilla donde estuvo antes se ve punteada, porque? no
          deberia verse nada y ya'. Empty slots are completely invisible
-         at all states â€” at rest AND on hover AND during drag-over.
+         at all states â€" at rest AND on hover AND during drag-over.
          No visual indicator at all. The slot is still cdkDropList
          (droppable) and still clickable for the assignment panel,
          just invisible. */
     }
 
     /* V25D93-FRONT F1: removidas .slot.attack/.midfield/.defense/.gk role-tinted
-       backgrounds â€” eran debug-only que Ivan reporto como "cruces rojas". */
+       backgrounds â€" eran debug-only que Ivan reporto como "cruces rojas". */
 
     .slot-gk {
       /* V25D93-FRONT F1: transparent. Mantengo la regla para no romper el
@@ -1958,7 +1958,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
 
 /* V25D99.6-FRONT: .slot.abandoned REMOVED entirely. Pre-V25D99.6 the
        abandoned slot had a dashed amber outline + pointer-events:none.
-       Ivan: 'tiene que desaparecer donde estaba antes' â€” the original
+       Ivan: 'tiene que desaparecer donde estaba antes' â€" the original
        slot must DISAPPEAR when a player moves out, not show as a
        ghost/amber outline. With free positioning removed (V25D99.6),
        the only way to leave a slot empty is via the bench move (which
@@ -1966,9 +1966,9 @@ import { SessionPlayer } from '../../shared/models/player.model';
        slot-swap where the displaced occupant FILLS the source slot
        (no empty slot remains). So .abandoned is impossible by design
        now. The base .slot rule (border:none, bg:transparent) already
-       makes empty slots invisible â€” no extra styling needed. */
+       makes empty slots invisible â€" no extra styling needed. */
     .slot.abandoned {
-      /* deprecated â€” kept as a no-op for backward compat with old builds */
+      /* deprecated â€" kept as a no-op for backward compat with old builds */
     }
 
     .slot.recommended {
@@ -1976,7 +1976,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
          sigue quedando el espacio marcado donde se inicio el jugador no
          se porque'. The yellow box-shadow on empty recommended slots
          was being perceived as a 'marked space' (ghost). Now empty
-         slots are TRULY invisible â€” only the slot's hover outline shows
+         slots are TRULY invisible â€" only the slot's hover outline shows
          (below). The .recommended class is kept on the element as a
          hook for future styling. */
     }
@@ -1986,7 +1986,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
 
     /* Slot recomendado sin jugador asignado */
     .slot.missing-player {
-      /* V25D93-FRONT F1: MANTIENE el tinted bg â€” UNICA exception a la regla
+      /* V25D93-FRONT F1: MANTIENE el tinted bg â€" UNICA exception a la regla
          "slots invisibles" porque esto ES informacion util (no debug clutter).
          El user ve donde falta asignar. Border-style:dashed indica "vacio". */
       background: rgba(231, 76, 60, 0.18);
@@ -2006,11 +2006,11 @@ import { SessionPlayer } from '../../shared/models/player.model';
       margin-top: 1px;
       text-transform: uppercase;
     }
-    /* V25D98.2-FRONT: .missing-indicator-overridden eliminado. IvÃ¡n
-       reportÃ³ que ver el role del slot original despuÃ©s del free drop
-       hacÃ­a sentir que el slot "seguÃ­a claiming al player". Ahora el
-       slot se ve completamente vacÃ­o (ni chip ni role indicator)
-       cuando el player estÃ¡ free-positioned. */
+    /* V25D98.2-FRONT: .missing-indicator-overridden eliminado. Iván
+       reportó que ver el role del slot original después del free drop
+       hacía sentir que el slot "seguía claiming al player". Ahora el
+       slot se ve completamente vacío (ni chip ni role indicator)
+       cuando el player está free-positioned. */
 
     .player-chip {
       font-size: 0.5rem;
@@ -2030,7 +2030,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
          (top:-8px, right:-8px) anchors against the chip rather than the
          slot. overflow:visible so the badge can extend above the chip
          without being clipped (the slot's overflow:visible is also required
-         for the badge to escape the slot's top edge â€” see .slot comment).
+         for the badge to escape the slot's top edge â€" see .slot comment).
          The text-overflow:ellipsis behavior moved to .player-chip-name
          (a child span wrapping the player name) so long names still truncate
          with "â€¦" via the child's own overflow:hidden. */
@@ -2073,16 +2073,16 @@ import { SessionPlayer } from '../../shared/models/player.model';
        eff-bad (eff < 0.7, red border). The border uses box-sizing:border-box
        semantics from the chip itself (the chip's padding stays put). */
      /* V25D64 (Sprint C24): eff-good border verde distintivo + alignment de
-        eff-warning y eff-bad a 2px para simetrÃ­a visual con eff-good y con
+        eff-warning y eff-bad a 2px para simetría visual con eff-good y con
         substitution-modal (que ya usaba 2px en C23). Pre-C24 warning/bad
-        estaban en 1px â€” ahora las 3 clases son 2px simÃ©tricas.
+        estaban en 1px â€" ahora las 3 clases son 2px simétricas.
         Mismo patron que V25D63-C23 en substitution-modal.component.css.
         V25D95.7-FRONT: border del chip removido. El chip es invisible
         (V25D95.6 transparent bg) y el border verde se "sangraba" hacia
-        afuera del marker card (que es mÃ¡s chico), mostrando un recuadro
+        afuera del marker card (que es más chico), mostrando un recuadro
         verde fantasma alrededor de Courtois en el GK slot (que es 180px
         ancho vs 70px del marker). La chemistry eff-* ring ahora vive
-        en .player-marker.eff-good/warning/bad abajo â€” el border rodea
+        en .player-marker.eff-good/warning/bad abajo â€" el border rodea
         el marker card directamente, sin bleed. */
      .player-chip.eff-warning {
        /* border removed V25D95.7 */
@@ -2099,7 +2099,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
     /* V25D51 (Sprint C13): corner badge anchored to the chip's top-right.
        Positioned absolute against the chip (which is position:relative),
        extending 8px above and 8px left of the chip's top-right corner.
-       Renders only when formationEffectiveness has a value for the slot â€”
+       Renders only when formationEffectiveness has a value for the slot â€"
        pre-V25D51 lineups (effectiveness=null) skip the badge entirely. */
     .player-chip .eff-badge {
       position: absolute;
@@ -2118,28 +2118,28 @@ import { SessionPlayer } from '../../shared/models/player.model';
     }
 
     /* Player Marker (number + name + role badge sobre el campo).
-       V25D91-FRONT-F1: el marker pasÃ³ de cÃ­rculo 32x32 a card 70x56
+       V25D91-FRONT-F1: el marker pasó de círculo 32x32 a card 70x56
        que muestra squad-number (1-22) arriba, nombre truncado en el
        medio, y role badge color-codeado por familia. Mismo scheme que
        V25D90 PartidoModal (yellow GK / blue DEF / green MID / red ATT). */
 .player-marker {
         position: absolute;
         /* V25D93-FRONT F3: width fijo 70px (suficiente para nombres largos en 2
-           lineas). Height VARIA por role per Ivan spec â€” ver los selectores
+           lineas). Height VARIA por role per Ivan spec â€" ver los selectores
            .color-gk/.color-def/.color-mid/.color-att abajo.
 
            V25D95.1-FRONT F4: z-index 20 â†’ 10. El hierarchy final es
            .field-slots=1, .field-line=2, .player-marker=10, .tactical-number=11.
            El marker queda encima de slots + markings pero el dorsal flota
-           externo en z:11. Antes z:20 era muy alto â€” el assignment panel
+           externo en z:11. Antes z:20 era muy alto â€" el assignment panel
            (z:100) y los warnings (z:100) ya estaban muy por encima, asi que
            bajar a 10 no afecta ningun overlay del modal.
 
            V25D99-FRONT: pointer-events: auto (was: none). Pre-V25D99 the
-           marker was purely visual â€” the slot's cdkDropList captured drag
+           marker was purely visual â€" the slot's cdkDropList captured drag
            events. V25D99 moved drag capture to (cdkDragEnded) on the
            marker itself. pointer-events: none blocked ALL mouse events
-           on the marker so cdkDrag never started â€” Ivan reported 'no
+           on the marker so cdkDrag never started â€" Ivan reported 'no
            deja hacer cambio de nada'. Re-enabling pointer events here
            makes the marker the drag handle as intended by the V25D99
            rewrite. The inner .player-chip-name text inherits pointer
@@ -2147,19 +2147,19 @@ import { SessionPlayer } from '../../shared/models/player.model';
            pass through to siblings, but the marker sits ON TOP of slots
            so clicks land on the marker, which uses cdkDrag to start a
            drag). The marker template also forwards click to onSlotClick
-           via the (click) on the .field element â€” but since the marker
+           via the (click) on the .field element â€" but since the marker
            has its own cdkDrag, plain clicks would be CDK-initiated
            drags; for click-to-assign UX see the assignment-panel flow.
 
            V25D99.10-FRONT: removed transform: translate(-50%, -50%).
            Replaced with MARGIN-based centering (below). Reason: CDK's
            inline transform: translate3d(dragX, dragY, 0) during drag
-           OVERRIDES any CSS transform on the element â€” the centering
+           OVERRIDES any CSS transform on the element â€" the centering
            was being lost during drag, causing the marker to be offset
            from the cursor (Ivan: 'queda dependiendo de a donde volando
            mas a la derecha, cuando lo agarro'). Margin affects the
            element's BOUNDING RECT (not its CSS transform), so CDK's
-           drag math respects the centering â€” cursor stays on the
+           drag math respects the centering â€" cursor stays on the
            marker's center regardless of where the user clicks. */
         width: 70px;
         height: 48px;
@@ -2173,7 +2173,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
         justify-content: center;
         gap: 1px;
         /* V25D93-FRONT F3: border 2px solid white per parent spec (ANTES no
-           habia border visible â€” solo drop-shadow). Ahora el marker se separa
+           habia border visible â€" solo drop-shadow). Ahora el marker se separa
            claramente del field green con borde blanco solido. */
         border: 2px solid #fff;
         border-radius: 6px;
@@ -2224,7 +2224,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
     /* V25D95-FRONT F3: tactical number badge (cuadradito chico que flota
        en el corner top-right EXTERNO del marker card). 14Ã—14px per spec,
        absolute top:-10 right:-8. Font 0.55rem semi-transparent (alpha
-       0.55) â€” sutil, complementa al .player-number INTERNO (mas grande
+       0.55) â€" sutil, complementa al .player-number INTERNO (mas grande
        y opaco) sin distraer. Background alpha 0.4 (semi-transparent
        black) para legibilidad sobre cualquier field background. Border-
        radius:50% lo hace circular como dorsales en TV broadcast.
@@ -2294,7 +2294,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
       line-height: 1.2;
     }
 
-    /* V25D91-FRONT-F1: role color scheme â€” yellow GK, blue DEF,
+    /* V25D91-FRONT-F1: role color scheme â€" yellow GK, blue DEF,
        green MID, red ATT. Same palette as V25D90 PartidoModal. */
     .player-marker.color-gk .player-role-label {
       background: #f59e0b;  /* amber-500 */
@@ -2333,7 +2333,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
            (analogous to the existing .tactical-number badge at top-right).
 
        Both reinforce the cross-role placement. The badge in particular is
-       readable at distance â€” the manager can scan the field for orange 'OFF'
+       readable at distance â€" the manager can scan the field for orange 'OFF'
        labels to find the off-role players without inspecting every marker.
        The border uses border-style dashed (and the same amber-500 color
        as the chip-level eff-warning) so it visually matches the existing
@@ -2367,20 +2367,20 @@ import { SessionPlayer } from '../../shared/models/player.model';
        effectively preserved via the mousedown-offset math CDK applies
        to its translate3d(x, y, 0)). The marker is opaque (background
        color + border + chip), so the cursor pixel sits BEHIND the
-       preview's center â€” visually it looks like the OS cursor vanished.
+       preview's center â€" visually it looks like the OS cursor vanished.
 
        Fix:
-       1. cursor: grabbing on the marker at all times â€” Ivan sees the
+       1. cursor: grabbing on the marker at all times â€" Ivan sees the
           standard 'grab/grabbing' cursor on hover+drag so the cursor
           type is always explicit (better UX than implicit default).
-       2. cdk-drag-preview opacity 0.92 â€” slight transparency so the
+       2. cdk-drag-preview opacity 0.92 â€" slight transparency so the
           OS cursor pixel is visible THROUGH the preview at its
           center. Also adds a deeper drop-shadow so the preview reads
           as 'lifted off the field' = clear drag affordance.
-       3. cdk-drag-placeholder opacity 0.3 â€” the original marker stays
+       3. cdk-drag-placeholder opacity 0.3 â€" the original marker stays
           in place but at 30% so Ivan can see WHERE the player will
           snap back to if he releases outside the field.
-       4. cursor: grabbing on the preview itself â€” guards against the
+       4. cursor: grabbing on the preview itself â€" guards against the
           browser ever rendering 'default' cursor during the drag.
 
        Scope: marker (.player-marker + .cdk-drag-*) only. Bench cards
@@ -2606,11 +2606,11 @@ import { SessionPlayer } from '../../shared/models/player.model';
       line-height: 1;
     }
 
-    /* Responsive â€” V25D56 (Sprint C17)
+    /* Responsive â€" V25D56 (Sprint C17)
        Progressive breakpoints: mobile (<=600px), tablet (601-1024px),
        desktop (default >=1025px). The previous single breakpoint at
        768px hid the .player-chip via display:none on mobile, which
-       IvÃ¡n flagged as a visual regression ("falta alguien en ese
+       Iván flagged as a visual regression ("falta alguien en ese
        espacio"). The chip now stays visible at all viewports, with
        font-size/padding scaled to fit narrow slots. */
     @media (max-width: 600px) {
@@ -2636,7 +2636,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
         height: 100%;
       }
 
-      /* Mobile chips keep visible â€” shrink font-size + padding so they
+      /* Mobile chips keep visible â€" shrink font-size + padding so they
          fit narrow slots without overflowing. */
       .player-chip {
         font-size: 0.4rem;
@@ -2685,7 +2685,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
       /* V25D92.5-FRONT F1 v2: removed max-width: 1200px cap on
          .squad-editor-container. Pre-V25D92.5 the cap limited container
          to 1200px even though the CDK overlay pane was 1520px (95vw of
-         1600vw viewport) â€” leaving 320px of empty dark green background
+         1600vw viewport) â€" leaving 320px of empty dark green background
          (the .squad-editor-container extends to its background-image
          gradient) so the field looked floated to the left of a wider
          pane. With the cap removed, container = 98vw = 1568px = pane,
@@ -2697,7 +2697,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
 
       /* V25D93.5-FRONT: removed .field max-width: min(600px, 100%) override.
          El field ahora es height-driven landscape 1.4:1 (definido en
-         regla base) y no necesita un cap horizontal â€” width se calcula
+         regla base) y no necesita un cap horizontal â€" width se calcula
          por aspect-ratio a partir de height. El cap 600 era de la era
          portrait 0.71:1 (V25D58) y ahora no aplica. */
     }
@@ -2711,10 +2711,10 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
 
   private destroy$ = new Subject<void>();
 
-  /** Emite cuando cambia la formaciÃ³n - con los players para actualizar el padre directamente */
+  /** Emite cuando cambia la formación - con los players para actualizar el padre directamente */
   @Output() formationChanged = new EventEmitter<{formation: string, players: any[]}>();
 
-  /** Subject para esperar confirmaciÃ³n de que la predicciÃ³n se refresh */
+  /** Subject para esperar confirmación de que la predicción se refresh */
   private formationChangeCompleteSubject = new Subject<void>();
 
   /** Output que expone el subject para que el padre pueda completar */
@@ -2738,7 +2738,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   /** Mensaje de error (observable) */
   errorMessage$ = new BehaviorSubject<string>('');
 
-  /** Mensaje de warning por condiciÃ³n del jugador */
+  /** Mensaje de warning por condición del jugador */
   conditionWarning$ = new BehaviorSubject<string>('');
 
   /** V24D6U3: server-issued warning (LINEUP_SHORT_HANDED, LINEUP_NO_GOALKEEPER) */
@@ -2747,21 +2747,21 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   /** Nombre del equipo */
   homeTeamName = 'Mi Equipo';
 
-  /** FormaciÃ³n actual (observable) */
+  /** Formación actual (observable) */
   homeFormation$ = new BehaviorSubject<string>('4-4-2');
 
-  /** FormaciÃ³n seleccionada */
+  /** Formación seleccionada */
   selectedFormation = '4-4-2';
 
   /**
    * V25D55-C16 P0.1: source of truth movido a
    * {@code shared/constants/formations.ts}. Antes eran solo las 7 originales
-   * â€” faltaban las 5 nuevas de V25D54-C15 (3-5-2-CDM, 5-4-1, 3-4-1-2,
+   * â€" faltaban las 5 nuevas de V25D54-C15 (3-5-2-CDM, 5-4-1, 3-4-1-2,
    * 4-2-2-2, 4-3-3-1). Ahora el dropdown muestra las 12 formations que el
    * back-end reconoce.
    *
    * <p>V25D96: the dropdown also needs to render the disabled
-   * {@code 'FormaciÃ³n del User'} option (when the user has drag-dropped
+   * {@code 'Formación del User'} option (when the user has drag-dropped
    * players to non-canonical positions). The dropdown's effective options
    * for display are {@link ALL_FORMATIONS} + the {@link USER_FORMATION_LABEL}
    * (UI-only label, not selectable). Keep {@code formations} as the canonical
@@ -2776,7 +2776,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
    * via drag-drop). Drives {@code dropdownFormationValue} and
    * {@code isSlotInActiveFormation} (so non-canonical slots with players
    * still render their markers). Set automatically by
-   * {@code detectFormation()} â€” never bind directly.
+   * {@code detectFormation()} â€" never bind directly.
    */
   private _isCustomLineup = false;
 
@@ -2807,7 +2807,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   /**
    * V25D99.13-FRONT: convenience getter for the template. Mirrors
    * {@code getDisplayedChemistryScore()} but unwraps the null as
-   * {@code null} for the panel's `?? 'â€”'` fallback chain.
+   * {@code null} for the panel's `?? 'â€"'` fallback chain.
    */
   get chemistryScore(): number | null {
     return this.getDisplayedChemistryScore();
@@ -2865,7 +2865,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
    * {@link liveRatings} is null (e.g. before the first preview returns),
    * the getters fall back to {@link formationEffectiveness$.value} (the
    * fields added in V25D99.15-BACK on the lineup save response) which
-   * is null on legacy lineups, in which case we render "â€”".
+   * is null on legacy lineups, in which case we render "â€"".
    */
   get attackRating(): number {
     return this.liveRatings?.attackRating
@@ -2933,7 +2933,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
    * V25D99.15-FRONT: actually fire the preview request. Builds a
    * {playerId, subdivisionId}[] from homePlayers (one entry per player
    * with a slotId) and POSTs to the preview endpoint. Falls back
-   * silently on 401 / 404 / 500 â€” the panel keeps showing the last
+   * silently on 401 / 404 / 500 â€" the panel keeps showing the last
    * known good values.
    */
   private fetchRatingsPreview(): void {
@@ -2984,7 +2984,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
         },
         // Silent fail: backend might be slow / unavailable / endpoint
         // not deployed yet on dev. The fallback getters keep the panel
-        // showing the last known values (or "â€”" if never computed).
+        // showing the last known values (or "â€"" if never computed).
         error: () => { /* noop */ }
       });
   }
@@ -3067,7 +3067,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   /**
    * V25D99.13-FRONT: compute the per-zone breakdown for the table.
    * Returns 4 rows (GK / DEF / MID / ATT) regardless of player count;
-   * empty rows show 'â€”' in the template.
+   * empty rows show 'â€"' in the template.
    *
    * Each row has:
    * - zone label
@@ -3179,7 +3179,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
    * Each cell holds the count of on-field players in that bucket.
    * The cell color band: 0 = exposed (red), 1 = low (yellow), 2+ = ok.
    *
-   * V25D99.15-FRONT: REMOVED â€” Ivan asked to drop the coverage section
+   * V25D99.15-FRONT: REMOVED â€" Ivan asked to drop the coverage section
    * ("no quiero que aparezca lo de cobertura, ademas esta raro un 4-4-2
    * es bastante standard, no es que falta un defensor en cada lado para
    * ser bien defensivo"). The per-zone engine ratings now surface the
@@ -3189,20 +3189,20 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
 
   /**
    * V25D99.14-FRONT: role-match factor for a player placed in a zone
-   * that's not their natural family. V25D99.15-FRONT: REMOVED â€” the
+   * that's not their natural family. V25D99.15-FRONT: REMOVED â€" the
    * frontend no longer computes ratings locally. The engine's
    * PositionEffectivenessCalculator handles the penalty at
    * {@code /preview-ratings} time.
    */
 
   /**
-   * V25D99.15-FRONT: REMOVED â€” engine-derived values now drive the
+   * V25D99.15-FRONT: REMOVED â€" engine-derived values now drive the
    * ratings via {@link liveRatings} (from /preview-ratings) and
    * {@link formationEffectiveness$.value} (from /current). See the
    * fallback getters above for the wiring.
    */
 
-  /** Cache de posiciones de formaciÃ³n */
+  /** Cache de posiciones de formación */
   private formationPositions: { [key: string]: FormationPositionDTO[] } = {};
 
   /** Mapping slotId -> player */
@@ -3225,7 +3225,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
    *
    * <p>{@code previewedChemistry$} holds the last successful preview response,
    * or {@code null} while waiting / after a failure. The template binds via
-   * async pipe and shows the score + Î” vs {@code currentChemistryScore}.
+   * async pipe and shows the score + Δ vs {@code currentChemistryScore}.
    *
    * <p>{@code currentChemistryScore} is the chemistry score of the LAST
    * PERSISTED lineup (from the initial {@code /career/lineup/current}
@@ -3246,11 +3246,11 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   /**
    * V25D47 (Sprint C11b): formation effectiveness snapshot from the most
    * recent {@code /career/lineup/current} response. Nullable for backward
-   * compat with lineups created before V25D47 â€” when null, the formation
+   * compat with lineups created before V25D47 â€" when null, the formation
    * effectiveness row in the header and the per-player color codes are
    * suppressed (the modal still works in click-only mode).
    *
-   * <p>Updated ONLY on /current load â€” NOT on every drag-drop. Drag-drop
+   * <p>Updated ONLY on /current load â€" NOT on every drag-drop. Drag-drop
    * calls saveLineup() which persists the new slots and (asynchronously)
    * the back recomputes formationEffectiveness. To avoid an extra round
    * trip per drop, we let the user re-open the modal (or the parent's
@@ -3309,7 +3309,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
    *
    * <p>Why 300ms debounce: typical user drag-and-drop emits 5-10 events
    * per second; without debounce, each event would trigger a backend
-   * roundtrip. 300ms is the sweet spot â€” fast enough that the preview
+   * roundtrip. 300ms is the sweet spot â€" fast enough that the preview
    * feels live, slow enough to coalesce a drag gesture into 1 call.
    *
    * <p>Why distinctUntilChanged on the joined string: avoids duplicate
@@ -3322,7 +3322,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
         debounceTime(300),
         distinctUntilChanged((a, b) => a.join(',') === b.join(',')),
         switchMap(ids => {
-          // Need exactly 11 to preview â€” earlier/later states emit null
+          // Need exactly 11 to preview â€" earlier/later states emit null
           // (template shows "Proyectando chemistry..." placeholder).
           if (!ids || ids.length !== 11) {
             this.previewError = false;
@@ -3351,7 +3351,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
    *
    * <p>The pipeline (see {@link setupChemistryPreviewPipeline}) coalesces
    * rapid calls and deduplicates against the last lineup snapshot. This
-   * method is fire-and-forget â€” it doesn't await the backend response.
+   * method is fire-and-forget â€" it doesn't await the backend response.
    */
   private triggerChemistryPreview(): void {
     const ids = this.homePlayers.map(p => p.playerId);
@@ -3390,18 +3390,18 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
           resolve();
         },
         error: () => {
-          resolve(); // Continuar sin coordenadas de formaciÃ³n
+          resolve(); // Continuar sin coordenadas de formación
         }
       });
     });
   }
 
   /**
- * Carga la alineaciÃ³n desde el backend.
+ * Carga la alineación desde el backend.
  *
  * <p>MVP1-lineup-cancha-1: si el response trae {@code slots[]} persistidos,
  * se usan para restaurar las asignaciones exactas (playerId â†’ subdivisionId).
- * Si {@code slots} viene vacÃ­o o ausente, se aplica el fallback de role-match
+ * Si {@code slots} viene vacío o ausente, se aplica el fallback de role-match
  * (backward compat con lineups previos al sprint).
    */
   private loadSquadFromBackend(): void {
@@ -3416,7 +3416,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
             : null;
 
         // V25D47 (Sprint C11b): capture formationEffectiveness from the
-        // back. Nullable for legacy lineups (pre-V25D47) â€” when null the
+        // back. Nullable for legacy lineups (pre-V25D47) â€" when null the
         // modal hides the effectiveness row and the chemistry preview is
         // shown unweighted (no teamAverage multiplier).
         this.formationEffectiveness$.next(
@@ -3432,7 +3432,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
         // V25D75-C40 B4: use the parent's currentFormation first (passed
         // via MAT_DIALOG_DATA) so the dialog opens with the SAME state the
         // parent shows. Was: response.formation || this.selectedFormation
-        // || '4-4-2' â€” fell back to 4-4-2 when response.formation was null
+        // || '4-4-2' â€" fell back to 4-4-2 when response.formation was null
         // and parent had e.g. 5-4-1, causing the dialog/parent desync.
         const formationName = response?.formation
           || this.data?.currentFormation
@@ -3442,8 +3442,8 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
 
         // MVP1-lineup-cancha-1.5 FIX (F3): setear selectedFormation ANTES del
         // role-match fallback para que isRecommendedSlot/getRecommendedRole
-        // (que usan this.selectedFormation) vean la formaciÃ³n correcta, no la
-        // vieja. Antes este seteo estaba al final del callback y los mÃ©todos
+        // (que usan this.selectedFormation) vean la formación correcta, no la
+        // vieja. Antes este seteo estaba al final del callback y los métodos
         // que dependen de selectedFormation usaban el valor previo.
         this.homeFormation$.next(formationName);
         this.selectedFormation = formationName;
@@ -3451,17 +3451,17 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
         // Limpiar mapeos anteriores
         this.slotPlayerMap = {};
 
-        // Si no hay jugadores, hacer auto-select automÃ¡ticamente
+        // Si no hay jugadores, hacer auto-select automáticamente
         const playersList = response?.players || [];
         if (playersList.length === 0) {
           this.executeAutoSelect(formationName);
-          // Noreturn aquÃ­ - necesitamos terminar la inicializaciÃ³n despuÃ©s del auto-select
+          // Noreturn aquí - necesitamos terminar la inicialización después del auto-select
         }
 
-        // V25D66-C26 (Sprint C26): si el caller (squad-management) pasÃ³ el
-        // squad completo vÃ­a dialog data, lo usamos como source de bench en
+        // V25D66-C26 (Sprint C26): si el caller (squad-management) pasó el
+        // squad completo vía dialog data, lo usamos como source de bench en
         // lugar de response.players (que solo trae los 11 del LINEUP). Si
-        // data.squad estÃ¡ vacÃ­o o ausente, fallback al comportamiento legacy
+        // data.squad está vacío o ausente, fallback al comportamiento legacy
         // (bench = filter !slotId sobre lineup, que da 0 cuando lineup = 11).
         const squadSource: any[] = (this.data?.squad && this.data.squad.length > 0)
           ? this.data.squad.map((sp: SessionPlayer) => ({
@@ -3514,12 +3514,12 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
           }
         }
 
-        // Para jugadores sin slot asignado (o si el back no devolviÃ³ slots),
-        // aplicar el fallback de role-match contra la formaciÃ³n activa.
+        // Para jugadores sin slot asignado (o si el back no devolvió slots),
+        // aplicar el fallback de role-match contra la formación activa.
         const assignedPositions = new Set<number>();
         for (const player of allPlayers) {
           if (player.slotId) {
-            // Ya tiene slot del path MVP1 â€” marcar la posiciÃ³n de formaciÃ³n como usada.
+            // Ya tiene slot del path MVP1 â€" marcar la posición de formación como usada.
             for (let i = 0; i < positions.length; i++) {
               if (positions[i].subdivisionId === player.slotId) {
                 assignedPositions.add(i);
@@ -3541,14 +3541,14 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
           }
         }
 
-        // V25D95.1-FRONT F2: defensive validation â€” clear any slotId that
+        // V25D95.1-FRONT F2: defensive validation â€" clear any slotId that
         // is NOT in the active formation. Pre-V25D95.1 the persisted slots
         // were applied verbatim, so a player placed in a 3-5-2 CAM slot
         // would keep that slotId after switching back to 4-4-2 (which has
         // no CAM position). The .player-marker would render at the CAM
         // position (ghost marker), AND if 2 players happened to share
         // that stale subdivisionId they would stack on top of each other
-        // (the "MbappÃ© / Rodrygo" overlap Ivan reported â€” actually a load-
+        // (the "Mbappé / Rodrygo" overlap Ivan reported â€" actually a load-
         // time bug where 2 GKs from the same squad shared the GK slotId
         // when the persisted lineup came from a 3-5-2 session with 2
         // GKs at the same coord).
@@ -3562,7 +3562,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
         for (const player of allPlayers) {
           if (!player.slotId) { continue; }
           if (this.isSlotInActiveFormation(player.slotId)) { continue; }
-          // stale slotId from a previous formation â€” free it
+          // stale slotId from a previous formation â€" free it
           delete this.slotPlayerMap[player.slotId];
           player.slotId = '';
         }
@@ -3596,7 +3596,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
         for (const player of allPlayers) {
           if (!player.slotId) { continue; }
           if (seenSubdivisionIds.has(player.slotId)) {
-            // Duplicate â€” clear the slotId, the player will go to bench.
+            // Duplicate â€" clear the slotId, the player will go to bench.
             delete this.slotPlayerMap[player.slotId];
             player.slotId = '';
             continue;
@@ -3607,15 +3607,15 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
         this.homePlayers$.next(allPlayers.filter(p => p.slotId));
         this.benchPlayers$.next(allPlayers.filter(p => !p.slotId));
 
-        // Finalizar inicializaciÃ³n
+        // Finalizar inicialización
         this.isInitializing = false;
         this.cdr.detectChanges();
       },
       error: (err) => {
         console.error('[SQUAD-EDITOR] Error loading lineup:', err);
-        // Si hay error, aÃºn mostrar la formaciÃ³n seleccionada
+        // Si hay error, aún mostrar la formación seleccionada
         this.homeFormation$.next(this.selectedFormation || '4-4-2');
-        // Finalizar inicializaciÃ³n tambiÃ©n en error
+        // Finalizar inicialización también en error
         this.isInitializing = false;
         this.cdr.detectChanges();
       }
@@ -3627,7 +3627,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     return this.homePlayers.length;
   }
 
-  /** Verifica si un slot estÃ¡ ocupado */
+  /** Verifica si un slot está ocupado */
   isSlotOccupied(sub: FieldSubdivisionDTO): boolean {
     return !!this.slotPlayerMap[sub.subdivisionId];
   }
@@ -3639,7 +3639,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
    * object-identity tracking combined with our `homePlayers$.next([...
    * homePlayers$.value])` re-emission (in handleMarkerDragEnd) would
    * cause *ngFor to destroy and recreate the marker DOM elements on
-   * every drag end. CDK's drag state is bound to the DOM element â€”
+   * every drag end. CDK's drag state is bound to the DOM element â€"
    * recreating it mid-drag or right after drag end loses the cdkDrag
    * reference and produces 'first drag fails, second works' symptoms.
    */
@@ -3652,7 +3652,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     return this.slotPlayerMap[sub.subdivisionId];
   }
 
-  /** Verifica si un slot es recomendado para la formaciÃ³n actual */
+  /** Verifica si un slot es recomendado para la formación actual */
   isRecommendedSlot(sub: FieldSubdivisionDTO): boolean {
     const positions = this.formationPositions[this.selectedFormation];
     if (!positions) return false;
@@ -3671,7 +3671,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
    *      "Empty slot" rectangles.
    *
    * <p>If the active formation has no loaded positions yet (still loading
-   * /editor/formations), returns false for safety â€” no slot gets rendered
+   * /editor/formations), returns false for safety â€" no slot gets rendered
    * until we know what the formation looks like.
    */
   isSlotInActiveFormation(subdivisionId: string | undefined): boolean {
@@ -3695,11 +3695,11 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
    *   - the slot is in the active formation (so it should render with
    *     its empty/occupied styling), OR
    *   - the slot currently has a player assigned (even if it's a stale
-   *     slot from a previous formation â€” we still need to render the
+   *     slot from a previous formation â€" we still need to render the
    *     draggable chip so the user can drag it back).
    *
    * <p>Returns false for slots that are neither in the active formation
-   * NOR have a player â€” those are the "ghost" slots that V25D95.1 hides
+   * NOR have a player â€" those are the "ghost" slots that V25D95.1 hides
    * to prevent the dashed "Empty slot" rectangles from appearing at
    * positions inherited from another formation (e.g., CAM from 4-2-3-1
    * persisting after switching to 4-4-2).
@@ -3712,11 +3712,11 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
 
   /** Verifica si falta jugador en un slot recomendado */
   isMissingPlayer(sub: FieldSubdivisionDTO): boolean {
-    // V25D98.4-FRONT: tambiÃ©n ocultamos la role label cuando el slot fue
-    // abandonado por un free-positioned player (slotPlayerMap vacÃ­o pero
-    // algÃºn player tiene slotId===sub.subdivisionId con override). Sin
-    // este check el slot se verÃ­a como "missing CM" despuÃ©s del free
-    // drop, sugiriendo que el slot todavÃ­a reclama al player.
+    // V25D98.4-FRONT: también ocultamos la role label cuando el slot fue
+    // abandonado por un free-positioned player (slotPlayerMap vacío pero
+    // algún player tiene slotId===sub.subdivisionId con override). Sin
+    // este check el slot se vería como "missing CM" después del free
+    // drop, sugiriendo que el slot todavía reclama al player.
     return this.isRecommendedSlot(sub)
       && !this.isSlotOccupied(sub)
       && !this.isSlotAbandonedByOverride(sub);
@@ -3724,10 +3724,10 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
 
   /**
    * V25D98.4-FRONT: true cuando el slot NO tiene player en slotPlayerMap
-   * pero algÃºn player en homePlayers$.value tiene ese slotId y un
+   * pero algún player en homePlayers$.value tiene ese slotId y un
    * override (xPercent/yPercent). Usado por isMissingPlayer para no
    * mostrar la role label "missing CM" en un slot abandonado por
-   * free-positioning â€” el player no estÃ¡ missing, estÃ¡ en otro pixel.
+   * free-positioning â€" el player no está missing, está en otro pixel.
    */
   isSlotAbandonedByOverride(sub: FieldSubdivisionDTO): boolean {
     if (this.slotPlayerMap[sub.subdivisionId]) { return false; }
@@ -3737,13 +3737,13 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * V25D98.1-FRONT: true cuando el slot estÃ¡ lÃ³gicamente ocupado pero el
+   * V25D98.1-FRONT: true cuando el slot está lógicamente ocupado pero el
    * player fue free-positioned (xPercent/yPercent override). Usado por el
    * template para:
-   * - ocultar el chip interno (que duplicarÃ­a el nombre en la posiciÃ³n
-   *   vieja mientras el marker estÃ¡ en la override)
-   * - mostrar el .missing-indicator con el role, asÃ­ IvÃ¡n ve quÃ© slot
-   *   sigue vinculado al player aunque el marker estÃ© visualmente en
+   * - ocultar el chip interno (que duplicaría el nombre en la posición
+   *   vieja mientras el marker está en la override)
+   * - mostrar el .missing-indicator con el role, así Iván ve qué slot
+   *   sigue vinculado al player aunque el marker esté visualmente en
    *   otro pixel.
    */
   isSlotOverridden(sub: FieldSubdivisionDTO): boolean {
@@ -3754,7 +3754,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   /**
    * V25D98.1-FRONT: true si el player tiene al menos una coordenada de
    * override (free positioning). El template del chip usa esto para
-   * ocultarse cuando el player ya estÃ¡ free-positioned.
+   * ocultarse cuando el player ya está free-positioned.
    */
   hasOverridePosition(player: PlayerOnFieldDto): boolean {
     return typeof player.xPercent === 'number' || typeof player.yPercent === 'number';
@@ -3787,9 +3787,9 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   /** Click en un slot */
   onSlotClick(sub: FieldSubdivisionDTO): void {
     // V25D98.5-FRONT: abandoned slots (player free-positioned elsewhere)
-    // are inert on click. IvÃ¡n no quiere popup â€” ni siquiera "Sin asignar"
-    // â€” porque el player estÃ¡ fully relocated a su override position. El
-    // slot queda como un rectÃ¡ngulo visual sin funciÃ³n hasta que el
+    // are inert on click. Iván no quiere popup â€" ni siquiera "Sin asignar"
+    // â€" porque el player está fully relocated a su override position. El
+    // slot queda como un rectángulo visual sin función hasta que el
     // user drag-dropee al player de vuelta (handleSlotDrop restaura el
     // slotPlayerMap y el slot vuelve a ser clickeable con player info).
     if (this.isSlotAbandonedByOverride(sub)) {
@@ -3802,7 +3802,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
 
   /**
    * V25D99-FRONT: click handler on the marker itself. V25D99 made the
-   * marker pointer-events: auto so it can capture cdkDragEnded â€” which
+   * marker pointer-events: auto so it can capture cdkDragEnded â€" which
    * means clicks on the marker no longer fall through to the underlying
    * slot. To preserve the click-to-show-player-info UX (which previously
    * worked via slot's onSlotClick), we add a (click) handler on the
@@ -3824,10 +3824,10 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     const player = this.benchPlayers.find(p => p.playerId === this.selectedPlayerToAssign);
     if (!player) return;
 
-    // Mostrar warning si el jugador tiene condiciÃ³n de riesgo
+    // Mostrar warning si el jugador tiene condición de riesgo
     this.showConditionWarning(player);
 
-    // Quitar jugador de su slot anterior si tenÃ­a uno
+    // Quitar jugador de su slot anterior si tenía uno
     if (player.slotId) {
       delete this.slotPlayerMap[player.slotId];
     }
@@ -3848,7 +3848,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     // V25D45 (Sprint C10): trigger chemistry preview (debounced in pipeline).
     this.triggerChemistryPreview();
     // V25D96-FRONT F2: re-detect formation after click-assign. Same flow as
-    // handleSlotDrop â€” if the click-assign puts a player into an off-role
+    // handleSlotDrop â€" if the click-assign puts a player into an off-role
     // slot (e.g. assigning a CB to a MID slot via the assign panel), we want
     // the dropdown + marker visibility to flip into user-formation mode.
     this.updateFormationDetection();
@@ -3928,7 +3928,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
    * <ul>
    *   <li>Same slot â†’ no-op (avoid feedback loops on cdkDragEnd).</li>
    *   <li>Source=slot-X, target=slot-Y, target empty â†’ move Xâ†’Y.</li>
-   *   <li>Source=slot-X, target=slot-Y, target occupied â†’ SWAP Xâ†”Y.</li>
+   *   <li>Source=slot-X, target=slot-Y, target occupied â†’ SWAP Xâ†"Y.</li>
    *   <li>Source=slot-X, target=bench â†’ move Xâ†’bench (remove from field).</li>
    *   <li>Source=bench, target=slot-Y, target empty â†’ move benchâ†’Y.</li>
    *   <li>Source=bench, target=slot-Y, target occupied â†’ move benchâ†’Y AND
@@ -3938,15 +3938,15 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
    * <p>After any successful drop, persists via {@link saveLineup} and
    * triggers a chemistry preview (debounced 300ms via the C10 pipeline).
    * Per the C11b task spec we deliberately do NOT call the back for a fresh
-   * formationEffectiveness on every drop â€” that would double the backend
+   * formationEffectiveness on every drop â€" that would double the backend
    * load. The user re-opens the modal (or parent refreshes /current) to see
    * the latest snapshot.
    */
   handleSlotDrop(event: CdkDragDrop<any>): void {
     // V25D99-FRONT: thin wrapper that translates the cdkDropListDropped
     // event into the shared assignPlayerToSlot API. V25D99 removed
-    // (cdkDropListDropped) bindings from slots â€” handleMarkerDragEnd is
-    // the primary drop handler â€” but we keep this method for backward
+    // (cdkDropListDropped) bindings from slots â€" handleMarkerDragEnd is
+    // the primary drop handler â€" but we keep this method for backward
     // compat with the unit-test suite (5 specs still call handleSlotDrop
     // directly with mock events). The runtime binding is gone but the
     // logic lives on in assignPlayerToSlot.
@@ -3976,7 +3976,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
    * player from the field (equivalent to {@link removePlayerFromSlot}).
    */
   handleBenchDrop(event: CdkDragDrop<any>): void {
-    // V25D99-FRONT: thin wrapper â€” same rationale as handleSlotDrop.
+    // V25D99-FRONT: thin wrapper â€" same rationale as handleSlotDrop.
     // Runtime binding removed in V25D99 (handleMarkerDragEnd handles
     // bench drops via the bench area hit-test). Kept for unit-test
     // backward compat.
@@ -4012,9 +4012,9 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     * V25D99-FRONT: REPLACED handleFieldDrop with handleMarkerDragEnd.
     * Pre-V25D99 the field was a cdkDropList that captured free drops via
     * (cdkDropListDropped)="handleFieldDrop($event)". But this caused TWO
-    * problems IvÃ¡n reported repeatedly:
+    * problems Iván reported repeatedly:
     *   1. cdkDropListSortingDisabled (added V25D98.2) suppressed dropped
-    *      events when source===container â€” the 'solo deja mover 1 vez'
+    *      events when source===container â€" the 'solo deja mover 1 vez'
     *      bug remained even after removing it in V25D98.6.
     *   2. CDK's internal item tracking re-ordered the OTHER markers
     *      visually during drag ('no quiero que se muevan los otros').
@@ -4023,7 +4023,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
 * and decides internally whether the drop point is on a slot (snap),
      * on the bench (move to bench) or free on the field (free positioning).
      * Slots remain cdkDropList only so CDK can render the drop-preview
-     * highlight during drag â€” but no (cdkDropListDropped) handler fires
+     * highlight during drag â€" but no (cdkDropListDropped) handler fires
      * from slots; the marker's cdkDragEnded is the single source of truth.
      */
 
@@ -4040,7 +4040,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
      * when the user had clicked anywhere off-center: the marker visually
      * snapped from the cursor's offset position to a centered-on-cursor
      * position. Ivan: 'termina el recuadro poniendose al medio de donde
-     * esta la mano ... hace un pequeÃ±o salto, tal vez para produccion no
+     * esta la mano ... hace un pequeño salto, tal vez para produccion no
      * este bueno ese salto.'
      *
      * V25D99.11 fix:
@@ -4097,7 +4097,7 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
     // V25D99.8 fix: REMOVE the snap-to-slot branch entirely. Every drop
     // inside the field goes to FREE POSITIONING (xPercent/yPercent set).
     // If the user wants the marker at a slot, they drop it AT that
-    // slot's pixel location â€” no more 'salta a otro' (jumps to another).
+    // slot's pixel location â€" no more 'salta a otro' (jumps to another).
     // Plus: explicit transform clear at the end of the handler so CDK's
     // leftover drag transform doesn't offset the marker visually.
     //
@@ -4132,13 +4132,13 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
     // 2b. FREE POSITIONING with V25D99.11 continuity fix.
     //
     // V25D99.10 placed the marker center on cursor (`xPct = (dropX -
-    // rect.left) / rect.width * 100`) â€” visually correct ONLY when the
+    // rect.left) / rect.width * 100`) â€" visually correct ONLY when the
     // user clicked the marker's exact center. If user clicked anywhere
     // else, the marker snapped to "centered on cursor" at release,
     // creating a small but visible jump relative to where it had been
     // during drag.
     //
-    // V25D99.11: preserve the natural drag semantic â€” the click point
+    // V25D99.11: preserve the natural drag semantic â€" the click point
     // follows the cursor. To do that, we read the pickup offset CDK
     // computed when the drag started (saved in onMarkerDragStarted, NOT
     // overridden) and shift the placement math so the source element's
@@ -4277,16 +4277,16 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
     * (small offset between cursor and slot center due to mousedown
     * offset math). With 5% margin, drops close to a slot snap to it
     * instead of falling through to free positioning. Only the NEAREST
-    * slot within margin is returned â€” no ambiguity when two slots are
+    * slot within margin is returned â€" no ambiguity when two slots are
     * both close (returns the closer one).
     */
   private findSlotAtPosition(xPct: number, yPct: number): FieldSubdivisionDTO | null {
     // V25D99.6-FRONT: EXACT slot match only. No snap-to-nearest (removed
     // from V25D99.3). Ivan: 'tienen que cada jugador que movemos quedarse
     // dentro de alguna de las coordenadas que hay en la cancha'. Players
-    // must land at exact slot coordinates â€” no free positioning, no
+    // must land at exact slot coordinates â€" no free positioning, no
     // snap-to-nearest heuristic. Drops that don't land exactly on a slot
-    // are cancelled (marker snaps back) â€” see handleMarkerDragEnd.
+    // are cancelled (marker snaps back) â€" see handleMarkerDragEnd.
     return this.subdivisions.find(s =>
       xPct >= s.left && xPct <= s.left + s.width
       && yPct >= s.top && yPct <= s.top + s.height
@@ -4311,7 +4311,7 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
    *
    * <p>Naming: there's already a click-handler `assignPlayerToSlot()` on the
    * component (assigns from the bench dropdown). This private helper is
-   * the programmatic equivalent â€” same intent, different signature.
+   * the programmatic equivalent â€" same intent, different signature.
    *
    * @param sourceSlotId null if the player came from the bench.
    * @param targetSlotId the slot to place the player into.
@@ -4433,7 +4433,7 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
    * free drop the marker was invisible. Root cause hypothesis: invalid
    * percentage value (NaN, negative, > 100, undefined-cast-as-number) was
    * silently passed to [style.left.%], producing an invalid CSS value that
-   * Chromium would treat as 'auto' â€” making the marker flow into the
+   * Chromium would treat as 'auto' â€" making the marker flow into the
    * natural DOM position instead of the intended absolute location. Now:
    * always return a valid [0, 100] number, clamping on entry. Same for Y.
    */
@@ -4566,7 +4566,7 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
    * </ul>
    *
    * <p>Returns an empty object for unknown roles so the role badge falls
-   * back to the default (no background) â€” same defensive pattern as the
+   * back to the default (no background) â€" same defensive pattern as the
    * other classifiers (effectivenessColor etc.).
    */
   getMarkerRoleClasses(role: string | undefined): { [klass: string]: boolean } {
@@ -4584,7 +4584,7 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
    *
    * <p>Antes: comparacion exacta `player.position === posRole`. Esto fallaba
    * porque el back devuelve posiciones con roles GENERICOS (GK/DEF/MID/ATT/
-   * WINGER â€” formato SessionPlayer desde /career/players/squad), pero las
+   * WINGER â€" formato SessionPlayer desde /career/players/squad), pero las
    * formations desde /editor/formations tienen roles ESPECIFICOS
    * (GK/CB/LB/RB/CM/CDM/CAM/LM/RM/ST/LW/RW/CF/WINGER). El unico match era GK.
    *
@@ -4597,7 +4597,7 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
    * para MID y ATT. WINGER entra en ATT porque es un atacante lateral.
    *
    * <p>Si ambos roles son desconocidos, fallback a comparacion exacta (no
-   * matchea) â€” comportamiento legacy preservado para roles exoticos.
+   * matchea) â€" comportamiento legacy preservado para roles exoticos.
    */
   rolesMatch(playerRole: string | undefined, formationRole: string | undefined): boolean {
     if (!playerRole || !formationRole) { return false; }
@@ -4648,7 +4648,7 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
    * canonical progression becomes visible in the formation label.
    *
    * <p>Fallback to {@link getRoleFamily} when xPct/yPct are unset
-   * (freshly-loaded lineup, never dragged) â€” preserves V25D99.11 test
+   * (freshly-loaded lineup, never dragged) â€" preserves V25D99.11 test
    * coverage that doesn't set positions.
    */
   private getPositionRoleFamily(player: PlayerOnFieldDto): 'GK' | 'DEF' | 'MID' | 'ATT' | null {
@@ -4677,7 +4677,7 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
    *
    * <p>Why family-level (not exact role): a user's 4-4-2 lineup with all CBs
    * in the DEF slots and a couple of CMs in the MID slots is indistinguishable
-   * from a user lineup with LB/CB in DEF slots â€” both families (4 DEF + 4 MID)
+   * from a user lineup with LB/CB in DEF slots â€" both families (4 DEF + 4 MID)
    * match. The family-level count keeps the comparison consistent across
    * formation variants (4-3-3 with 3 LW/CF/RW should still resolve to '4-3-3').
    */
@@ -4791,11 +4791,11 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
    * <p>When the lineup is in canonical mode, the comparison is direct:
    * player.role vs the role attached to this subdivisionId in the active
    * canonical formation (the last formation the user picked from the
-   * dropdown â€” same value used as the GET parameter for auto-select).
+   * dropdown â€" same value used as the GET parameter for auto-select).
    *
    * <p>When the lineup is in custom mode ({@code _isCustomLineup}), the
    * "recommended" role for slots outside the canonical positions is empty,
-   * so we still compare against the active canonical positions â€” even
+   * so we still compare against the active canonical positions â€" even
    * though the marker is allowed to render at any slot. This keeps the
    * OFF badge consistent: a CB placed in a MID slot of 4-4-2 (where the
    * MID slot's recommended role is 'MID') shows OFF; a CB placed in a
@@ -4892,23 +4892,23 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
   }
 
   /**
-   * Cambia la formaciÃ³n cuando el usuario selecciona una opciÃ³n del `<select>`.
+   * Cambia la formación cuando el usuario selecciona una opción del `<select>`.
    *
    * <p>V25D91.5-FRONT F6 fix: este handler se invoca desde `(ngModelChange)` (no
-   * `(change)`), lo que garantiza que Angular ya actualizÃ³ {@code this.selectedFormation}
+   * `(change)`), lo que garantiza que Angular ya actualizó {@code this.selectedFormation}
    * cuando el handler corre. Antes con `(change)` el orden era incierto y a veces
-   * leÃ­a el valor VIEJO, mandando un HTTP call con la formaciÃ³n anterior â†’ no-op
+   * leía el valor VIEJO, mandando un HTTP call con la formación anterior â†’ no-op
    * visual.
    *
-   * <p>El parÃ¡metro {@code newFormation} viene del `(ngModelChange)`; si por
-   * alguna razÃ³n llega undefined (e.g. una llamada programÃ¡tica sin arg), fallback
+   * <p>El parámetro {@code newFormation} viene del `(ngModelChange)`; si por
+   * alguna razón llega undefined (e.g. una llamada programática sin arg), fallback
    * a {@code this.selectedFormation}.
    *
    * <p>Antes el flag {@code isFormationChanging} solo se reseteaba cuando
    * {@code formationChangeCompleteSubject.next()} se llamaba desde el padre
-   * (vÃ­a `(formationChangeComplete)` Output). Pero el padre
-   * {@code squad-management.component.ts} nunca escucha ese Output, asÃ­ que
-   * el select quedaba permanentemente disabled despuÃ©s del primer cambio. Ahora
+   * (vía `(formationChangeComplete)` Output). Pero el padre
+   * {@code squad-management.component.ts} nunca escucha ese Output, así que
+   * el select quedaba permanentemente disabled después del primer cambio. Ahora
    * reseteamos el flag directamente en el callback HTTP de
    * {@link executeFormationChange}, independiente del padre.
    */
@@ -4919,36 +4919,36 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
       return;
     }
 
-// Ignorar cambios durante inicializaciÃ³n (evita NG0100)
+// Ignorar cambios durante inicialización (evita NG0100)
     if (this.isInitializing) {
       return;
     }
 
-    // V25D91.5-FRONT F6: priorizar el argumento explÃ­cito (viene de ngModelChange,
+    // V25D91.5-FRONT F6: priorizar el argumento explícito (viene de ngModelChange,
     // siempre actualizado) sobre this.selectedFormation (puede no estarlo si se
-    // llama el handler programÃ¡ticamente antes de que Angular sincronice el DOM).
+    // llama el handler programáticamente antes de que Angular sincronice el DOM).
     const targetFormation = newFormation ?? this.selectedFormation;
     if (!targetFormation) {
       return;
     }
 
     // V25D91.5-FRONT F6: sincronizar this.selectedFormation con la nueva
-    // formaciÃ³n. En producciÃ³n vÃ­a (ngModelChange) NgModel ya lo escribiÃ³,
-    // pero en llamadas programÃ¡ticas (tests, debugging) necesitamos hacerlo
+    // formación. En producción vía (ngModelChange) NgModel ya lo escribió,
+    // pero en llamadas programáticas (tests, debugging) necesitamos hacerlo
     // nosotros para que el getter y el template queden consistentes.
     if (this.selectedFormation !== targetFormation) {
       this.selectedFormation = targetFormation;
     }
 
     // V25D91.5-FRONT F6: sincronizar this.selectedFormation con la nueva
-    // formaciÃ³n. En producciÃ³n vÃ­a (ngModelChange) NgModel ya lo escribiÃ³,
-    // pero en llamadas programÃ¡ticas (tests, debugging) necesitamos hacerlo
+    // formación. En producción vía (ngModelChange) NgModel ya lo escribió,
+    // pero en llamadas programáticas (tests, debugging) necesitamos hacerlo
     // nosotros para que el getter y el template queden consistentes.
     if (this.selectedFormation !== targetFormation) {
       this.selectedFormation = targetFormation;
     }
 
-    // No-op si la formaciÃ³n no cambiÃ³ realmente
+    // No-op si la formación no cambió realmente
     if (targetFormation === this.homeFormation$.value) {
       return;
     }
@@ -4957,8 +4957,8 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
     this.isFormationChanging = true;
     this.cdr.markForCheck();
 
-    // Resetear el subject para esperar nueva confirmaciÃ³n (legacy contract
-    // con el padre â€” squad-management no escucha, pero lo emitimos por si
+    // Resetear el subject para esperar nueva confirmación (legacy contract
+    // con el padre â€" squad-management no escucha, pero lo emitimos por si
     // otro caller en el futuro lo hace).
     this.formationChangeCompleteSubject = new Subject<void>();
 
@@ -4980,14 +4980,14 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
       next: (response) => {
         this.loadingFormation$.next(false);
         this.applyLineupToSlots(formation, response?.players || []);
-        // Finalizar inicializaciÃ³n despuÃ©s de auto-select
+        // Finalizar inicialización después de auto-select
         this.isInitializing = false;
         this.cdr.detectChanges();
       },
       error: (err) => {
         this.loadingFormation$.next(false);
         console.error('[SQUAD-EDITOR] Auto-select error:', err);
-        // Finalizar inicializaciÃ³n tambiÃ©n en error
+        // Finalizar inicialización también en error
         this.isInitializing = false;
         this.cdr.detectChanges();
       }
@@ -5001,10 +5001,10 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
 
     const positions = this.formationPositions[formationName] || [];
 
-    // V25D66-C26 (Sprint C26): si el caller pasÃ³ squad via dialog data,
+    // V25D66-C26 (Sprint C26): si el caller pasó squad via dialog data,
     // usarlo como pool completo para que la banca muestre los jugadores
     // no seleccionados del squad (no solo del response de auto-select).
-    // Fallback al playersList legacy cuando squad estÃ¡ ausente.
+    // Fallback al playersList legacy cuando squad está ausente.
     const squadSource: any[] = (this.data?.squad && this.data.squad.length > 0)
       ? this.data.squad.map((sp: SessionPlayer) => ({
           playerId: sp.sessionPlayerId,
@@ -5047,7 +5047,7 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
       mentality: typeof p.mentality === 'number' ? p.mentality : undefined
     }));
 
-    // Asignar slots segÃºn posiciÃ³n EXACTA del jugador
+    // Asignar slots según posición EXACTA del jugador
     const assignedPositions = new Set<number>();
 
     allPlayers.forEach((player) => {
@@ -5078,27 +5078,27 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
 
     // V25D91.5-FRONT F6 fix: markForCheck + detectChanges. El template
     // itera sobre homePlayers (getter sobre BehaviorSubject) sin async
-    // pipe, asÃ­ que necesita change detection explÃ­cita para repintar
-    // los markers en sus nuevas posiciones. Antes solo habÃ­a detectChanges
-    // que funcionaba pero era frÃ¡gil ante schedules async.
+    // pipe, así que necesita change detection explícita para repintar
+    // los markers en sus nuevas posiciones. Antes solo había detectChanges
+    // que funcionaba pero era frágil ante schedules async.
     this.cdr.markForCheck();
     this.cdr.detectChanges();
   }
 
   /**
-   * Ejecuta el cambio de formaciÃ³n vÃ­a POST /career/lineup/auto-select y aplica
+   * Ejecuta el cambio de formación vía POST /career/lineup/auto-select y aplica
    * los players retornados a los slots del campo.
    *
-   * <p>V25D91.5-FRONT F6 fix: antes este mÃ©todo retornaba una Promise que solo
-   * resolvÃ­a despuÃ©s del HTTP. El reset de {@code isFormationChanging} vivÃ­a
-   * en {@code onFormationChange.then()} y dependÃ­a de que el padre
+   * <p>V25D91.5-FRONT F6 fix: antes este método retornaba una Promise que solo
+   * resolvía después del HTTP. El reset de {@code isFormationChanging} vivía
+   * en {@code onFormationChange.then()} y dependía de que el padre
    * escuchara {@code formationChangeCompleteSubject}. Como el padre no lo hace,
    * el flag quedaba en true para siempre y el select quedaba disabled.
    *
    * <p>Ahora el reset del flag vive directamente en los callbacks next/error
-   * de este mÃ©todo, sin depender del padre. TambiÃ©n agregamos
+   * de este método, sin depender del padre. También agregamos
    * {@code cdr.markForCheck()} + {@code cdr.detectChanges()} para forzar change
-   * detection en el squad-header (donde estÃ¡ el select y la chemistry preview).
+   * detection en el squad-header (donde está el select y la chemistry preview).
    */
   private executeFormationChange(newFormation: string): void {
     const startTime = performance.now();
@@ -5119,8 +5119,8 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
         // backend misbehaves (drops below 11 players, returns off-role slots).
         this.detectFormation();
         // MVP1-lineup-cancha-1.5 FIX (F4, defensivo): persistir los slots
-        // despuÃ©s del auto-select. Si F1 (back) estÃ¡ bien implementado,
-        // el back ya persistiÃ³ el subdivision map; este saveLineup es
+        // después del auto-select. Si F1 (back) está bien implementado,
+        // el back ya persistió el subdivision map; este saveLineup es
         // redundante pero defensivo. Si F1 tiene un bug, este saveLineup
         // asegura persistencia. El guard interno bloquea si lineup < 7.
         this.saveLineup();
@@ -5144,7 +5144,7 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
         // Legacy: emit formationChangeComplete con el subject (no-op si nadie escucha).
         this.formationChangeComplete.emit(this.formationChangeCompleteSubject);
 
-        // V25D91.5-FRONT F6 fix: reset del flag + cd explicit. Antes dependÃ­a del
+        // V25D91.5-FRONT F6 fix: reset del flag + cd explicit. Antes dependía del
         // padre escuchando formationChangeComplete, lo que nunca pasaba.
         this.isFormationChanging = false;
         this.cdr.markForCheck();
@@ -5155,7 +5155,7 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
         const elapsed = (performance.now() - startTime).toFixed(0);
         console.error(`[SQUAD-EDITOR] Auto-select ERROR after ${elapsed}ms:`, err);
         this.errorMessage$.next('Error al auto-seleccionar jugadores');
-        // V25D91.5-FRONT F6 fix: reset tambiÃ©n en error path.
+        // V25D91.5-FRONT F6 fix: reset también en error path.
         this.isFormationChanging = false;
         this.cdr.markForCheck();
         this.cdr.detectChanges();
@@ -5163,11 +5163,11 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
     });
   }
 
-  /** Guarda la alineaciÃ³n en el backend.
+  /** Guarda la alineación en el backend.
    *
-   * <p>MVP1-lineup-cancha-1: envÃ­a primero los slots a
+   * <p>MVP1-lineup-cancha-1: envía primero los slots a
    * {@code /career/lineup/manual-select} (para persistir la subdivisionId por
-   * jugador), luego {@code /career/lineup/confirm} para confirmar la alineaciÃ³n.
+   * jugador), luego {@code /career/lineup/confirm} para confirmar la alineación.
    *
    * <p>Si el back rechaza con 422 (LINEUP_VALIDATION_ERROR, etc.), se surface
    * el mensaje inline sin llamar a /confirm.
@@ -5178,14 +5178,14 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
     const playerCount = this.homePlayers.length;
     if (playerCount < 7) {
       // V25D78-C55.7.7.1 BUG_L4 (continuation from C55.7.7 squad-management.component.html
-      // commit 31822e3): clarify that 7 is a floor, NOT a ceiling â€” the user can save with
+      // commit 31822e3): clarify that 7 is a floor, NOT a ceiling â€" the user can save with
       // any valid lineup between 7 and 11. The actual guard logic (< 7 â†’ block) is unchanged.
-      this.errorMessage$.next('MÃ­nimo 7 jugadores para guardar (puedes tener mÃ¡s)');
+      this.errorMessage$.next('Mínimo 7 jugadores para guardar (puedes tener más)');
       this.lineupWarning$.next(null);
       return;
     }
     if (playerCount > 11) {
-      this.errorMessage$.next('MÃ¡ximo 11 jugadores');
+      this.errorMessage$.next('Máximo 11 jugadores');
       this.lineupWarning$.next(null);
       return;
     }
@@ -5193,7 +5193,7 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
 
     // Construir body para /manual-select con los slots actuales (playerId + subdivisionId).
     // V25D98-FRONT: incluye customXPercent/customYPercent si el player tiene
-    // posiciÃ³n libre (free positioning por drag en field fuera de slots).
+    // posición libre (free positioning por drag en field fuera de slots).
     // El back puede ignorar estos campos por backward compat.
     const playerIds: string[] = this.homePlayers.map(p => p.playerId);
     const slots: LineupSlotDTO[] = this.homePlayers
@@ -5205,7 +5205,7 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
         return dto;
       });
 
-    // Paso 1: persistir la subdivision map vÃ­a /manual-select.
+    // Paso 1: persistir la subdivision map vía /manual-select.
     this.http.post<{warnings?: LineupWarningDTO[]}>(
       `${environment.apiUrl}/career/lineup/manual-select`,
       {
@@ -5215,7 +5215,7 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
       }
     ).subscribe({
       next: () => {
-        // Paso 2: confirmar la alineaciÃ³n (genera lineup "armed" para el match).
+        // Paso 2: confirmar la alineación (genera lineup "armed" para el match).
         this.http.post<{warnings?: LineupWarningDTO[]}>(
           `${environment.apiUrl}/career/lineup/confirm`,
           {}
@@ -5235,7 +5235,7 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
       },
       error: (err) => {
         console.error('[SQUAD-EDITOR] Error saving manual-select:', err);
-        // 422 with code (e.g. LINEUP_MINIMUM_PLAYERS_NOT_MET) â€” surface inline
+        // 422 with code (e.g. LINEUP_MINIMUM_PLAYERS_NOT_MET) â€" surface inline
         if (err.error?.code) {
           this.errorMessage$.next(err.error.message || 'Error al guardar');
         }
@@ -5248,22 +5248,22 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
     this.dialogRef.close();
   }
 
-  /** Muestra warning si el jugador seleccionado tiene condiciÃ³n de riesgo */
+  /** Muestra warning si el jugador seleccionado tiene condición de riesgo */
   showConditionWarning(player: PlayerOnFieldDto): void {
     if (player.injured) {
-      this.conditionWarning$.next('âš ï¸ Injured player selected. Consider replacing them before confirming.');
+      this.conditionWarning$.next('⚡ ï¸ Injured player selected. Consider replacing them before confirming.');
     } else if ((player.stamina ?? 100) <= 19) {
-      this.conditionWarning$.next('âš¡ Exhausted player selected. Starting them may affect performance.');
+      this.conditionWarning$.next('⚡¡ Exhausted player selected. Starting them may affect performance.');
     } else if ((player.stamina ?? 100) <= 39) {
-      this.conditionWarning$.next('âš¡ Very tired player selected. Consider resting them.');
+      this.conditionWarning$.next('⚡¡ Very tired player selected. Consider resting them.');
     } else if ((player.stamina ?? 100) <= 59) {
-      this.conditionWarning$.next('âš¡ Tired player selected. They may not perform at full capacity.');
+      this.conditionWarning$.next('⚡¡ Tired player selected. They may not perform at full capacity.');
     } else {
       this.conditionWarning$.next('');
     }
   }
 
-  /** Limpia el warning de condiciÃ³n */
+  /** Limpia el warning de condición */
   clearConditionWarning(): void {
     this.conditionWarning$.next('');
   }
