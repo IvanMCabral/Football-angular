@@ -65,11 +65,20 @@ describe('FormationModalComponent — LIVE-MATCH-F3-UI-LIVE FE5', () => {
   let engineServiceSpy: jasmine.SpyObj<MatchEngineService>;
   let dialogRefSpy: jasmine.SpyObj<MatDialogRef<FormationModalComponent>>;
   let snackBarSpy: jasmine.SpyObj<MatSnackBar>;
+  let httpClientSpy: jasmine.SpyObj<HttpClient>;
 
   beforeEach(async () => {
     engineServiceSpy = jasmine.createSpyObj('MatchEngineService', ['changeFormation']);
     dialogRefSpy = jasmine.createSpyObj('MatDialogRef', ['close']);
     snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
+    httpClientSpy = jasmine.createSpyObj('HttpClient', ['get', 'post']);
+    // V25D99.20.3-FRONT BUG-1: onFormationChange POSTs /career/lineup/auto-select
+    // and refreshes slotAssignments from the response. The existing tests
+    // don't care about the auto-select response — make the spy return a
+    // no-op observable by default so the .subscribe() call doesn't blow
+    // up. Specific tests (the V25D99.20.3-FRONT BUG-1 describe) override
+    // this with their own returnValue.
+    httpClientSpy.post.and.returnValue(of({ formation: '4-4-2', slots: [] }));
 
     await TestBed.configureTestingModule({
       imports: [FormationModalComponent, NoopAnimationsModule],
@@ -78,7 +87,7 @@ describe('FormationModalComponent — LIVE-MATCH-F3-UI-LIVE FE5', () => {
         { provide: MatDialogRef, useValue: dialogRefSpy },
         { provide: MatSnackBar, useValue: snackBarSpy },
         { provide: MatchEngineService, useValue: engineServiceSpy },
-        { provide: HttpClient, useValue: jasmine.createSpyObj('HttpClient', ['get', 'post']) }
+        { provide: HttpClient, useValue: httpClientSpy }
       ]
     }).compileComponents();
 
@@ -704,6 +713,13 @@ describe('FormationModalComponent — V25D81.1 BUG #4 auto-fill empty slots', ()
     engineServiceSpy.changeFormation.and.returnValue(of({ success: true, formation: '4-4-2' }));
     dialogRefSpy = jasmine.createSpyObj('MatDialogRef', ['close']);
     snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
+    // V25D99.20.3-FRONT BUG-1: onFormationChange POSTs /career/lineup/auto-select
+    // via HttpClient. The test suite for V25D81.1 doesn't care about the
+    // auto-select response, so make the spy return a no-op observable
+    // by default (the conservative response handler in the component
+    // keeps the local slotAssignments on empty response).
+    const httpSpy = jasmine.createSpyObj('HttpClient', ['get', 'post']);
+    httpSpy.post.and.returnValue(of({ formation: '4-4-2', slots: [] }));
 
     await TestBed.configureTestingModule({
       imports: [FormationModalComponent, NoopAnimationsModule],
@@ -712,7 +728,7 @@ describe('FormationModalComponent — V25D81.1 BUG #4 auto-fill empty slots', ()
         { provide: MatDialogRef, useValue: dialogRefSpy },
         { provide: MatSnackBar, useValue: snackBarSpy },
         { provide: MatchEngineService, useValue: engineServiceSpy },
-        { provide: HttpClient, useValue: jasmine.createSpyObj('HttpClient', ['get', 'post']) }
+        { provide: HttpClient, useValue: httpSpy }
       ]
     }).compileComponents();
 
@@ -916,5 +932,69 @@ describe('FormationModalComponent — V25D81.1 BUG #4 auto-fill empty slots', ()
     expect(playerIds).toContain('p2');
     expect(playerIds).toContain('p3');
     expect(playerIds).toContain('p4');
+  });
+
+  // ============================================================
+  // V25D99.20.3-FRONT BUG-1 pinning tests: onFormationChange must
+  // POST /career/lineup/auto-select so the backend re-runs the
+  // HELPER-BASED slot assignment with the new formation. Pre-fix,
+  // the modal only updated local slotAssignments and the squad
+  // page kept reading the stale /career/lineup/current response.
+  // Symptom: chem header showed 83/20% on the modal vs 91/60% on
+  // the squad page (state divergence).
+  // ============================================================
+
+  let httpClientSpy: jasmine.SpyObj<HttpClient>;
+
+  describe('V25D99.20.3-FRONT BUG-1: onFormationChange posts to backend', () => {
+    beforeEach(() => {
+      httpClientSpy = TestBed.inject(HttpClient) as jasmine.SpyObj<HttpClient>;
+    });
+
+    it('posts /career/lineup/auto-select with the new formation', () => {
+      httpClientSpy.post.and.returnValue(of({
+        formation: '4-3-3',
+        slots: []
+      }));
+
+      component.onFormationChange('4-3-3');
+
+      expect(httpClientSpy.post).toHaveBeenCalledTimes(1);
+      const callArgs = httpClientSpy.post.calls.mostRecent().args;
+      expect(callArgs[0]).toContain('/career/lineup/auto-select');
+      expect(callArgs[1]).toEqual({ formation: '4-3-3' });
+    });
+
+    it('refreshes slotAssignments from the auto-select response slots', () => {
+      // Mock the backend returning HELPER-BASED slot assignments.
+      httpClientSpy.post.and.returnValue(of({
+        formation: '4-3-3',
+        slots: [
+          { playerId: 'p1', subdivisionId: 'GK-1' },
+          { playerId: 'p2', subdivisionId: 'S22-1' },
+          { playerId: 'p3', subdivisionId: 'S22-2' },
+          { playerId: 'p4', subdivisionId: 'S22-3' },
+          { playerId: 'p5', subdivisionId: 'S23-2' }
+        ]
+      }));
+
+      component.onFormationChange('4-3-3');
+
+      // After the response, slotAssignments should reflect the
+      // backend's HELPER-BASED assignment (not the local re-flow).
+      expect(component.slotAssignments.get(0)).toBe('p1');
+      expect(component.slotAssignments.get(1)).toBe('p2');
+      expect(component.slotAssignments.get(2)).toBe('p3');
+      expect(component.slotAssignments.get(3)).toBe('p4');
+      expect(component.slotAssignments.get(4)).toBe('p5');
+    });
+
+    it('surfaces an error message when the auto-select POST fails', () => {
+      httpClientSpy.post.and.returnValue(throwError(() => new Error('network down')));
+
+      component.onFormationChange('4-3-3');
+
+      expect(component.errorMsg).toContain('No se pudo actualizar');
+    });
   });
 });

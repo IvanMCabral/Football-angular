@@ -15,10 +15,12 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { FormsModule } from '@angular/forms';
+import { HttpClient } from '@angular/common/http';
 import { Subject, takeUntil } from 'rxjs';
 import { MatchEngineService } from '../../../../core/services/match-engine.service';
 import { ALL_FORMATIONS, FormationCode } from '../../../../shared/constants/formations';
 import { SessionPlayer } from '../../../../shared/models/player.model';
+import { environment } from '../../../../environments/environment';
 
 export interface FormationDialogData {
   matchId: string;
@@ -600,6 +602,7 @@ export class FormationModalComponent {
   private dialogRef = inject(MatDialogRef<FormationModalComponent>);
   private engineService = inject(MatchEngineService);
   private snackBar = inject(MatSnackBar);
+  private http = inject(HttpClient);
 
   readonly formations: readonly string[] = FORMATIONS;
 
@@ -706,6 +709,57 @@ export class FormationModalComponent {
       this.slotAssignments.set(i, oldAssignments.get(i) ?? null);
     }
     this.errorMsg = '';
+
+    // V25D99.20.3-FRONT BUG-1: re-flow the local slotAssignments above is
+    // a UI-only change. Without a backend call, the squad page would
+    // still read the stale /career/lineup/current response (with
+    // 14 slots if the previous formation had more dots) and the
+    // chem header on the modal would render against an empty
+    // slot map. POST /career/lineup/auto-select so the backend
+    // re-runs the HELPER-BASED slot assignment with the new
+    // formation, then refresh this modal's slotAssignments from
+    // the response so the local chem readout stays consistent.
+    this.http.post<{
+      formation: string;
+      slots: Array<{ playerId: string; subdivisionId: string }>;
+    }>(`${environment.apiUrl}/career/lineup/auto-select`, {
+      formation: newFormation
+    }).subscribe({
+      next: (resp) => {
+        // V25D99.20.3-FRONT: only override the local slotAssignments if
+        // the backend actually returned a non-empty slot list. If the
+        // response has 0 slots (e.g. the test harness's default mock
+        // returns `{slots: []}` or the backend's auto-select produced
+        // a partial map), KEEP the local re-flow above so the visual
+        // pitch doesn't go blank. The chem readout will be refreshed
+        // separately on the next /career/lineup/current call from
+        // the squad page anyway.
+        if (resp && Array.isArray(resp.slots) && resp.slots.length > 0) {
+          const refreshed = new Map<number, string | null>();
+          for (const s of resp.slots) {
+            if (s && s.subdivisionId && s.playerId) {
+              refreshed.set(refreshed.size, s.playerId);
+            }
+          }
+          // Pad with nulls up to the new line count so the visual
+          // pitch template has a stable iteration range.
+          while (refreshed.size < newLineCount) {
+            refreshed.set(refreshed.size, null);
+          }
+          this.slotAssignments = refreshed;
+        }
+        this.errorMsg = '';
+      },
+      error: (err) => {
+        // Surface the failure so the manager doesn't think the change
+        // committed. The local slotAssignments re-flow is still
+        // applied (UI-only), but the chem readout will be wrong
+        // until the next /career/lineup/current refresh from the
+        // squad page.
+        console.error('[FORMATION-MODAL] auto-select failed on formation change:', err);
+        this.errorMsg = 'No se pudo actualizar la formación en el backend. Chem puede estar desactualizado.';
+      }
+    });
   }
 
   // ========== V25D81-BUG #4: HTML5 drag-and-drop handlers ==========
