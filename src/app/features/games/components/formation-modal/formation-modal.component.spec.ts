@@ -271,6 +271,27 @@ describe('FormationModalComponent — LIVE-MATCH-F3-UI-LIVE FE5', () => {
     );
   });
 
+  // ============================================================
+  // V25D99.20.3.1-FRONT BUG-2 pinning test: Escape key closes the
+  // dialog through the cancel() method (consistent with the
+  // "Cancelar" button), instead of using MatDialog's default
+  // dialogRef.close(undefined) which would surface a different
+  // close reason to the parent.
+  // ============================================================
+
+  it('V25D99.20.3.1-FRONT BUG-2: Escape key triggers cancel() with success=false, reason=cancelled', () => {
+    component.onEscape();
+    expect(dialogRefSpy.close).toHaveBeenCalledWith(
+      jasmine.objectContaining({ success: false, reason: 'cancelled' })
+    );
+  });
+
+  it('V25D99.20.3.1-FRONT BUG-2: Escape ignored when isSubmitting=true (avoid mid-save close)', () => {
+    component.isSubmitting = true;
+    component.onEscape();
+    expect(dialogRefSpy.close).not.toHaveBeenCalled();
+  });
+
   // ============================================================================
   // V25D55 (Sprint C16) P0.1 + P1.3+4 — HTML CSS class bindings
   // ============================================================================

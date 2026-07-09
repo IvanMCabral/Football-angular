@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, HostListener, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   MAT_DIALOG_DATA,
@@ -724,7 +724,9 @@ export class FormationModalComponent {
       slots: Array<{ playerId: string; subdivisionId: string }>;
     }>(`${environment.apiUrl}/career/lineup/auto-select`, {
       formation: newFormation
-    }).subscribe({
+    })
+    .pipe(takeUntil(this.destroy$))
+    .subscribe({
       next: (resp) => {
         // V25D99.20.3-FRONT: only override the local slotAssignments if
         // the backend actually returned a non-empty slot list. If the
@@ -1068,6 +1070,19 @@ export class FormationModalComponent {
       return [1, 4, 4, 2]; // fallback defensivo
     }
     return lines.map(line => line.length);
+  }
+
+  @HostListener('document:keydown.escape')
+  onEscape(): void {
+    // V25D99.20.3.1-FRONT BUG-2: MatDialog's default Escape close calls
+    // dialogRef.close(undefined) which is fine for parent subscribers
+    // but doesn't surface the "cancelled" reason through our normal
+    // cancel() method. Hook the Escape key to route through the same
+    // cancel() handler that the "Cancelar" button uses so the close
+    // reason is consistent across both close paths.
+    if (!this.isSubmitting) {
+      this.cancel();
+    }
   }
 
   confirm(): void {
