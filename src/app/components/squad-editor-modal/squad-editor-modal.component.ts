@@ -4299,27 +4299,28 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
       if (closest) { player.slotId = closest.subdivisionId; }
     }
 
-    // V25D99.20-FRONT BUG-4a: snap-back to native slot when the drop
-    // lands inside the player's canonical subdivision bounding box. The
-    // V25D99.8 simplification deliberately removed the original snap-to
-    // -slot branch and made every drop free-positioning, which wrote
-    // player.xPercent/yPercent unconditionally. The back's
-    // FormationEffectiveness.resolveSlotCoords then preferred the
-    // customX/Y override over canonical coords, applying a distance
-    // penalty that stuck even when the user dragged the marker back to
-    // the native slot. This branch restores the snap-back semantic for
-    // drops that land inside the player's owning subdivision: clear the
-    // customX/Y override so the back falls back to canonical coords and
-    // the chem score returns to baseline.
+    // V25D99.20.13-FRONT: snap-back only near the canonical center, not
+    // anywhere inside the owning slot rectangle. The previous rectangle
+    // check made tiny manual moves feel broken: if the user moved a marker
+    // a few pixels but still dropped inside the same slot box, we cleared
+    // xPercent/yPercent and the card jumped back to the original center.
+    //
+    // Keep the useful "drop exactly back on the native point => clear
+    // override / baseline chemistry" semantic, but only inside a very small
+    // center tolerance. Any visible micro-move now persists and feeds the
+    // preview ratings.
     const owningSlot = player.slotId
       ? this.subdivisions.find(s => s.subdivisionId === player.slotId)
       : null;
-    const dropInsideNativeSlot =
-      !!owningSlot &&
-      xPct >= owningSlot.left && xPct <= owningSlot.left + owningSlot.width &&
-      yPct >= owningSlot.top  && yPct <= owningSlot.top  + owningSlot.height;
+    const canonicalX = player.slotId ? this.getFormationPositionCoord(player.slotId, 'x') : null;
+    const canonicalY = player.slotId ? this.getFormationPositionCoord(player.slotId, 'y') : null;
+    const centerX = canonicalX ?? (owningSlot ? owningSlot.left + owningSlot.width / 2 : null);
+    const centerY = canonicalY ?? (owningSlot ? owningSlot.top + owningSlot.height / 2 : null);
+    const dropNearNativeCenter =
+      centerX !== null && centerY !== null
+      && Math.hypot(xPct - centerX, yPct - centerY) <= 1.5;
 
-    if (dropInsideNativeSlot) {
+    if (dropNearNativeCenter) {
       // Snap back: clear any existing free-position override and
       // RESTORE slot occupancy (free positioning may have emptied the
       // slotPlayerMap entry earlier). Re-claiming the slot ensures the
