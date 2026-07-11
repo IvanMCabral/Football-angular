@@ -3832,13 +3832,15 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
 
   private isInsideGoalkeeperProtectedArea(xPct: number, yPct: number): boolean {
     const gkSlot = this.subdivisions.find(s => s.subdivisionId === 'GK-1');
+    // Only the explicit GK-1 box is protected. Defenders may enter any other
+    // defensive space, including the penalty area around it.
     if (gkSlot) {
       return xPct >= gkSlot.left
         && xPct <= gkSlot.left + gkSlot.width
         && yPct >= gkSlot.top
         && yPct <= gkSlot.top + gkSlot.height;
     }
-    return xPct >= 35 && xPct <= 65 && yPct >= 88;
+    return false;
   }
 
   getMarkerRoleLabel(player: PlayerOnFieldDto): string {
