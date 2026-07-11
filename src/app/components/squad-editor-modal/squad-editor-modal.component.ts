@@ -3521,7 +3521,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
         }
 
         // MVP1-lineup-cancha-1: si el back trae slots persistidos, restaurar asignaciones exactas.
-        const persistedSlots: Array<{ playerId: string; subdivisionId: string }> = response?.slots ?? [];
+        const persistedSlots: LineupSlotDTO[] = response?.slots ?? [];
         const usedSubdivisionIds = new Set<string>();
         if (persistedSlots.length > 0) {
           for (const slot of persistedSlots) {
@@ -3531,6 +3531,12 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
             // Si dos slots apuntan al mismo subdivisionId, conservar solo el primero.
             if (usedSubdivisionIds.has(slot.subdivisionId)) continue;
             player.slotId = slot.subdivisionId;
+            if (typeof slot.customXPercent === 'number' && isFinite(slot.customXPercent)) {
+              player.xPercent = Math.max(0, Math.min(100, slot.customXPercent));
+            }
+            if (typeof slot.customYPercent === 'number' && isFinite(slot.customYPercent)) {
+              player.yPercent = Math.max(0, Math.min(100, slot.customYPercent));
+            }
             this.slotPlayerMap[slot.subdivisionId] = player;
             usedSubdivisionIds.add(slot.subdivisionId);
           }
