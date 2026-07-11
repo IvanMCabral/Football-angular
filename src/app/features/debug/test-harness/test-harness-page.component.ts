@@ -247,7 +247,7 @@ const DEFAULT_REPLAY_SEED = 12345;
               <button
                 mat-stroked-button
                 (click)="onRunFormationMatrix()"
-                [disabled]="mutationInFlight() || !selectedMatchId()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
                 aria-label="Replay selected match with every formation and the same seed"
               >
                 Formation matrix
@@ -261,6 +261,15 @@ const DEFAULT_REPLAY_SEED = 12345;
                 Simulate round {{ selectedRoundModel ?? '—' }}
               </button>
             </div>
+
+            <p
+              *ngIf="selectedMatchId() && !selectedMatchIncludesUserTeam()"
+              class="harness-warning"
+              role="status"
+            >
+              Formation matrix affects only {{ userTeamName() || 'your team' }}.
+              Pick a match involving that team to test lineup changes.
+            </p>
 
             <div *ngIf="formationReplayResults().length > 0" class="formation-matrix">
               <div class="matrix-header">
@@ -282,7 +291,7 @@ const DEFAULT_REPLAY_SEED = 12345;
                   <span role="cell">{{ row.formation }}</span>
                   <span role="cell">{{ row.homeGoals ?? '—' }}-{{ row.awayGoals ?? '—' }}</span>
                   <span role="cell">{{ fmtPct(row.homePossession) }} / {{ fmtPct(row.awayPossession) }}</span>
-                  <span role="cell">{{ row.homeShots ?? 'â€”' }} / {{ row.awayShots ?? 'â€”' }}</span>
+                  <span role="cell">{{ row.homeShots ?? '-' }} / {{ row.awayShots ?? '-' }}</span>
                 </div>
               </div>
             </div>
@@ -463,6 +472,16 @@ const DEFAULT_REPLAY_SEED = 12345;
       margin: 1rem 0;
     }
     .button-stack { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 1rem; }
+    .harness-warning {
+      margin: 0.75rem 0 0;
+      padding: 0.55rem 0.7rem;
+      border-radius: 6px;
+      background: #fff8e1;
+      color: #795548;
+      border: 1px solid #ffe0a3;
+      font-size: 0.82rem;
+      line-height: 1.35;
+    }
     .formation-matrix {
       margin-top: 1rem;
       border: 1px solid #e0e0e0;
@@ -604,8 +623,12 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   /** The active careerId (resolved from CareerStatus; null if no career). */
   readonly careerId = signal<string | null>(null);
 
+  readonly userTeamName = signal<string | null>(null);
+
   /** Currently selected match (Panel C click → Panel A renders). */
   readonly selectedMatchId = signal<string | null>(null);
+
+  readonly selectedMatch = signal<TestHarnessMatchRow | null>(null);
 
   /** All matches of the active career, grouped by round. */
   readonly rounds = signal<RoundGroup[]>([]);
@@ -624,6 +647,15 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
 
   /** True if there is an active career. */
   readonly hasCareer = computed(() => this.careerId() !== null);
+
+  readonly selectedMatchIncludesUserTeam = computed(() => {
+    const m = this.selectedMatch();
+    const team = this.userTeamName();
+    if (!m || !team) {
+      return false;
+    }
+    return m.homeTeamName === team || m.awayTeamName === team;
+  });
 
   // ============== Panel D state ==============
 
@@ -718,11 +750,14 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       next: (status) => {
         if (!status.careerId) {
           this.careerId.set(null);
+          this.userTeamName.set(null);
+          this.selectedMatch.set(null);
           this.rounds.set([]);
           this.loading.set(false);
           return;
         }
         this.careerId.set(status.careerId);
+        this.userTeamName.set(status.userTeamName ?? null);
         this.loadMatches();
       },
       error: (err) => {
@@ -737,6 +772,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   /** Set the selected match (Panel C → Panel A re-render via @Input). */
   selectMatch(m: TestHarnessMatchRow): void {
     this.selectedMatchId.set(m.matchId);
+    this.selectedMatch.set(m);
     // Reset the scrubber to the start of the match when switching matches.
     this.selectedMinute.set(0);
   }
@@ -957,6 +993,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         // new score, then refresh Panel A + D (existing pattern).
         this.loadMatches();
         this.refreshDetailAfterMutation();
+        this.refreshDetailAfterMutation(1200);
       },
       error: (err) => {
         this.mutationInFlight.set(false);
@@ -1073,6 +1110,14 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       });
       return;
     }
+    if (!this.selectedMatchIncludesUserTeam()) {
+      this.snackBar.open(
+        `Pick a match involving ${this.userTeamName() || 'your team'} before running the formation matrix.`,
+        'OK',
+        { duration: 5000 }
+      );
+      return;
+    }
 
     const seed = this.seedInputModel;
     const originalFormation = this.selectedFormationModel;
@@ -1116,6 +1161,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           );
           this.loadMatches();
           this.refreshDetailAfterMutation();
+          this.refreshDetailAfterMutation(1200);
         };
 
         if (!originalFormation) {
@@ -1215,11 +1261,18 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
    * Force Panel A to re-fetch by re-setting the signal. The V24 detail
    * page reads inputs and refetches when they change.
    */
-  private refreshDetailAfterMutation(): void {
+  private refreshDetailAfterMutation(delayMs = 0): void {
     const current = this.selectedMatchId();
     if (current) {
-      this.selectedMatchId.set(null);
-      Promise.resolve().then(() => this.selectedMatchId.set(current));
+      const remount = () => {
+        this.selectedMatchId.set(null);
+        Promise.resolve().then(() => this.selectedMatchId.set(current));
+      };
+      if (delayMs > 0) {
+        setTimeout(remount, delayMs);
+      } else {
+        remount();
+      }
     }
   }
 
