@@ -7,7 +7,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatIconModule } from '@angular/material/icon';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../environments/environment';
-import { Subject, BehaviorSubject, of, takeUntil } from 'rxjs';
+import { Subject, BehaviorSubject, of, takeUntil, forkJoin } from 'rxjs';
 import { debounceTime, distinctUntilChanged, switchMap, catchError } from 'rxjs/operators';
 import { CdkDragDrop, CdkDragEnd, CdkDragStart, DragDropModule } from '@angular/cdk/drag-drop';
 import { LineupWarningDTO } from '../../shared/models/lineup/lineup-warning.dto';
@@ -3364,16 +3364,20 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
 
   /** Carga todas las subdivisiones desde el backend */
   private loadSubdivisions(): void {
-    this.http.get<FieldSubdivisionDTO[]>(`${environment.apiUrl}/editor/subdivisions`).subscribe({
-      next: (subs) => {
-        // Usar setTimeout para deferir el cambio y evitar NG0100
-        setTimeout(() => {
-          this.subdivisions$.next(subs);
-          this.cdr.detectChanges();
-          this.loadFormationPositions().then(() => {
-            this.loadSquadFromBackend();
-          });
-        }, 0);
+    forkJoin({
+      subs: this.http.get<FieldSubdivisionDTO[]>(`${environment.apiUrl}/editor/subdivisions`),
+      formations: this.http.get<FormationDTO[]>(`${environment.apiUrl}/editor/formations`).pipe(
+        catchError(() => of([] as FormationDTO[]))
+      )
+    }).subscribe({
+      next: ({ subs, formations }) => {
+        this.subdivisions$.next(subs);
+        formations.forEach(f => {
+          this.formationPositions[f.name] = f.positions;
+        });
+        this.loadSquadFromBackend();
+        this.cdr.markForCheck();
+        this.cdr.detectChanges();
       },
       error: (err) => {
         console.error('[SQUAD-EDITOR] Error loading subdivisions:', err);
