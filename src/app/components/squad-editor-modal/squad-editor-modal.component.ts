@@ -113,7 +113,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
               <span *ngIf="teamAverage !== null && teamAverage < 1.0"
                     class="preview-eff-weight"
                     [title]="'Ponderado por formación (eff. team ' + (teamAverage * 100).toFixed(0) + '%)'">
-                Ã—{{ (teamAverage * 100).toFixed(0) }}%
+                ×{{ (teamAverage * 100).toFixed(0) }}%
               </span>
               <span class="preview-delta"
                     *ngIf="currentChemistryScore !== null"
@@ -129,7 +129,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
                 Proyectando chemistry...
               </span>
               <ng-template #previewFailed>
-                <span class="preview-label preview-error">⚡  Chemistry preview unavailable</span>
+                <span class="preview-label preview-error">⚠ Chemistry preview unavailable</span>
               </ng-template>
             </ng-template>
           </div>
@@ -160,9 +160,9 @@ import { SessionPlayer } from '../../shared/models/player.model';
                   class="reset-positions-btn"
                   *ngIf="hasCustomPositions()"
                   title="Volver a las posiciones canónicas de la formación">
-            â†º Reset posiciones
+            ↺ Reset posiciones
           </button>
-          <button mat-icon-button (click)="close()" class="close-btn" title="Cerrar">âœ•</button>
+          <button mat-icon-button (click)="close()" class="close-btn" title="Cerrar">×</button>
         </div>
       </div>
       <!-- ^^^ V25D92.6-FRONT F1: restructured header. .squad-header-left (h2 +
@@ -211,12 +211,12 @@ import { SessionPlayer } from '../../shared/models/player.model';
                     [class.high]="(chemistryScore ?? 0) >= 80"
                     [class.mid]="(chemistryScore ?? 0) >= 60 && (chemistryScore ?? 0) < 80"
                     [class.low]="(chemistryScore ?? 0) < 60">
-                {{ chemistryScore ?? 'â€"' }}<span class="tsp-chem-max">/99</span>
+                {{ chemistryScore ?? '—' }}<span class="tsp-chem-max">/99</span>
               </span>
               <span *ngIf="teamAverage !== null && teamAverage < 1.0"
                     class="tsp-eff-weight"
                     [title]="'Eff. team: ' + (teamAverage * 100).toFixed(0) + '%'">
-                Ã—{{ (teamAverage * 100).toFixed(0) }}%
+                ×{{ (teamAverage * 100).toFixed(0) }}%
               </span>
             </div>
             <div class="tsp-bar-bg">
@@ -239,7 +239,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
                       [class.high]="(teamAverage ?? 0) >= 0.85"
                       [class.mid]="(teamAverage ?? 0) >= 0.5 && (teamAverage ?? 0) < 0.85"
                       [class.low]="(teamAverage ?? 0) < 0.5">
-                  {{ teamAverage !== null ? (teamAverage * 100).toFixed(0) + '%' : 'â€"' }}
+                  {{ teamAverage !== null ? (teamAverage * 100).toFixed(0) + '%' : '—' }}
                 </span>
               </div>
               <div class="tsp-stat">
@@ -260,7 +260,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
                       [class.high]="attackRating >= 100"
                       [class.mid]="attackRating >= 75 && attackRating < 100"
                       [class.low]="attackRating < 75">
-                  {{ attackRating || 'â€"' }}{{ attackRating ? '%' : '' }}
+                  {{ attackRating || '—' }}{{ attackRating ? '%' : '' }}
                 </span>
                 <div class="tsp-bar-bg">
                   <div class="tsp-bar-fg"
@@ -276,7 +276,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
                       [class.high]="midfieldRating >= 100"
                       [class.mid]="midfieldRating >= 75 && midfieldRating < 100"
                       [class.low]="midfieldRating < 75">
-                  {{ midfieldRating || 'â€"' }}{{ midfieldRating ? '%' : '' }}
+                  {{ midfieldRating || '—' }}{{ midfieldRating ? '%' : '' }}
                 </span>
                 <div class="tsp-bar-bg">
                   <div class="tsp-bar-fg"
@@ -292,7 +292,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
                       [class.high]="defenseRating >= 100"
                       [class.mid]="defenseRating >= 75 && defenseRating < 100"
                       [class.low]="defenseRating < 75">
-                  {{ defenseRating || 'â€"' }}{{ defenseRating ? '%' : '' }}
+                  {{ defenseRating || '—' }}{{ defenseRating ? '%' : '' }}
                 </span>
                 <div class="tsp-bar-bg">
                   <div class="tsp-bar-fg"
@@ -328,7 +328,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
                 <div class="tsp-offrole-name">{{ o.player.name }}</div>
                 <div class="tsp-offrole-detail">
                   <span class="tsp-offrole-role">{{ o.naturalRole }}</span>
-                  <span class="tsp-offrole-arrow">â†’</span>
+                  <span class="tsp-offrole-arrow">→</span>
                   <span class="tsp-offrole-zone">{{ o.actualZone }}</span>
                 </div>
                 <div class="tsp-offrole-penalty"
@@ -384,12 +384,12 @@ import { SessionPlayer } from '../../shared/models/player.model';
                     [class.empty-row]="row.count === 0">
                   <td class="tsp-zone-cell">{{ row.zone }}</td>
                   <td class="tsp-num-cell">{{ row.count }}</td>
-                  <td class="tsp-num-cell">{{ row.count === 0 ? 'â€"' : row.avgOverall }}</td>
+                  <td class="tsp-num-cell">{{ row.count === 0 ? '—' : row.avgOverall }}</td>
                   <td class="tsp-num-cell"
                       [class.high]="row.avgEff >= 85"
                       [class.mid]="row.avgEff >= 50 && row.avgEff < 85"
                       [class.low]="row.avgEff < 50 && row.count > 0">
-                    {{ row.count === 0 ? 'â€"' : row.avgEff + '%' }}
+                    {{ row.count === 0 ? '—' : row.avgEff + '%' }}
                   </td>
                   <td class="tsp-num-cell">{{ row.contributionPct }}%</td>
                 </tr>
@@ -658,7 +658,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
           </div>
           <span *ngIf="!benchPlayers || benchPlayers.length === 0"
                 class="bench-empty">
-            (vacía â€" todos en cancha)
+            (vacía — todos en cancha)
           </span>
         </div>
       </div>
@@ -672,7 +672,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
           <span>{{homeFormation}}</span>
         </div>
         <div class="field-orientation">
-          <span class="orientation-label">â†" ATAQUE</span>
+          <span class="orientation-label">↑ ATAQUE</span>
         </div>
         <div class="bench-info">
           <span>Slots: {{occupiedSlots}}/11</span>
@@ -683,7 +683,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
       <div *ngIf="selectedSlot" class="assignment-panel">
         <div class="assignment-header">
           <span>Slot: {{selectedSlot.subdivisionId}}</span>
-          <button mat-icon-button (click)="selectedSlot = null" title="Cerrar">âœ•</button>
+          <button mat-icon-button (click)="selectedSlot = null" title="Cerrar">×</button>
         </div>
         <div class="assignment-content">
           <div *ngIf="getPlayerInSlot(selectedSlot) as player" class="assigned-player">
@@ -729,7 +729,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
           </ng-container>
         </mat-icon>
         <span class="banner-text">{{w.message}}</span>
-        <button class="banner-close" (click)="lineupWarning$.next(null)" title="Cerrar">Ã—</button>
+        <button class="banner-close" (click)="lineupWarning$.next(null)" title="Cerrar">×</button>
       </div>
 
       <!-- Warning por condición del jugador -->
