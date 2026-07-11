@@ -142,7 +142,7 @@ const DEFAULT_REPLAY_SEED = 12345;
             Select a match in Panel C to view its V24 detail.
           </p>
           <app-v24-match-detail-page
-            *ngIf="selectedMatchId()"
+            *ngIf="selectedMatchId() && detailPanelVisible()"
             [inputCareerId]="careerId()"
             [inputMatchId]="selectedMatchId()"
           ></app-v24-match-detail-page>
@@ -627,6 +627,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
 
   /** Currently selected match (Panel C click → Panel A renders). */
   readonly selectedMatchId = signal<string | null>(null);
+  readonly detailPanelVisible = signal<boolean>(true);
 
   readonly selectedMatch = signal<TestHarnessMatchRow | null>(null);
 
@@ -1258,15 +1259,21 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Force Panel A to re-fetch by re-setting the signal. The V24 detail
-   * page reads inputs and refetches when they change.
+   * Force Panel A to re-fetch without clearing the global selected match.
+   *
+   * Previous implementation temporarily set selectedMatchId(null) and then
+   * restored it on the next microtask. That remounted Panel A, but it also made
+   * Panel B/D briefly believe no match was selected. During long replay flows
+   * like Formation matrix, that transient null could collapse controls and make
+   * the matrix table disappear or leave buttons disabled. Keep selectedMatchId
+   * stable and toggle only the detail panel visibility.
    */
   private refreshDetailAfterMutation(delayMs = 0): void {
     const current = this.selectedMatchId();
     if (current) {
       const remount = () => {
-        this.selectedMatchId.set(null);
-        Promise.resolve().then(() => this.selectedMatchId.set(current));
+        this.detailPanelVisible.set(false);
+        Promise.resolve().then(() => this.detailPanelVisible.set(true));
       };
       if (delayMs > 0) {
         setTimeout(remount, delayMs);
