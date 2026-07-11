@@ -5154,12 +5154,14 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
     this.benchPlayers$.next(allPlayers.filter(p => !p.slotId));
     this.triggerChemistryPreview();
 
-    // V25D96-FRONT F2: auto-select always produces a canonical lineup (the
-    // backend applies the formation-role matching), but we still re-run
-    // detectFormation to (a) flip _isCustomLineup back to false after a
-    // user-driven formation change and (b) be defensive against any future
-    // backend anomaly that returns < 11 players or off-role slots.
-    this.detectFormation();
+    // V25D99.20.6-FRONT: an explicit auto-select / formation change must
+    // preserve the exact formation requested by the user. Do NOT call
+    // detectFormation() here: it only counts role families and collapses
+    // variants with the same counts (e.g. 4-2-3-1 -> 4-1-4-1,
+    // 5-3-2 -> 3-5-2, 4-2-2-2 -> 4-4-2, 4-3-3-1 -> 4-3-3).
+    this.selectedFormation = formationName;
+    this.homeFormation$.next(formationName);
+    this._isCustomLineup = false;
 
     // V25D91.5-FRONT F6 fix: markForCheck + detectChanges. El template
     // itera sobre homePlayers (getter sobre BehaviorSubject) sin async
@@ -5197,12 +5199,12 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
       next: (response) => {
         this.loadingFormation$.next(false);
         this.applyLineupToSlots(newFormation, response?.players || [], response?.slots || []);
-        // V25D96-FRONT F2: an auto-select ALWAYS produces a canonical lineup
-        // (the back ensures this), so this should always flip
-        // _isCustomLineup back to false. We still call detectFormation
-        // rather than blindly setting the flag to be defensive in case the
-        // backend misbehaves (drops below 11 players, returns off-role slots).
-        this.detectFormation();
+        // V25D99.20.6-FRONT: preserve exact requested variant; see
+        // applyLineupToSlots() for why detectFormation() is intentionally
+        // not used after explicit formation selection.
+        this.selectedFormation = newFormation;
+        this.homeFormation$.next(newFormation);
+        this._isCustomLineup = false;
         // MVP1-lineup-cancha-1.5 FIX (F4, defensivo): persistir los slots
         // después del auto-select. Si F1 (back) está bien implementado,
         // el back ya persistió el subdivision map; este saveLineup es
