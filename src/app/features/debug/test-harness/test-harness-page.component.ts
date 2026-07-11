@@ -1121,13 +1121,26 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     }
 
     const seed = this.seedInputModel;
-    const originalFormation = this.selectedFormationModel;
     this.formationReplayResults.set([]);
     this.mutationInFlight.set(true);
 
-    from(this.formationCodes).pipe(
+    this.harness.getCurrentLineup().pipe(
+      switchMap((originalLineup) => {
+        const originalFormation =
+          originalLineup?.formation || this.selectedFormationModel || null;
+        const originalPlayerIds =
+          originalLineup?.players?.map((p) => p.playerId).filter(Boolean) ?? [];
+        const originalSlots = originalLineup?.slots ?? [];
+
+        if (originalPlayerIds.length !== 11) {
+          throw new Error(
+            `Formation matrix needs exactly 11 current lineup players, got ${originalPlayerIds.length}.`
+          );
+        }
+
+        return from(this.formationCodes).pipe(
       concatMap((formation) =>
-        this.harness.setFormation(formation).pipe(
+        this.harness.manualSelectLineup(formation, originalPlayerIds).pipe(
           switchMap(() => this.harness.replayMatch(matchId, seed)),
           map((fixture): FormationReplayResult => ({
             formation,
@@ -1139,10 +1152,31 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
             awayShots: fixture?.result?.awayShots ?? null,
           }))
         )
-      )
+      ),
+          switchMap((row) => {
+            this.formationReplayResults.update((rows) => [...rows, row]);
+            return of(row);
+          }),
+          // Restore the exact original lineup after the last measured formation.
+          // The restore is part of the observable chain so `complete` only fires
+          // after the user squad is back where it started.
+          switchMap((row, index) => {
+            const isLast = index === this.formationCodes.length - 1;
+            if (!isLast || !originalFormation) {
+              return of(row);
+            }
+            return this.harness.manualSelectLineup(
+              originalFormation,
+              originalPlayerIds,
+              originalSlots
+            ).pipe(map(() => row));
+          })
+        );
+      })
     ).subscribe({
       next: (row) => {
-        this.formationReplayResults.update((rows) => [...rows, row]);
+        // Rows are appended inside the chain so they appear progressively before
+        // the restore request runs. Keep next side-effect free.
       },
       error: (err) => {
         this.mutationInFlight.set(false);
@@ -1153,39 +1187,16 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         );
       },
       complete: () => {
-        const finishMatrix = () => {
-          this.mutationInFlight.set(false);
-          this.snackBar.open(
-            `Formation matrix completed (${this.formationReplayResults().length} formations).`,
-            'OK',
-            { duration: 3000 }
-          );
-          this.loadMatches();
-          this.refreshDetailAfterMutation();
-          this.refreshDetailAfterMutation(1200);
-        };
-
-        if (!originalFormation) {
-          finishMatrix();
-          return;
-        }
-
-        this.harness.setFormation(originalFormation).pipe(
-          switchMap(() => this.harness.replayMatch(matchId, seed))
-        ).subscribe({
-          next: () => {
-            this.selectedFormationModel = originalFormation;
-          },
-          error: (err: unknown) => {
-            this.mutationInFlight.set(false);
-            this.snackBar.open(
-              this.fmtError(err, 'Matrix completed, but failed to restore formation'),
-              'OK',
-              { duration: 5000 }
-            );
-          },
-          complete: finishMatrix,
-        });
+        this.mutationInFlight.set(false);
+        this.refreshLineupContext();
+        this.snackBar.open(
+          `Formation matrix completed (${this.formationReplayResults().length} formations).`,
+          'OK',
+          { duration: 3000 }
+        );
+        this.loadMatches();
+        this.refreshDetailAfterMutation();
+        this.refreshDetailAfterMutation(1200);
       },
     });
   }

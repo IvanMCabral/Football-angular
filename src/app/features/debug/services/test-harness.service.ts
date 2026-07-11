@@ -2,6 +2,8 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { LineupDTO } from '../../../shared/models/lineup/lineup.dto';
+import { LineupSlotDTO } from '../../../shared/models/lineup/lineup-slot.dto';
 import {
   CustomFixture,
   MatchFixture,
@@ -31,6 +33,7 @@ export class TestHarnessService {
   private http = inject(HttpClient);
   private apiUrl = `${environment.apiUrl}/test-harness/career`;
   private matchEngineUrl = `${environment.apiUrl}/match-engine`;
+  private lineupUrl = `${environment.apiUrl}/career/lineup`;
 
   /**
    * POST /api/v1/test-harness/career/set-formation
@@ -51,6 +54,31 @@ export class TestHarnessService {
       `${this.apiUrl}/set-formation`,
       body
     );
+  }
+
+  getCurrentLineup(): Observable<LineupDTO> {
+    return this.http.get<LineupDTO>(`${this.lineupUrl}/current`);
+  }
+
+  /**
+   * Persist a lineup through the real lineup endpoint.
+   *
+   * Used by the Formation matrix when we want the V24 engine to receive a real
+   * tactical shape, not only a formation label. Passing no slots lets the backend
+   * rebuild canonical slots for the requested formation while preserving the
+   * same player IDs. Passing slots restores the exact original manual/custom
+   * shape after the matrix finishes.
+   */
+  manualSelectLineup(
+    formation: string,
+    playerIds: string[],
+    slots?: LineupSlotDTO[]
+  ): Observable<LineupDTO> {
+    return this.http.post<LineupDTO>(`${this.lineupUrl}/manual-select`, {
+      formation,
+      playerIds,
+      slots: slots ?? [],
+    });
   }
 
   /**
