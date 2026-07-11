@@ -16,6 +16,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatInputModule } from '@angular/material/input';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { concatMap, from, map, switchMap } from 'rxjs';
 
 import { CareerService } from '../../../core/services/career.service';
 import { Fixture } from '../../../core/services/career.model';
@@ -33,6 +34,16 @@ interface RoundGroup {
   round: number;
   byeTeam: string | null;
   matches: TestHarnessMatchRow[];
+}
+
+interface FormationReplayResult {
+  formation: FormationCode;
+  homeGoals: number | null;
+  awayGoals: number | null;
+  homePossession: number | null;
+  awayPossession: number | null;
+  homeShots: number | null;
+  awayShots: number | null;
 }
 
 const TIMELINE_DEBOUNCE_MS = 150;
@@ -221,12 +232,45 @@ const DEFAULT_REPLAY_SEED = 12345;
               </button>
               <button
                 mat-stroked-button
+                (click)="onRunFormationMatrix()"
+                [disabled]="mutationInFlight() || !selectedMatchId()"
+                aria-label="Replay selected match with every formation and the same seed"
+              >
+                Formation matrix
+              </button>
+              <button
+                mat-stroked-button
                 (click)="onSimulateRound()"
                 [disabled]="mutationInFlight() || selectedRoundModel === null"
                 aria-label="Simulate selected round"
               >
                 Simulate round {{ selectedRoundModel ?? '—' }}
               </button>
+            </div>
+
+            <div *ngIf="formationReplayResults().length > 0" class="formation-matrix">
+              <div class="matrix-header">
+                <strong>Formation matrix</strong>
+                <span>Same match + seed {{ seedInputModel ?? 'auto' }}</span>
+              </div>
+              <div class="matrix-table" role="table" aria-label="Formation replay comparison">
+                <div class="matrix-row matrix-row-head" role="row">
+                  <span role="columnheader">Form.</span>
+                  <span role="columnheader">Score</span>
+                  <span role="columnheader">Poss.</span>
+                  <span role="columnheader">Shots</span>
+                </div>
+                <div
+                  *ngFor="let row of formationReplayResults(); trackBy: trackByFormationReplay"
+                  class="matrix-row"
+                  role="row"
+                >
+                  <span role="cell">{{ row.formation }}</span>
+                  <span role="cell">{{ row.homeGoals ?? '—' }}-{{ row.awayGoals ?? '—' }}</span>
+                  <span role="cell">{{ fmtPct(row.homePossession) }} / {{ fmtPct(row.awayPossession) }}</span>
+                  <span role="cell">{{ row.homeShots ?? 'â€”' }} / {{ row.awayShots ?? 'â€”' }}</span>
+                </div>
+              </div>
             </div>
           </div>
         </section>
@@ -405,6 +449,36 @@ const DEFAULT_REPLAY_SEED = 12345;
       margin: 1rem 0;
     }
     .button-stack { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 1rem; }
+    .formation-matrix {
+      margin-top: 1rem;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      overflow: hidden;
+      background: #fafafa;
+    }
+    .matrix-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.5rem;
+      padding: 0.5rem 0.75rem;
+      font-size: 0.8rem;
+      color: var(--text-muted, #666);
+      background: #f3f6f3;
+    }
+    .matrix-table { display: grid; font-size: 0.8rem; }
+    .matrix-row {
+      display: grid;
+      grid-template-columns: 76px 72px 1fr 1fr;
+      gap: 0.5rem;
+      padding: 0.4rem 0.75rem;
+      border-top: 1px solid #eee;
+      font-variant-numeric: tabular-nums;
+    }
+    .matrix-row-head {
+      font-weight: 700;
+      color: var(--text-muted, #555);
+      background: #fff;
+    }
     .rounds-list { list-style: none; margin: 0; padding: 0; }
     .round-block { margin-bottom: 1rem; }
     .round-header { display: flex; gap: 0.5rem; align-items: baseline; margin-bottom: 0.5rem; }
@@ -528,6 +602,9 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
 
   /** Error message from the initial load (null when OK). */
   readonly loadError = signal<string | null>(null);
+
+  /** Formation comparison results for selected match + seed. */
+  readonly formationReplayResults = signal<FormationReplayResult[]>([]);
 
   /** True if there is an active career. */
   readonly hasCareer = computed(() => this.careerId() !== null);
@@ -892,6 +969,102 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
 
   trackByMatchId(_index: number, m: TestHarnessMatchRow): string {
     return m.matchId;
+  }
+
+  trackByFormationReplay(_index: number, row: FormationReplayResult): string {
+    return row.formation;
+  }
+
+  fmtPct(value: number | null): string {
+    if (value === null || value === undefined || !Number.isFinite(value)) {
+      return '—';
+    }
+    return `${Math.round(value)}%`;
+  }
+
+  /**
+   * Replay-lab shortcut: run the selected match once per formation with the
+   * same seed, then render the score/possession/shot table in Panel B.
+   *
+   * The calls run sequentially through the existing set-formation + replay
+   * endpoints so the engine sees exactly the formation being measured.
+   */
+  onRunFormationMatrix(): void {
+    const matchId = this.selectedMatchId();
+    if (!matchId) {
+      this.snackBar.open('Select a match in Panel C first.', 'OK', {
+        duration: 3000,
+      });
+      return;
+    }
+
+    const seed = this.seedInputModel;
+    const originalFormation = this.selectedFormationModel;
+    this.formationReplayResults.set([]);
+    this.mutationInFlight.set(true);
+
+    from(this.formationCodes).pipe(
+      concatMap((formation) =>
+        this.harness.setFormation(formation).pipe(
+          switchMap(() => this.harness.replayMatch(matchId, seed)),
+          map((fixture): FormationReplayResult => ({
+            formation,
+            homeGoals: fixture?.result?.homeGoals ?? null,
+            awayGoals: fixture?.result?.awayGoals ?? null,
+            homePossession: fixture?.result?.homePossession ?? null,
+            awayPossession: fixture?.result?.awayPossession ?? null,
+            homeShots: fixture?.result?.homeShots ?? null,
+            awayShots: fixture?.result?.awayShots ?? null,
+          }))
+        )
+      )
+    ).subscribe({
+      next: (row) => {
+        this.formationReplayResults.update((rows) => [...rows, row]);
+      },
+      error: (err) => {
+        this.mutationInFlight.set(false);
+        this.snackBar.open(
+          this.fmtError(err, 'Failed to run formation matrix'),
+          'OK',
+          { duration: 5000 }
+        );
+      },
+      complete: () => {
+        const finishMatrix = () => {
+          this.mutationInFlight.set(false);
+          this.snackBar.open(
+            `Formation matrix completed (${this.formationReplayResults().length} formations).`,
+            'OK',
+            { duration: 3000 }
+          );
+          this.loadMatches();
+          this.refreshDetailAfterMutation();
+        };
+
+        if (!originalFormation) {
+          finishMatrix();
+          return;
+        }
+
+        this.harness.setFormation(originalFormation).pipe(
+          switchMap(() => this.harness.replayMatch(matchId, seed))
+        ).subscribe({
+          next: () => {
+            this.selectedFormationModel = originalFormation;
+          },
+          error: (err: unknown) => {
+            this.mutationInFlight.set(false);
+            this.snackBar.open(
+              this.fmtError(err, 'Matrix completed, but failed to restore formation'),
+              'OK',
+              { duration: 5000 }
+            );
+          },
+          complete: finishMatrix,
+        });
+      },
+    });
   }
 
   // ============== Internal helpers ==============
