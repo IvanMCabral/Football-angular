@@ -3339,8 +3339,12 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
         takeUntil(this.destroy$)
       )
       .subscribe(detail => {
-        this.previewError = false;
+        if (detail) {
+          this.previewError = false;
+        }
         this.previewedChemistry$.next(detail);
+        this.cdr.markForCheck();
+        this.cdr.detectChanges();
       });
   }
 
@@ -3478,8 +3482,22 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
             }))
           : playersList;
 
+        const squadById = new Map<string, any>();
+        squadSource.forEach((p: any) => squadById.set(p.playerId, p));
+
+        const selectedPlayerIds = new Set((playersList || []).map((p: any) => p.playerId).filter(Boolean));
+        const orderedSource = selectedPlayerIds.size > 0
+          ? [
+              ...(playersList || []).map((p: any) => ({
+                ...(squadById.get(p.playerId) || {}),
+                ...p
+              })),
+              ...squadSource.filter((p: any) => !selectedPlayerIds.has(p.playerId))
+            ]
+          : squadSource;
+
         // Convertir jugadores del response
-        const allPlayers: PlayerOnFieldDto[] = squadSource.map((p: any) => ({
+        const allPlayers: PlayerOnFieldDto[] = orderedSource.map((p: any) => ({
           playerId: p.playerId,
           name: p.name,
           position: p.position,
@@ -3606,6 +3624,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
 
         this.homePlayers$.next(allPlayers.filter(p => p.slotId));
         this.benchPlayers$.next(allPlayers.filter(p => !p.slotId));
+        this.triggerChemistryPreview();
 
         // Finalizar inicialización
         this.isInitializing = false;
