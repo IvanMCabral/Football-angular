@@ -199,7 +199,19 @@ export class SquadManagementComponent implements OnInit {
         return 0;
       }
       if (lineup.slots != null && lineup.slots.length > 0) {
-        return lineup.slots.length;
+        const uniquePlayerIds = new Set<string>();
+        const uniqueSubdivisionIds = new Set<string>();
+        for (const slot of lineup.slots) {
+          if (!slot?.playerId || !slot?.subdivisionId) {
+            continue;
+          }
+          if (uniquePlayerIds.has(slot.playerId) || uniqueSubdivisionIds.has(slot.subdivisionId)) {
+            continue;
+          }
+          uniquePlayerIds.add(slot.playerId);
+          uniqueSubdivisionIds.add(slot.subdivisionId);
+        }
+        return uniqueSubdivisionIds.size;
       }
       return lineup.players?.length ?? 0;
     }

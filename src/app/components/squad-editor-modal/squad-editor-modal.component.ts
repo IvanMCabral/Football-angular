@@ -193,7 +193,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
                     [class.is-custom]="isCustomLineup()">
                 {{ dropdownFormationValue }}
               </span>
-              <span class="tsp-coverage">{{ homePlayers.length }}/11</span>
+              <span class="tsp-coverage">{{ occupiedSlots }}/11</span>
             </div>
             <div class="tsp-style-tags" *ngIf="styleTags?.length">
               <span *ngFor="let tag of styleTags" class="tsp-tag">{{ tag }}</span>
@@ -580,6 +580,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
               <div *ngIf="player.slotId"
                    class="player-marker"
                    cdkDrag
+                   [cdkDragDisabled]="isGoalkeeperPlayer(player)"
                    [cdkDragData]="player"
                    (cdkDragStarted)="onMarkerDragStarted($event)"
                    (cdkDragEnded)="handleMarkerDragEnd($event, player)"
@@ -615,7 +616,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
                    nothing). Now drag-drop works directly on the marker card. -->
                <div class="player-number">{{i + 1}}</div>
                <div class="player-name-label">{{player.name}}</div>
-               <div class="player-role-label">{{player.role}}</div>
+               <div class="player-role-label">{{getMarkerRoleLabel(player)}}</div>
                <!-- V25D96-FRONT F4: OFF badge visible only when the player's
                     role doesn't match the slot's recommended role in the
                     active canonical formation. The dashed orange border on
@@ -2193,7 +2194,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
          (56px) and MID (44px) need different offsets to keep their
          centers on style.top.
          (The height overrides below are V25D93-FRONT F3.) */
-      .player-marker.color-gk { height: 56px; margin-top: -28px; }
+      .player-marker.color-gk { height: 38px; margin-top: -19px; }
       .player-marker.color-def { height: 48px; margin-top: -24px; }
       .player-marker.color-mid { height: 44px; margin-top: -22px; }
       .player-marker.color-att { height: 48px; margin-top: -24px; }
@@ -3671,7 +3672,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
 
   /** Slots ocupados */
   get occupiedSlots(): number {
-    return this.homePlayers.length;
+    return this.getUniqueValidHomePlayers().length;
   }
 
   /** Verifica si un slot está ocupado */
@@ -3807,11 +3808,54 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     return typeof player.xPercent === 'number' || typeof player.yPercent === 'number';
   }
 
+  isGoalkeeperPlayer(player: PlayerOnFieldDto | null | undefined): boolean {
+    return this.getRoleFamily(player?.role ?? '') === 'GK';
+  }
+
+  private isGoalkeeperSlot(slotId: string | null | undefined): boolean {
+    return slotId === 'GK-1';
+  }
+
+  private canPlayerUseSlot(player: PlayerOnFieldDto, slotId: string | null | undefined): boolean {
+    if (!slotId) { return false; }
+    const gkPlayer = this.isGoalkeeperPlayer(player);
+    const gkSlot = this.isGoalkeeperSlot(slotId);
+    return gkPlayer === gkSlot;
+  }
+
+  private lockGoalkeeperToGoalArea(player: PlayerOnFieldDto): void {
+    player.slotId = 'GK-1';
+    delete player.xPercent;
+    delete player.yPercent;
+    this.slotPlayerMap['GK-1'] = player;
+  }
+
+  private isInsideGoalkeeperProtectedArea(xPct: number, yPct: number): boolean {
+    const gkSlot = this.subdivisions.find(s => s.subdivisionId === 'GK-1');
+    if (gkSlot) {
+      return xPct >= gkSlot.left
+        && xPct <= gkSlot.left + gkSlot.width
+        && yPct >= gkSlot.top
+        && yPct <= gkSlot.top + gkSlot.height;
+    }
+    return xPct >= 35 && xPct <= 65 && yPct >= 88;
+  }
+
+  getMarkerRoleLabel(player: PlayerOnFieldDto): string {
+    if (!player?.slotId) { return player?.role ?? ''; }
+    const tacticalRole = this.getRecommendedRoleBySlotId(player.slotId);
+    return tacticalRole || player.role;
+  }
+
   /** Obtiene el rol del jugador recomendado para un slot */
   getRecommendedRole(sub: FieldSubdivisionDTO): string {
+    return this.getRecommendedRoleBySlotId(sub.subdivisionId);
+  }
+
+  private getRecommendedRoleBySlotId(slotId: string): string {
     const positions = this.formationPositions[this.selectedFormation];
     if (!positions) return '';
-    const pos = positions.find(p => p.subdivisionId === sub.subdivisionId);
+    const pos = positions.find(p => p.subdivisionId === slotId);
     return pos?.role || '';
   }
 
@@ -3867,6 +3911,9 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
 
     const player = this.benchPlayers.find(p => p.playerId === this.selectedPlayerToAssign);
     if (!player) return;
+    if (!this.canPlayerUseSlot(player, this.selectedSlot.subdivisionId)) {
+      return;
+    }
 
     // Mostrar warning si el jugador tiene condición de riesgo
     this.showConditionWarning(player);
@@ -4106,6 +4153,10 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     if (!dragRef) { return; }
     const data = (event.source as any)?.data as PlayerOnFieldDto | undefined;
     if (!data?.playerId) { return; }
+    if (this.isGoalkeeperPlayer(data)) {
+      event.source?.reset?.();
+      return;
+    }
     // Save the NATURAL pickup offset that CDK computed from the click.
     this.markerPickupOffset.set(data.playerId, {
       x: dragRef._pickupPositionInElement?.x ?? 35,
@@ -4115,6 +4166,13 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
 
 handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
     if (!player) { return; }
+    if (this.isGoalkeeperPlayer(player)) {
+      this.lockGoalkeeperToGoalArea(player);
+      event.source?.reset?.();
+      this.homePlayers$.next([...this.homePlayers$.value]);
+      this.cdr.markForCheck();
+      return;
+    }
 
     // 1. Compute drop position as % of the field bounding rect.
     const fieldEl = this.fieldContainer?.nativeElement;
@@ -4216,10 +4274,26 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
     const xPct = Math.max(0, Math.min(100, ((dropX - pickup.x + 35 - rect.left) / rect.width) * 100));
     const yPct = Math.max(0, Math.min(100, ((dropY - pickup.y + halfHeight - rect.top) / rect.height) * 100));
 
+    if (this.isInsideGoalkeeperProtectedArea(xPct, yPct)) {
+      if (player.slotId) {
+        delete player.xPercent;
+        delete player.yPercent;
+        this.slotPlayerMap[player.slotId] = player;
+      }
+      event.source?.reset?.();
+      this.saveLineup();
+      this.triggerChemistryPreview();
+      this.updateFormationDetection();
+      this.homePlayers$.next([...this.homePlayers$.value]);
+      this.cdr.markForCheck();
+      this.cdr.detectChanges();
+      return;
+    }
+
     // For bench players (no slotId): promote them to the closest subdivision
     // so they participate in chemistry preview.
     if (!player.slotId || player.slotId === '') {
-      const closest = this.findClosestSubdivision(xPct, yPct);
+      const closest = this.findClosestSubdivision(xPct, yPct, player);
       if (closest) { player.slotId = closest.subdivisionId; }
     }
 
@@ -4367,6 +4441,9 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
     targetSlotId: string,
     occupant: PlayerOnFieldDto | null
   ): void {
+    if (!this.canPlayerUseSlot(player, targetSlotId)) {
+      return;
+    }
     // Step 1: free the source slot (if from a slot).
     if (sourceSlotId) {
       delete this.slotPlayerMap[sourceSlotId];
@@ -4426,6 +4503,12 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
    * fake CdkDragDrop event.
    */
   private movePlayerToBench(player: PlayerOnFieldDto): void {
+    if (this.isGoalkeeperPlayer(player)) {
+      this.lockGoalkeeperToGoalArea(player);
+      this.homePlayers$.next([...this.homePlayers$.value]);
+      this.cdr.markForCheck();
+      return;
+    }
     if (!player.slotId) { return; } // already on bench
     delete this.slotPlayerMap[player.slotId];
     player.slotId = '';
@@ -4454,10 +4537,17 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
    * dropped onto the field and needs a sensible slotId to anchor the
    * chemistry/formation calculations.
    */
-  private findClosestSubdivision(xPct: number, yPct: number): FieldSubdivisionDTO | null {
+  private findClosestSubdivision(
+    xPct: number,
+    yPct: number,
+    player?: PlayerOnFieldDto
+  ): FieldSubdivisionDTO | null {
     let best: FieldSubdivisionDTO | null = null;
     let bestDist = Infinity;
     for (const sub of this.subdivisions) {
+      if (player && !this.canPlayerUseSlot(player, sub.subdivisionId)) {
+        continue;
+      }
       const cx = sub.left + sub.width / 2;
       const cy = sub.top + sub.height / 2;
       const dx = cx - xPct;
@@ -4725,7 +4815,7 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
     if (typeof player.xPercent === 'number' && isFinite(player.xPercent) &&
         typeof player.yPercent === 'number' && isFinite(player.yPercent) &&
         this.subdivisions && this.subdivisions.length > 0) {
-      const closest = this.findClosestSubdivision(player.xPercent, player.yPercent);
+      const closest = this.findClosestSubdivision(player.xPercent, player.yPercent, player);
       if (closest) {
         const zone = (closest as any).zone ?? '';
         if (zone === 'GK') return 'GK';
@@ -5134,10 +5224,17 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
     allPlayers.forEach((player) => playerById.set(player.playerId, player));
 
     const usedSubdivisionIds = new Set<string>();
+    const usedPlayerIds = new Set<string>();
     if (backendSlots?.length > 0) {
       backendSlots.forEach((slot) => {
         const player = playerById.get(slot.playerId);
-        if (!player || !slot.subdivisionId || usedSubdivisionIds.has(slot.subdivisionId)) return;
+        if (!player
+          || !slot.subdivisionId
+          || usedSubdivisionIds.has(slot.subdivisionId)
+          || usedPlayerIds.has(slot.playerId)
+          || !this.canPlayerUseSlot(player, slot.subdivisionId)) {
+          return;
+        }
         player.slotId = slot.subdivisionId;
         if (typeof slot.customXPercent === 'number' && isFinite(slot.customXPercent)) {
           player.xPercent = Math.max(0, Math.min(100, slot.customXPercent));
@@ -5147,7 +5244,18 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
         }
         this.slotPlayerMap[slot.subdivisionId] = player;
         usedSubdivisionIds.add(slot.subdivisionId);
+        usedPlayerIds.add(slot.playerId);
       });
+    }
+
+    if (!this.slotPlayerMap['GK-1']) {
+      const goalkeeper = allPlayers.find(player =>
+        this.isGoalkeeperPlayer(player) && !usedPlayerIds.has(player.playerId));
+      if (goalkeeper) {
+        this.lockGoalkeeperToGoalArea(goalkeeper);
+        usedSubdivisionIds.add('GK-1');
+        usedPlayerIds.add(goalkeeper.playerId);
+      }
     }
 
     const assignedPositions = new Set<number>();
@@ -5281,7 +5389,8 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
   private saveLineup(): void {
     // V24D6U3: client-side guard before sending the save. The backend
     // would 422 anyway; we surface the error inline without sending a doomed request.
-    const playerCount = this.homePlayers.length;
+    const validHomePlayers = this.getUniqueValidHomePlayers();
+    const playerCount = validHomePlayers.length;
     if (playerCount < 7) {
       // V25D78-C55.7.7.1 BUG_L4 (continuation from C55.7.7 squad-management.component.html
       // commit 31822e3): clarify that 7 is a floor, NOT a ceiling â€" the user can save with
@@ -5301,8 +5410,8 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
     // V25D98-FRONT: incluye customXPercent/customYPercent si el player tiene
     // posición libre (free positioning por drag en field fuera de slots).
     // El back puede ignorar estos campos por backward compat.
-    const playerIds: string[] = this.homePlayers.map(p => p.playerId);
-    const slots: LineupSlotDTO[] = this.homePlayers
+    const playerIds: string[] = validHomePlayers.map(p => p.playerId);
+    const slots: LineupSlotDTO[] = validHomePlayers
       .filter(p => !!p.slotId)
       .map(p => {
         const dto: LineupSlotDTO = { playerId: p.playerId, subdivisionId: p.slotId };
@@ -5347,6 +5456,27 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
         }
       }
     });
+  }
+
+  private getUniqueValidHomePlayers(): PlayerOnFieldDto[] {
+    const seenPlayers = new Set<string>();
+    const seenSlots = new Set<string>();
+    const result: PlayerOnFieldDto[] = [];
+    for (const player of this.homePlayers) {
+      if (!player?.playerId || !player.slotId) {
+        continue;
+      }
+      if (seenPlayers.has(player.playerId) || seenSlots.has(player.slotId)) {
+        continue;
+      }
+      if (!this.canPlayerUseSlot(player, player.slotId)) {
+        continue;
+      }
+      seenPlayers.add(player.playerId);
+      seenSlots.add(player.slotId);
+      result.push(player);
+    }
+    return result;
   }
 
   /** Cierra el modal */
