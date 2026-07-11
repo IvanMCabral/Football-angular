@@ -4979,7 +4979,7 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
     }).subscribe({
       next: (response) => {
         this.loadingFormation$.next(false);
-        this.applyLineupToSlots(formation, response?.players || []);
+        this.applyLineupToSlots(formation, response?.players || [], response?.slots || []);
         // Finalizar inicialización después de auto-select
         this.isInitializing = false;
         this.cdr.detectChanges();
@@ -4995,7 +4995,7 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
   }
 
   /** Aplica la lineup a los slots del campo */
-  private applyLineupToSlots(formationName: string, playersList: any[]): void {
+  private applyLineupToSlots(formationName: string, playersList: any[], backendSlots: LineupSlotDTO[] = []): void {
     // Limpiar mapeos antes de aplicar nueva lineup
     this.slotPlayerMap = {};
 
@@ -5028,8 +5028,16 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
         }))
       : playersList;
 
+    const selectedPlayerIds = new Set((playersList || []).map((p: any) => p.playerId).filter(Boolean));
+    const orderedSource = selectedPlayerIds.size > 0
+      ? [
+          ...squadSource.filter((p: any) => selectedPlayerIds.has(p.playerId)),
+          ...squadSource.filter((p: any) => !selectedPlayerIds.has(p.playerId))
+        ]
+      : squadSource;
+
     // Convertir jugadores del response
-    const allPlayers: PlayerOnFieldDto[] = squadSource.map((p: any) => ({
+    const allPlayers: PlayerOnFieldDto[] = orderedSource.map((p: any) => ({
       playerId: p.playerId,
       name: p.name,
       position: p.position,
@@ -5048,9 +5056,30 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
     }));
 
     // Asignar slots según posición EXACTA del jugador
+    const playerById = new Map<string, PlayerOnFieldDto>();
+    allPlayers.forEach((player) => playerById.set(player.playerId, player));
+
+    const usedSubdivisionIds = new Set<string>();
+    if (backendSlots?.length > 0) {
+      backendSlots.forEach((slot) => {
+        const player = playerById.get(slot.playerId);
+        if (!player || !slot.subdivisionId || usedSubdivisionIds.has(slot.subdivisionId)) return;
+        player.slotId = slot.subdivisionId;
+        if (typeof slot.customXPercent === 'number' && isFinite(slot.customXPercent)) {
+          player.xPercent = Math.max(0, Math.min(100, slot.customXPercent));
+        }
+        if (typeof slot.customYPercent === 'number' && isFinite(slot.customYPercent)) {
+          player.yPercent = Math.max(0, Math.min(100, slot.customYPercent));
+        }
+        this.slotPlayerMap[slot.subdivisionId] = player;
+        usedSubdivisionIds.add(slot.subdivisionId);
+      });
+    }
+
     const assignedPositions = new Set<number>();
 
     allPlayers.forEach((player) => {
+      if (backendSlots?.length > 0 || player.slotId) return;
       for (let i = 0; i < positions.length; i++) {
         if (assignedPositions.has(i)) continue;
 
@@ -5068,6 +5097,7 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
     // Actualizar listas de jugadores
     this.homePlayers$.next(allPlayers.filter(p => p.slotId));
     this.benchPlayers$.next(allPlayers.filter(p => !p.slotId));
+    this.triggerChemistryPreview();
 
     // V25D96-FRONT F2: auto-select always produces a canonical lineup (the
     // backend applies the formation-role matching), but we still re-run
@@ -5111,7 +5141,7 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
     }).subscribe({
       next: (response) => {
         this.loadingFormation$.next(false);
-        this.applyLineupToSlots(newFormation, response?.players || []);
+        this.applyLineupToSlots(newFormation, response?.players || [], response?.slots || []);
         // V25D96-FRONT F2: an auto-select ALWAYS produces a canonical lineup
         // (the back ensures this), so this should always flip
         // _isCustomLineup back to false. We still call detectFormation
