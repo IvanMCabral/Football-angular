@@ -5,7 +5,7 @@
  * (HttpClient is mocked via a Spy).
  *
  * <p>V25D54-C15 P3.2: agregados tests para las 5 formations nuevas
- * (3-5-2-CDM, 5-4-1, 3-4-1-2, 4-2-2-2, 4-3-3-1) — verifican que el
+ * (3-5-2-CDM, 5-4-1, 3-4-1-2, 4-2-2-2, 4-1-2-3) — verifican que el
  * dropdown las incluye, que formationLines devuelve el shape correcto,
  * y que getDotLabel retorna los role labels específicos (LWB, RWB, CDM,
  * CAM, etc.) en lugar de los genéricos anteriores.
@@ -56,7 +56,7 @@ const ALL_FORMATIONS = [
   '4-4-2', '4-3-3', '3-5-2', '4-2-3-1',
   '5-3-2', '4-1-4-1', '3-4-3',
   '3-5-2-CDM', '5-4-1', '3-4-1-2', '4-2-2-2',
-  '4-3-3-1'
+  '4-1-2-3'
 ];
 
 describe('FormationModalComponent — LIVE-MATCH-F3-UI-LIVE FE5', () => {
@@ -143,7 +143,7 @@ describe('FormationModalComponent — LIVE-MATCH-F3-UI-LIVE FE5', () => {
     expect(component.formationLines).toEqual([1, 3, 4, 1, 2]);    // GK + 3CB + 4MID + 1CAM + 2ST
     component.onFormationChange('4-2-2-2');
     expect(component.formationLines).toEqual([1, 4, 2, 2, 2]);    // GK + 4DEF + 2CDM + 2wide + 2ST
-    component.onFormationChange('4-3-3-1');
+    component.onFormationChange('4-1-2-3');
     expect(component.formationLines).toEqual([1, 4, 1, 2, 3]);    // GK + 4DEF + 1CDM + 2CM + 3ATT
   });
 
@@ -177,8 +177,8 @@ describe('FormationModalComponent — LIVE-MATCH-F3-UI-LIVE FE5', () => {
     expect(component.getDotLabel(4, 0, 2, false)).toBe('LWB');
     expect(component.getDotLabel(4, 1, 2, false)).toBe('RWB');
 
-    // 4-3-3-1: GK + 4DEF + 1CDM + 2CM + LW+ST+RW
-    component.onFormationChange('4-3-3-1');
+    // 4-1-2-3: GK + 4DEF + 1CDM + 2CM + LW+ST+RW
+    component.onFormationChange('4-1-2-3');
     expect(component.getDotLabel(2, 0, 1, false)).toBe('CDM');
     expect(component.getDotLabel(3, 0, 2, false)).toBe('CM');
     expect(component.getDotLabel(4, 0, 3, true)).toBe('LW');
@@ -325,7 +325,7 @@ describe('FormationModalComponent — LIVE-MATCH-F3-UI-LIVE FE5', () => {
     expect(shared).toContain('5-4-1');
     expect(shared).toContain('3-4-1-2');
     expect(shared).toContain('4-2-2-2');
-    expect(shared).toContain('4-3-3-1');
+    expect(shared).toContain('4-1-2-3');
   });
 
   it('V25D55-C16 P1.3+4: GK dot has class is-gk (was always false before the fix)', () => {

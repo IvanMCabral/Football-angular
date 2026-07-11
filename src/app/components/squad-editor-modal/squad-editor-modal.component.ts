@@ -2757,7 +2757,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
    * V25D55-C16 P0.1: source of truth movido a
    * {@code shared/constants/formations.ts}. Antes eran solo las 7 originales
    * â€" faltaban las 5 nuevas de V25D54-C15 (3-5-2-CDM, 5-4-1, 3-4-1-2,
-   * 4-2-2-2, 4-3-3-1). Ahora el dropdown muestra las 12 formations que el
+   * 4-2-2-2, 4-1-2-3). Ahora el dropdown muestra las 12 formations que el
    * back-end reconoce.
    *
    * <p>V25D96: the dropdown also needs to render the disabled
@@ -5158,7 +5158,7 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
     // preserve the exact formation requested by the user. Do NOT call
     // detectFormation() here: it only counts role families and collapses
     // variants with the same counts (e.g. 4-2-3-1 -> 4-1-4-1,
-    // 5-3-2 -> 3-5-2, 4-2-2-2 -> 4-4-2, 4-3-3-1 -> 4-3-3).
+    // 5-3-2 -> 3-5-2, 4-2-2-2 -> 4-4-2, 4-1-2-3 -> 4-3-3).
     this.selectedFormation = formationName;
     this.homeFormation$.next(formationName);
     this._isCustomLineup = false;

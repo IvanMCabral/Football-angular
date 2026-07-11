@@ -52,7 +52,7 @@ export interface FormationDialogData {
 
 /**
  * All formations exposed by the modal. V25D54-C15: added 5 formations
- * nuevas (P1: 3-5-2-CDM, 5-4-1, 3-4-1-2, 4-2-2-2; P2: 4-3-3-1) para que
+ * nuevas (P1: 3-5-2-CDM, 5-4-1, 3-4-1-2, 4-2-2-2; P2: 4-1-2-3) para que
  * el dropdown muestre las 12 formations disponibles en el back.
  *
  * V25D55-C16 P0.1: source of truth moved to
@@ -151,8 +151,8 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
     ['LM', 'RM'],
     ['ST', 'ST']
   ],
-  // ========== V25D54-C15 P2: variante 4-3-3-1 ==========
-  '4-3-3-1': [
+  // ========== V25D54-C15 P2: variante 4-1-2-3 ==========
+  '4-1-2-3': [
     ['GK'],
     ['LB', 'CB', 'CB', 'RB'],
     ['CDM'],

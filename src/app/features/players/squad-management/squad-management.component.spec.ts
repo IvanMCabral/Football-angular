@@ -233,7 +233,7 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
     expect(component.availableFormations).toContain('5-4-1');
     expect(component.availableFormations).toContain('3-4-1-2');
     expect(component.availableFormations).toContain('4-2-2-2');
-    expect(component.availableFormations).toContain('4-3-3-1');
+    expect(component.availableFormations).toContain('4-1-2-3');
     // Regression: 7 originales siguen presentes.
     for (const f of ['4-4-2', '4-3-3', '3-5-2', '4-2-3-1', '5-3-2', '4-1-4-1', '3-4-3']) {
       expect(component.availableFormations).toContain(f);
