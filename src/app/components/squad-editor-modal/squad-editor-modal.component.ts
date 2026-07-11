@@ -226,6 +226,26 @@ import { SessionPlayer } from '../../shared/models/player.model';
                    [class.low]="(chemistryScore ?? 0) < 60"
                    [style.width.%]="chemistryScore ?? 0"></div>
             </div>
+            <div class="tsp-tactical-chem" *ngIf="tacticalChemistry as tc">
+              <div class="tsp-stat">
+                <span class="tsp-stat-label">Tactical links</span>
+                <span class="tsp-stat-val"
+                      [class.high]="tc.score >= 80"
+                      [class.mid]="tc.score >= 60 && tc.score < 80"
+                      [class.low]="tc.score < 60">{{ tc.score }}/99</span>
+              </div>
+              <div class="tsp-mini-grid">
+                <span>DEF {{ tc.lineScores?.['DEF'] ?? '—' }}</span>
+                <span>MID {{ tc.lineScores?.['MID'] ?? '—' }}</span>
+                <span>ATT {{ tc.lineScores?.['ATT'] ?? '—' }}</span>
+                <span>L {{ tc.channelScores?.['LEFT'] ?? '—' }}</span>
+                <span>C {{ tc.channelScores?.['CENTER'] ?? '—' }}</span>
+                <span>R {{ tc.channelScores?.['RIGHT'] ?? '—' }}</span>
+              </div>
+              <div class="tsp-warning-line" *ngIf="tc.warnings?.length">
+                {{ tc.warnings[0] }}
+              </div>
+            </div>
             <div class="tsp-stats-row">
               <div class="tsp-stat">
                 <span class="tsp-stat-label">Stamina avg</span>
@@ -1405,6 +1425,35 @@ import { SessionPlayer } from '../../shared/models/player.model';
     .tsp-stat-val.mid { color: #eab308; }
     .tsp-stat-val.low { color: #c53030; }
     .tsp-stat-val.danger { color: #fc8181; }
+    .tsp-tactical-chem {
+      margin: 8px 0;
+      padding: 8px;
+      border-radius: 6px;
+      background: rgba(255,255,255,0.035);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    .tsp-mini-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 4px;
+      margin-top: 6px;
+      font-size: 10px;
+      color: rgba(255,255,255,0.78);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .tsp-mini-grid span {
+      padding: 3px 4px;
+      border-radius: 4px;
+      background: rgba(255,255,255,0.04);
+      text-align: center;
+    }
+    .tsp-warning-line {
+      margin-top: 6px;
+      color: #f6ad55;
+      font-size: 10px;
+      font-weight: 700;
+    }
     .tsp-rating-row {
       display: grid;
       grid-template-columns: 1fr 1fr 1fr;
@@ -3257,7 +3306,12 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
    * for a "Chemistry preview unavailable" warning. Resets on the next
    * successful call.
    */
-  private previewTrigger$ = new Subject<string[]>();
+  private previewTrigger$ = new Subject<{
+    ids: string[];
+    formation: string;
+    slots: LineupSlotDTO[];
+    signature: string;
+  }>();
   previewedChemistry$ = new BehaviorSubject<ChemistryDetailDTO | null>(null);
   currentChemistryScore: number | null = null;
   previewError = false;
@@ -3339,15 +3393,19 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     this.previewTrigger$
       .pipe(
         debounceTime(300),
-        distinctUntilChanged((a, b) => a.join(',') === b.join(',')),
-        switchMap(ids => {
+        distinctUntilChanged((a, b) => a.signature === b.signature),
+        switchMap(snapshot => {
           // Need exactly 11 to preview â€" earlier/later states emit null
           // (template shows "Proyectando chemistry..." placeholder).
-          if (!ids || ids.length !== 11) {
+          if (!snapshot.ids || snapshot.ids.length !== 11) {
             this.previewError = false;
             return of(null);
           }
-          return this.chemistryPreview.previewChemistry(ids).pipe(
+          return this.chemistryPreview.previewChemistry(
+            snapshot.ids,
+            snapshot.formation,
+            snapshot.slots
+          ).pipe(
             catchError(err => {
               console.warn('[SQUAD-EDITOR] Chemistry preview failed:', err);
               this.previewError = true;
@@ -3378,7 +3436,33 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
    */
   private triggerChemistryPreview(): void {
     const ids = this.homePlayers.map(p => p.playerId);
-    this.previewTrigger$.next(ids);
+    const slots: LineupSlotDTO[] = this.homePlayers
+      .filter(p => !!p.slotId)
+      .map(p => {
+        const dto: LineupSlotDTO = { playerId: p.playerId, subdivisionId: p.slotId };
+        if (typeof p.xPercent === 'number' && isFinite(p.xPercent)) {
+          dto.customXPercent = p.xPercent;
+        }
+        if (typeof p.yPercent === 'number' && isFinite(p.yPercent)) {
+          dto.customYPercent = p.yPercent;
+        }
+        return dto;
+      });
+    const signature = JSON.stringify({
+      formation: this.selectedFormation,
+      slots: slots.map(s => ({
+        p: s.playerId,
+        s: s.subdivisionId,
+        x: typeof s.customXPercent === 'number' ? Number(s.customXPercent.toFixed(2)) : null,
+        y: typeof s.customYPercent === 'number' ? Number(s.customYPercent.toFixed(2)) : null,
+      }))
+    });
+    this.previewTrigger$.next({
+      ids,
+      formation: this.selectedFormation,
+      slots,
+      signature
+    });
   }
 
   /** Carga todas las subdivisiones desde el backend */
@@ -5050,6 +5134,10 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
   get teamAverage(): number | null {
     const fe = this.formationEffectiveness$.value;
     return fe && typeof fe.teamAverage === 'number' ? fe.teamAverage : null;
+  }
+
+  get tacticalChemistry() {
+    return this.previewedChemistry$.value?.breakdown?.tacticalChemistry ?? null;
   }
 
   /** Convenience: get the inferredFormation for template (or null). */

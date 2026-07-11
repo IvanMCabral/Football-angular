@@ -70,6 +70,25 @@ export interface ChemistryBreakdownDTO {
    * Same "elite" threshold as the V25D41 coverage bonus on the back.
    */
   coveragePercentage: number;
+  /** V25D99.20.13: optional spatial/player-link chemistry. */
+  tacticalChemistry?: TacticalChemistryDTO | null;
+}
+
+export interface TacticalChemistryDTO {
+  score: number;
+  lineScores: Record<string, number>;
+  channelScores: Record<string, number>;
+  links: TacticalChemistryLinkDTO[];
+  warnings: string[];
+}
+
+export interface TacticalChemistryLinkDTO {
+  fromPlayerId: string;
+  toPlayerId: string;
+  type: string;
+  score: number;
+  distance: number;
+  note: string;
 }
 
 /**

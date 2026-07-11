@@ -3,6 +3,7 @@ import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { ChemistryDetailDTO } from '../../shared/models/lineup/lineup.dto';
+import { LineupSlotDTO } from '../../shared/models/lineup/lineup-slot.dto';
 
 /**
  * V25D45 (Sprint C10): thin HTTP wrapper around
@@ -42,10 +43,14 @@ export class ChemistryPreviewService {
    * @returns Observable that emits the {@link ChemistryDetailDTO} on success
    *          and errors with the HTTP error response on failure.
    */
-  previewChemistry(playerIds: string[]): Observable<ChemistryDetailDTO> {
+  previewChemistry(
+    playerIds: string[],
+    formation?: string,
+    slots?: LineupSlotDTO[]
+  ): Observable<ChemistryDetailDTO> {
     return this.http.post<ChemistryDetailDTO>(
       `${environment.apiUrl}/career/lineup/preview-chemistry`,
-      { playerIds }
+      { playerIds, formation, slots }
     );
   }
 }
