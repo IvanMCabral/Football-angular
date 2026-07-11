@@ -4477,6 +4477,8 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
       return Math.max(0, Math.min(100, player.xPercent));
     }
     if (!player.slotId) { return 50; }
+    const formationX = this.getFormationPositionCoord(player.slotId, 'x');
+    if (formationX !== null) { return formationX; }
     const cx = this.getSlotCenterX(player.slotId);
     return isFinite(cx) ? cx : 50;
   }
@@ -4487,8 +4489,32 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
       return Math.max(0, Math.min(100, player.yPercent));
     }
     if (!player.slotId) { return 50; }
+    const formationY = this.getFormationPositionCoord(player.slotId, 'y');
+    if (formationY !== null) { return formationY; }
     const cy = this.getSlotCenterY(player.slotId);
     return isFinite(cy) ? cy : 50;
+  }
+
+  /**
+   * V25D99.20.5-FRONT: render canonical formation markers at the exact
+   * formation coordinates, not merely at the coarse subdivision center.
+   *
+   * <p>The persisted {@code slotId} remains the tactical/source-of-truth key
+   * for saves, swaps and ratings. But visually the manager expects a
+   * formation to look like football: wing-backs, pivots, CAMs and strikers
+   * should sit at their authored x/y coordinates. Before this helper,
+   * markers without free-position overrides fell back to
+   * {@link #getSlotCenterX}/{@link #getSlotCenterY}, so several formations
+   * looked odd even though the API returned 11 players / 11 slots.
+   */
+  private getFormationPositionCoord(slotId: string, axis: 'x' | 'y'): number | null {
+    const positions = this.formationPositions[this.selectedFormation];
+    if (!positions || positions.length === 0) { return null; }
+    const pos = positions.find(p => p.subdivisionId === slotId);
+    if (!pos) { return null; }
+    const value = axis === 'x' ? pos.xPercent : pos.yPercent;
+    if (typeof value !== 'number' || !isFinite(value)) { return null; }
+    return Math.max(0, Math.min(100, value));
   }
 
   /**
