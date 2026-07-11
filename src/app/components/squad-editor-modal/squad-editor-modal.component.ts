@@ -2967,7 +2967,14 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
         return dto;
       });
     const body = { formation: this.selectedFormation, slots };
-    this.http.post<{ attackRating: number; midfieldRating: number; defenseRating: number }>(
+    this.http.post<{
+      attackRating: number;
+      midfieldRating: number;
+      defenseRating: number;
+      inferredFormation?: string;
+      perPlayerEffectiveness?: Record<string, number>;
+      teamAverage?: number;
+    }>(
       `${environment.apiUrl}/career/lineup/preview-ratings`, body)
       .subscribe({
         next: (res) => {
@@ -2979,7 +2986,18 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
               midfieldRating: Math.round(res.midfieldRating),
               defenseRating: Math.round(res.defenseRating),
             };
+            if (typeof res.teamAverage === 'number') {
+              this.formationEffectiveness$.next({
+                inferredFormation: res.inferredFormation || this.selectedFormation,
+                perPlayerEffectiveness: res.perPlayerEffectiveness || {},
+                teamAverage: res.teamAverage,
+                attackRating: res.attackRating,
+                midfieldRating: res.midfieldRating,
+                defenseRating: res.defenseRating,
+              });
+            }
             this.cdr.markForCheck();
+            this.cdr.detectChanges();
           }
         },
         // Silent fail: backend might be slow / unavailable / endpoint
@@ -3824,9 +3842,8 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     if (this.isSlotAbandonedByOverride(sub)) {
       return;
     }
-    this.selectedSlot = sub;
+    this.selectedSlot = null;
     this.selectedPlayerToAssign = '';
-    this.cdr.detectChanges();
   }
 
   /**
@@ -3840,10 +3857,8 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
    * (no drag) fires this click handler, drag fires cdkDragEnded.
    */
   onMarkerClick(player: PlayerOnFieldDto): void {
-    if (!player.slotId) { return; }
-    const sub = this.subdivisions.find(s => s.subdivisionId === player.slotId);
-    if (!sub) { return; }
-    this.onSlotClick(sub);
+    this.selectedSlot = null;
+    this.selectedPlayerToAssign = '';
   }
 
   /** Asigna un jugador al slot seleccionado */
