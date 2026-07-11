@@ -16,13 +16,18 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatInputModule } from '@angular/material/input';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { concatMap, from, map, switchMap } from 'rxjs';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { HttpClient } from '@angular/common/http';
+import { catchError, concatMap, forkJoin, from, map, of, switchMap } from 'rxjs';
 
 import { CareerService } from '../../../core/services/career.service';
 import { Fixture } from '../../../core/services/career.model';
+import { environment } from '../../../environments/environment';
 import { MatchDetailApiService } from '../../match-detail/services/match-detail-api.service';
 import { TimelineSnapshot } from '../../match-detail/models/match-detail.model';
 import { V24MatchDetailPageComponent } from '../../match-detail/pages/v24-match-detail-page.component';
+import { SquadEditorModalComponent } from '../../../components/squad-editor-modal/squad-editor-modal.component';
+import { SessionPlayer } from '../../../shared/models/player.model';
 import {
   FORMATION_CODES,
   FormationCode,
@@ -92,6 +97,7 @@ const DEFAULT_REPLAY_SEED = 12345;
     MatFormFieldModule,
     MatInputModule,
     MatSelectModule,
+    MatDialogModule,
     V24MatchDetailPageComponent,
   ],
   template: `
@@ -185,6 +191,14 @@ const DEFAULT_REPLAY_SEED = 12345;
                 aria-label="Replace fixtures with a Barcelona rival"
               >
                 Replace Fixtures
+              </button>
+              <button
+                mat-stroked-button
+                (click)="openSquadEditor()"
+                [disabled]="mutationInFlight()"
+                aria-label="Open visual squad editor"
+              >
+                Open squad editor
               </button>
             </div>
           </div>
@@ -557,6 +571,8 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   private matchDetailApi = inject(MatchDetailApiService);
   private harness = inject(TestHarnessService);
   private snackBar = inject(MatSnackBar);
+  private dialog = inject(MatDialog);
+  private http = inject(HttpClient);
 
   /** Allowed formation codes (UI select options). */
   readonly formationCodes: readonly FormationCode[] = FORMATION_CODES;
@@ -816,6 +832,66 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         this.mutationInFlight.set(false);
         this.snackBar.open(
           this.fmtError(err, 'Failed to replace fixtures'),
+          'OK',
+          { duration: 5000 }
+        );
+      },
+    });
+  }
+
+  /**
+   * Opens the same visual editor used by /squad, directly from the replay lab.
+   *
+   * This is intentionally not a second implementation: player swaps, bench
+   * moves, free pixel positioning, customX/customY persistence, tactical
+   * chemistry preview and manual-select save all stay inside the production
+   * SquadEditorModalComponent. The harness only provides the current career
+   * context and refreshes after the modal closes.
+   */
+  openSquadEditor(): void {
+    const careerId = this.careerId();
+    if (!careerId) {
+      this.snackBar.open('No active career loaded.', 'OK', { duration: 3000 });
+      return;
+    }
+
+    this.mutationInFlight.set(true);
+    forkJoin({
+      squad: this.http.get<SessionPlayer[]>(`${environment.apiUrl}/career/players/squad`).pipe(
+        catchError(() => of([] as SessionPlayer[]))
+      ),
+      lineup: this.http.get<{ formation?: string | null }>(`${environment.apiUrl}/career/lineup/current`).pipe(
+        catchError(() => of({ formation: this.selectedFormationModel }))
+      ),
+    }).subscribe({
+      next: ({ squad, lineup }) => {
+        this.mutationInFlight.set(false);
+        const currentFormation =
+          lineup?.formation ?? this.selectedFormationModel ?? '4-4-2';
+
+        const ref = this.dialog.open(SquadEditorModalComponent, {
+          data: {
+            careerId,
+            matchId: null,
+            squad,
+            currentFormation,
+          },
+          width: '98vw',
+          height: '90vh',
+          disableClose: false,
+          panelClass: 'squad-editor-panel',
+        });
+
+        ref.afterClosed().subscribe(() => {
+          this.refreshLineupContext();
+          this.loadMatches();
+          this.refreshDetailAfterMutation();
+        });
+      },
+      error: (err) => {
+        this.mutationInFlight.set(false);
+        this.snackBar.open(
+          this.fmtError(err, 'Failed to open squad editor'),
           'OK',
           { duration: 5000 }
         );
@@ -1145,6 +1221,17 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       this.selectedMatchId.set(null);
       Promise.resolve().then(() => this.selectedMatchId.set(current));
     }
+  }
+
+  private refreshLineupContext(): void {
+    this.http.get<{ formation?: string | null }>(`${environment.apiUrl}/career/lineup/current`)
+      .pipe(catchError(() => of(null)))
+      .subscribe((lineup) => {
+        const formation = lineup?.formation;
+        if (formation && this.formationCodes.includes(formation as FormationCode)) {
+          this.selectedFormationModel = formation as FormationCode;
+        }
+      });
   }
 
   private fmtError(err: any, fallback: string): string {
