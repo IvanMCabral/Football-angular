@@ -4820,12 +4820,16 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
           lineupCounts.mid === canonicalCounts.mid &&
           lineupCounts.att === canonicalCounts.att) {
         this._isCustomLineup = false;
-        // V25D99.12.1-FRONT: keep `selectedFormation` in sync with the
-        // detected canonical so the dropdown label flips (4-4-2 -> 4-3-3
-        // etc) and `saveLineup` sends the new formation name to the back.
-        // Without this line, the dropdown keeps showing the old value even
-        // when the lineup counts actually match a different canonical.
-        this.selectedFormation = f;
+        // UX MVP: do NOT overwrite selectedFormation from drag inference.
+        //
+        // The manager-selected formation is tactical intent. A manual drag
+        // can make the current shape *look* like another canonical by count
+        // for one frame (e.g. a 4-4-2 MID crosses into ATT and count-based
+        // detection says 4-3-3). If we mutate selectedFormation here, the
+        // preview-ratings request switches formation base instantly and ATT /
+        // DEF jump radically for a one-pixel move. Keep the dropdown anchored
+        // to the user's explicit choice; changing formation should happen via
+        // the select/autoselect flow, not as a side effect of free positioning.
         return f;
       }
     }

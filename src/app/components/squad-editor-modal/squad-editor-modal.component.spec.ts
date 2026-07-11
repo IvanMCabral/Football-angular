@@ -3510,6 +3510,60 @@ describe('SquadEditorModalComponent — V25D96 free-formation + drag-drop cross-
     }, 30);
   });
 
+  it('keeps selectedFormation anchored when drag inference matches a different canonical', (done) => {
+    setTimeout(() => {
+      (component as any).formationPositions['4-4-2'] = [
+        { subdivisionId: 'GK', role: 'GK', xPercent: 50, yPercent: 93, actionRangePercent: 5, index: 0 },
+        { subdivisionId: 'D1', role: 'LB', xPercent: 15, yPercent: 78, actionRangePercent: 7, index: 1 },
+        { subdivisionId: 'D2', role: 'CB', xPercent: 35, yPercent: 78, actionRangePercent: 7, index: 2 },
+        { subdivisionId: 'D3', role: 'CB', xPercent: 65, yPercent: 78, actionRangePercent: 7, index: 3 },
+        { subdivisionId: 'D4', role: 'RB', xPercent: 85, yPercent: 78, actionRangePercent: 7, index: 4 },
+        { subdivisionId: 'M1', role: 'LM', xPercent: 15, yPercent: 50, actionRangePercent: 7, index: 5 },
+        { subdivisionId: 'M2', role: 'CM', xPercent: 35, yPercent: 50, actionRangePercent: 8, index: 6 },
+        { subdivisionId: 'M3', role: 'CM', xPercent: 65, yPercent: 50, actionRangePercent: 8, index: 7 },
+        { subdivisionId: 'M4', role: 'RM', xPercent: 85, yPercent: 50, actionRangePercent: 7, index: 8 },
+        { subdivisionId: 'A1', role: 'ST', xPercent: 35, yPercent: 12, actionRangePercent: 6, index: 9 },
+        { subdivisionId: 'A2', role: 'ST', xPercent: 65, yPercent: 12, actionRangePercent: 6, index: 10 }
+      ];
+      (component as any).formationPositions['4-3-3'] = [
+        { subdivisionId: 'GK', role: 'GK', xPercent: 50, yPercent: 93, actionRangePercent: 5, index: 0 },
+        { subdivisionId: 'D1', role: 'LB', xPercent: 15, yPercent: 78, actionRangePercent: 7, index: 1 },
+        { subdivisionId: 'D2', role: 'CB', xPercent: 35, yPercent: 78, actionRangePercent: 7, index: 2 },
+        { subdivisionId: 'D3', role: 'CB', xPercent: 65, yPercent: 78, actionRangePercent: 7, index: 3 },
+        { subdivisionId: 'D4', role: 'RB', xPercent: 85, yPercent: 78, actionRangePercent: 7, index: 4 },
+        { subdivisionId: 'M1', role: 'CM', xPercent: 30, yPercent: 50, actionRangePercent: 8, index: 5 },
+        { subdivisionId: 'M2', role: 'CM', xPercent: 50, yPercent: 50, actionRangePercent: 8, index: 6 },
+        { subdivisionId: 'M3', role: 'CM', xPercent: 70, yPercent: 50, actionRangePercent: 8, index: 7 },
+        { subdivisionId: 'A1', role: 'LW', xPercent: 20, yPercent: 14, actionRangePercent: 6, index: 8 },
+        { subdivisionId: 'A2', role: 'ST', xPercent: 50, yPercent: 14, actionRangePercent: 6, index: 9 },
+        { subdivisionId: 'A3', role: 'RW', xPercent: 80, yPercent: 14, actionRangePercent: 6, index: 10 }
+      ];
+
+      component.selectedFormation = '4-4-2';
+      const manuallyAdvancedShape = [
+        { playerId: 'gk', role: 'GK', position: 'GK', slotId: 'GK', overall: 80, energy: 100, injured: false, stamina: 100, active: true, isEmpty: false, name: 'GK' },
+        { playerId: 'd1', role: 'LB', position: 'LB', slotId: 'D1', overall: 80, energy: 100, injured: false, stamina: 100, active: true, isEmpty: false, name: 'D1' },
+        { playerId: 'd2', role: 'CB', position: 'CB', slotId: 'D2', overall: 80, energy: 100, injured: false, stamina: 100, active: true, isEmpty: false, name: 'D2' },
+        { playerId: 'd3', role: 'CB', position: 'CB', slotId: 'D3', overall: 80, energy: 100, injured: false, stamina: 100, active: true, isEmpty: false, name: 'D3' },
+        { playerId: 'd4', role: 'RB', position: 'RB', slotId: 'D4', overall: 80, energy: 100, injured: false, stamina: 100, active: true, isEmpty: false, name: 'D4' },
+        { playerId: 'm1', role: 'CM', position: 'CM', slotId: 'M1', overall: 80, energy: 100, injured: false, stamina: 100, active: true, isEmpty: false, name: 'M1' },
+        { playerId: 'm2', role: 'CM', position: 'CM', slotId: 'M2', overall: 80, energy: 100, injured: false, stamina: 100, active: true, isEmpty: false, name: 'M2' },
+        { playerId: 'm3', role: 'CM', position: 'CM', slotId: 'M3', overall: 80, energy: 100, injured: false, stamina: 100, active: true, isEmpty: false, name: 'M3' },
+        { playerId: 'a1', role: 'LW', position: 'LW', slotId: 'A1', overall: 80, energy: 100, injured: false, stamina: 100, active: true, isEmpty: false, name: 'A1' },
+        { playerId: 'a2', role: 'ST', position: 'ST', slotId: 'A2', overall: 80, energy: 100, injured: false, stamina: 100, active: true, isEmpty: false, name: 'A2' },
+        { playerId: 'a3', role: 'RW', position: 'RW', slotId: 'A3', overall: 80, energy: 100, injured: false, stamina: 100, active: true, isEmpty: false, name: 'A3' }
+      ];
+      (component as any).homePlayers$.next(manuallyAdvancedShape);
+
+      const detected = (component as any).detectFormation();
+
+      expect(detected).toBe('4-3-3', 'the count-based detector may see a 4-3-3 shape');
+      expect(component.selectedFormation).toBe('4-4-2',
+        'drag inference must not mutate the manager-selected formation');
+      done();
+    }, 30);
+  });
+
   it('V25D96 F2 (helper): countRoleFamily buckets roles into the 4 families', () => {
     // Direct unit test of the role-family counter with explicit input.
     // Bypasses the canonical-formations + lineup machinery to isolate
