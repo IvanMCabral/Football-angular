@@ -162,6 +162,30 @@ export interface MatchResultData {
   awayShots?: number;
 }
 
+export interface ScenarioMatrixRow {
+  scenario: string;
+  description: string;
+  formation: string;
+  initialStyle: TeamStyle;
+  changeMinute: number | null;
+  changedStyle: TeamStyle | null;
+  homeGoals: number;
+  awayGoals: number;
+  homeXg: number;
+  awayXg: number;
+  homeShots: number;
+  awayShots: number;
+  homePossession: number;
+  awayPossession: number;
+  homeCentralShots: number;
+  homeWideShots: number;
+  homeLongShots: number;
+  awayCentralShots: number;
+  awayWideShots: number;
+  awayLongShots: number;
+  tacticalChanges: number;
+}
+
 /**
  * V24D24.2 — response shape for {@code POST /match-engine/rounds/start}.
  *

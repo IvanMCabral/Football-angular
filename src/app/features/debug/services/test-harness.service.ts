@@ -9,6 +9,7 @@ import {
   MatchFixture,
   ReplayMatchRequest,
   RoundStateResponse,
+  ScenarioMatrixRow,
   SetFormationRequest,
   SetStyleRequest,
   SimulateRoundRequest,
@@ -151,6 +152,14 @@ export class TestHarnessService {
     const body: ReplayMatchRequest = { seed };
     return this.http.post<MatchFixture>(
       `${this.apiUrl}/match/${matchId}/replay`,
+      body
+    );
+  }
+
+  runScenarioMatrix(matchId: string, seed: number | null): Observable<ScenarioMatrixRow[]> {
+    const body: ReplayMatchRequest = { seed };
+    return this.http.post<ScenarioMatrixRow[]>(
+      `${this.apiUrl}/match/${matchId}/scenario-matrix`,
       body
     );
   }

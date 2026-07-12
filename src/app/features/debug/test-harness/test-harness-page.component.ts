@@ -32,6 +32,7 @@ import {
   FORMATION_CODES,
   FormationCode,
   MatchFixture,
+  ScenarioMatrixRow,
   TestHarnessMatchRow,
   TeamStyle,
 } from '../models/test-harness.model';
@@ -283,6 +284,14 @@ const DEFAULT_REPLAY_SEED = 12345;
               </button>
               <button
                 mat-stroked-button
+                (click)="onRunScenarioMatrix()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                aria-label="Run controlled live tactical scenarios for the selected match and seed"
+              >
+                Scenario matrix
+              </button>
+              <button
+                mat-stroked-button
                 (click)="onSimulateRound()"
                 [disabled]="mutationInFlight() || selectedRoundModel === null"
                 aria-label="Simulate selected round"
@@ -329,6 +338,47 @@ const DEFAULT_REPLAY_SEED = 12345;
                   <span role="cell">{{ row.homeGoals ?? '—' }}-{{ row.awayGoals ?? '—' }}</span>
                   <span role="cell">{{ fmtPct(row.homePossession) }} / {{ fmtPct(row.awayPossession) }}</span>
                   <span role="cell">{{ row.homeShots ?? '-' }} / {{ row.awayShots ?? '-' }}</span>
+                  <span role="cell">{{ fmtXg(row.homeXg) }} / {{ fmtXg(row.awayXg) }}</span>
+                  <span role="cell">
+                    {{ row.homeCentralShots }}/{{ row.homeWideShots }}/{{ row.homeLongShots }}
+                    /
+                    {{ row.awayCentralShots }}/{{ row.awayWideShots }}/{{ row.awayLongShots }}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div *ngIf="scenarioMatrixResults().length > 0" class="formation-matrix">
+              <div class="matrix-header">
+                <strong>Scenario matrix</strong>
+                <span>Same match + seed {{ seedInputModel ?? 'auto' }} · live tactical changes</span>
+                <button type="button" class="matrix-export" (click)="copyScenarioMatrixJson()">
+                  Copy JSON
+                </button>
+              </div>
+              <div class="matrix-table" role="table" aria-label="Live tactical scenario comparison">
+                <div class="matrix-row matrix-row-head" role="row">
+                  <span role="columnheader">Scenario</span>
+                  <span role="columnheader">Score</span>
+                  <span role="columnheader">Poss.</span>
+                  <span role="columnheader">Shots</span>
+                  <span role="columnheader">xG</span>
+                  <span role="columnheader">Zones C/W/L</span>
+                </div>
+                <div
+                  *ngFor="let row of scenarioMatrixResults(); trackBy: trackByScenarioMatrix"
+                  class="matrix-row"
+                  role="row"
+                >
+                  <span role="cell" [title]="row.description">
+                    {{ row.scenario }}
+                    <small *ngIf="row.changeMinute !== null">
+                      m{{ row.changeMinute }} → {{ styleShort(row.changedStyle) }}
+                    </small>
+                  </span>
+                  <span role="cell">{{ row.homeGoals }}-{{ row.awayGoals }}</span>
+                  <span role="cell">{{ fmtPct(row.homePossession) }} / {{ fmtPct(row.awayPossession) }}</span>
+                  <span role="cell">{{ row.homeShots }} / {{ row.awayShots }}</span>
                   <span role="cell">{{ fmtXg(row.homeXg) }} / {{ fmtXg(row.awayXg) }}</span>
                   <span role="cell">
                     {{ row.homeCentralShots }}/{{ row.homeWideShots }}/{{ row.homeLongShots }}
@@ -712,6 +762,9 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   /** Formation comparison results for selected match + seed. */
   readonly formationReplayResults = signal<FormationReplayResult[]>([]);
 
+  /** Controlled live tactical scenarios for selected match + seed. */
+  readonly scenarioMatrixResults = signal<ScenarioMatrixRow[]>([]);
+
   /** True if there is an active career. */
   readonly hasCareer = computed(() => this.careerId() !== null);
 
@@ -953,6 +1006,14 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const payload = JSON.stringify(this.formationReplayResults(), null, 2);
     navigator.clipboard?.writeText(payload).then(
       () => this.snackBar.open('Formation matrix JSON copied.', 'OK', { duration: 2500 }),
+      () => this.snackBar.open(payload, 'OK', { duration: 5000 })
+    );
+  }
+
+  copyScenarioMatrixJson(): void {
+    const payload = JSON.stringify(this.scenarioMatrixResults(), null, 2);
+    navigator.clipboard?.writeText(payload).then(
+      () => this.snackBar.open('Scenario matrix JSON copied.', 'OK', { duration: 2500 }),
       () => this.snackBar.open(payload, 'OK', { duration: 5000 })
     );
   }
@@ -1261,12 +1322,23 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return row.formation;
   }
 
+  trackByScenarioMatrix(_index: number, row: ScenarioMatrixRow): string {
+    return row.scenario;
+  }
+
   selectedStyleLabel(): string {
     return this.teamStyleOptions.find((o) => o.value === this.selectedStyleModel)?.label ?? this.selectedStyleModel;
   }
 
   selectedStyleHint(): string {
     return this.teamStyleOptions.find((o) => o.value === this.selectedStyleModel)?.hint ?? '';
+  }
+
+  styleShort(style: TeamStyle | null): string {
+    if (!style) {
+      return '-';
+    }
+    return this.teamStyleOptions.find((o) => o.value === style)?.label ?? style;
   }
 
   fmtPct(value: number | null): string {
@@ -1382,6 +1454,46 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         this.loadMatches();
         this.refreshDetailAfterMutation();
         this.refreshDetailAfterMutation(1200);
+      },
+    });
+  }
+
+  onRunScenarioMatrix(): void {
+    const matchId = this.selectedMatchId();
+    if (!matchId) {
+      this.snackBar.open('Select a match in Panel C first.', 'OK', {
+        duration: 3000,
+      });
+      return;
+    }
+    if (!this.selectedMatchIncludesUserTeam()) {
+      this.snackBar.open(
+        `Pick a match involving ${this.userTeamName() || 'your team'} before running the scenario matrix.`,
+        'OK',
+        { duration: 5000 }
+      );
+      return;
+    }
+
+    this.scenarioMatrixResults.set([]);
+    this.mutationInFlight.set(true);
+    this.harness.runScenarioMatrix(matchId, this.seedInputModel).subscribe({
+      next: (rows) => {
+        this.scenarioMatrixResults.set(rows ?? []);
+        this.mutationInFlight.set(false);
+        this.snackBar.open(
+          `Scenario matrix completed (${rows?.length ?? 0} scenarios).`,
+          'OK',
+          { duration: 3000 }
+        );
+      },
+      error: (err) => {
+        this.mutationInFlight.set(false);
+        this.snackBar.open(
+          this.fmtError(err, 'Failed to run scenario matrix'),
+          'OK',
+          { duration: 5000 }
+        );
       },
     });
   }
