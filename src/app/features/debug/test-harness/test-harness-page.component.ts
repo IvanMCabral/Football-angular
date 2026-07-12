@@ -33,6 +33,7 @@ import {
   FormationCode,
   MatchFixture,
   TestHarnessMatchRow,
+  TeamStyle,
 } from '../models/test-harness.model';
 import { TestHarnessService } from '../services/test-harness.service';
 
@@ -58,6 +59,12 @@ interface FormationReplayResult {
   awayCentralShots: number;
   awayWideShots: number;
   awayLongShots: number;
+}
+
+interface TeamStyleOption {
+  value: TeamStyle;
+  label: string;
+  hint: string;
 }
 
 const TIMELINE_DEBOUNCE_MS = 150;
@@ -230,6 +237,19 @@ const DEFAULT_REPLAY_SEED = 12345;
               />
             </mat-form-field>
 
+            <mat-form-field appearance="outline" class="style-field">
+              <mat-label>Focus</mat-label>
+              <mat-select
+                [(ngModel)]="selectedStyleModel"
+                aria-label="Select tactical focus for replay"
+              >
+                <mat-option *ngFor="let option of teamStyleOptions" [value]="option.value">
+                  {{ option.label }}
+                </mat-option>
+              </mat-select>
+              <mat-hint>{{ selectedStyleHint() }}</mat-hint>
+            </mat-form-field>
+
             <mat-form-field appearance="outline" class="round-field">
               <mat-label>Round</mat-label>
               <mat-select
@@ -283,7 +303,7 @@ const DEFAULT_REPLAY_SEED = 12345;
             <div *ngIf="formationReplayResults().length > 0" class="formation-matrix">
               <div class="matrix-header">
                 <strong>Formation matrix</strong>
-                <span>Same match + seed {{ seedInputModel ?? 'auto' }}</span>
+                <span>Same match + seed {{ seedInputModel ?? 'auto' }} + {{ selectedStyleLabel() }}</span>
                 <button type="button" class="matrix-export" (click)="copyFormationMatrixJson()">
                   Copy JSON
                 </button>
@@ -630,6 +650,16 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   /** Allowed formation codes (UI select options). */
   readonly formationCodes: readonly FormationCode[] = FORMATION_CODES;
 
+  readonly teamStyleOptions: readonly TeamStyleOption[] = [
+    { value: 'BALANCED', label: 'Balanceado', hint: 'Sin sesgo de canal.' },
+    { value: 'WIDE_PLAY', label: 'Bandas', hint: 'Busca más ataques y remates por los costados.' },
+    { value: 'CENTRAL_PLAY', label: 'Centro', hint: 'Concentra juego interior y remates centrales.' },
+    { value: 'ATTACKING', label: 'Ofensivo', hint: 'Sube volumen general de chances.' },
+    { value: 'DEFENSIVE', label: 'Defensivo', hint: 'Baja ritmo y prioriza protección.' },
+    { value: 'COUNTER', label: 'Contra', hint: 'Menos posesión, más transición.' },
+    { value: 'POSSESSION', label: 'Posesión', hint: 'Más posesión y elaboración.' },
+  ];
+
   /** Constants exposed to the template. */
   readonly TIMELINE_MAX_MINUTE = TIMELINE_MAX_MINUTE;
   readonly TIMELINE_STEP = TIMELINE_STEP;
@@ -645,6 +675,8 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
 
   /** Selected formation (two-way bound to mat-select via ngModel). */
   selectedFormationModel: FormationCode | null = '4-3-3';
+
+  selectedStyleModel: TeamStyle = 'BALANCED';
 
   /** V24D24.2: seed for the "Replay with seed" button (null = non-reproducible). */
   seedInputModel: number | null = DEFAULT_REPLAY_SEED;
@@ -1112,7 +1144,9 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       return;
     }
     this.mutationInFlight.set(true);
-    this.harness.replayMatch(matchId, this.seedInputModel).subscribe({
+    this.harness.setStyle(this.selectedStyleModel).pipe(
+      switchMap(() => this.harness.replayMatch(matchId, this.seedInputModel))
+    ).subscribe({
       next: (fixture) => {
         this.mutationInFlight.set(false);
         const seedDesc =
@@ -1124,7 +1158,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
             ? ` → ${fixture.result.homeGoals}-${fixture.result.awayGoals}`
             : '';
         this.snackBar.open(
-          `Match replayed (${seedDesc})${score}.`,
+          `Match replayed (${seedDesc}, ${this.selectedStyleLabel()})${score}.`,
           'OK',
           { duration: 3000 }
         );
@@ -1227,6 +1261,14 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return row.formation;
   }
 
+  selectedStyleLabel(): string {
+    return this.teamStyleOptions.find((o) => o.value === this.selectedStyleModel)?.label ?? this.selectedStyleModel;
+  }
+
+  selectedStyleHint(): string {
+    return this.teamStyleOptions.find((o) => o.value === this.selectedStyleModel)?.hint ?? '';
+  }
+
   fmtPct(value: number | null): string {
     if (value === null || value === undefined || !Number.isFinite(value)) {
       return '—';
@@ -1283,7 +1325,8 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           );
         }
 
-        return from(this.formationCodes).pipe(
+        return this.harness.setStyle(this.selectedStyleModel).pipe(
+          switchMap(() => from(this.formationCodes)),
       concatMap((formation) =>
         this.harness.manualSelectLineup(formation, originalPlayerIds).pipe(
           switchMap(() => this.harness.replayMatch(matchId, seed)),

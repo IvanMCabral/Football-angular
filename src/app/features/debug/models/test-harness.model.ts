@@ -36,6 +36,20 @@ export interface SetFormationRequest {
   formation: string;
 }
 
+export type TeamStyle =
+  | 'BALANCED'
+  | 'ATTACKING'
+  | 'DEFENSIVE'
+  | 'COUNTER'
+  | 'POSSESSION'
+  | 'WIDE_PLAY'
+  | 'CENTRAL_PLAY';
+
+/** Body for POST /api/v1/test-harness/career/set-style. */
+export interface SetStyleRequest {
+  style: TeamStyle;
+}
+
 /** Body item for POST /api/v1/test-harness/career/replace-fixtures. */
 export interface CustomFixture {
   homeTeamId: string;
@@ -56,6 +70,8 @@ export interface TestHarnessMutationResponse {
   teamsPerDivision?: number;
   // Present on /set-formation
   formation?: string;
+  // Present on /set-style
+  style?: TeamStyle;
   // Present on /replace-fixtures
   fixtureCount?: number;
   maxRound?: number;

@@ -10,8 +10,10 @@ import {
   ReplayMatchRequest,
   RoundStateResponse,
   SetFormationRequest,
+  SetStyleRequest,
   SimulateRoundRequest,
   TestHarnessMutationResponse,
+  TeamStyle,
 } from '../models/test-harness.model';
 
 /**
@@ -52,6 +54,14 @@ export class TestHarnessService {
     const body: SetFormationRequest = { formation };
     return this.http.post<TestHarnessMutationResponse>(
       `${this.apiUrl}/set-formation`,
+      body
+    );
+  }
+
+  setStyle(style: TeamStyle): Observable<TestHarnessMutationResponse> {
+    const body: SetStyleRequest = { style };
+    return this.http.post<TestHarnessMutationResponse>(
+      `${this.apiUrl}/set-style`,
       body
     );
   }
