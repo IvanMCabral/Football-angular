@@ -324,10 +324,15 @@ const DEFAULT_REPLAY_SEED = 12345;
                 <div class="matrix-row matrix-row-head" role="row">
                   <span role="columnheader">Form.</span>
                   <span role="columnheader">Score</span>
+                  <span role="columnheader">Δ Score</span>
                   <span role="columnheader">Poss.</span>
+                  <span role="columnheader">Δ Poss.</span>
                   <span role="columnheader">Shots</span>
+                  <span role="columnheader">Δ Shots</span>
                   <span role="columnheader">xG</span>
+                  <span role="columnheader">Δ xG</span>
                   <span role="columnheader">Zones C/W/L</span>
+                  <span role="columnheader">Δ Zones</span>
                 </div>
                 <div
                   *ngFor="let row of formationReplayResults(); trackBy: trackByFormationReplay"
@@ -476,13 +481,30 @@ const DEFAULT_REPLAY_SEED = 12345;
                   <span role="cell">{{ row.changeMinute ?? 'Base' }}</span>
                   <span role="cell" [title]="row.actionDetail">{{ actionLabel(row) }}</span>
                   <span role="cell">{{ row.homeGoals }}-{{ row.awayGoals }}</span>
+                  <span role="cell" [class]="deltaClass(scenarioGoalDiff(row))">
+                    {{ fmtDeltaInt(scenarioGoalDiff(row)) }}
+                  </span>
                   <span role="cell">{{ fmtPct(row.homePossession) }} / {{ fmtPct(row.awayPossession) }}</span>
+                  <span role="cell" [class]="deltaClass(scenarioPossessionDiff(row))">
+                    {{ fmtDeltaInt(scenarioPossessionDiff(row)) }}pp
+                  </span>
                   <span role="cell">{{ row.homeShots }} / {{ row.awayShots }}</span>
+                  <span role="cell" [class]="deltaClass(scenarioShotDiff(row))">
+                    {{ fmtDeltaInt(scenarioShotDiff(row)) }}
+                  </span>
                   <span role="cell">{{ fmtXg(row.homeXg) }} / {{ fmtXg(row.awayXg) }}</span>
+                  <span role="cell" [class]="deltaClass(scenarioXgDiff(row))">
+                    {{ fmtDeltaNumber(scenarioXgDiff(row)) }}
+                  </span>
                   <span role="cell">
                     {{ row.homeCentralShots }}/{{ row.homeWideShots }}/{{ row.homeLongShots }}
                     /
                     {{ row.awayCentralShots }}/{{ row.awayWideShots }}/{{ row.awayLongShots }}
+                  </span>
+                  <span role="cell" [class]="deltaClass(scenarioZoneDiff(row).central + scenarioZoneDiff(row).wide + scenarioZoneDiff(row).long)">
+                    C {{ fmtDeltaInt(scenarioZoneDiff(row).central) }}
+                    · W {{ fmtDeltaInt(scenarioZoneDiff(row).wide) }}
+                    · L {{ fmtDeltaInt(scenarioZoneDiff(row).long) }}
                   </span>
                 </div>
               </div>
@@ -726,16 +748,33 @@ const DEFAULT_REPLAY_SEED = 12345;
       grid-template-columns: 90px 80px 120px 100px 100px minmax(220px, 1fr);
     }
     .scenario-matrix-table {
-      min-width: 1080px;
+      min-width: 1460px;
     }
     .scenario-matrix-row {
-      grid-template-columns: 190px 72px minmax(260px, 1.5fr) 78px 120px 100px 110px minmax(220px, 1fr);
+      grid-template-columns:
+        190px 72px minmax(240px, 1.5fr)
+        78px 78px
+        120px 78px
+        100px 78px
+        110px 78px
+        minmax(220px, 1fr) 170px;
     }
     .matrix-row > span {
       min-width: 0;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+    .delta-positive {
+      color: #087f23;
+      font-weight: 700;
+    }
+    .delta-negative {
+      color: #b71c1c;
+      font-weight: 700;
+    }
+    .delta-neutral {
+      color: var(--text-muted, #777);
     }
     .matrix-row-head {
       font-weight: 700;
@@ -1478,6 +1517,71 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       return row.actionDetail || 'Substitution';
     }
     return 'Base';
+  }
+
+  scenarioGoalDiff(row: ScenarioMatrixRow): number {
+    const baseline = this.scenarioBaseline();
+    if (!baseline || row === baseline) return 0;
+    return this.goalDifference(row) - this.goalDifference(baseline);
+  }
+
+  scenarioPossessionDiff(row: ScenarioMatrixRow): number {
+    const baseline = this.scenarioBaseline();
+    if (!baseline || row === baseline) return 0;
+    return row.homePossession - baseline.homePossession;
+  }
+
+  scenarioShotDiff(row: ScenarioMatrixRow): number {
+    const baseline = this.scenarioBaseline();
+    if (!baseline || row === baseline) return 0;
+    return row.homeShots - baseline.homeShots;
+  }
+
+  scenarioXgDiff(row: ScenarioMatrixRow): number {
+    const baseline = this.scenarioBaseline();
+    if (!baseline || row === baseline) return 0;
+    return row.homeXg - baseline.homeXg;
+  }
+
+  scenarioZoneDiff(row: ScenarioMatrixRow): { central: number; wide: number; long: number } {
+    const baseline = this.scenarioBaseline();
+    if (!baseline || row === baseline) {
+      return { central: 0, wide: 0, long: 0 };
+    }
+    return {
+      central: row.homeCentralShots - baseline.homeCentralShots,
+      wide: row.homeWideShots - baseline.homeWideShots,
+      long: row.homeLongShots - baseline.homeLongShots,
+    };
+  }
+
+  fmtDeltaInt(value: number): string {
+    if (!Number.isFinite(value) || value === 0) {
+      return '±0';
+    }
+    return value > 0 ? `+${Math.round(value)}` : `${Math.round(value)}`;
+  }
+
+  fmtDeltaNumber(value: number): string {
+    if (!Number.isFinite(value) || Math.abs(value) < 0.005) {
+      return '±0.00';
+    }
+    return value > 0 ? `+${value.toFixed(2)}` : value.toFixed(2);
+  }
+
+  deltaClass(value: number): string {
+    if (!Number.isFinite(value) || Math.abs(value) < 0.005) {
+      return 'delta-neutral';
+    }
+    return value > 0 ? 'delta-positive' : 'delta-negative';
+  }
+
+  private scenarioBaseline(): ScenarioMatrixRow | null {
+    return this.scenarioMatrixResults()[0] ?? null;
+  }
+
+  private goalDifference(row: ScenarioMatrixRow): number {
+    return row.homeGoals - row.awayGoals;
   }
 
   fmtPct(value: number | null): string {
