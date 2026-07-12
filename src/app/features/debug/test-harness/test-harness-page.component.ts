@@ -324,7 +324,7 @@ const DEFAULT_REPLAY_SEED = 12345;
                 <div class="matrix-row matrix-row-head" role="row">
                   <span role="columnheader">Form.</span>
                   <span role="columnheader">Score</span>
-                  <span role="columnheader">Δ Score</span>
+                  <span role="columnheader">Delta Score</span>
                   <span role="columnheader">Poss.</span>
                   <span role="columnheader">Δ Poss.</span>
                   <span role="columnheader">Shots</span>
@@ -365,11 +365,16 @@ const DEFAULT_REPLAY_SEED = 12345;
                 <div class="matrix-row matrix-row-head" role="row">
                   <span role="columnheader">Scenario</span>
                   <span role="columnheader">Action</span>
-                  <span role="columnheader">Score</span>
-                  <span role="columnheader">Poss.</span>
-                  <span role="columnheader">Shots</span>
-                  <span role="columnheader">xG</span>
-                  <span role="columnheader">Zones C/W/L</span>
+                  <span role="columnheader">Score For/Ag.</span>
+                  <span role="columnheader">Δ Score</span>
+                  <span role="columnheader">Poss For/Ag.</span>
+                  <span role="columnheader">Delta Poss</span>
+                  <span role="columnheader">Shots For/Ag.</span>
+                  <span role="columnheader">Delta Shots</span>
+                  <span role="columnheader">xG For/Ag.</span>
+                  <span role="columnheader">Delta xG</span>
+                  <span role="columnheader">Zones For C/W/L</span>
+                  <span role="columnheader">Delta Zones</span>
                 </div>
                 <div
                   *ngFor="let row of scenarioMatrixResults(); trackBy: trackByScenarioMatrix"
@@ -385,14 +390,12 @@ const DEFAULT_REPLAY_SEED = 12345;
                   <span role="cell" [title]="row.actionDetail">
                     {{ actionLabel(row) }}
                   </span>
-                  <span role="cell">{{ row.homeGoals }}-{{ row.awayGoals }}</span>
-                  <span role="cell">{{ fmtPct(row.homePossession) }} / {{ fmtPct(row.awayPossession) }}</span>
-                  <span role="cell">{{ row.homeShots }} / {{ row.awayShots }}</span>
-                  <span role="cell">{{ fmtXg(row.homeXg) }} / {{ fmtXg(row.awayXg) }}</span>
+                  <span role="cell">{{ scenarioGoalsFor(row) }}-{{ scenarioGoalsAgainst(row) }}</span>
+                  <span role="cell">{{ fmtPct(scenarioPossessionFor(row)) }} / {{ fmtPct(scenarioPossessionAgainst(row)) }}</span>
+                  <span role="cell">{{ scenarioShotsFor(row) }} / {{ scenarioShotsAgainst(row) }}</span>
+                  <span role="cell">{{ fmtXg(scenarioXgFor(row)) }} / {{ fmtXg(scenarioXgAgainst(row)) }}</span>
                   <span role="cell">
-                    {{ row.homeCentralShots }}/{{ row.homeWideShots }}/{{ row.homeLongShots }}
-                    /
-                    {{ row.awayCentralShots }}/{{ row.awayWideShots }}/{{ row.awayLongShots }}
+                    {{ scenarioZonesFor(row).central }}/{{ scenarioZonesFor(row).wide }}/{{ scenarioZonesFor(row).long }}
                   </span>
                 </div>
               </div>
@@ -426,11 +429,16 @@ const DEFAULT_REPLAY_SEED = 12345;
               <div class="matrix-table formation-matrix-table" role="table" aria-label="Formation replay comparison">
                 <div class="matrix-row formation-matrix-row matrix-row-head" role="row">
                   <span role="columnheader">Form.</span>
-                  <span role="columnheader">Score</span>
-                  <span role="columnheader">Poss.</span>
-                  <span role="columnheader">Shots</span>
-                  <span role="columnheader">xG</span>
-                  <span role="columnheader">Zones C/W/L</span>
+                  <span role="columnheader">Score For/Ag.</span>
+                  <span role="columnheader">Δ Score</span>
+                  <span role="columnheader">Poss For/Ag.</span>
+                  <span role="columnheader">Δ Poss</span>
+                  <span role="columnheader">Shots For/Ag.</span>
+                  <span role="columnheader">Δ Shots</span>
+                  <span role="columnheader">xG For/Ag.</span>
+                  <span role="columnheader">Δ xG</span>
+                  <span role="columnheader">Zones For C/W/L</span>
+                  <span role="columnheader">Δ Zones</span>
                 </div>
                 <div
                   *ngFor="let row of formationReplayResults(); trackBy: trackByFormationReplay"
@@ -466,11 +474,16 @@ const DEFAULT_REPLAY_SEED = 12345;
                   <span role="columnheader">Scenario</span>
                   <span role="columnheader">Minute</span>
                   <span role="columnheader">Action</span>
-                  <span role="columnheader">Score</span>
-                  <span role="columnheader">Poss.</span>
-                  <span role="columnheader">Shots</span>
-                  <span role="columnheader">xG</span>
-                  <span role="columnheader">Zones C/W/L</span>
+                  <span role="columnheader">Score For/Ag.</span>
+                  <span role="columnheader">Δ Score</span>
+                  <span role="columnheader">Poss For/Ag.</span>
+                  <span role="columnheader">Δ Poss</span>
+                  <span role="columnheader">Shots For/Ag.</span>
+                  <span role="columnheader">Δ Shots</span>
+                  <span role="columnheader">xG For/Ag.</span>
+                  <span role="columnheader">Δ xG</span>
+                  <span role="columnheader">Zones For C/W/L</span>
+                  <span role="columnheader">Δ Zones</span>
                 </div>
                 <div
                   *ngFor="let row of scenarioMatrixResults(); trackBy: trackByScenarioMatrix"
@@ -480,26 +493,24 @@ const DEFAULT_REPLAY_SEED = 12345;
                   <span role="cell" [title]="row.description">{{ row.scenario }}</span>
                   <span role="cell">{{ row.changeMinute ?? 'Base' }}</span>
                   <span role="cell" [title]="row.actionDetail">{{ actionLabel(row) }}</span>
-                  <span role="cell">{{ row.homeGoals }}-{{ row.awayGoals }}</span>
+                  <span role="cell">{{ scenarioGoalsFor(row) }}-{{ scenarioGoalsAgainst(row) }}</span>
                   <span role="cell" [class]="deltaClass(scenarioGoalDiff(row))">
                     {{ fmtDeltaInt(scenarioGoalDiff(row)) }}
                   </span>
-                  <span role="cell">{{ fmtPct(row.homePossession) }} / {{ fmtPct(row.awayPossession) }}</span>
+                  <span role="cell">{{ fmtPct(scenarioPossessionFor(row)) }} / {{ fmtPct(scenarioPossessionAgainst(row)) }}</span>
                   <span role="cell" [class]="deltaClass(scenarioPossessionDiff(row))">
                     {{ fmtDeltaInt(scenarioPossessionDiff(row)) }}pp
                   </span>
-                  <span role="cell">{{ row.homeShots }} / {{ row.awayShots }}</span>
+                  <span role="cell">{{ scenarioShotsFor(row) }} / {{ scenarioShotsAgainst(row) }}</span>
                   <span role="cell" [class]="deltaClass(scenarioShotDiff(row))">
                     {{ fmtDeltaInt(scenarioShotDiff(row)) }}
                   </span>
-                  <span role="cell">{{ fmtXg(row.homeXg) }} / {{ fmtXg(row.awayXg) }}</span>
+                  <span role="cell">{{ fmtXg(scenarioXgFor(row)) }} / {{ fmtXg(scenarioXgAgainst(row)) }}</span>
                   <span role="cell" [class]="deltaClass(scenarioXgDiff(row))">
                     {{ fmtDeltaNumber(scenarioXgDiff(row)) }}
                   </span>
                   <span role="cell">
-                    {{ row.homeCentralShots }}/{{ row.homeWideShots }}/{{ row.homeLongShots }}
-                    /
-                    {{ row.awayCentralShots }}/{{ row.awayWideShots }}/{{ row.awayLongShots }}
+                    {{ scenarioZonesFor(row).central }}/{{ scenarioZonesFor(row).wide }}/{{ scenarioZonesFor(row).long }}
                   </span>
                   <span role="cell" [class]="deltaClass(scenarioZoneDiff(row).central + scenarioZoneDiff(row).wide + scenarioZoneDiff(row).long)">
                     C {{ fmtDeltaInt(scenarioZoneDiff(row).central) }}
@@ -1528,19 +1539,19 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   scenarioPossessionDiff(row: ScenarioMatrixRow): number {
     const baseline = this.scenarioBaseline();
     if (!baseline || row === baseline) return 0;
-    return row.homePossession - baseline.homePossession;
+    return this.scenarioPossessionFor(row) - this.scenarioPossessionFor(baseline);
   }
 
   scenarioShotDiff(row: ScenarioMatrixRow): number {
     const baseline = this.scenarioBaseline();
     if (!baseline || row === baseline) return 0;
-    return row.homeShots - baseline.homeShots;
+    return this.scenarioShotsFor(row) - this.scenarioShotsFor(baseline);
   }
 
   scenarioXgDiff(row: ScenarioMatrixRow): number {
     const baseline = this.scenarioBaseline();
     if (!baseline || row === baseline) return 0;
-    return row.homeXg - baseline.homeXg;
+    return this.scenarioXgFor(row) - this.scenarioXgFor(baseline);
   }
 
   scenarioZoneDiff(row: ScenarioMatrixRow): { central: number; wide: number; long: number } {
@@ -1548,11 +1559,59 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     if (!baseline || row === baseline) {
       return { central: 0, wide: 0, long: 0 };
     }
+    const rowZones = this.scenarioZonesFor(row);
+    const baselineZones = this.scenarioZonesFor(baseline);
     return {
-      central: row.homeCentralShots - baseline.homeCentralShots,
-      wide: row.homeWideShots - baseline.homeWideShots,
-      long: row.homeLongShots - baseline.homeLongShots,
+      central: rowZones.central - baselineZones.central,
+      wide: rowZones.wide - baselineZones.wide,
+      long: rowZones.long - baselineZones.long,
     };
+  }
+
+  scenarioGoalsFor(row: ScenarioMatrixRow): number {
+    return this.selectedUserTeamIsHome() ? row.homeGoals : row.awayGoals;
+  }
+
+  scenarioGoalsAgainst(row: ScenarioMatrixRow): number {
+    return this.selectedUserTeamIsHome() ? row.awayGoals : row.homeGoals;
+  }
+
+  scenarioPossessionFor(row: ScenarioMatrixRow): number {
+    return this.selectedUserTeamIsHome() ? row.homePossession : row.awayPossession;
+  }
+
+  scenarioPossessionAgainst(row: ScenarioMatrixRow): number {
+    return this.selectedUserTeamIsHome() ? row.awayPossession : row.homePossession;
+  }
+
+  scenarioShotsFor(row: ScenarioMatrixRow): number {
+    return this.selectedUserTeamIsHome() ? row.homeShots : row.awayShots;
+  }
+
+  scenarioShotsAgainst(row: ScenarioMatrixRow): number {
+    return this.selectedUserTeamIsHome() ? row.awayShots : row.homeShots;
+  }
+
+  scenarioXgFor(row: ScenarioMatrixRow): number {
+    return this.selectedUserTeamIsHome() ? row.homeXg : row.awayXg;
+  }
+
+  scenarioXgAgainst(row: ScenarioMatrixRow): number {
+    return this.selectedUserTeamIsHome() ? row.awayXg : row.homeXg;
+  }
+
+  scenarioZonesFor(row: ScenarioMatrixRow): { central: number; wide: number; long: number } {
+    if (this.selectedUserTeamIsHome()) {
+      return { central: row.homeCentralShots, wide: row.homeWideShots, long: row.homeLongShots };
+    }
+    return { central: row.awayCentralShots, wide: row.awayWideShots, long: row.awayLongShots };
+  }
+
+  scenarioZonesAgainst(row: ScenarioMatrixRow): { central: number; wide: number; long: number } {
+    if (this.selectedUserTeamIsHome()) {
+      return { central: row.awayCentralShots, wide: row.awayWideShots, long: row.awayLongShots };
+    }
+    return { central: row.homeCentralShots, wide: row.homeWideShots, long: row.homeLongShots };
   }
 
   fmtDeltaInt(value: number): string {
@@ -1581,7 +1640,13 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   }
 
   private goalDifference(row: ScenarioMatrixRow): number {
-    return row.homeGoals - row.awayGoals;
+    return this.scenarioGoalsFor(row) - this.scenarioGoalsAgainst(row);
+  }
+
+  private selectedUserTeamIsHome(): boolean {
+    const match = this.selectedMatch();
+    const userTeam = this.userTeamName();
+    return !!match && !!userTeam && match.homeTeamName === userTeam;
   }
 
   fmtPct(value: number | null): string {
