@@ -395,6 +395,101 @@ const DEFAULT_REPLAY_SEED = 12345;
           </div>
         </section>
 
+        <!-- Panel E: replay analysis matrices (full width) -->
+        <section
+          *ngIf="formationReplayResults().length > 0 || scenarioMatrixResults().length > 0"
+          class="panel panel-e"
+          aria-labelledby="panel-e-heading"
+        >
+          <h2 id="panel-e-heading" class="panel-title">Panel E · Replay Analysis</h2>
+          <p class="panel-hint">
+            Compare the same match and seed across formations, live tactical changes and substitutions.
+          </p>
+
+          <div *ngIf="formationReplayResults().length > 0" class="formation-matrix analysis-matrix">
+            <div class="matrix-header">
+              <strong>Formation matrix</strong>
+              <span>Same match + seed {{ seedInputModel ?? 'auto' }} + {{ selectedStyleLabel() }}</span>
+              <button type="button" class="matrix-export" (click)="copyFormationMatrixJson()">
+                Copy JSON
+              </button>
+              <button type="button" class="matrix-export" (click)="downloadFormationMatrixCsv()">
+                CSV
+              </button>
+            </div>
+            <div class="matrix-scroll">
+              <div class="matrix-table formation-matrix-table" role="table" aria-label="Formation replay comparison">
+                <div class="matrix-row formation-matrix-row matrix-row-head" role="row">
+                  <span role="columnheader">Form.</span>
+                  <span role="columnheader">Score</span>
+                  <span role="columnheader">Poss.</span>
+                  <span role="columnheader">Shots</span>
+                  <span role="columnheader">xG</span>
+                  <span role="columnheader">Zones C/W/L</span>
+                </div>
+                <div
+                  *ngFor="let row of formationReplayResults(); trackBy: trackByFormationReplay"
+                  class="matrix-row formation-matrix-row"
+                  role="row"
+                >
+                  <span role="cell">{{ row.formation }}</span>
+                  <span role="cell">{{ row.homeGoals ?? '—' }}-{{ row.awayGoals ?? '—' }}</span>
+                  <span role="cell">{{ fmtPct(row.homePossession) }} / {{ fmtPct(row.awayPossession) }}</span>
+                  <span role="cell">{{ row.homeShots ?? '-' }} / {{ row.awayShots ?? '-' }}</span>
+                  <span role="cell">{{ fmtXg(row.homeXg) }} / {{ fmtXg(row.awayXg) }}</span>
+                  <span role="cell">
+                    {{ row.homeCentralShots }}/{{ row.homeWideShots }}/{{ row.homeLongShots }}
+                    /
+                    {{ row.awayCentralShots }}/{{ row.awayWideShots }}/{{ row.awayLongShots }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div *ngIf="scenarioMatrixResults().length > 0" class="formation-matrix analysis-matrix scenario-matrix">
+            <div class="matrix-header">
+              <strong>Scenario matrix</strong>
+              <span>Same match + seed {{ seedInputModel ?? 'auto' }} · live tactical changes</span>
+              <button type="button" class="matrix-export" (click)="copyScenarioMatrixJson()">
+                Copy JSON
+              </button>
+            </div>
+            <div class="matrix-scroll">
+              <div class="matrix-table scenario-matrix-table" role="table" aria-label="Live tactical scenario comparison">
+                <div class="matrix-row scenario-matrix-row matrix-row-head" role="row">
+                  <span role="columnheader">Scenario</span>
+                  <span role="columnheader">Minute</span>
+                  <span role="columnheader">Action</span>
+                  <span role="columnheader">Score</span>
+                  <span role="columnheader">Poss.</span>
+                  <span role="columnheader">Shots</span>
+                  <span role="columnheader">xG</span>
+                  <span role="columnheader">Zones C/W/L</span>
+                </div>
+                <div
+                  *ngFor="let row of scenarioMatrixResults(); trackBy: trackByScenarioMatrix"
+                  class="matrix-row scenario-matrix-row"
+                  role="row"
+                >
+                  <span role="cell" [title]="row.description">{{ row.scenario }}</span>
+                  <span role="cell">{{ row.changeMinute ?? 'Base' }}</span>
+                  <span role="cell" [title]="row.actionDetail">{{ actionLabel(row) }}</span>
+                  <span role="cell">{{ row.homeGoals }}-{{ row.awayGoals }}</span>
+                  <span role="cell">{{ fmtPct(row.homePossession) }} / {{ fmtPct(row.awayPossession) }}</span>
+                  <span role="cell">{{ row.homeShots }} / {{ row.awayShots }}</span>
+                  <span role="cell">{{ fmtXg(row.homeXg) }} / {{ fmtXg(row.awayXg) }}</span>
+                  <span role="cell">
+                    {{ row.homeCentralShots }}/{{ row.homeWideShots }}/{{ row.homeLongShots }}
+                    /
+                    {{ row.awayCentralShots }}/{{ row.awayWideShots }}/{{ row.awayLongShots }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <!-- Panel C: Match list (full width) -->
         <section class="panel panel-c" aria-labelledby="panel-c-heading">
           <h2 id="panel-c-heading" class="panel-title">Panel C · Matches</h2>
@@ -544,6 +639,7 @@ const DEFAULT_REPLAY_SEED = 12345;
       grid-template-columns: 1fr 1fr;
       grid-template-areas:
         "a b"
+        "e e"
         "c c"
         "d d";
       gap: 1rem;
@@ -551,12 +647,13 @@ const DEFAULT_REPLAY_SEED = 12345;
     @media (max-width: 767px) {
       .test-harness-grid {
         grid-template-columns: 1fr;
-        grid-template-areas: "a" "b" "c" "d";
+        grid-template-areas: "a" "b" "e" "c" "d";
       }
     }
     .panel { border: 1px solid var(--border-color, #e0e0e0); border-radius: 6px; padding: 1rem; background: var(--panel-bg, #fff); }
     .panel-a { grid-area: a; min-height: 320px; }
     .panel-b { grid-area: b; }
+    .panel-e { grid-area: e; }
     .panel-c { grid-area: c; }
     .panel-d { grid-area: d; }
     .panel-title { margin: 0 0 0.5rem; font-size: 1rem; }
@@ -586,6 +683,12 @@ const DEFAULT_REPLAY_SEED = 12345;
       overflow: hidden;
       background: #fafafa;
     }
+    .panel-b .formation-matrix {
+      display: none;
+    }
+    .panel-e .formation-matrix {
+      margin-top: 0.75rem;
+    }
     .matrix-header {
       display: flex;
       align-items: center;
@@ -606,7 +709,11 @@ const DEFAULT_REPLAY_SEED = 12345;
       padding: 0.18rem 0.55rem;
       cursor: pointer;
     }
-    .matrix-table { display: grid; font-size: 0.8rem; }
+    .matrix-scroll {
+      overflow-x: auto;
+      width: 100%;
+    }
+    .matrix-table { display: grid; font-size: 0.8rem; min-width: 760px; }
     .matrix-row {
       display: grid;
       grid-template-columns: 72px 62px 92px 78px 78px minmax(128px, 1fr);
@@ -614,6 +721,21 @@ const DEFAULT_REPLAY_SEED = 12345;
       padding: 0.4rem 0.75rem;
       border-top: 1px solid #eee;
       font-variant-numeric: tabular-nums;
+    }
+    .formation-matrix-row {
+      grid-template-columns: 90px 80px 120px 100px 100px minmax(220px, 1fr);
+    }
+    .scenario-matrix-table {
+      min-width: 1080px;
+    }
+    .scenario-matrix-row {
+      grid-template-columns: 190px 72px minmax(260px, 1.5fr) 78px 120px 100px 110px minmax(220px, 1fr);
+    }
+    .matrix-row > span {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .matrix-row-head {
       font-weight: 700;
