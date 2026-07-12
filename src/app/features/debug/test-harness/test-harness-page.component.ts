@@ -24,13 +24,14 @@ import { CareerService } from '../../../core/services/career.service';
 import { Fixture } from '../../../core/services/career.model';
 import { environment } from '../../../environments/environment';
 import { MatchDetailApiService } from '../../match-detail/services/match-detail-api.service';
-import { TimelineSnapshot } from '../../match-detail/models/match-detail.model';
+import { MatchDetail, MatchEvent, TimelineSnapshot } from '../../match-detail/models/match-detail.model';
 import { V24MatchDetailPageComponent } from '../../match-detail/pages/v24-match-detail-page.component';
 import { SquadEditorModalComponent } from '../../../components/squad-editor-modal/squad-editor-modal.component';
 import { SessionPlayer } from '../../../shared/models/player.model';
 import {
   FORMATION_CODES,
   FormationCode,
+  MatchFixture,
   TestHarnessMatchRow,
 } from '../models/test-harness.model';
 import { TestHarnessService } from '../services/test-harness.service';
@@ -49,6 +50,14 @@ interface FormationReplayResult {
   awayPossession: number | null;
   homeShots: number | null;
   awayShots: number | null;
+  homeXg: number | null;
+  awayXg: number | null;
+  homeCentralShots: number;
+  homeWideShots: number;
+  homeLongShots: number;
+  awayCentralShots: number;
+  awayWideShots: number;
+  awayLongShots: number;
 }
 
 const TIMELINE_DEBOUNCE_MS = 150;
@@ -275,6 +284,12 @@ const DEFAULT_REPLAY_SEED = 12345;
               <div class="matrix-header">
                 <strong>Formation matrix</strong>
                 <span>Same match + seed {{ seedInputModel ?? 'auto' }}</span>
+                <button type="button" class="matrix-export" (click)="copyFormationMatrixJson()">
+                  Copy JSON
+                </button>
+                <button type="button" class="matrix-export" (click)="downloadFormationMatrixCsv()">
+                  CSV
+                </button>
               </div>
               <div class="matrix-table" role="table" aria-label="Formation replay comparison">
                 <div class="matrix-row matrix-row-head" role="row">
@@ -282,6 +297,8 @@ const DEFAULT_REPLAY_SEED = 12345;
                   <span role="columnheader">Score</span>
                   <span role="columnheader">Poss.</span>
                   <span role="columnheader">Shots</span>
+                  <span role="columnheader">xG</span>
+                  <span role="columnheader">Zones C/W/L</span>
                 </div>
                 <div
                   *ngFor="let row of formationReplayResults(); trackBy: trackByFormationReplay"
@@ -292,6 +309,12 @@ const DEFAULT_REPLAY_SEED = 12345;
                   <span role="cell">{{ row.homeGoals ?? '—' }}-{{ row.awayGoals ?? '—' }}</span>
                   <span role="cell">{{ fmtPct(row.homePossession) }} / {{ fmtPct(row.awayPossession) }}</span>
                   <span role="cell">{{ row.homeShots ?? '-' }} / {{ row.awayShots ?? '-' }}</span>
+                  <span role="cell">{{ fmtXg(row.homeXg) }} / {{ fmtXg(row.awayXg) }}</span>
+                  <span role="cell">
+                    {{ row.homeCentralShots }}/{{ row.homeWideShots }}/{{ row.homeLongShots }}
+                    /
+                    {{ row.awayCentralShots }}/{{ row.awayWideShots }}/{{ row.awayLongShots }}
+                  </span>
                 </div>
               </div>
             </div>
@@ -491,17 +514,28 @@ const DEFAULT_REPLAY_SEED = 12345;
     }
     .matrix-header {
       display: flex;
-      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: flex-start;
       gap: 0.5rem;
       padding: 0.5rem 0.75rem;
       font-size: 0.8rem;
       color: var(--text-muted, #666);
       background: #f3f6f3;
     }
+    .matrix-export {
+      border: 1px solid #cfd8dc;
+      border-radius: 999px;
+      background: #fff;
+      color: #2e5f3e;
+      font-size: 0.72rem;
+      padding: 0.18rem 0.55rem;
+      cursor: pointer;
+    }
     .matrix-table { display: grid; font-size: 0.8rem; }
     .matrix-row {
       display: grid;
-      grid-template-columns: 76px 72px 1fr 1fr;
+      grid-template-columns: 72px 62px 92px 78px 78px minmax(128px, 1fr);
       gap: 0.5rem;
       padding: 0.4rem 0.75rem;
       border-top: 1px solid #eee;
@@ -876,6 +910,110 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     });
   }
 
+  fmtXg(value: number | null): string {
+    if (value === null || value === undefined || !Number.isFinite(value)) {
+      return 'â€”';
+    }
+    return value.toFixed(2);
+  }
+
+  copyFormationMatrixJson(): void {
+    const payload = JSON.stringify(this.formationReplayResults(), null, 2);
+    navigator.clipboard?.writeText(payload).then(
+      () => this.snackBar.open('Formation matrix JSON copied.', 'OK', { duration: 2500 }),
+      () => this.snackBar.open(payload, 'OK', { duration: 5000 })
+    );
+  }
+
+  downloadFormationMatrixCsv(): void {
+    const rows = this.formationReplayResults();
+    const header = [
+      'formation', 'homeGoals', 'awayGoals', 'homePossession', 'awayPossession',
+      'homeShots', 'awayShots', 'homeXg', 'awayXg',
+      'homeCentralShots', 'homeWideShots', 'homeLongShots',
+      'awayCentralShots', 'awayWideShots', 'awayLongShots',
+    ];
+    const lines = [
+      header.join(','),
+      ...rows.map((r) => header.map((key) => this.csvCell((r as unknown as Record<string, unknown>)[key])).join(',')),
+    ];
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `formation-matrix-${this.seedInputModel ?? 'auto'}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  private csvCell(value: unknown): string {
+    if (value === null || value === undefined) return '';
+    const text = String(value);
+    return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+  }
+
+  private buildFormationReplayResult(
+    formation: FormationCode,
+    fixture: MatchFixture,
+    detail: MatchDetail | null
+  ): FormationReplayResult {
+    const zoneSummary = this.summarizeShotZones(detail);
+    return {
+      formation,
+      homeGoals: fixture?.result?.homeGoals ?? null,
+      awayGoals: fixture?.result?.awayGoals ?? null,
+      homePossession: fixture?.result?.homePossession ?? null,
+      awayPossession: fixture?.result?.awayPossession ?? null,
+      homeShots: fixture?.result?.homeShots ?? null,
+      awayShots: fixture?.result?.awayShots ?? null,
+      homeXg: detail?.homeXg ?? null,
+      awayXg: detail?.awayXg ?? null,
+      homeCentralShots: zoneSummary.home.central,
+      homeWideShots: zoneSummary.home.wide,
+      homeLongShots: zoneSummary.home.long,
+      awayCentralShots: zoneSummary.away.central,
+      awayWideShots: zoneSummary.away.wide,
+      awayLongShots: zoneSummary.away.long,
+    };
+  }
+
+  private summarizeShotZones(detail: MatchDetail | null): {
+    home: { central: number; wide: number; long: number };
+    away: { central: number; wide: number; long: number };
+  } {
+    const summary = {
+      home: { central: 0, wide: 0, long: 0 },
+      away: { central: 0, wide: 0, long: 0 },
+    };
+    if (!detail) return summary;
+    for (const event of detail.timeline ?? []) {
+      if (!this.isShotLikeEvent(event)) continue;
+      const bucket = event.teamId === detail.homeTeamId ? summary.home : summary.away;
+      const location = event.shotCoordinate?.location;
+      if (location === 'PENALTY_AREA_WIDE') {
+        bucket.wide++;
+      } else if (location === 'OUTSIDE_BOX' || location === 'LONG_RANGE') {
+        bucket.long++;
+      } else {
+        bucket.central++;
+      }
+    }
+    return summary;
+  }
+
+  private isShotLikeEvent(event: MatchEvent): boolean {
+    return (
+        event.type === 'SHOT'
+        || event.type === 'SHOT_ON_TARGET'
+        || event.type === 'MISS'
+        || event.type === 'BLOCK'
+        || event.type === 'GOAL'
+      )
+      && event.xg !== null
+      && event.xg !== undefined
+      && event.xg > 0;
+  }
+
   /**
    * Opens the same visual editor used by /squad, directly from the replay lab.
    *
@@ -1119,6 +1257,13 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       );
       return;
     }
+    const careerId = this.careerId();
+    if (!careerId) {
+      this.snackBar.open('Active career id is not available.', 'OK', {
+        duration: 3000,
+      });
+      return;
+    }
 
     const seed = this.seedInputModel;
     this.formationReplayResults.set([]);
@@ -1142,15 +1287,12 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       concatMap((formation) =>
         this.harness.manualSelectLineup(formation, originalPlayerIds).pipe(
           switchMap(() => this.harness.replayMatch(matchId, seed)),
-          map((fixture): FormationReplayResult => ({
-            formation,
-            homeGoals: fixture?.result?.homeGoals ?? null,
-            awayGoals: fixture?.result?.awayGoals ?? null,
-            homePossession: fixture?.result?.homePossession ?? null,
-            awayPossession: fixture?.result?.awayPossession ?? null,
-            homeShots: fixture?.result?.homeShots ?? null,
-            awayShots: fixture?.result?.awayShots ?? null,
-          }))
+          switchMap((fixture) =>
+            this.matchDetailApi.getMatchDetail(careerId, matchId).pipe(
+              catchError(() => of(null)),
+              map((detail) => this.buildFormationReplayResult(formation, fixture, detail))
+            )
+          )
         )
       ),
           switchMap((row) => {

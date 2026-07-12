@@ -12,13 +12,19 @@
 export type MatchEventType =
   | 'GOAL'
   | 'SHOT'
+  | 'SHOT_ON_TARGET'
+  | 'SAVE'
+  | 'MISS'
+  | 'BLOCK'
+  | 'CHANCE_CREATED'
   | 'FOUL'
   | 'YELLOW_CARD'
   | 'RED_CARD'
   | 'INJURY'
   | 'SUBSTITUTION'
   | 'OFFSIDE'
-  | 'CORNER';
+  | 'CORNER'
+  | 'TACTICAL_CHANGE';
 
 /** Shot location categories based on distance from goal */
 export type ShotLocation =
