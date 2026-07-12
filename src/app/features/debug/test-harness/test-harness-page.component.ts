@@ -359,6 +359,7 @@ const DEFAULT_REPLAY_SEED = 12345;
               <div class="matrix-table" role="table" aria-label="Live tactical scenario comparison">
                 <div class="matrix-row matrix-row-head" role="row">
                   <span role="columnheader">Scenario</span>
+                  <span role="columnheader">Action</span>
                   <span role="columnheader">Score</span>
                   <span role="columnheader">Poss.</span>
                   <span role="columnheader">Shots</span>
@@ -373,8 +374,11 @@ const DEFAULT_REPLAY_SEED = 12345;
                   <span role="cell" [title]="row.description">
                     {{ row.scenario }}
                     <small *ngIf="row.changeMinute !== null">
-                      m{{ row.changeMinute }} → {{ styleShort(row.changedStyle) }}
+                      m{{ row.changeMinute }}
                     </small>
+                  </span>
+                  <span role="cell" [title]="row.actionDetail">
+                    {{ actionLabel(row) }}
                   </span>
                   <span role="cell">{{ row.homeGoals }}-{{ row.awayGoals }}</span>
                   <span role="cell">{{ fmtPct(row.homePossession) }} / {{ fmtPct(row.awayPossession) }}</span>
@@ -1339,6 +1343,19 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       return '-';
     }
     return this.teamStyleOptions.find((o) => o.value === style)?.label ?? style;
+  }
+
+  actionLabel(row: ScenarioMatrixRow): string {
+    if (row.actionType === 'STYLE') {
+      return this.styleShort(row.changedStyle);
+    }
+    if (row.actionType === 'FORMATION') {
+      return row.actionDetail || 'Formation';
+    }
+    if (row.actionType === 'SUBSTITUTION') {
+      return row.actionDetail || 'Substitution';
+    }
+    return 'Base';
   }
 
   fmtPct(value: number | null): string {

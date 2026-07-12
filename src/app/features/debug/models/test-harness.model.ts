@@ -169,6 +169,8 @@ export interface ScenarioMatrixRow {
   initialStyle: TeamStyle;
   changeMinute: number | null;
   changedStyle: TeamStyle | null;
+  actionType: 'NONE' | 'STYLE' | 'FORMATION' | 'SUBSTITUTION' | string;
+  actionDetail: string;
   homeGoals: number;
   awayGoals: number;
   homeXg: number;
@@ -184,6 +186,7 @@ export interface ScenarioMatrixRow {
   awayWideShots: number;
   awayLongShots: number;
   tacticalChanges: number;
+  substitutions: number;
 }
 
 /**
