@@ -309,97 +309,6 @@ const DEFAULT_REPLAY_SEED = 12345;
               Pick a match involving that team to test lineup changes.
             </p>
 
-            <div *ngIf="formationReplayResults().length > 0" class="formation-matrix">
-              <div class="matrix-header">
-                <strong>Formation matrix</strong>
-                <span>Same match + seed {{ seedInputModel ?? 'auto' }} + {{ selectedStyleLabel() }}</span>
-                <button type="button" class="matrix-export" (click)="copyFormationMatrixJson()">
-                  Copy JSON
-                </button>
-                <button type="button" class="matrix-export" (click)="downloadFormationMatrixCsv()">
-                  CSV
-                </button>
-              </div>
-              <div class="matrix-table" role="table" aria-label="Formation replay comparison">
-                <div class="matrix-row matrix-row-head" role="row">
-                  <span role="columnheader">Form.</span>
-                  <span role="columnheader">Score</span>
-                  <span role="columnheader">Delta Score</span>
-                  <span role="columnheader">Poss.</span>
-                  <span role="columnheader">Δ Poss.</span>
-                  <span role="columnheader">Shots</span>
-                  <span role="columnheader">Δ Shots</span>
-                  <span role="columnheader">xG</span>
-                  <span role="columnheader">Δ xG</span>
-                  <span role="columnheader">Zones C/W/L</span>
-                  <span role="columnheader">Δ Zones</span>
-                </div>
-                <div
-                  *ngFor="let row of formationReplayResults(); trackBy: trackByFormationReplay"
-                  class="matrix-row"
-                  role="row"
-                >
-                  <span role="cell">{{ row.formation }}</span>
-                  <span role="cell">{{ row.homeGoals ?? '—' }}-{{ row.awayGoals ?? '—' }}</span>
-                  <span role="cell">{{ fmtPct(row.homePossession) }} / {{ fmtPct(row.awayPossession) }}</span>
-                  <span role="cell">{{ row.homeShots ?? '-' }} / {{ row.awayShots ?? '-' }}</span>
-                  <span role="cell">{{ fmtXg(row.homeXg) }} / {{ fmtXg(row.awayXg) }}</span>
-                  <span role="cell">
-                    {{ row.homeCentralShots }}/{{ row.homeWideShots }}/{{ row.homeLongShots }}
-                    /
-                    {{ row.awayCentralShots }}/{{ row.awayWideShots }}/{{ row.awayLongShots }}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div *ngIf="scenarioMatrixResults().length > 0" class="formation-matrix">
-              <div class="matrix-header">
-                <strong>Scenario matrix</strong>
-                <span>Same match + seed {{ seedInputModel ?? 'auto' }} · live tactical changes</span>
-                <button type="button" class="matrix-export" (click)="copyScenarioMatrixJson()">
-                  Copy JSON
-                </button>
-              </div>
-              <div class="matrix-table" role="table" aria-label="Live tactical scenario comparison">
-                <div class="matrix-row matrix-row-head" role="row">
-                  <span role="columnheader">Scenario</span>
-                  <span role="columnheader">Action</span>
-                  <span role="columnheader">Score For/Ag.</span>
-                  <span role="columnheader">Δ Score</span>
-                  <span role="columnheader">Poss For/Ag.</span>
-                  <span role="columnheader">Delta Poss</span>
-                  <span role="columnheader">Shots For/Ag.</span>
-                  <span role="columnheader">Delta Shots</span>
-                  <span role="columnheader">xG For/Ag.</span>
-                  <span role="columnheader">Delta xG</span>
-                  <span role="columnheader">Zones For C/W/L</span>
-                  <span role="columnheader">Delta Zones</span>
-                </div>
-                <div
-                  *ngFor="let row of scenarioMatrixResults(); trackBy: trackByScenarioMatrix"
-                  class="matrix-row"
-                  role="row"
-                >
-                  <span role="cell" [title]="row.description">
-                    {{ row.scenario }}
-                    <small *ngIf="row.changeMinute !== null">
-                      m{{ row.changeMinute }}
-                    </small>
-                  </span>
-                  <span role="cell" [title]="row.actionDetail">
-                    {{ actionLabel(row) }}
-                  </span>
-                  <span role="cell">{{ scenarioGoalsFor(row) }}-{{ scenarioGoalsAgainst(row) }}</span>
-                  <span role="cell">{{ fmtPct(scenarioPossessionFor(row)) }} / {{ fmtPct(scenarioPossessionAgainst(row)) }}</span>
-                  <span role="cell">{{ scenarioShotsFor(row) }} / {{ scenarioShotsAgainst(row) }}</span>
-                  <span role="cell">{{ fmtXg(scenarioXgFor(row)) }} / {{ fmtXg(scenarioXgAgainst(row)) }}</span>
-                  <span role="cell">
-                    {{ scenarioZonesFor(row).central }}/{{ scenarioZonesFor(row).wide }}/{{ scenarioZonesFor(row).long }}
-                  </span>
-                </div>
-              </div>
-            </div>
           </div>
         </section>
 
@@ -430,15 +339,15 @@ const DEFAULT_REPLAY_SEED = 12345;
                 <div class="matrix-row formation-matrix-row matrix-row-head" role="row">
                   <span role="columnheader">Form.</span>
                   <span role="columnheader">Score For/Ag.</span>
-                  <span role="columnheader">Δ Score</span>
+                  <span role="columnheader">Delta Score</span>
                   <span role="columnheader">Poss For/Ag.</span>
-                  <span role="columnheader">Δ Poss</span>
+                  <span role="columnheader">Delta Poss</span>
                   <span role="columnheader">Shots For/Ag.</span>
-                  <span role="columnheader">Δ Shots</span>
+                  <span role="columnheader">Delta Shots</span>
                   <span role="columnheader">xG For/Ag.</span>
-                  <span role="columnheader">Δ xG</span>
+                  <span role="columnheader">Delta xG</span>
                   <span role="columnheader">Zones For C/W/L</span>
-                  <span role="columnheader">Δ Zones</span>
+                  <span role="columnheader">Delta Zones</span>
                 </div>
                 <div
                   *ngFor="let row of formationReplayResults(); trackBy: trackByFormationReplay"
@@ -475,15 +384,15 @@ const DEFAULT_REPLAY_SEED = 12345;
                   <span role="columnheader">Minute</span>
                   <span role="columnheader">Action</span>
                   <span role="columnheader">Score For/Ag.</span>
-                  <span role="columnheader">Δ Score</span>
+                  <span role="columnheader">Delta Score</span>
                   <span role="columnheader">Poss For/Ag.</span>
-                  <span role="columnheader">Δ Poss</span>
+                  <span role="columnheader">Delta Poss</span>
                   <span role="columnheader">Shots For/Ag.</span>
-                  <span role="columnheader">Δ Shots</span>
+                  <span role="columnheader">Delta Shots</span>
                   <span role="columnheader">xG For/Ag.</span>
-                  <span role="columnheader">Δ xG</span>
+                  <span role="columnheader">Delta xG</span>
                   <span role="columnheader">Zones For C/W/L</span>
-                  <span role="columnheader">Δ Zones</span>
+                  <span role="columnheader">Delta Zones</span>
                 </div>
                 <div
                   *ngFor="let row of scenarioMatrixResults(); trackBy: trackByScenarioMatrix"
@@ -715,9 +624,6 @@ const DEFAULT_REPLAY_SEED = 12345;
       border-radius: 6px;
       overflow: hidden;
       background: #fafafa;
-    }
-    .panel-b .formation-matrix {
-      display: none;
     }
     .panel-e .formation-matrix {
       margin-top: 0.75rem;
