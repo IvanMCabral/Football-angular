@@ -35,6 +35,8 @@ describe('TestHarnessPageComponent', () => {
     ]);
     harness = jasmine.createSpyObj('TestHarnessService', [
       'setFormation',
+      'setStyle',
+      'getCurrentLineup',
       'resetInjuries',
       'replaceFixtures',
       'replayMatch',
@@ -93,6 +95,9 @@ describe('TestHarnessPageComponent', () => {
     );
     // Default: detail is unavailable (404 → null).
     matchDetailApi.getMatchDetail.and.returnValue(of(null));
+    harness.setStyle.and.returnValue(
+      of({ success: true, message: 'style ok', style: 'BALANCED' } as any)
+    );
 
     await TestBed.configureTestingModule({
       imports: [TestHarnessPageComponent, NoopAnimationsModule],
@@ -482,7 +487,7 @@ describe('TestHarnessPageComponent', () => {
     expect(component.timelineLoading()).toBeFalse();
   });
 
-  it('refreshDetailAfterMutation triggers a refetch via the null-and-reset pattern', async () => {
+  it('refreshDetailAfterMutation remounts detail panel without clearing the selected match', async () => {
     const detail1 = sampleSnapshot(0);
     const detail2 = { ...sampleSnapshot(45), homeGoals: 5 };
     matchDetailApi.getMatchTimeline.and.returnValues(of(detail1), of(detail2));
@@ -501,17 +506,17 @@ describe('TestHarnessPageComponent', () => {
     component.applyFormation();
     fixture.detectChanges();
     await fixture.whenStable();
-    // Allow the null/reset microtask + the next debounce to settle
+    // Allow the stable remount microtask to settle.
     await new Promise((r) => setTimeout(r, 250));
     fixture.detectChanges();
     await fixture.whenStable();
 
-    // After refresh, the timeline was fetched at least twice (initial +
-    // after the null-reset, the selectedMatchId was set back to match-1
-    // and the effect re-fetched).
+    // The old implementation briefly set selectedMatchId(null). The stable
+    // remount keeps Panel B/D state intact while Panel A refreshes.
+    expect(component.selectedMatchId()).toBe('match-1');
+    expect(component.detailPanelVisible()).toBeTrue();
+    expect(component.detailRefreshToken()).toBeGreaterThan(0);
     expect(matchDetailApi.getMatchTimeline).toHaveBeenCalled();
-    const calls = matchDetailApi.getMatchTimeline.calls.allArgs();
-    expect(calls.length).toBeGreaterThanOrEqual(2);
   });
 
   it('ngOnDestroy clears the pending debounce timer', async () => {
@@ -729,12 +734,10 @@ describe('TestHarnessPageComponent', () => {
     expect(row.awayTeamName).toBe('team-uuid-away');
   });
 
-  it('F2.5: onReplayWithSeed triggers refreshDetailAfterMutation which refetches the timeline (BUG_REPLAY_NO_REFRESH_UI)', async () => {
-    // The replay handler must trigger refreshDetailAfterMutation() in
-    // the success callback so Panel D re-renders with the new state.
-    // We verify the observable side-effect: the timeline is fetched at
-    // least twice (initial on select + after the null-and-reset
-    // microtask triggered by refreshDetailAfterMutation).
+  it('F2.5: onReplayWithSeed remounts detail without clearing the selected match (BUG_REPLAY_NO_REFRESH_UI)', async () => {
+    // The replay handler must trigger refreshDetailAfterMutation() in the
+    // success callback. Current implementation remounts only Panel A and keeps
+    // selectedMatchId stable, avoiding the old null-and-reset flicker.
     matchDetailApi.getMatchTimeline.calls.reset();
     matchDetailApi.getMatchTimeline.and.returnValue(of(sampleSnapshot(0)));
     matchDetailApi.getMatchDetail.and.returnValue(of(null));
@@ -761,15 +764,15 @@ describe('TestHarnessPageComponent', () => {
     component.onReplayWithSeed();
     fixture.detectChanges();
     await fixture.whenStable();
-    // Allow the null-and-reset microtask + the next 150ms debounce to
-    // settle so the refetch lands.
+    // Allow the stable remount microtask to settle.
     await new Promise((r) => setTimeout(r, 250));
     fixture.detectChanges();
     await fixture.whenStable();
 
-    const callsAfterReplay = matchDetailApi.getMatchTimeline.calls.allArgs().length;
-    // At least one new fetch happened after the replay callback.
-    expect(callsAfterReplay).toBeGreaterThan(callsAfterSelect);
+    expect(component.selectedMatchId()).toBe('match-1');
+    expect(component.detailPanelVisible()).toBeTrue();
+    expect(component.detailRefreshToken()).toBeGreaterThan(0);
+    expect(matchDetailApi.getMatchTimeline.calls.allArgs().length).toBeGreaterThanOrEqual(callsAfterSelect);
   });
 
   it('onSimulateRound calls the service with the roundId + matches of the selected round', () => {
@@ -843,6 +846,73 @@ describe('TestHarnessPageComponent', () => {
     expect(harness.simulateRound).not.toHaveBeenCalled();
     expect(snackBarSpy.open).toHaveBeenCalled();
   });
+
+  it('copies a professional Markdown report for the player swap battery', async () => {
+    const writeText = jasmine.createSpy('writeText').and.returnValue(Promise.resolve());
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+
+    component.selectMatch({
+      ...makeMatchRow('match-1'),
+      homeTeamName: 'Real Betis',
+      awayTeamName: 'Real Madrid',
+    });
+    component.playerSwapBatteryPrecisionModel = 'balanced';
+    component.playerSwapBatteryModeModel = 'natural';
+    component.playerSwapBatterySummaries.set([
+      makePlayerSwapSummary({
+        baselinePlayer: 'Jude Bellingham',
+        swapPlayer: 'Endrick',
+        swapRead: 'Clear upgrade',
+        swapFit: 'Same profile',
+        deltaShotsFor: 2.25,
+        deltaShotsAgainst: 0.5,
+        deltaXgFor: 0.18,
+        deltaXgAgainst: 0.03,
+        deltaXgDiff: 0.15,
+        preAutoSubDeltaXgDiff: 0.11,
+        tacticalAttackRead: 'Ataque +',
+        tacticalCentralControlRead: 'Control =',
+        tacticalProtectionRead: 'Proteccion =',
+        tacticalChannelsRead: 'Canales =',
+      }),
+      makePlayerSwapSummary({
+        baselinePlayer: 'Federico Valverde',
+        swapPlayer: 'Luka Modric',
+        swapRead: 'Clear downgrade',
+        swapFit: 'Same profile',
+        deltaShotsFor: -1.5,
+        deltaShotsAgainst: 1.25,
+        deltaXgFor: -0.08,
+        deltaXgAgainst: 0.06,
+        deltaXgDiff: -0.14,
+        preAutoSubDeltaXgDiff: -0.09,
+      }),
+    ] as any);
+
+    component.copyPlayerSwapBatteryReport();
+    await Promise.resolve();
+
+    expect(writeText).toHaveBeenCalled();
+    const report = writeText.calls.mostRecent().args[0] as string;
+    expect(report).toContain('# Player Swap Battery Report');
+    expect(report).toContain('Match: Real Betis vs Real Madrid');
+    expect(report).toContain('Mode: natural');
+    expect(report).toContain('Precision: balanced');
+    expect(report).toContain('Confidence: Medium confidence');
+    expect(report).toContain('Seeds: 12345..12354');
+    expect(report).toContain('Best: Jude Bellingham -> Endrick');
+    expect(report).toContain('Worst: Federico Valverde -> Luka Modric');
+    expect(report).toContain('Reads: 1 Clear upgrade · 1 Clear downgrade');
+    expect(report).toContain('Fit: 2 Same profile');
+    expect(report).toContain('Coach read: Lectura balanceada');
+    expect(report).toContain('| Swap | OVR | Fit | Read | Ataque | Control | Proteccion | Canales | Shots | Shots Ag. | xG For | xG Ag. | xG Diff | Pre xG Diff |');
+    expect(report).toContain('| Jude Bellingham -> Endrick | — | Same profile | Clear upgrade | Ataque + | Control = | Proteccion = | Canales = | +2.25 | +0.50 | +0.18 | +0.03 | +0.15 | +0.11 |');
+    expect(report).toContain('## Tactical breakdown detail');
+    expect(snackBarSpy.open).toHaveBeenCalledWith('Player swap battery report copied.', 'OK', { duration: 2500 });
+  });
 });
 
 function makeMatchRow(matchId: string) {
@@ -872,5 +942,83 @@ function sampleSnapshot(minute: number): TimelineSnapshot {
     homeShots: 4,
     awayShots: 1,
     events: [],
+  };
+}
+
+function makePlayerSwapSummary(overrides: Record<string, unknown>) {
+  const baseline = {
+    label: 'baseline',
+    formation: '4-3-3',
+    style: 'BALANCED',
+    seedStart: 12345,
+    seedEnd: 12354,
+    seedCount: 10,
+    playerCount: 11,
+    starters: [],
+    avgGoalsFor: 1,
+    avgGoalsAgainst: 1,
+    avgGoalDiff: 0,
+    avgPossessionFor: 55,
+    avgShotsFor: 10,
+    avgShotsAgainst: 8,
+    avgShotDiff: 2,
+    avgXgFor: 1.25,
+    avgXgAgainst: 0.9,
+    avgXgDiff: 0.35,
+    avgCentralShotsFor: 4,
+    avgWideShotsFor: 4,
+    avgLongShotsFor: 2,
+    avgCentralShotsAgainst: 3,
+    avgWideShotsAgainst: 3,
+    avgLongShotsAgainst: 2,
+    timestamp: '2026-07-13T00:00:00.000Z',
+  };
+  return {
+    slotId: 'S05-1',
+    formation: '4-3-3',
+    seedStart: 12345,
+    seedEnd: 12354,
+    seedCount: 10,
+    baselinePlayer: 'Starter',
+    swapPlayer: 'Bench',
+    baseline,
+    swapped: { ...baseline, label: 'swapped' },
+    deltaGoalsFor: 0,
+    deltaGoalsAgainst: 0,
+    deltaGoalDiff: 0,
+    deltaShotsFor: 0,
+    deltaShotsAgainst: 0,
+    deltaPossessionFor: 0,
+    deltaXgFor: 0,
+    deltaXgAgainst: 0,
+    deltaXgDiff: 0,
+    deltaCentralShotsFor: 0,
+    deltaWideShotsFor: 0,
+    deltaLongShotsFor: 0,
+    deltaCentralShotsAgainst: 0,
+    deltaWideShotsAgainst: 0,
+    deltaLongShotsAgainst: 0,
+    preAutoSubDeltaShotsFor: 0,
+    preAutoSubDeltaShotsAgainst: 0,
+    preAutoSubDeltaXgFor: 0,
+    preAutoSubDeltaXgAgainst: 0,
+    preAutoSubDeltaXgDiff: 0,
+    swapRead: 'Noise / neutral',
+    swapReadDetail: 'test',
+    swapReadClass: 'read-neutral',
+    swapFit: 'Same profile',
+    swapFitDetail: 'test',
+    swapFitClass: 'fit-good',
+    tacticalAttackRead: 'Ataque =',
+    tacticalAttackClass: 'delta-neutral',
+    tacticalCentralControlRead: 'Control =',
+    tacticalCentralControlClass: 'delta-neutral',
+    tacticalProtectionRead: 'Proteccion =',
+    tacticalProtectionClass: 'delta-neutral',
+    tacticalChannelsRead: 'Canales =',
+    tacticalChannelsClass: 'delta-neutral',
+    tacticalBreakdownDetail: 'test',
+    timestamp: '2026-07-13T00:00:00.000Z',
+    ...overrides,
   };
 }

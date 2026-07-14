@@ -217,6 +217,23 @@ export class SquadManagementComponent implements OnInit {
     }
 
 selectedFormation$ = new BehaviorSubject<string>('4-4-2');
+
+private applyLineup(lineup: LineupDTO | null): void {
+  this.lineupSubject$.next(lineup);
+  this.lineupWarning$.next(this.pickLineupWarning(lineup?.warnings));
+
+  /**
+   * V25D99.73-FRONT: keep the /squad formation selector synchronized with
+   * the persisted lineup. The visual editor can change formation internally
+   * and save it through /career/lineup/manual-select; after closing, the
+   * parent refetches /current. Pre-fix we updated lineupSubject$ but left
+   * selectedFormation$ with the old value, so the background selector could
+   * still say 4-4-2 while reopening the modal correctly showed 4-3-3.
+   */
+  if (lineup?.formation && ALL_FORMATIONS.includes(lineup.formation as any)) {
+    this.selectedFormation$.next(lineup.formation);
+  }
+}
   /**
    * V25D38-F1: extendido a las 7 formations que el engine soporta.
    * V25D55-C16 P0.1: extendido a las 12 formations que el back-end
@@ -321,12 +338,10 @@ this.squad$ = combineLatest([
      this.http.get<LineupDTO>(`${environment.apiUrl}/career/lineup/current`)
        .pipe(
          tap(lineup => {
-           this.lineupSubject$.next(lineup);
-           this.lineupWarning$.next(this.pickLineupWarning(lineup.warnings));
+           this.applyLineup(lineup);
          }),
          catchError(err => {
-           this.lineupSubject$.next(null);
-           this.lineupWarning$.next(null);
+           this.applyLineup(null);
            return of(null);
          })
        )
@@ -516,12 +531,10 @@ this.squad$ = combineLatest([
          this.http.get<LineupDTO>(`${environment.apiUrl}/career/lineup/current`)
            .pipe(
              tap(lineup => {
-               this.lineupSubject$.next(lineup);
-               this.lineupWarning$.next(this.pickLineupWarning(lineup.warnings));
+               this.applyLineup(lineup);
              }),
              catchError(err => {
-               this.lineupSubject$.next(null);
-               this.lineupWarning$.next(null);
+               this.applyLineup(null);
                return of(null);
              })
            )
@@ -590,12 +603,10 @@ openVisualEditor(): void {
         this.http.get<LineupDTO>(`${environment.apiUrl}/career/lineup/current`)
           .pipe(
             tap(lineup => {
-              this.lineupSubject$.next(lineup);
-              this.lineupWarning$.next(this.pickLineupWarning(lineup.warnings));
+              this.applyLineup(lineup);
             }),
             catchError(() => {
-              this.lineupSubject$.next(null);
-              this.lineupWarning$.next(null);
+              this.applyLineup(null);
               return of(null);
             })
           )
@@ -627,8 +638,7 @@ openVisualEditor(): void {
      )
      .subscribe({
        next: (lineup) => {
-         this.lineupSubject$.next(lineup);
-         this.lineupWarning$.next(this.pickLineupWarning(lineup.warnings));
+         this.applyLineup(lineup);
          this.lineupLoading$.next(false);
        },
        error: (err) => {

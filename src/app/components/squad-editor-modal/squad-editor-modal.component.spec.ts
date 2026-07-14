@@ -103,6 +103,29 @@ describe('SquadEditorModalComponent — MVP1-lineup-cancha-1', () => {
       'ngOnInit should GET /api/v1/editor/subdivisions');
   });
 
+  it('V25D99.69: saveLineup sends free-position customX/customY to manual-select', () => {
+    const players = Array.from({ length: 7 }, (_, index) => ({
+      playerId: `p${index + 1}`,
+      name: `Player ${index + 1}`,
+      role: index === 0 ? 'GK' : 'MID',
+      slotId: index === 0 ? 'GK-1' : `S13-${index}`,
+      xPercent: index === 3 ? 31.65 : undefined,
+      yPercent: index === 3 ? 56.0 : undefined,
+    }));
+    (component as any).selectedFormation = '4-4-2';
+    (component as any).getUniqueValidHomePlayers = () => players;
+
+    (component as any).saveLineup();
+
+    const manualSelectCall = httpClientSpy.post.calls.allArgs()
+      .find(args => String(args[0]).includes('/career/lineup/manual-select'));
+    expect(manualSelectCall).toBeTruthy('saveLineup must call manual-select');
+    const body = manualSelectCall?.[1] as any;
+    const movedSlot = body.slots.find((slot: any) => slot.playerId === 'p4');
+    expect(movedSlot.customXPercent).toBe(31.65);
+    expect(movedSlot.customYPercent).toBe(56.0);
+  });
+
   it('should call /editor/formations on init', (done) => {
     fixture.detectChanges();
     // loadSubdivisions uses setTimeout(0) before chaining formations load.
@@ -2024,7 +2047,16 @@ describe('SquadEditorModalComponent — V25D66-C26 bench display', () => {
       const okComponent = okFixture.componentInstance;
       okFixture.detectChanges();
 
-      (okComponent as any).homePlayers$.next(new Array(11).fill({}) as any);
+      const validPlayers = Array.from({ length: 11 }, (_, i) => ({
+        playerId: `valid-${i}`,
+        name: `Valid ${i}`,
+        position: i === 0 ? 'GK' : (i <= 4 ? 'DEF' : (i <= 8 ? 'MID' : 'ATT')),
+        role: i === 0 ? 'GK' : (i <= 4 ? 'DEF' : (i <= 8 ? 'MID' : 'ATT')),
+        overall: 70,
+        slotId: i === 0 ? 'GK-1' : `S${20 + i}-1`,
+      }));
+      spyOn(okComponent as any, 'canPlayerUseSlot').and.returnValue(true);
+      (okComponent as any).homePlayers$.next(validPlayers as any);
       (okComponent as any).saveLineup();
 
       const captured = (okComponent as any).errorMessage$.value;
@@ -3744,7 +3776,7 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
     fixture.detectChanges();
   });
 
-  it('getMarkerX/Y: returns xPercent when set (free positioning), else slot center (V25D99.7)', (done) => {
+  it('getMarkerX/Y: returns xPercent when set (free positioning), else authored formation coord (V25D99.20.5)', (done) => {
     // V25D99.7: free positioning restored. After a free drop, the marker
     // is at (xPercent, yPercent). When xPercent/yPercent are unset, the
     // marker is at the slot center.
@@ -3753,8 +3785,8 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
       // baseline: no override → returns slot center
       const baseX = (component as any).getMarkerX(pDef);
       const baseY = (component as any).getMarkerY(pDef);
-      expect(baseX).toBe((component as any).getSlotCenterX('S22-1'));
-      expect(baseY).toBe((component as any).getSlotCenterY('S22-1'));
+      expect(baseX).toBe(20);
+      expect(baseY).toBe(75);
       // override: returns custom %
       pDef.xPercent = 60;
       pDef.yPercent = 35;
@@ -4043,7 +4075,7 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
    * then computes chem against canonical coords (no override) and the
    * score returns to baseline.
    */
-  it('V25D99.20 BUG-4a: drop outside any slot then drag back to native slot bbox → snap-back clears customX/Y and re-claims slot', (done) => {
+  it('V25D99.20.13: drop outside any slot then slightly inside native slot bbox keeps micro-position override', (done) => {
     setTimeout(() => {
       const pDef = (component as any).slotPlayerMap['S22-1'];
       expect(pDef).toBeTruthy('fixture must seed pDef in S22-1');
@@ -4063,25 +4095,22 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
       expect(pDef.yPercent).toBe(75, 'first drop: free-position yPercent set');
       expect((component as any).slotPlayerMap['S22-1']).toBeUndefined('first drop: slot vacated by free positioning');
 
-      // Step 2: drag back inside S22-1 bbox (xPct=22.5, yPct=76).
+      // Step 2: drag back inside S22-1 bbox but not near the authored
+      // native point. This is a legitimate micro/manual move and must
+      // not snap back, otherwise a small move "vuelve al mismo lugar".
       (component as any).handleMarkerDragEnd({ dropPoint: { x: 225, y: 610 } } as any, pDef);
 
-      // V25D99.20 BUG-4a: snap-back clears xPercent/yPercent and re-claims
-      // the slotPlayerMap entry. Without these, the back's resolveSlotCoords
-      // would still pick up the override and the chem would stay low.
-      expect(pDef.xPercent).toBeUndefined('snap-back: xPercent cleared');
-      expect(pDef.yPercent).toBeUndefined('snap-back: yPercent cleared');
-      expect((component as any).slotPlayerMap['S22-1']).toBe(pDef, 'snap-back: slot re-claimed');
+      expect(pDef.xPercent).toBe(22.5, 'micro-position: xPercent persists');
+      expect(pDef.yPercent).toBe(76.25, 'micro-position: yPercent persists');
+      expect((component as any).slotPlayerMap['S22-1']).toBeUndefined('micro-position: slot remains visually vacated');
 
-      // Marker renders at canonical slot center (since override is gone,
-      // getMarkerX/Y fall back to getSlotCenterX/Y).
-      expect((component as any).getMarkerX(pDef)).toBe((component as any).getSlotCenterX('S22-1'));
-      expect((component as any).getMarkerY(pDef)).toBe((component as any).getSlotCenterY('S22-1'));
+      expect((component as any).getMarkerX(pDef)).toBe(22.5);
+      expect((component as any).getMarkerY(pDef)).toBe(76.25);
       done();
     }, 30);
   });
 
-  it('V25D99.20 BUG-4a: drop inside native slot when already at canonical → no customX/Y, slot still occupied', (done) => {
+  it('V25D99.20 BUG-4a: drop near native authored point when already at canonical clears customX/Y', (done) => {
     setTimeout(() => {
       const pDef = (component as any).slotPlayerMap['S22-1'];
       expect(pDef).toBeTruthy('fixture must seed pDef in S22-1');
@@ -4096,8 +4125,10 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
       expect(pDef.xPercent).toBeUndefined();
       expect(pDef.yPercent).toBeUndefined();
 
-      // Drop inside S22-1 bbox.
-      (component as any).handleMarkerDragEnd({ dropPoint: { x: 225, y: 610 } } as any, pDef);
+      // Drop near authored S22-1 formation point. With the mocked field,
+      // dropPoint (200, 600) plus default pickup/half-card math yields
+      // x=20, y=75: exactly the authored native point.
+      (component as any).handleMarkerDragEnd({ dropPoint: { x: 200, y: 600 } } as any, pDef);
 
       expect(pDef.xPercent).toBeUndefined('snap-back on canonical: no xPercent');
       expect(pDef.yPercent).toBeUndefined('snap-back on canonical: no yPercent');

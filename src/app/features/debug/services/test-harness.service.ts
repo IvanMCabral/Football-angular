@@ -6,10 +6,19 @@ import { LineupDTO } from '../../../shared/models/lineup/lineup.dto';
 import { LineupSlotDTO } from '../../../shared/models/lineup/lineup-slot.dto';
 import {
   CustomFixture,
+  LabMutationResult,
   MatchFixture,
+  PlayerSwapMatrixSummaryRequest,
+  PlayerSwapMatrixSummaryRow,
+  PositionPixelMatrixSummaryRequest,
+  PositionPixelMatrixSummaryRow,
+  FormationMatrixRow,
+  FormationMatrixSummaryRow,
   ReplayMatchRequest,
   RoundStateResponse,
   ScenarioMatrixRow,
+  ScenarioMatrixSummaryRequest,
+  ScenarioMatrixSummaryRow,
   SetFormationRequest,
   SetStyleRequest,
   SimulateRoundRequest,
@@ -156,11 +165,205 @@ export class TestHarnessService {
     );
   }
 
+  runFormationMatrix(matchId: string, seed: number | null): Observable<FormationMatrixRow[]> {
+    const body: ReplayMatchRequest = { seed };
+    return this.http.post<FormationMatrixRow[]>(
+      `${this.apiUrl}/match/${matchId}/formation-matrix`,
+      body
+    );
+  }
+
+  runFormationMatrixSummary(
+    matchId: string,
+    seedStart: number,
+    seedCount: number
+  ): Observable<FormationMatrixSummaryRow[]> {
+    const body: ScenarioMatrixSummaryRequest = { seedStart, seedCount };
+    return this.http.post<FormationMatrixSummaryRow[]>(
+      `${this.apiUrl}/match/${matchId}/formation-matrix/summary`,
+      body
+    );
+  }
+
   runScenarioMatrix(matchId: string, seed: number | null): Observable<ScenarioMatrixRow[]> {
     const body: ReplayMatchRequest = { seed };
     return this.http.post<ScenarioMatrixRow[]>(
       `${this.apiUrl}/match/${matchId}/scenario-matrix`,
       body
+    );
+  }
+
+  runScenarioMatrixSummary(
+    matchId: string,
+    seedStart: number,
+    seedCount: number,
+    scenarioGroup: ScenarioMatrixSummaryRequest['scenarioGroup'] = 'ALL',
+    controlledTeamSide: ScenarioMatrixSummaryRequest['controlledTeamSide'] = 'USER'
+  ): Observable<ScenarioMatrixSummaryRow[]> {
+    const body: ScenarioMatrixSummaryRequest = { seedStart, seedCount, scenarioGroup, controlledTeamSide };
+    return this.http.post<ScenarioMatrixSummaryRow[]>(
+      `${this.apiUrl}/match/${matchId}/scenario-matrix/summary`,
+      body
+    );
+  }
+
+  runPlayerSwapMatrixSummary(
+    matchId: string,
+    request: PlayerSwapMatrixSummaryRequest
+  ): Observable<PlayerSwapMatrixSummaryRow> {
+    return this.http.post<PlayerSwapMatrixSummaryRow>(
+      `${this.apiUrl}/match/${matchId}/player-swap-matrix/summary`,
+      request
+    );
+  }
+
+  runPositionPixelMatrixSummary(
+    matchId: string,
+    request: PositionPixelMatrixSummaryRequest
+  ): Observable<PositionPixelMatrixSummaryRow> {
+    return this.http.post<PositionPixelMatrixSummaryRow>(
+      `${this.apiUrl}/match/${matchId}/position-pixel-matrix/summary`,
+      request
+    );
+  }
+
+  prepareOffensiveUpgradeLab(): Observable<LabMutationResult> {
+    return this.http.post<LabMutationResult>(
+      `${this.apiUrl}/labs/offensive-upgrade/prepare`,
+      {}
+    );
+  }
+
+  restoreOffensiveUpgradeLab(): Observable<LabMutationResult> {
+    return this.http.post<LabMutationResult>(
+      `${this.apiUrl}/labs/offensive-upgrade/restore`,
+      {}
+    );
+  }
+
+  prepareDefensiveDowngradeLab(): Observable<LabMutationResult> {
+    return this.http.post<LabMutationResult>(
+      `${this.apiUrl}/labs/defensive-downgrade/prepare`,
+      {}
+    );
+  }
+
+  restoreDefensiveDowngradeLab(): Observable<LabMutationResult> {
+    return this.http.post<LabMutationResult>(
+      `${this.apiUrl}/labs/defensive-downgrade/restore`,
+      {}
+    );
+  }
+
+  prepareWeakWideDefendersLab(): Observable<LabMutationResult> {
+    return this.http.post<LabMutationResult>(
+      `${this.apiUrl}/labs/weak-wide-defenders/prepare`,
+      {}
+    );
+  }
+
+  restoreWeakWideDefendersLab(): Observable<LabMutationResult> {
+    return this.http.post<LabMutationResult>(
+      `${this.apiUrl}/labs/weak-wide-defenders/restore`,
+      {}
+    );
+  }
+
+  prepareOpponentWeakWideDefendersLab(matchId: string): Observable<LabMutationResult> {
+    return this.http.post<LabMutationResult>(
+      `${this.apiUrl}/match/${matchId}/labs/opponent-weak-wide-defenders/prepare`,
+      {}
+    );
+  }
+
+  restoreOpponentWeakWideDefendersLab(matchId: string): Observable<LabMutationResult> {
+    return this.http.post<LabMutationResult>(
+      `${this.apiUrl}/match/${matchId}/labs/opponent-weak-wide-defenders/restore`,
+      {}
+    );
+  }
+
+  prepareOpponentWeakLeftDefenderLab(matchId: string): Observable<LabMutationResult> {
+    return this.http.post<LabMutationResult>(
+      `${this.apiUrl}/match/${matchId}/labs/opponent-weak-left-defender/prepare`,
+      {}
+    );
+  }
+
+  restoreOpponentWeakLeftDefenderLab(matchId: string): Observable<LabMutationResult> {
+    return this.http.post<LabMutationResult>(
+      `${this.apiUrl}/match/${matchId}/labs/opponent-weak-left-defender/restore`,
+      {}
+    );
+  }
+
+  prepareOpponentWeakRightDefenderLab(matchId: string): Observable<LabMutationResult> {
+    return this.http.post<LabMutationResult>(
+      `${this.apiUrl}/match/${matchId}/labs/opponent-weak-right-defender/prepare`,
+      {}
+    );
+  }
+
+  restoreOpponentWeakRightDefenderLab(matchId: string): Observable<LabMutationResult> {
+    return this.http.post<LabMutationResult>(
+      `${this.apiUrl}/match/${matchId}/labs/opponent-weak-right-defender/restore`,
+      {}
+    );
+  }
+
+  prepareOpponentWeakCenterBacksLab(matchId: string): Observable<LabMutationResult> {
+    return this.http.post<LabMutationResult>(
+      `${this.apiUrl}/match/${matchId}/labs/opponent-weak-center-backs/prepare`,
+      {}
+    );
+  }
+
+  restoreOpponentWeakCenterBacksLab(matchId: string): Observable<LabMutationResult> {
+    return this.http.post<LabMutationResult>(
+      `${this.apiUrl}/match/${matchId}/labs/opponent-weak-center-backs/restore`,
+      {}
+    );
+  }
+
+  prepareWeakLeftDefenderLab(): Observable<LabMutationResult> {
+    return this.http.post<LabMutationResult>(
+      `${this.apiUrl}/labs/weak-left-defender/prepare`,
+      {}
+    );
+  }
+
+  restoreWeakLeftDefenderLab(): Observable<LabMutationResult> {
+    return this.http.post<LabMutationResult>(
+      `${this.apiUrl}/labs/weak-left-defender/restore`,
+      {}
+    );
+  }
+
+  prepareWeakRightDefenderLab(): Observable<LabMutationResult> {
+    return this.http.post<LabMutationResult>(
+      `${this.apiUrl}/labs/weak-right-defender/prepare`,
+      {}
+    );
+  }
+
+  restoreWeakRightDefenderLab(): Observable<LabMutationResult> {
+    return this.http.post<LabMutationResult>(
+      `${this.apiUrl}/labs/weak-right-defender/restore`,
+      {}
+    );
+  }
+
+  prepareWeakCenterBacksLab(): Observable<LabMutationResult> {
+    return this.http.post<LabMutationResult>(
+      `${this.apiUrl}/labs/weak-center-backs/prepare`,
+      {}
+    );
+  }
+
+  restoreWeakCenterBacksLab(): Observable<LabMutationResult> {
+    return this.http.post<LabMutationResult>(
+      `${this.apiUrl}/labs/weak-center-backs/restore`,
+      {}
     );
   }
 

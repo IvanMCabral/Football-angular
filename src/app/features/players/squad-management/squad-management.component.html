@@ -187,8 +187,8 @@
         <label for="formation">Formación:</label>
         <select
           id="formation"
-          [value]="selectedFormation$ | async"
-          (change)="onFormationChange($any($event.target).value)"
+          [ngModel]="selectedFormation$ | async"
+          (ngModelChange)="onFormationChange($event)"
           class="formation-select">
           <option *ngFor="let formation of availableFormations" [value]="formation">
             {{formation}}

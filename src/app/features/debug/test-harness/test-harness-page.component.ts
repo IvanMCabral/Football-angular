@@ -18,7 +18,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { HttpClient } from '@angular/common/http';
-import { catchError, concatMap, forkJoin, from, map, of, switchMap } from 'rxjs';
+import { Observable, catchError, concatMap, forkJoin, from, map, mergeMap, of, switchMap, timeout, toArray } from 'rxjs';
 
 import { CareerService } from '../../../core/services/career.service';
 import { Fixture } from '../../../core/services/career.model';
@@ -28,11 +28,20 @@ import { MatchDetail, MatchEvent, TimelineSnapshot } from '../../match-detail/mo
 import { V24MatchDetailPageComponent } from '../../match-detail/pages/v24-match-detail-page.component';
 import { SquadEditorModalComponent } from '../../../components/squad-editor-modal/squad-editor-modal.component';
 import { SessionPlayer } from '../../../shared/models/player.model';
+import { LineupDTO } from '../../../shared/models/lineup/lineup.dto';
+import { LineupSlotDTO } from '../../../shared/models/lineup/lineup-slot.dto';
+import { FormationDTO } from '../../../shared/models/lineup/formation.dto';
 import {
   FORMATION_CODES,
   FormationCode,
+  FormationMatrixRow,
+  FormationMatrixSummaryRow,
+  LabMutationResult,
   MatchFixture,
+  PlayerSwapMatrixSummaryRow,
+  PositionPixelMatrixSummaryRow,
   ScenarioMatrixRow,
+  ScenarioMatrixSummaryRow,
   TestHarnessMatchRow,
   TeamStyle,
 } from '../models/test-harness.model';
@@ -62,6 +71,248 @@ interface FormationReplayResult {
   awayLongShots: number;
 }
 
+interface CurrentLineupReplayResult {
+  label: string;
+  formation: string | null;
+  seed: number | null;
+  style: TeamStyle;
+  playerCount: number;
+  starters: string[];
+  score: string;
+  possession: string;
+  shots: string;
+  xg: string;
+  zones: string;
+  timestamp: string;
+}
+
+interface CurrentLineupMultiSeedSummary {
+  label: string;
+  formation: string | null;
+  style: TeamStyle;
+  seedStart: number;
+  seedEnd: number;
+  seedCount: number;
+  playerCount: number;
+  starters: string[];
+  avgGoalsFor: number;
+  avgGoalsAgainst: number;
+  avgGoalDiff: number;
+  avgPossessionFor: number;
+  avgShotsFor: number;
+  avgShotsAgainst: number;
+  avgShotDiff: number;
+  avgXgFor: number;
+  avgXgAgainst: number;
+  avgXgDiff: number;
+  avgCentralShotsFor: number;
+  avgWideShotsFor: number;
+  avgLongShotsFor: number;
+  avgCentralShotsAgainst: number;
+  avgWideShotsAgainst: number;
+  avgLongShotsAgainst: number;
+  timestamp: string;
+}
+
+interface CurrentLineupReplaySample {
+  lineup: LineupDTO;
+  fixture: MatchFixture;
+  detail: MatchDetail | null;
+  seed: number;
+}
+
+interface PlayerSwapMatrixSummary {
+  slotId: string;
+  formation: string;
+  seedStart: number;
+  seedEnd: number;
+  seedCount: number;
+  baselinePlayer: string;
+  swapPlayer: string;
+  baselinePlayerOverall: number | null;
+  swapPlayerOverall: number | null;
+  deltaPlayerOverall: number | null;
+  baseline: CurrentLineupMultiSeedSummary;
+  swapped: CurrentLineupMultiSeedSummary;
+  deltaGoalsFor: number;
+  deltaGoalsAgainst: number;
+  deltaGoalDiff: number;
+  deltaShotsFor: number;
+  deltaShotsAgainst: number;
+  deltaPossessionFor: number;
+  deltaXgFor: number;
+  deltaXgAgainst: number;
+  deltaXgDiff: number;
+  deltaCentralShotsFor: number;
+  deltaWideShotsFor: number;
+  deltaLongShotsFor: number;
+  deltaCentralShotsAgainst: number;
+  deltaWideShotsAgainst: number;
+  deltaLongShotsAgainst: number;
+  preAutoSubDeltaShotsFor?: number;
+  preAutoSubDeltaShotsAgainst?: number;
+  preAutoSubDeltaXgFor?: number;
+  preAutoSubDeltaXgAgainst?: number;
+  preAutoSubDeltaXgDiff?: number;
+  swapRead: string;
+  swapReadDetail: string;
+  swapReadClass: string;
+  swapFit: string;
+  swapFitDetail: string;
+  swapFitClass: string;
+  tacticalAttackRead: string;
+  tacticalAttackClass: string;
+  tacticalCentralControlRead: string;
+  tacticalCentralControlClass: string;
+  tacticalProtectionRead: string;
+  tacticalProtectionClass: string;
+  tacticalChannelsRead: string;
+  tacticalChannelsClass: string;
+  tacticalBreakdownDetail: string;
+  timestamp: string;
+}
+
+interface PlayerSwapSlotOption {
+  playerId: string;
+  playerName: string;
+  position: string;
+  slotId: string;
+  label: string;
+}
+
+interface PlayerSwapBenchOption {
+  playerId: string;
+  playerName: string;
+  position: string;
+  score: number;
+  label: string;
+}
+
+interface PlayerSwapCandidate {
+  starterId: string;
+  starterName: string;
+  starterPosition: string;
+  benchId: string;
+  benchName: string;
+  benchPosition: string;
+  slotId: string;
+}
+
+interface PlayerSwapBatterySummary {
+  total: number;
+  mode: string;
+  precision: string;
+  confidence: string;
+  best: PlayerSwapMatrixSummary | null;
+  worst: PlayerSwapMatrixSummary | null;
+  reads: Record<string, number>;
+  fits: Record<string, number>;
+}
+
+interface PlayerSwapPrecisionComparisonRow {
+  candidateKey: string;
+  starter: string;
+  bench: string;
+  slotId: string;
+  fit: string;
+  quick: PlayerSwapMatrixSummary;
+  balanced: PlayerSwapMatrixSummary;
+  stability: string;
+  stabilityClass: string;
+}
+
+interface PositionPixelMatrixSummary {
+  label: string;
+  playerName: string;
+  playerPosition: string;
+  slotId: string;
+  fromXPercent: number;
+  fromYPercent: number;
+  targetXPercent: number;
+  targetYPercent: number;
+  seedStart: number;
+  seedEnd: number;
+  deltaShotsFor: number;
+  deltaShotsAgainst: number;
+  deltaPossessionFor: number;
+  deltaXgFor: number;
+  deltaXgAgainst: number;
+  deltaXgDiff: number;
+  deltaCentralShotsFor: number;
+  deltaWideShotsFor: number;
+  deltaLongShotsFor: number;
+  deltaCentralShotsAgainst: number;
+  deltaWideShotsAgainst: number;
+  deltaLongShotsAgainst: number;
+  deltaCentralXgFor: number;
+  deltaWideXgFor: number;
+  deltaLongXgFor: number;
+  deltaCentralXgAgainst: number;
+  deltaWideXgAgainst: number;
+  deltaLongXgAgainst: number;
+  baselineXgFor: number;
+  baselineXgAgainst: number;
+  movedXgFor: number;
+  movedXgAgainst: number;
+  timestamp: string;
+}
+
+type PositionPixelReadLevel = 'stable' | 'visible' | 'strong' | 'check';
+type PositionPixelReadFilter = 'all' | PositionPixelReadLevel;
+type PositionPixelSortMode = 'default' | 'read-desc' | 'impact-desc' | 'distance-desc';
+type ScenarioSummaryReadLevel = 'noise' | 'small' | 'visible' | 'strong' | 'review';
+type ScenarioSummaryReadFilter = 'all' | ScenarioSummaryReadLevel | 'actionable';
+type ScenarioSummarySortMode = 'default' | 'read-desc' | 'impact-desc' | 'xg-desc';
+type ControlledTeamSide = 'USER' | 'HOME' | 'AWAY';
+interface ScenarioScoutingNote {
+  title: string;
+  body: string;
+  className: string;
+}
+
+interface ScenarioDecisionCard {
+  title: string;
+  label: string;
+  metrics: string;
+  detail: string;
+  className: string;
+}
+
+interface ScenarioBatteryRow {
+  matchId: string;
+  matchLabel: string;
+  controlledSide: Exclude<ControlledTeamSide, 'USER'>;
+  controlledTeam: string;
+  scenarioGroup: 'ALL' | 'OFFENSE' | 'DEFENSE' | 'OPPONENT';
+  seedStart: number;
+  seedCount: number;
+  scenarioCount: number;
+  decision: string;
+  decisionDetail: string;
+  cards: ScenarioDecisionCard[];
+}
+
+type PositionPixelExportRow = PositionPixelMatrixSummary & {
+  read: string;
+  tacticalRead: string;
+  tacticalReadReason: string;
+  shapeMove: string;
+  shapeMoveDetail: string;
+  movementDistance: number;
+  impactScore: number;
+  attackGainScore: number;
+  attackLossScore: number;
+  defensiveRiskScore: number;
+  defensiveGainScore: number;
+};
+
+interface PositionPixelCandidate {
+  starterId: string;
+  starterName: string;
+  starterPosition: string;
+  slotId: string;
+}
+
 interface TeamStyleOption {
   value: TeamStyle;
   label: string;
@@ -74,17 +325,19 @@ const TIMELINE_STEP = 5;
 
 /**
  * V24D24.2: Default seed for the "Replay with seed" button. Same number as
- * the regression-test baseline so Iván can reproduce a known result with
+ * the regression-test baseline so Iv?n can reproduce a known result with
  * one click. The user is free to override.
  */
 const DEFAULT_REPLAY_SEED = 12345;
+const CURRENT_LINEUP_MULTI_SEED_COUNT = 5;
+const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
 
 /**
  * V24D24: Test-Harness UI page (4-panel layout).
  *
  * <p>Route: {@code /debug/test-harness}.
  *
- * <p>Layout (desktop, ≥768px):
+ * <p>Layout (desktop, ?768px):
  * <pre>
  * +-----------------+-----------------+
  * |  Panel A        |  Panel B        |
@@ -97,7 +350,7 @@ const DEFAULT_REPLAY_SEED = 12345;
  * +-----------------------------------+
  * </pre>
  *
- * <p>Backend gating: this UI is a debug surface — the backend is
+ * <p>Backend gating: this UI is a debug surface ? the backend is
  * profile-gated ({@code dev | local | test}). The /detail and /timeline
  * endpoints return 404 in prod. REVISOR runs the smoke against the
  * dev profile.
@@ -122,7 +375,7 @@ const DEFAULT_REPLAY_SEED = 12345;
       <header class="page-header">
         <h1 class="page-title">Test Harness</h1>
         <p class="page-subtitle">
-          Debug surface — change formation, replay, and inspect match detail.
+          Debug surface ? change formation, replay, and inspect match detail.
         </p>
         <a routerLink="/dashboard" class="link link-back" aria-label="Back to dashboard">
           &larr; Back to dashboard
@@ -147,14 +400,14 @@ const DEFAULT_REPLAY_SEED = 12345;
       <!-- Loading state -->
       <div *ngIf="loading()" class="state-container" role="status" aria-live="polite">
         <div class="state-spinner" aria-hidden="true"></div>
-        <p class="loading-text">Loading test harness…</p>
+        <p class="loading-text">Loading test harness?</p>
       </div>
 
       <!-- Main grid -->
       <div *ngIf="!loading() && !loadError() && hasCareer()" class="test-harness-grid">
         <!-- Panel A: Reused V24 match detail (F2) -->
         <section class="panel panel-a" aria-labelledby="panel-a-heading">
-          <h2 id="panel-a-heading" class="panel-title">Panel A · Match Detail</h2>
+          <h2 id="panel-a-heading" class="panel-title">Panel A ? Match Detail</h2>
           <p class="panel-hint" *ngIf="!selectedMatchId()">
             Select a match in Panel C to view its V24 detail.
           </p>
@@ -162,12 +415,13 @@ const DEFAULT_REPLAY_SEED = 12345;
             *ngIf="selectedMatchId() && detailPanelVisible()"
             [inputCareerId]="careerId()"
             [inputMatchId]="selectedMatchId()"
+            [inputRefreshToken]="detailRefreshToken()"
           ></app-v24-match-detail-page>
         </section>
 
         <!-- Panel B: Mutation controls -->
         <section class="panel panel-b" aria-labelledby="panel-b-heading">
-          <h2 id="panel-b-heading" class="panel-title">Panel B · Mutations</h2>
+          <h2 id="panel-b-heading" class="panel-title">Panel B ? Mutations</h2>
 
           <div class="control-group">
             <mat-form-field appearance="outline" class="formation-field">
@@ -251,6 +505,116 @@ const DEFAULT_REPLAY_SEED = 12345;
               <mat-hint>{{ selectedStyleHint() }}</mat-hint>
             </mat-form-field>
 
+            <div class="swap-selector-row" aria-label="Player swap matrix selectors">
+              <mat-form-field appearance="outline" class="swap-field">
+                <mat-label>Swap slot</mat-label>
+                <mat-select
+                  [(ngModel)]="selectedSwapStarterIdModel"
+                  aria-label="Select starter slot for player swap matrix"
+                >
+                  <mat-option [value]="null">Auto attacker</mat-option>
+                  <mat-option *ngFor="let option of playerSwapSlotOptions(); trackBy: trackBySwapSlotOption" [value]="option.playerId">
+                    {{ option.label }}
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="swap-field">
+                <mat-label>Swap player</mat-label>
+                <mat-select
+                  [(ngModel)]="selectedSwapBenchIdModel"
+                  aria-label="Select bench player for player swap matrix"
+                >
+                  <mat-option [value]="null">Auto bench attacker</mat-option>
+                  <mat-option *ngFor="let option of playerSwapBenchOptions(); trackBy: trackBySwapBenchOption" [value]="option.playerId">
+                    {{ option.label }}
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="swap-seed-count-field">
+                <mat-label>Swap seeds</mat-label>
+                <input
+                  matInput
+                  type="number"
+                  min="1"
+                  max="50"
+                  [(ngModel)]="playerSwapSeedCountModel"
+                  (ngModelChange)="onPlayerSwapSeedCountChange($event)"
+                  aria-label="Number of seeds for player swap matrix"
+                />
+                <mat-hint>1-50 ? Multi-seed usa min 20</mat-hint>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="swap-field">
+                <mat-label>Battery precision</mat-label>
+                <mat-select
+                  [(ngModel)]="playerSwapBatteryPrecisionModel"
+                  (ngModelChange)="onPlayerSwapBatteryPrecisionChange($event)"
+                  aria-label="Select player swap battery precision"
+                >
+                  <mat-option value="quick">Quick</mat-option>
+                  <mat-option value="balanced">Balanced</mat-option>
+                  <mat-option value="reliable">Reliable</mat-option>
+                </mat-select>
+                <mat-hint>{{ playerSwapBatteryPrecisionHint() }}</mat-hint>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="swap-field">
+                <mat-label>Battery mode</mat-label>
+                <mat-select
+                  [(ngModel)]="playerSwapBatteryModeModel"
+                  aria-label="Select player swap battery mode"
+                >
+                  <mat-option value="natural">Natural only</mat-option>
+                  <mat-option value="mixed">Include experiments</mat-option>
+                  <mat-option value="stress">Stress test</mat-option>
+                </mat-select>
+                <mat-hint>{{ playerSwapBatteryModeHint() }}</mat-hint>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="swap-field">
+                <mat-label>Controlar</mat-label>
+                <mat-select
+                  [(ngModel)]="controlledTeamSideModel"
+                  aria-label="Select controlled team side for scenario smokes"
+                >
+                  <mat-option value="USER" [disabled]="selectedMatchId() !== null && !selectedMatchIncludesUserTeam()">
+                    Mi equipo
+                  </mat-option>
+                  <mat-option value="HOME">Local</mat-option>
+                  <mat-option value="AWAY">Visitante</mat-option>
+                </mat-select>
+                <mat-hint>{{ controlledTeamSideHint() }}</mat-hint>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="swap-field">
+                <mat-label>Battery tablero</mat-label>
+                <mat-select
+                  [(ngModel)]="scenarioBatteryGroupModel"
+                  aria-label="Select tactical battery group"
+                >
+                  <mat-option value="OFFENSE">Ataque</mat-option>
+                  <mat-option value="DEFENSE">Defensa</mat-option>
+                  <mat-option value="OPPONENT">Rival</mat-option>
+                  <mat-option value="ALL">Todo</mat-option>
+                </mat-select>
+                <mat-hint>{{ scenarioBatteryGroupHint() }}</mat-hint>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="swap-field">
+                <mat-label>Battery alcance</mat-label>
+                <mat-select
+                  [(ngModel)]="scenarioBatteryScopeModel"
+                  aria-label="Select tactical battery scope"
+                >
+                  <mat-option value="quick">Rapida</mat-option>
+                  <mat-option value="balanced">Media</mat-option>
+                </mat-select>
+                <mat-hint>{{ scenarioBatteryScopeHint() }}</mat-hint>
+              </mat-form-field>
+            </div>
+
             <mat-form-field appearance="outline" class="round-field">
               <mat-label>Round</mat-label>
               <mat-select
@@ -275,12 +639,85 @@ const DEFAULT_REPLAY_SEED = 12345;
                 Replay with seed
               </button>
               <button
+                mat-raised-button
+                color="accent"
+                (click)="onReplayCurrentLineup()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                aria-label="Replay selected match with the current visual lineup and seed"
+              >
+                Replay current lineup
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRunCurrentLineupMultiSeed()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                aria-label="Replay current visual lineup across multiple seeds"
+              >
+                Current lineup multi-seed
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRunAutoPlayerSwapMatrix()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                aria-label="Compare a starter attacker against a bench attacker across multiple seeds"
+              >
+                Player swap matrix
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRunPlayerSwapBattery()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                aria-label="Compare several starter and bench player swaps across multiple seeds"
+              >
+                Player swap battery
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRunPlayerSwapPrecisionCompare()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                aria-label="Compare player swap battery reads between quick and balanced precision"
+              >
+                Compare precision
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRunPositionPixelMatrix()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                aria-label="Compare multiple pixel movement presets for the selected starter across seeds"
+              >
+                Position presets matrix
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRunPositionSensitivityCheck()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                aria-label="Run high-seed micro-movement sensitivity check for position pixels"
+              >
+                Sensitivity check
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRunPositionCalibrationSweep()"
+                [disabled]="mutationInFlight() || !userTeamName()"
+                aria-label="Run position calibration sweep across multiple user-team matches"
+              >
+                Calibration sweep
+              </button>
+              <button
                 mat-stroked-button
                 (click)="onRunFormationMatrix()"
                 [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
                 aria-label="Replay selected match with every formation and the same seed"
               >
                 Formation matrix
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRunFormationMatrixSummary()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                aria-label="Average every formation across multiple seeds"
+              >
+                Formation avg ({{ scenarioMatrixSummaryEffectiveSeedCount() }} seeds)
               </button>
               <button
                 mat-stroked-button
@@ -292,11 +729,222 @@ const DEFAULT_REPLAY_SEED = 12345;
               </button>
               <button
                 mat-stroked-button
+                (click)="onRunScenarioMatrixSummary()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !canRunScenarioSummaryForControlledSide()"
+                aria-label="Run controlled live tactical scenarios across multiple seeds"
+              >
+                Multi-seed matrix ({{ scenarioMatrixSummaryEffectiveSeedCount() }} seeds)
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRunScenarioMatrixSmoke()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !canRunScenarioSummaryForControlledSide()"
+                aria-label="Run quick controlled live tactical scenario smoke across five seeds"
+              >
+                Scenario smoke (5 seeds)
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRunScenarioMatrixBlockSmoke('OFFENSE')"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !canRunScenarioSummaryForControlledSide()"
+                aria-label="Run quick offensive scenario smoke across five seeds"
+              >
+                Smoke ataque
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRunScenarioMatrixBlockSmoke('DEFENSE')"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !canRunScenarioSummaryForControlledSide()"
+                aria-label="Run quick defensive scenario smoke across five seeds"
+              >
+                Smoke defensa
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRunScenarioMatrixBlockSmoke('OPPONENT')"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !canRunScenarioSummaryForControlledSide()"
+                aria-label="Run quick opponent channel exposure scenario smoke across five seeds"
+              >
+                Smoke rival
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRunScenarioBatteryBoard()"
+                [disabled]="mutationInFlight() || scenarioBatteryCandidateMatches().length === 0"
+                aria-label="Run quick tactical battery board across several matches and both sides"
+              >
+                Battery tablero
+              </button>
+              <span *ngIf="scenarioBatteryProgress()" class="inline-progress" aria-live="polite">
+                {{ scenarioBatteryProgress() }}
+              </span>
+              <button
+                mat-stroked-button
+                (click)="onPrepareOffensiveUpgradeLab()"
+                [disabled]="mutationInFlight()"
+                aria-label="Prepare controlled offensive substitution upgrade lab"
+              >
+                Prepare offensive lab
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRestoreOffensiveUpgradeLab()"
+                [disabled]="mutationInFlight()"
+                aria-label="Restore controlled offensive substitution upgrade lab"
+              >
+                Restore lab
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onPrepareDefensiveDowngradeLab()"
+                [disabled]="mutationInFlight()"
+                aria-label="Prepare controlled defensive substitution downgrade lab"
+              >
+                Prepare defensive lab
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRestoreDefensiveDowngradeLab()"
+                [disabled]="mutationInFlight()"
+                aria-label="Restore controlled defensive substitution downgrade lab"
+              >
+                Restore defensive lab
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onPrepareWeakWideDefendersLab()"
+                [disabled]="mutationInFlight()"
+                aria-label="Prepare weak wide defenders exposure lab"
+              >
+                Prepare weak wide DEF lab
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRestoreWeakWideDefendersLab()"
+                [disabled]="mutationInFlight()"
+                aria-label="Restore weak wide defenders exposure lab"
+              >
+                Restore weak wide DEF lab
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onPrepareOpponentWeakWideDefendersLab()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                aria-label="Prepare selected opponent weak wide defenders lab"
+              >
+                Prepare rival weak wide DEF
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRestoreOpponentWeakWideDefendersLab()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                aria-label="Restore selected opponent weak wide defenders lab"
+              >
+                Restore rival weak wide DEF
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onPrepareOpponentWeakLeftDefenderLab()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                aria-label="Prepare selected opponent weak left defender lab"
+              >
+                Prepare rival weak left DEF
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRestoreOpponentWeakLeftDefenderLab()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                aria-label="Restore selected opponent weak left defender lab"
+              >
+                Restore rival weak left DEF
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onPrepareOpponentWeakRightDefenderLab()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                aria-label="Prepare selected opponent weak right defender lab"
+              >
+                Prepare rival weak right DEF
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRestoreOpponentWeakRightDefenderLab()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                aria-label="Restore selected opponent weak right defender lab"
+              >
+                Restore rival weak right DEF
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onPrepareOpponentWeakCenterBacksLab()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                aria-label="Prepare selected opponent weak center backs lab"
+              >
+                Prepare rival weak CB
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRestoreOpponentWeakCenterBacksLab()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                aria-label="Restore selected opponent weak center backs lab"
+              >
+                Restore rival weak CB
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onPrepareWeakLeftDefenderLab()"
+                [disabled]="mutationInFlight()"
+                aria-label="Prepare weak left defender channel lab"
+              >
+                Prepare weak left DEF
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRestoreWeakLeftDefenderLab()"
+                [disabled]="mutationInFlight()"
+                aria-label="Restore weak left defender channel lab"
+              >
+                Restore weak left DEF
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onPrepareWeakRightDefenderLab()"
+                [disabled]="mutationInFlight()"
+                aria-label="Prepare weak right defender channel lab"
+              >
+                Prepare weak right DEF
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRestoreWeakRightDefenderLab()"
+                [disabled]="mutationInFlight()"
+                aria-label="Restore weak right defender channel lab"
+              >
+                Restore weak right DEF
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onPrepareWeakCenterBacksLab()"
+                [disabled]="mutationInFlight()"
+                aria-label="Prepare weak center backs channel lab"
+              >
+                Prepare weak CB lab
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRestoreWeakCenterBacksLab()"
+                [disabled]="mutationInFlight()"
+                aria-label="Restore weak center backs channel lab"
+              >
+                Restore weak CB lab
+              </button>
+              <button
+                mat-stroked-button
                 (click)="onSimulateRound()"
                 [disabled]="mutationInFlight() || selectedRoundModel === null"
                 aria-label="Simulate selected round"
               >
-                Simulate round {{ selectedRoundModel ?? '—' }}
+                Simulate round {{ selectedRoundModel ?? '?' }}
               </button>
             </div>
 
@@ -305,8 +953,18 @@ const DEFAULT_REPLAY_SEED = 12345;
               class="harness-warning"
               role="status"
             >
-              Formation matrix affects only {{ userTeamName() || 'your team' }}.
-              Pick a match involving that team to test lineup changes.
+              Formation/player matrices still affect only {{ userTeamName() || 'your team' }}.
+              Scenario smokes can test this match by choosing Local or Visitante in Controlar.
+            </p>
+
+            <p
+              *ngIf="analysisReadyMessage()"
+              class="analysis-ready-banner"
+              role="status"
+              aria-live="polite"
+            >
+              {{ analysisReadyMessage() }}
+              <button type="button" (click)="scrollToReplayAnalysis()">View Panel E</button>
             </p>
 
           </div>
@@ -314,14 +972,486 @@ const DEFAULT_REPLAY_SEED = 12345;
 
         <!-- Panel E: replay analysis matrices (full width) -->
         <section
-          *ngIf="formationReplayResults().length > 0 || scenarioMatrixResults().length > 0"
+          *ngIf="currentLineupReplayResult() || currentLineupMultiSeedSummary() || playerSwapMatrixSummary() || playerSwapBatterySummaries().length > 0 || playerSwapPrecisionComparisonRows().length > 0 || positionPixelMatrixSummary() || positionPixelMatrixRows().length > 0 || formationReplayResults().length > 0 || formationMatrixSummaryResults().length > 0 || scenarioMatrixResults().length > 0 || scenarioMatrixSummaryResults().length > 0 || scenarioBatteryRows().length > 0"
+          id="test-harness-replay-analysis"
           class="panel panel-e"
           aria-labelledby="panel-e-heading"
         >
-          <h2 id="panel-e-heading" class="panel-title">Panel E · Replay Analysis</h2>
+          <h2 id="panel-e-heading" class="panel-title">Panel E ? Replay Analysis</h2>
           <p class="panel-hint">
             Compare the same match and seed across formations, live tactical changes and substitutions.
           </p>
+
+          <div *ngIf="currentLineupReplayResult() as replay" class="formation-matrix analysis-matrix current-lineup-replay">
+            <div class="matrix-header">
+              <strong>Current lineup replay</strong>
+              <span>
+                {{ replay.label }} ? formation {{ replay.formation || '?' }}
+                ? seed {{ replay.seed ?? 'auto' }} ? {{ selectedStyleLabel() }}
+              </span>
+              <button type="button" class="matrix-export" (click)="copyCurrentLineupReplayJson()">
+                Copy JSON
+              </button>
+            </div>
+            <div class="current-replay-grid" role="group" aria-label="Current lineup replay summary">
+              <div class="metric-card">
+                <span class="metric-label">Score</span>
+                <span class="metric-value">{{ replay.score }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Possession</span>
+                <span class="metric-value">{{ replay.possession }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Shots</span>
+                <span class="metric-value">{{ replay.shots }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">xG</span>
+                <span class="metric-value">{{ replay.xg }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Zones C/W/L</span>
+                <span class="metric-value">{{ replay.zones }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Starters</span>
+                <span class="metric-value">{{ replay.playerCount }}/11</span>
+              </div>
+            </div>
+            <p class="panel-hint current-replay-starters">
+              {{ replay.starters.join(' ? ') }}
+            </p>
+          </div>
+
+          <div *ngIf="currentLineupMultiSeedSummary() as summary" class="formation-matrix analysis-matrix current-lineup-replay">
+            <div class="matrix-header">
+              <strong>Current lineup multi-seed</strong>
+              <span>
+                {{ summary.label }} ? formation {{ summary.formation || '?' }}
+                ? seeds {{ summary.seedStart }}..{{ summary.seedEnd }} ? {{ selectedStyleLabel() }}
+              </span>
+              <button type="button" class="matrix-export" (click)="copyCurrentLineupMultiSeedJson()">
+                Copy JSON
+              </button>
+            </div>
+            <div class="current-replay-grid" role="group" aria-label="Current lineup multi-seed summary">
+              <div class="metric-card">
+                <span class="metric-label">Avg Score</span>
+                <span class="metric-value">{{ fmtXg(summary.avgGoalsFor) }}-{{ fmtXg(summary.avgGoalsAgainst) }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Avg GD</span>
+                <span class="metric-value" [class]="deltaClass(summary.avgGoalDiff)">{{ fmtDeltaNumber(summary.avgGoalDiff) }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Avg Poss</span>
+                <span class="metric-value">{{ fmtPct(summary.avgPossessionFor) }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Avg Shots</span>
+                <span class="metric-value">
+                  {{ fmtXg(summary.avgShotsFor) }} / {{ fmtXg(summary.avgShotsAgainst) }}
+                  <span [class]="deltaClass(summary.avgShotDiff)">({{ fmtDeltaNumber(summary.avgShotDiff) }})</span>
+                </span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Avg xG</span>
+                <span class="metric-value">
+                  {{ fmtXg(summary.avgXgFor) }} / {{ fmtXg(summary.avgXgAgainst) }}
+                  <span [class]="deltaClass(summary.avgXgDiff)">({{ fmtDeltaNumber(summary.avgXgDiff) }})</span>
+                </span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Avg zones C/W/L</span>
+                <span class="metric-value">
+                  {{ fmtXg(summary.avgCentralShotsFor) }}/{{ fmtXg(summary.avgWideShotsFor) }}/{{ fmtXg(summary.avgLongShotsFor) }}
+                  /
+                  {{ fmtXg(summary.avgCentralShotsAgainst) }}/{{ fmtXg(summary.avgWideShotsAgainst) }}/{{ fmtXg(summary.avgLongShotsAgainst) }}
+                </span>
+              </div>
+            </div>
+            <p class="panel-hint current-replay-starters">
+              Starters {{ summary.playerCount }}/11 ? {{ summary.starters.join(' ? ') }}
+            </p>
+          </div>
+
+          <div *ngIf="playerSwapMatrixSummary() as swap" class="formation-matrix analysis-matrix current-lineup-replay">
+            <div class="matrix-header">
+              <strong>Player swap matrix</strong>
+              <span>
+                {{ swap.baselinePlayer }} vs {{ swap.swapPlayer }}
+                ? slot {{ swap.slotId }} ? seeds {{ swap.seedStart }}..{{ swap.seedEnd }}
+              </span>
+              <button type="button" class="matrix-export" (click)="copyPlayerSwapMatrixJson()">
+                Copy JSON
+              </button>
+              <button type="button" class="matrix-export" (click)="downloadPlayerSwapMatrixCsv()">
+                CSV
+              </button>
+            </div>
+            <div class="current-replay-grid" role="group" aria-label="Player swap matrix summary">
+              <div class="metric-card">
+                <span class="metric-label">Coach read</span>
+                <span class="metric-value" [class]="swap.swapReadClass">{{ swap.swapRead }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">? GF</span>
+                <span class="metric-value" [class]="deltaClass(swap.deltaGoalsFor)">{{ fmtDeltaNumber(swap.deltaGoalsFor) }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">? GA</span>
+                <span class="metric-value" [class]="deltaClass(-swap.deltaGoalsAgainst)">{{ fmtDeltaNumber(swap.deltaGoalsAgainst) }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">? GD</span>
+                <span class="metric-value" [class]="deltaClass(swap.deltaGoalDiff)">{{ fmtDeltaNumber(swap.deltaGoalDiff) }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">? Shots</span>
+                <span class="metric-value" [class]="deltaClass(swap.deltaShotsFor)">{{ fmtDeltaNumber(swap.deltaShotsFor) }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Delta Poss</span>
+                <span class="metric-value" [class]="deltaClass(swap.deltaPossessionFor)">{{ fmtDeltaNumber(swap.deltaPossessionFor) }}%</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">? xG For</span>
+                <span class="metric-value" [class]="deltaClass(swap.deltaXgFor)">{{ fmtDeltaNumber(swap.deltaXgFor) }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">? xG Diff</span>
+                <span class="metric-value" [class]="deltaClass(swap.deltaXgDiff)">{{ fmtDeltaNumber(swap.deltaXgDiff) }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Delta Zones For C/W/L</span>
+                <span class="metric-value" [class]="deltaClass(swap.deltaCentralShotsFor + swap.deltaWideShotsFor + swap.deltaLongShotsFor)">
+                  {{ fmtDeltaNumber(swap.deltaCentralShotsFor) }}/{{ fmtDeltaNumber(swap.deltaWideShotsFor) }}/{{ fmtDeltaNumber(swap.deltaLongShotsFor) }}
+                </span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Delta Zones Ag. C/W/L</span>
+                <span class="metric-value" [class]="deltaClass(-(swap.deltaCentralShotsAgainst + swap.deltaWideShotsAgainst + swap.deltaLongShotsAgainst))">
+                  {{ fmtDeltaNumber(swap.deltaCentralShotsAgainst) }}/{{ fmtDeltaNumber(swap.deltaWideShotsAgainst) }}/{{ fmtDeltaNumber(swap.deltaLongShotsAgainst) }}
+                </span>
+              </div>
+            </div>
+            <p class="panel-hint current-replay-starters" *ngIf="swap.preAutoSubDeltaXgFor !== undefined">
+              Pre-auto-sub 1'-59':
+              ÃŽ? Shots {{ fmtDeltaNumber(swap.preAutoSubDeltaShotsFor || 0) }}
+              Ã‚? ÃŽ? Shots Ag. {{ fmtDeltaNumber(swap.preAutoSubDeltaShotsAgainst || 0) }}
+              Ã‚? ÃŽ? xG For {{ fmtDeltaNumber(swap.preAutoSubDeltaXgFor || 0) }}
+              Ã‚? ÃŽ? xG Ag. {{ fmtDeltaNumber(swap.preAutoSubDeltaXgAgainst || 0) }}
+              Ã‚? ÃŽ? xG Diff {{ fmtDeltaNumber(swap.preAutoSubDeltaXgDiff || 0) }}
+            </p>
+            <p class="panel-hint current-replay-starters">
+              Coach read: {{ swap.swapReadDetail }}
+            </p>
+            <p class="panel-hint current-replay-starters">
+              Baseline avg xG {{ fmtXg(swap.baseline.avgXgFor) }} / {{ fmtXg(swap.baseline.avgXgAgainst) }}
+              ? Swapped avg xG {{ fmtXg(swap.swapped.avgXgFor) }} / {{ fmtXg(swap.swapped.avgXgAgainst) }}
+            </p>
+            <p class="panel-hint current-replay-starters">
+              Poss {{ fmtPct(swap.baseline.avgPossessionFor) }} -> {{ fmtPct(swap.swapped.avgPossessionFor) }}
+              Ã‚? Zones for C/W/L
+              {{ fmtXg(swap.baseline.avgCentralShotsFor) }}/{{ fmtXg(swap.baseline.avgWideShotsFor) }}/{{ fmtXg(swap.baseline.avgLongShotsFor) }}
+              ->
+              {{ fmtXg(swap.swapped.avgCentralShotsFor) }}/{{ fmtXg(swap.swapped.avgWideShotsFor) }}/{{ fmtXg(swap.swapped.avgLongShotsFor) }}
+              Ã‚? Against
+              {{ fmtXg(swap.baseline.avgCentralShotsAgainst) }}/{{ fmtXg(swap.baseline.avgWideShotsAgainst) }}/{{ fmtXg(swap.baseline.avgLongShotsAgainst) }}
+              ->
+              {{ fmtXg(swap.swapped.avgCentralShotsAgainst) }}/{{ fmtXg(swap.swapped.avgWideShotsAgainst) }}/{{ fmtXg(swap.swapped.avgLongShotsAgainst) }}
+            </p>
+          </div>
+
+          <div *ngIf="playerSwapBatterySummaries().length > 0" class="formation-matrix analysis-matrix current-lineup-replay">
+            <div class="matrix-header">
+              <strong>Player swap battery</strong>
+              <span>{{ playerSwapBatterySummaries().length }} swaps ? seeds {{ playerSwapBatterySummaries()[0].seedStart }}..{{ playerSwapBatterySummaries()[0].seedEnd }}</span>
+              <button type="button" class="matrix-export" (click)="copyPlayerSwapBatteryJson()">
+                Copy JSON
+              </button>
+              <button type="button" class="matrix-export" (click)="copyPlayerSwapBatteryReport()">
+                Copy report
+              </button>
+              <button type="button" class="matrix-export" (click)="downloadPlayerSwapBatteryCsv()">
+                CSV
+              </button>
+            </div>
+            <div *ngIf="playerSwapBatterySummary() as battery" class="current-replay-grid" role="group" aria-label="Player swap battery summary">
+              <div class="metric-card">
+                <span class="metric-label">Best</span>
+                <span class="metric-value delta-positive">{{ playerSwapBatteryBestWorstText(battery.best) }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Worst</span>
+                <span class="metric-value delta-negative">{{ playerSwapBatteryBestWorstText(battery.worst) }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Reads</span>
+                <span class="metric-value">{{ playerSwapBatteryCounterText(battery.reads) }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Fit</span>
+                <span class="metric-value">{{ playerSwapBatteryCounterText(battery.fits) }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Mode</span>
+                <span class="metric-value">{{ battery.mode }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Confidence</span>
+                <span class="metric-value">{{ battery.confidence }} ? {{ battery.precision }}</span>
+              </div>
+            </div>
+            <div class="table-scroll compact-position-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Read</th>
+                    <th>Fit</th>
+                    <th>Starter</th>
+                    <th>Bench</th>
+                    <th>OVR</th>
+                    <th>Slot</th>
+                    <th>Shots</th>
+                    <th>Shots Ag.</th>
+                    <th>xG For</th>
+                    <th>xG Ag.</th>
+                    <th>xG Diff</th>
+                    <th>Pre xG Diff</th>
+                    <th>Ataque</th>
+                    <th>Control</th>
+                    <th>Proteccion</th>
+                    <th>Canales</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let swap of playerSwapBatterySummaries(); trackBy: trackByPlayerSwapSummary">
+                    <td [class]="swap.swapReadClass">{{ swap.swapRead }}</td>
+                    <td [class]="swap.swapFitClass">{{ swap.swapFit }}</td>
+                    <td>{{ swap.baselinePlayer }}</td>
+                    <td>{{ swap.swapPlayer }}</td>
+                    <td [class]="deltaClass(swap.deltaPlayerOverall || 0)">
+                      {{ playerSwapOverallText(swap) }}
+                    </td>
+                    <td>{{ swap.slotId }}</td>
+                    <td [class]="deltaClass(swap.deltaShotsFor)">{{ fmtDeltaNumber(swap.deltaShotsFor) }}</td>
+                    <td [class]="deltaClass(-swap.deltaShotsAgainst)">{{ fmtDeltaNumber(swap.deltaShotsAgainst) }}</td>
+                    <td [class]="deltaClass(swap.deltaXgFor)">{{ fmtDeltaNumber(swap.deltaXgFor) }}</td>
+                    <td [class]="deltaClass(-swap.deltaXgAgainst)">{{ fmtDeltaNumber(swap.deltaXgAgainst) }}</td>
+                    <td [class]="deltaClass(swap.deltaXgDiff)">{{ fmtDeltaNumber(swap.deltaXgDiff) }}</td>
+                    <td [class]="deltaClass(swap.preAutoSubDeltaXgDiff || 0)">{{ fmtDeltaNumber(swap.preAutoSubDeltaXgDiff || 0) }}</td>
+                    <td [class]="swap.tacticalAttackClass">{{ swap.tacticalAttackRead }}</td>
+                    <td [class]="swap.tacticalCentralControlClass">{{ swap.tacticalCentralControlRead }}</td>
+                    <td [class]="swap.tacticalProtectionClass">{{ swap.tacticalProtectionRead }}</td>
+                    <td [class]="swap.tacticalChannelsClass" [title]="swap.tacticalBreakdownDetail">{{ swap.tacticalChannelsRead }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div *ngIf="playerSwapPrecisionComparisonRows().length > 0" class="formation-matrix analysis-matrix current-lineup-replay">
+            <div class="matrix-header">
+              <strong>Player swap precision compare</strong>
+              <span>Quick 3 seeds vs Balanced 10 seeds ? {{ playerSwapPrecisionComparisonRows().length }} swaps</span>
+            </div>
+            <div class="table-scroll compact-position-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Stability</th>
+                    <th>Fit</th>
+                    <th>Starter</th>
+                    <th>Bench</th>
+                    <th>Quick read</th>
+                    <th>Balanced read</th>
+                    <th>Quick xG Diff</th>
+                    <th>Balanced xG Diff</th>
+                    <th>Quick pre</th>
+                    <th>Balanced pre</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let row of playerSwapPrecisionComparisonRows(); trackBy: trackByPlayerSwapPrecisionComparison">
+                    <td [class]="row.stabilityClass">{{ row.stability }}</td>
+                    <td>{{ row.fit }}</td>
+                    <td>{{ row.starter }}</td>
+                    <td>{{ row.bench }}</td>
+                    <td [class]="row.quick.swapReadClass">{{ row.quick.swapRead }}</td>
+                    <td [class]="row.balanced.swapReadClass">{{ row.balanced.swapRead }}</td>
+                    <td [class]="deltaClass(row.quick.deltaXgDiff)">{{ fmtDeltaNumber(row.quick.deltaXgDiff) }}</td>
+                    <td [class]="deltaClass(row.balanced.deltaXgDiff)">{{ fmtDeltaNumber(row.balanced.deltaXgDiff) }}</td>
+                    <td [class]="deltaClass(row.quick.preAutoSubDeltaXgDiff || 0)">{{ fmtDeltaNumber(row.quick.preAutoSubDeltaXgDiff || 0) }}</td>
+                    <td [class]="deltaClass(row.balanced.preAutoSubDeltaXgDiff || 0)">{{ fmtDeltaNumber(row.balanced.preAutoSubDeltaXgDiff || 0) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div *ngIf="positionPixelMatrixSummary() as pixel" class="formation-matrix analysis-matrix current-lineup-replay">
+            <div class="matrix-header">
+              <strong>Position pixel matrix</strong>
+              <span>
+                {{ pixel.playerName }} ({{ pixel.playerPosition }}) ? slot {{ pixel.slotId }}
+                ? {{ pixel.fromXPercent }}/{{ pixel.fromYPercent }} -> {{ pixel.targetXPercent }}/{{ pixel.targetYPercent }}
+                ? seeds {{ pixel.seedStart }}..{{ pixel.seedEnd }}
+              </span>
+            </div>
+            <div class="current-replay-grid" role="group" aria-label="Position pixel matrix summary">
+              <div class="metric-card">
+                <span class="metric-label">Delta Shots</span>
+                <span class="metric-value" [class]="deltaClass(pixel.deltaShotsFor)">{{ fmtDeltaNumber(pixel.deltaShotsFor) }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Delta Poss</span>
+                <span class="metric-value" [class]="deltaClass(pixel.deltaPossessionFor)">{{ fmtDeltaNumber(pixel.deltaPossessionFor) }}%</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Delta xG For</span>
+                <span class="metric-value" [class]="deltaClass(pixel.deltaXgFor)">{{ fmtDeltaNumber(pixel.deltaXgFor) }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Delta xG Diff</span>
+                <span class="metric-value" [class]="deltaClass(pixel.deltaXgDiff)">{{ fmtDeltaNumber(pixel.deltaXgDiff) }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Delta Zones C/W/L</span>
+                <span class="metric-value" [class]="deltaClass(pixel.deltaCentralShotsFor + pixel.deltaWideShotsFor + pixel.deltaLongShotsFor)">
+                  {{ fmtDeltaNumber(pixel.deltaCentralShotsFor) }}/{{ fmtDeltaNumber(pixel.deltaWideShotsFor) }}/{{ fmtDeltaNumber(pixel.deltaLongShotsFor) }}
+                </span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Delta Zones Ag. C/W/L</span>
+                <span class="metric-value" [class]="deltaClass(-(pixel.deltaCentralShotsAgainst + pixel.deltaWideShotsAgainst + pixel.deltaLongShotsAgainst))">
+                  {{ fmtDeltaNumber(pixel.deltaCentralShotsAgainst) }}/{{ fmtDeltaNumber(pixel.deltaWideShotsAgainst) }}/{{ fmtDeltaNumber(pixel.deltaLongShotsAgainst) }}
+                </span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Delta xG Ag. C/W/L</span>
+                <span class="metric-value" [class]="deltaClass(-(pixel.deltaCentralXgAgainst + pixel.deltaWideXgAgainst + pixel.deltaLongXgAgainst))">
+                  {{ fmtDeltaNumber(pixel.deltaCentralXgAgainst) }}/{{ fmtDeltaNumber(pixel.deltaWideXgAgainst) }}/{{ fmtDeltaNumber(pixel.deltaLongXgAgainst) }}
+                </span>
+              </div>
+            </div>
+            <p class="panel-hint current-replay-starters">
+              xG for {{ fmtXg(pixel.baselineXgFor) }} -> {{ fmtXg(pixel.movedXgFor) }}
+              Ã‚? xG against {{ fmtXg(pixel.baselineXgAgainst) }} -> {{ fmtXg(pixel.movedXgAgainst) }}.
+              This is a 1-pixel forward sensitivity smoke; larger/sideways presets can reuse the same endpoint.
+            </p>
+          </div>
+
+          <div *ngIf="positionPixelMatrixRows().length > 0" class="formation-matrix analysis-matrix">
+            <div class="matrix-header">
+              <strong>Position movement presets</strong>
+              <span>DEF/MID/ATT representatives + same seeds, multiple pixel moves</span>
+              <button type="button" class="matrix-export" (click)="copyPositionPixelMatrixJson()">
+                Copy filtered JSON
+              </button>
+              <button type="button" class="matrix-export" (click)="downloadPositionPixelMatrixCsv()">
+                CSV
+              </button>
+            </div>
+            <div class="position-read-summary" aria-label="Position movement read summary">
+              <span
+                *ngFor="let item of positionPixelReadSummary()"
+                class="read-pill"
+                [ngClass]="'read-' + item.level"
+              >
+                {{ item.label }} {{ item.count }}
+              </span>
+              <span *ngIf="positionPixelHasChecks()" class="read-alert">
+                Review Check rows before tuning.
+              </span>
+            </div>
+            <div class="position-read-summary tactical-read-summary" aria-label="Position movement tactical summary">
+              <span
+                *ngFor="let item of positionPixelTacticalReadSummary()"
+                class="read-pill tactical-read-pill"
+                [class]="item.className"
+                [title]="item.hint"
+              >
+                {{ item.label }} {{ item.count }}
+              </span>
+            </div>
+            <div class="position-read-controls" aria-label="Position movement table controls">
+              <label>
+                Read
+                <select [ngModel]="positionPixelReadFilter()" (ngModelChange)="setPositionPixelReadFilter($event)">
+                  <option value="all">All</option>
+                  <option value="check">Check</option>
+                  <option value="strong">Strong</option>
+                  <option value="visible">Visible</option>
+                  <option value="stable">Stable</option>
+                </select>
+              </label>
+              <label>
+                Sort
+                <select [ngModel]="positionPixelSortMode()" (ngModelChange)="setPositionPixelSortMode($event)">
+                  <option value="default">Run order</option>
+                  <option value="read-desc">Read priority</option>
+                  <option value="impact-desc">Impact</option>
+                  <option value="distance-desc">Movement distance</option>
+                </select>
+              </label>
+              <span class="position-read-count">
+                Showing {{ displayedPositionPixelMatrixRows().length }} / {{ positionPixelMatrixRows().length }}
+              </span>
+            </div>
+            <div class="matrix-scroll">
+              <div class="matrix-scroll-hint" aria-hidden="true">Scroll horizontal para ver lectura ofensiva/defensiva completa ?</div>
+              <div class="matrix-table position-movement-table" role="table" aria-label="Position movement preset comparison">
+                <div class="matrix-row formation-matrix-row matrix-row-head" role="row">
+                  <span role="columnheader">Player</span>
+                  <span role="columnheader">Move</span>
+                  <span role="columnheader">Coord.</span>
+                  <span role="columnheader">Delta xG</span>
+                  <span role="columnheader">Delta xG Ag.</span>
+                  <span role="columnheader">Delta shots</span>
+                  <span role="columnheader">Shots Ag.</span>
+                  <span role="columnheader">Delta poss</span>
+                  <span role="columnheader">Delta zones C/W/L</span>
+                  <span role="columnheader">Zones Ag. C/W/L</span>
+                  <span role="columnheader">xG zones C/W/L</span>
+                  <span role="columnheader">xG Ag. C/W/L</span>
+                  <span role="columnheader">Shape move</span>
+                  <span role="columnheader">Tactical read</span>
+                  <span role="columnheader">Read</span>
+                </div>
+                <div *ngFor="let row of displayedPositionPixelMatrixRows(); trackBy: trackByPositionPixelRow" class="matrix-row formation-matrix-row" role="row">
+                  <span role="cell">{{ row.playerName }} ({{ row.playerPosition }})</span>
+                  <span role="cell">{{ row.label }}</span>
+                  <span role="cell">{{ row.fromXPercent }}/{{ row.fromYPercent }} -> {{ row.targetXPercent }}/{{ row.targetYPercent }}</span>
+                  <span role="cell" [class]="deltaClass(row.deltaXgFor)">{{ fmtDeltaMicro(row.deltaXgFor) }}</span>
+                  <span role="cell" [class]="deltaClass(-row.deltaXgAgainst)">{{ fmtDeltaMicro(row.deltaXgAgainst) }}</span>
+                  <span role="cell" [class]="deltaClass(row.deltaShotsFor)">{{ fmtDeltaNumber(row.deltaShotsFor) }}</span>
+                  <span role="cell" [class]="deltaClass(-row.deltaShotsAgainst)">{{ fmtDeltaNumber(row.deltaShotsAgainst) }}</span>
+                  <span role="cell" [class]="deltaClass(row.deltaPossessionFor)">{{ fmtDeltaNumber(row.deltaPossessionFor) }}%</span>
+                  <span role="cell" [class]="deltaClass(row.deltaCentralShotsFor + row.deltaWideShotsFor + row.deltaLongShotsFor)">
+                    {{ fmtDeltaNumber(row.deltaCentralShotsFor) }}/{{ fmtDeltaNumber(row.deltaWideShotsFor) }}/{{ fmtDeltaNumber(row.deltaLongShotsFor) }}
+                  </span>
+                  <span role="cell" [class]="deltaClass(-(row.deltaCentralShotsAgainst + row.deltaWideShotsAgainst + row.deltaLongShotsAgainst))">
+                    {{ fmtDeltaNumber(row.deltaCentralShotsAgainst) }}/{{ fmtDeltaNumber(row.deltaWideShotsAgainst) }}/{{ fmtDeltaNumber(row.deltaLongShotsAgainst) }}
+                  </span>
+                  <span role="cell" [class]="deltaClass(row.deltaCentralXgFor + row.deltaWideXgFor + row.deltaLongXgFor)">
+                    {{ fmtDeltaMicro(row.deltaCentralXgFor) }}/{{ fmtDeltaMicro(row.deltaWideXgFor) }}/{{ fmtDeltaMicro(row.deltaLongXgFor) }}
+                  </span>
+                  <span role="cell" [class]="deltaClass(-(row.deltaCentralXgAgainst + row.deltaWideXgAgainst + row.deltaLongXgAgainst))">
+                    {{ fmtDeltaMicro(row.deltaCentralXgAgainst) }}/{{ fmtDeltaMicro(row.deltaWideXgAgainst) }}/{{ fmtDeltaMicro(row.deltaLongXgAgainst) }}
+                  </span>
+                  <span role="cell" class="shape-move-read" [title]="positionPixelShapeMoveDetail(row)">
+                    {{ positionPixelShapeMove(row) }}
+                  </span>
+                  <span role="cell" [class]="positionPixelTacticalReadClass(row)" [title]="positionPixelTacticalReadReason(row)">
+                    {{ positionPixelTacticalRead(row) }}
+                  </span>
+                  <span role="cell" [class]="positionPixelReadClass(row)">{{ positionPixelRead(row) }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
 
           <div *ngIf="formationReplayResults().length > 0" class="formation-matrix analysis-matrix">
             <div class="matrix-header">
@@ -355,7 +1485,7 @@ const DEFAULT_REPLAY_SEED = 12345;
                   role="row"
                 >
                   <span role="cell">{{ row.formation }}</span>
-                  <span role="cell">{{ row.homeGoals ?? '—' }}-{{ row.awayGoals ?? '—' }}</span>
+                  <span role="cell">{{ row.homeGoals ?? '?' }}-{{ row.awayGoals ?? '?' }}</span>
                   <span role="cell">{{ fmtPct(row.homePossession) }} / {{ fmtPct(row.awayPossession) }}</span>
                   <span role="cell">{{ row.homeShots ?? '-' }} / {{ row.awayShots ?? '-' }}</span>
                   <span role="cell">{{ fmtXg(row.homeXg) }} / {{ fmtXg(row.awayXg) }}</span>
@@ -369,10 +1499,68 @@ const DEFAULT_REPLAY_SEED = 12345;
             </div>
           </div>
 
+          <div *ngIf="formationMatrixSummaryResults().length > 0" class="formation-matrix analysis-matrix">
+            <div class="matrix-header">
+              <strong>Formation averages</strong>
+              <span>
+                Seeds {{ formationMatrixSummaryResults()[0].seedStart }}-{{ formationMatrixSummaryResults()[0].seedEnd }}
+                ? {{ formationMatrixSummaryResults()[0].seedCount }} runs per formation
+              </span>
+            </div>
+            <div class="matrix-scroll">
+              <div class="matrix-table formation-matrix-table" role="table" aria-label="Formation average comparison">
+                <div class="matrix-row formation-matrix-row matrix-row-head" role="row">
+                  <span role="columnheader">Form.</span>
+                  <span role="columnheader">Goals F/Ag.</span>
+                  <span role="columnheader">Goal diff</span>
+                  <span role="columnheader">Poss For</span>
+                  <span role="columnheader">Shots F/Ag.</span>
+                  <span role="columnheader">Shot diff</span>
+                  <span role="columnheader">xG F/Ag.</span>
+                  <span role="columnheader">xG diff</span>
+                  <span role="columnheader">Zones F C/W/L</span>
+                  <span role="columnheader">Zones Ag C/W/L</span>
+                  <span role="columnheader">Shape P/A/D</span>
+                  <span role="columnheader">Atk L/C/R</span>
+                  <span role="columnheader">Def L/C/R</span>
+                </div>
+                <div
+                  *ngFor="let row of formationMatrixSummaryResults(); trackBy: trackByFormationSummary"
+                  class="matrix-row formation-matrix-row"
+                  role="row"
+                >
+                  <span role="cell">{{ row.formation }}</span>
+                  <span role="cell">{{ fmtXg(row.avgGoalsFor) }} / {{ fmtXg(row.avgGoalsAgainst) }}</span>
+                  <span role="cell">{{ fmtDeltaNumber(row.avgGoalDiff) }}</span>
+                  <span role="cell">{{ fmtPct(row.avgPossessionFor) }}</span>
+                  <span role="cell">{{ fmtXg(row.avgShotsFor) }} / {{ fmtXg(row.avgShotsAgainst) }}</span>
+                  <span role="cell">{{ fmtDeltaNumber(row.avgShotDiff) }}</span>
+                  <span role="cell">{{ fmtXg(row.avgXgFor) }} / {{ fmtXg(row.avgXgAgainst) }}</span>
+                  <span role="cell">{{ fmtDeltaNumber(row.avgXgDiff) }}</span>
+                  <span role="cell">
+                    {{ fmtXg(row.avgCentralShotsFor) }}/{{ fmtXg(row.avgWideShotsFor) }}/{{ fmtXg(row.avgLongShotsFor) }}
+                  </span>
+                  <span role="cell">
+                    {{ fmtXg(row.avgCentralShotsAgainst) }}/{{ fmtXg(row.avgWideShotsAgainst) }}/{{ fmtXg(row.avgLongShotsAgainst) }}
+                  </span>
+                  <span role="cell">
+                    {{ fmtXg(row.avgShapePossessionMultiplier) }}/{{ fmtXg(row.avgShapeAttackVolumeMultiplier) }}/{{ fmtXg(row.avgShapeDefensiveResistanceMultiplier) }}
+                  </span>
+                  <span role="cell">
+                    {{ fmtXg(row.avgShapeAttackLeft) }}/{{ fmtXg(row.avgShapeAttackCenter) }}/{{ fmtXg(row.avgShapeAttackRight) }}
+                  </span>
+                  <span role="cell">
+                    {{ fmtXg(row.avgShapeDefenseLeft) }}/{{ fmtXg(row.avgShapeDefenseCenter) }}/{{ fmtXg(row.avgShapeDefenseRight) }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div *ngIf="scenarioMatrixResults().length > 0" class="formation-matrix analysis-matrix scenario-matrix">
             <div class="matrix-header">
               <strong>Scenario matrix</strong>
-              <span>Same match + seed {{ seedInputModel ?? 'auto' }} · live tactical changes</span>
+              <span>Same match + seed {{ seedInputModel ?? 'auto' }} ? live tactical changes</span>
               <button type="button" class="matrix-export" (click)="copyScenarioMatrixJson()">
                 Copy JSON
               </button>
@@ -423,9 +1611,260 @@ const DEFAULT_REPLAY_SEED = 12345;
                   </span>
                   <span role="cell" [class]="deltaClass(scenarioZoneDiff(row).central + scenarioZoneDiff(row).wide + scenarioZoneDiff(row).long)">
                     C {{ fmtDeltaInt(scenarioZoneDiff(row).central) }}
-                    · W {{ fmtDeltaInt(scenarioZoneDiff(row).wide) }}
-                    · L {{ fmtDeltaInt(scenarioZoneDiff(row).long) }}
+                    ? W {{ fmtDeltaInt(scenarioZoneDiff(row).wide) }}
+                    ? L {{ fmtDeltaInt(scenarioZoneDiff(row).long) }}
                   </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div *ngIf="scenarioMatrixSummaryResults().length > 0" class="formation-matrix analysis-matrix scenario-matrix">
+            <div class="matrix-header">
+              <strong>Multi-seed scenario summary</strong>
+              <span>
+                Same match ? seeds {{ summarySeedStart() }}..{{ summarySeedEnd() }}
+                ? averages vs minute baselines
+              </span>
+              <span class="controlled-team-badge">
+                Controlando: {{ controlledTeamDisplayName() }}
+              </span>
+              <button type="button" class="matrix-export" (click)="copyScenarioMatrixSummaryJson()">
+                Copy filtered JSON
+              </button>
+              <button type="button" class="matrix-export" (click)="downloadScenarioMatrixSummaryCsv()">
+                CSV
+              </button>
+            </div>
+            <div class="position-read-summary tactical-read-summary" aria-label="Equipo controlado">
+              <span class="read-pill tactical-read-pill read-visible">
+                Controlando: {{ controlledTeamDisplayName() }}
+              </span>
+            </div>
+            <div
+              *ngIf="scenarioScoutingNotes().length > 0"
+              class="position-read-summary tactical-read-summary"
+              aria-label="Scouting rapido"
+            >
+              <span
+                *ngFor="let note of scenarioScoutingNotes()"
+                class="read-pill tactical-read-pill"
+                [class]="note.className"
+                [title]="note.body"
+              >
+                {{ note.title }}: {{ note.body }}
+              </span>
+            </div>
+            <div
+              *ngIf="scenarioDecisionCards().length > 0"
+              class="scenario-decision-grid"
+              aria-label="Decision tactica rapida"
+            >
+              <article
+                *ngFor="let card of scenarioDecisionCards()"
+                class="scenario-decision-card"
+                [class]="card.className"
+                [title]="card.detail"
+              >
+                <span class="decision-title">{{ card.title }}</span>
+                <strong>{{ card.label }}</strong>
+                <span class="decision-metrics">{{ card.metrics }}</span>
+                <small>{{ card.detail }}</small>
+              </article>
+            </div>
+            <div class="position-read-controls" aria-label="Scenario summary table controls">
+              <label>
+                Read
+                <select [ngModel]="scenarioSummaryReadFilter()" (ngModelChange)="setScenarioSummaryReadFilter($event)">
+                  <option value="all">All</option>
+                  <option value="actionable">Actionable</option>
+                  <option value="review">Review</option>
+                  <option value="strong">Strong</option>
+                  <option value="visible">Visible</option>
+                  <option value="small">Small signal</option>
+                  <option value="noise">Noise</option>
+                </select>
+              </label>
+              <label>
+                Sort
+                <select [ngModel]="scenarioSummarySortMode()" (ngModelChange)="setScenarioSummarySortMode($event)">
+                  <option value="read-desc">Read priority</option>
+                  <option value="impact-desc">Impact</option>
+                  <option value="xg-desc">xG movement</option>
+                  <option value="default">Run order</option>
+                </select>
+              </label>
+              <span class="position-read-count">
+                Showing {{ displayedScenarioMatrixSummaryRows().length }} / {{ scenarioMatrixSummaryResults().length }}
+              </span>
+            </div>
+            <div class="position-read-summary tactical-read-summary" aria-label="Scenario summary outcome summary">
+              <span
+                *ngFor="let item of scenarioSummaryOutcomeSummary()"
+                class="read-pill tactical-read-pill"
+                [class]="item.className"
+                [title]="item.hint"
+              >
+                {{ item.label }} {{ item.count }}
+              </span>
+            </div>
+            <div class="matrix-scroll">
+              <div class="matrix-table scenario-matrix-table" role="table" aria-label="Multi-seed tactical scenario summary">
+                <div class="matrix-row scenario-matrix-summary-row matrix-row-head" role="row">
+                  <span role="columnheader">Scenario</span>
+                  <span role="columnheader">Baseline</span>
+                  <span role="columnheader">Action</span>
+                  <span role="columnheader">Coach read</span>
+                  <span role="columnheader">Read</span>
+                  <span role="columnheader">Outcome</span>
+                  <span role="columnheader">Seeds</span>
+                  <span role="columnheader">?xG For avg</span>
+                  <span role="columnheader">?xG For min/max</span>
+                  <span role="columnheader">?xG Ag.</span>
+                  <span role="columnheader">?Shots For/Ag.</span>
+                  <span role="columnheader">?Poss</span>
+                  <span role="columnheader">?Zones C/W</span>
+                  <span role="columnheader">?Opp zones C/W</span>
+                  <span role="columnheader">?Opp xG C/W</span>
+                  <span role="columnheader">?Opp wide L/R xG</span>
+                </div>
+                <div
+                  *ngFor="let row of displayedScenarioMatrixSummaryRows(); trackBy: trackByScenarioMatrixSummary"
+                  class="matrix-row scenario-matrix-summary-row"
+                  role="row"
+                >
+                  <span role="cell">{{ row.scenario }}</span>
+                  <span role="cell">{{ row.baselineScenario }}</span>
+                  <span role="cell" [title]="row.actionDetail">{{ summaryActionLabel(row) }}</span>
+                  <span role="cell" class="shape-move-read" [title]="scenarioSummaryCoachReadDetail(row)">
+                    {{ scenarioSummaryCoachRead(row) }}
+                  </span>
+                  <span
+                    role="cell"
+                    [class]="scenarioSummaryReadClass(row)"
+                    [title]="scenarioSummaryReadReason(row)"
+                  >
+                    {{ scenarioSummaryRead(row) }}
+                  </span>
+                  <span
+                    role="cell"
+                    [class]="scenarioSummaryOutcomeClass(row)"
+                    [title]="scenarioSummaryOutcomeReason(row)"
+                  >
+                    {{ scenarioSummaryOutcome(row) }}
+                  </span>
+                  <span role="cell">{{ row.seedCount }}</span>
+                  <span role="cell" [class]="deltaClass(row.avgUserXgDelta)">
+                    {{ fmtDeltaNumber(row.avgUserXgDelta) }}
+                  </span>
+                  <span role="cell">
+                    {{ fmtDeltaNumber(row.minUserXgDelta) }} / {{ fmtDeltaNumber(row.maxUserXgDelta) }}
+                  </span>
+                  <span role="cell" [class]="deltaClass(-row.avgOpponentXgDelta)">
+                    {{ fmtDeltaNumber(row.avgOpponentXgDelta) }}
+                  </span>
+                  <span role="cell">
+                    <span [class]="deltaClass(row.avgUserShotsDelta)">
+                      F {{ fmtDeltaNumber(row.avgUserShotsDelta) }}
+                    </span>
+                    ?
+                    <span [class]="deltaClass(-row.avgOpponentShotsDelta)">
+                      Ag {{ fmtDeltaNumber(row.avgOpponentShotsDelta) }}
+                    </span>
+                  </span>
+                  <span role="cell" [class]="deltaClass(row.avgUserPossessionDelta)">
+                    {{ fmtDeltaNumber(row.avgUserPossessionDelta) }}pp
+                  </span>
+                  <span role="cell">
+                    C {{ fmtDeltaNumber(row.avgUserCentralDelta) }}
+                    ? W {{ fmtDeltaNumber(row.avgUserWideDelta) }}
+                  </span>
+                  <span role="cell">
+                    C {{ fmtDeltaNumber(row.avgOpponentCentralDelta) }}
+                    ? W {{ fmtDeltaNumber(row.avgOpponentWideDelta) }}
+                  </span>
+                  <span role="cell">
+                    C {{ fmtDeltaNumber(row.avgOpponentCentralXgDelta) }}
+                    ? W {{ fmtDeltaNumber(row.avgOpponentWideXgDelta) }}
+                  </span>
+                  <span role="cell">
+                    L {{ fmtDeltaNumber(row.avgOpponentLeftWideXgDelta) }}
+                    ? R {{ fmtDeltaNumber(row.avgOpponentRightWideXgDelta) }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div *ngIf="scenarioBatteryRows().length > 0" class="formation-matrix analysis-matrix scenario-battery">
+            <div class="matrix-header">
+              <strong>Battery tablero tactico</strong>
+              <span>
+                {{ scenarioBatteryRows().length }} lecturas ? seeds {{ summarySeedStart() }}..{{ summarySeedStart() + scenarioMatrixSmokeSeedCount() - 1 }}
+                ? {{ scenarioBatteryGroupLabel(scenarioBatteryRows()[0]?.scenarioGroup || scenarioBatteryGroupModel) }}
+              </span>
+              <button type="button" class="matrix-export" (click)="copyScenarioBatteryJson()">
+                Copy JSON
+              </button>
+              <button type="button" class="matrix-export" (click)="downloadScenarioBatteryCsv()">
+                CSV
+              </button>
+            </div>
+            <div class="position-read-summary tactical-read-summary" aria-label="Scenario battery notes">
+              <span class="read-pill tactical-read-pill read-visible">
+                {{ scenarioBatteryScopeHint() }}
+              </span>
+              <span class="read-pill tactical-read-pill read-stable">
+                {{ scenarioBatteryGroupHint() }}
+              </span>
+            </div>
+            <div class="matrix-scroll">
+              <div class="matrix-table scenario-battery-table" role="table" aria-label="Tactical battery board">
+                <div class="matrix-row scenario-battery-row matrix-row-head" role="row">
+                  <span role="columnheader">Partido</span>
+                  <span role="columnheader">Controlando</span>
+                  <span role="columnheader">Grupo</span>
+                  <span role="columnheader">Decision</span>
+                  <span role="columnheader">Plan</span>
+                  <span role="columnheader">Doble</span>
+                  <span role="columnheader">Atacar</span>
+                  <span role="columnheader">Forma</span>
+                  <span role="columnheader">Cuidar</span>
+                  <span role="columnheader">Evitar</span>
+                  <span role="columnheader">Amenaza rival</span>
+                  <span role="columnheader">Escenarios</span>
+                </div>
+                <div
+                  *ngFor="let row of scenarioBatteryRows(); trackBy: trackByScenarioBattery"
+                  class="matrix-row scenario-battery-row"
+                  role="row"
+                >
+                  <span role="cell">{{ row.matchLabel }}</span>
+                  <span role="cell">{{ row.controlledTeam }} ({{ row.controlledSide === 'HOME' ? 'local' : 'visitante' }})</span>
+                  <span role="cell">{{ scenarioBatteryGroupLabel(row.scenarioGroup) }}</span>
+                  <span role="cell" [title]="row.decisionDetail">{{ row.decision }}</span>
+                  <span role="cell" [title]="scenarioBatteryCardDetail(row, 'Plan actual')">
+                    {{ scenarioBatteryCardSummary(row, 'Plan actual') }}
+                  </span>
+                  <span role="cell" [title]="scenarioBatteryCardDetail(row, 'Doble ganancia')">
+                    {{ scenarioBatteryCardSummary(row, 'Doble ganancia') }}
+                  </span>
+                  <span role="cell" [title]="scenarioBatteryCardDetail(row, 'Atacar')">
+                    {{ scenarioBatteryCardSummary(row, 'Atacar') }}
+                  </span>
+                  <span role="cell" [title]="scenarioBatteryCardDetail(row, 'Forma')">
+                    {{ scenarioBatteryCardSummary(row, 'Forma') }}
+                  </span>
+                  <span role="cell" [title]="scenarioBatteryCardDetail(row, 'Cuidar')">
+                    {{ scenarioBatteryCardSummary(row, 'Cuidar') }}
+                  </span>
+                  <span role="cell" [title]="scenarioBatteryCardDetail(row, 'Evitar')">
+                    {{ scenarioBatteryCardSummary(row, 'Evitar') }}
+                  </span>
+                  <span role="cell" [title]="scenarioBatteryCardDetail(row, 'Amenaza rival')">
+                    {{ scenarioBatteryCardSummary(row, 'Amenaza rival') }}
+                  </span>
+                  <span role="cell">{{ row.scenarioCount }} x {{ row.seedCount }}</span>
                 </div>
               </div>
             </div>
@@ -434,7 +1873,7 @@ const DEFAULT_REPLAY_SEED = 12345;
 
         <!-- Panel C: Match list (full width) -->
         <section class="panel panel-c" aria-labelledby="panel-c-heading">
-          <h2 id="panel-c-heading" class="panel-title">Panel C · Matches</h2>
+          <h2 id="panel-c-heading" class="panel-title">Panel C ? Matches</h2>
           <p class="panel-hint">Click a match to load its detail in Panel A and the scrubber in Panel D.</p>
 
           <div *ngIf="rounds().length === 0" class="empty-rounds">
@@ -467,7 +1906,7 @@ const DEFAULT_REPLAY_SEED = 12345;
                     <ng-container *ngIf="m.homeGoals !== null && m.awayGoals !== null; else pendingScore">
                       {{ m.homeGoals }} - {{ m.awayGoals }}
                     </ng-container>
-                    <ng-template #pendingScore>—</ng-template>
+                    <ng-template #pendingScore>?</ng-template>
                   </span>
                   <span class="match-status" [attr.data-status]="m.status">{{ m.status }}</span>
                 </li>
@@ -478,7 +1917,7 @@ const DEFAULT_REPLAY_SEED = 12345;
 
         <!-- Panel D: Timeline scrubber (F3) -->
         <section class="panel panel-d" aria-labelledby="panel-d-heading">
-          <h2 id="panel-d-heading" class="panel-title">Panel D · Timeline Scrubber</h2>
+          <h2 id="panel-d-heading" class="panel-title">Panel D ? Timeline Scrubber</h2>
           <p class="panel-hint" *ngIf="!selectedMatchId()">
             Select a match in Panel C to use the timeline scrubber.
           </p>
@@ -602,6 +2041,16 @@ const DEFAULT_REPLAY_SEED = 12345;
     .panel-hint { margin: 0 0 1rem; color: var(--text-muted, #666); font-size: 0.85rem; }
     .formation-field { width: 100%; }
     .seed-field, .round-field { width: 100%; }
+    .swap-selector-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr minmax(110px, 0.45fr);
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .swap-field, .swap-seed-count-field { width: 100%; }
+    @media (max-width: 767px) {
+      .swap-selector-row { grid-template-columns: 1fr; }
+    }
     .control-group-divider {
       height: 1px;
       background: var(--border-color, #e0e0e0);
@@ -617,6 +2066,36 @@ const DEFAULT_REPLAY_SEED = 12345;
       border: 1px solid #ffe0a3;
       font-size: 0.82rem;
       line-height: 1.35;
+    }
+    .analysis-ready-banner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      margin: 0.75rem 0 0;
+      padding: 0.6rem 0.7rem;
+      border: 1px solid rgba(34, 197, 94, 0.45);
+      border-radius: 6px;
+      background: rgba(34, 197, 94, 0.12);
+      color: #166534;
+      font-size: 0.82rem;
+      font-weight: 700;
+      line-height: 1.35;
+    }
+    .analysis-ready-banner button {
+      border: 0;
+      border-radius: 999px;
+      background: #166534;
+      color: #fff;
+      cursor: pointer;
+      font: inherit;
+      font-size: 0.76rem;
+      font-weight: 800;
+      padding: 0.32rem 0.6rem;
+      white-space: nowrap;
+    }
+    .analysis-ready-banner button:hover {
+      background: #14532d;
     }
     .formation-matrix {
       margin-top: 1rem;
@@ -648,9 +2127,32 @@ const DEFAULT_REPLAY_SEED = 12345;
       padding: 0.18rem 0.55rem;
       cursor: pointer;
     }
+    .controlled-team-badge {
+      border: 1px solid #1565c0;
+      border-radius: 999px;
+      background: #eaf4ff;
+      color: #0d47a1;
+      font-size: 0.74rem;
+      font-weight: 900;
+      padding: 0.18rem 0.6rem;
+    }
     .matrix-scroll {
       overflow-x: auto;
       width: 100%;
+      border-top: 1px solid #edf2ee;
+      scrollbar-color: #9bb8a4 #edf2ee;
+    }
+    .matrix-scroll-hint {
+      position: sticky;
+      left: 0;
+      width: max-content;
+      max-width: 100%;
+      padding: 0.25rem 0.75rem;
+      color: var(--text-muted, #667);
+      font-size: 0.72rem;
+      font-weight: 700;
+      background: linear-gradient(90deg, #fbfdfb 70%, rgba(251, 253, 251, 0));
+      z-index: 1;
     }
     .matrix-table { display: grid; font-size: 0.8rem; min-width: 760px; }
     .matrix-row {
@@ -662,10 +2164,45 @@ const DEFAULT_REPLAY_SEED = 12345;
       font-variant-numeric: tabular-nums;
     }
     .formation-matrix-row {
-      grid-template-columns: 90px 80px 120px 100px 100px minmax(220px, 1fr);
+      grid-template-columns: 120px 82px 126px 82px 86px 86px minmax(190px, 1fr) 92px;
+    }
+    .position-movement-table {
+      min-width: 1540px;
+      font-size: 0.74rem;
+    }
+    .position-movement-table .matrix-row {
+      grid-template-columns:
+        126px 112px 128px
+        72px 74px 72px 72px 72px
+        120px 120px 96px 126px 96px 72px;
+      gap: 0.35rem;
+      padding: 0.34rem 0.65rem;
+      align-items: center;
+    }
+    .position-movement-table .matrix-row > span {
+      white-space: normal;
+      line-height: 1.2;
+    }
+    .position-movement-table .matrix-row > span:nth-child(4),
+    .position-movement-table .matrix-row > span:nth-child(5),
+    .position-movement-table .matrix-row > span:nth-child(6),
+    .position-movement-table .matrix-row > span:nth-child(7),
+    .position-movement-table .matrix-row > span:nth-child(8) {
+      text-align: right;
+      white-space: nowrap;
+    }
+    .position-movement-table .matrix-row > span:nth-child(9),
+    .position-movement-table .matrix-row > span:nth-child(10) {
+      font-size: 0.7rem;
+      white-space: nowrap;
+    }
+    .shape-move-read {
+      color: #245b39;
+      font-size: 0.7rem;
+      font-weight: 700;
     }
     .scenario-matrix-table {
-      min-width: 1460px;
+      min-width: 1600px;
     }
     .scenario-matrix-row {
       grid-template-columns:
@@ -675,6 +2212,40 @@ const DEFAULT_REPLAY_SEED = 12345;
         100px 78px
         110px 78px
         minmax(220px, 1fr) 170px;
+    }
+    .scenario-matrix-summary-row {
+      grid-template-columns:
+        190px 150px minmax(240px, 1.5fr)
+        150px 96px 108px 64px 100px 130px 100px
+        150px 100px 130px 150px 150px 170px;
+    }
+    .scenario-battery-table {
+      min-width: 2200px;
+    }
+    .scenario-battery-row {
+      grid-template-columns:
+        220px 180px 86px
+        minmax(220px, 1.1fr)
+        minmax(180px, 0.9fr)
+        minmax(210px, 1fr)
+        minmax(210px, 1fr)
+        minmax(210px, 1fr)
+        minmax(210px, 1fr)
+        minmax(210px, 1fr)
+        minmax(210px, 1fr)
+        90px;
+    }
+    .inline-progress {
+      display: inline-flex;
+      align-items: center;
+      min-height: 32px;
+      padding: 0 0.75rem;
+      border-radius: 999px;
+      background: #eef7ff;
+      color: #0d47a1;
+      font-size: 0.78rem;
+      font-weight: 700;
+      white-space: nowrap;
     }
     .matrix-row > span {
       min-width: 0;
@@ -692,6 +2263,135 @@ const DEFAULT_REPLAY_SEED = 12345;
     }
     .delta-neutral {
       color: var(--text-muted, #777);
+    }
+    .read-stable {
+      color: var(--text-muted, #777);
+      font-weight: 700;
+    }
+    .read-visible {
+      color: #1565c0;
+      font-weight: 700;
+    }
+    .read-strong {
+      color: #ef6c00;
+      font-weight: 700;
+    }
+    .read-check {
+      color: #b71c1c;
+      font-weight: 800;
+    }
+    .position-read-summary {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      align-items: center;
+      margin: 0.35rem 0 0.65rem;
+    }
+    .tactical-read-summary {
+      margin-top: -0.25rem;
+    }
+    .read-pill {
+      border: 1px solid currentColor;
+      border-radius: 999px;
+      padding: 0.16rem 0.5rem;
+      background: rgba(255, 255, 255, 0.66);
+      font-size: 0.74rem;
+      font-weight: 800;
+    }
+    .tactical-read-pill {
+      background: rgba(46, 95, 62, 0.06);
+    }
+    .scenario-decision-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 0.55rem;
+      margin: 0.1rem 0 0.8rem;
+    }
+    .scenario-decision-card {
+      display: flex;
+      flex-direction: column;
+      gap: 0.22rem;
+      min-height: 92px;
+      padding: 0.55rem 0.65rem;
+      border: 1px solid #dbe7dd;
+      border-left: 4px solid #9e9e9e;
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    }
+    .scenario-decision-card .decision-title {
+      color: var(--text-muted, #666);
+      font-size: 0.68rem;
+      font-weight: 900;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .scenario-decision-card strong {
+      color: #163f28;
+      font-size: 0.86rem;
+      line-height: 1.15;
+    }
+    .scenario-decision-card .decision-metrics {
+      font-size: 0.78rem;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+    }
+    .scenario-decision-card small {
+      color: var(--text-muted, #555);
+      font-size: 0.72rem;
+      line-height: 1.2;
+    }
+    .scenario-decision-card.decision-attack {
+      border-left-color: #1565c0;
+      background: #f7fbff;
+    }
+    .scenario-decision-card.decision-shape {
+      border-left-color: #6a1b9a;
+      background: #fbf7ff;
+    }
+    .scenario-decision-card.decision-safe {
+      border-left-color: #2e7d32;
+      background: #f7fff8;
+    }
+    .scenario-decision-card.decision-risk {
+      border-left-color: #b71c1c;
+      background: #fff7f7;
+    }
+    .read-alert {
+      border-radius: 999px;
+      padding: 0.16rem 0.55rem;
+      background: rgba(183, 28, 28, 0.1);
+      color: #b71c1c;
+      font-size: 0.74rem;
+      font-weight: 800;
+    }
+    .position-read-controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.65rem;
+      margin: 0 0 0.75rem;
+      color: var(--text-muted, #555);
+      font-size: 0.78rem;
+    }
+    .position-read-controls label {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-weight: 700;
+    }
+    .position-read-controls select {
+      border: 1px solid #d6e4d8;
+      border-radius: 999px;
+      padding: 0.18rem 0.5rem;
+      background: #fff;
+      color: var(--text-color, #1f2d24);
+      font-size: 0.76rem;
+      font-weight: 700;
+    }
+    .position-read-count {
+      margin-left: auto;
+      font-weight: 700;
     }
     .matrix-row-head {
       font-weight: 700;
@@ -755,6 +2455,16 @@ const DEFAULT_REPLAY_SEED = 12345;
       grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
       gap: 0.5rem;
     }
+    .current-replay-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+    }
+    .current-replay-starters {
+      margin-top: 0.75rem;
+      line-height: 1.4;
+    }
     .metric-card {
       display: flex; flex-direction: column; align-items: center;
       padding: 0.5rem; border: 1px solid #eee; border-radius: 4px;
@@ -778,18 +2488,21 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   private snackBar = inject(MatSnackBar);
   private dialog = inject(MatDialog);
   private http = inject(HttpClient);
+  private readonly formationPositionsByName = signal<Record<string, FormationDTO['positions']>>({});
 
   /** Allowed formation codes (UI select options). */
   readonly formationCodes: readonly FormationCode[] = FORMATION_CODES;
 
   readonly teamStyleOptions: readonly TeamStyleOption[] = [
     { value: 'BALANCED', label: 'Balanceado', hint: 'Sin sesgo de canal.' },
-    { value: 'WIDE_PLAY', label: 'Bandas', hint: 'Busca más ataques y remates por los costados.' },
+    { value: 'WIDE_PLAY', label: 'Bandas', hint: 'Busca m?s ataques y remates por los costados.' },
+    { value: 'LEFT_FLANK', label: 'Canal izquierdo', hint: 'Carga ataques por el canal izquierdo del modelo.' },
+    { value: 'RIGHT_FLANK', label: 'Canal derecho', hint: 'Carga ataques por el canal derecho del modelo.' },
     { value: 'CENTRAL_PLAY', label: 'Centro', hint: 'Concentra juego interior y remates centrales.' },
     { value: 'ATTACKING', label: 'Ofensivo', hint: 'Sube volumen general de chances.' },
-    { value: 'DEFENSIVE', label: 'Defensivo', hint: 'Baja ritmo y prioriza protección.' },
-    { value: 'COUNTER', label: 'Contra', hint: 'Menos posesión, más transición.' },
-    { value: 'POSSESSION', label: 'Posesión', hint: 'Más posesión y elaboración.' },
+    { value: 'DEFENSIVE', label: 'Defensivo', hint: 'Baja ritmo y prioriza protecci?n.' },
+    { value: 'COUNTER', label: 'Contra', hint: 'Menos posesi?n, m?s transici?n.' },
+    { value: 'POSSESSION', label: 'Posesi?n', hint: 'M?s posesi?n y elaboraci?n.' },
   ];
 
   /** Constants exposed to the template. */
@@ -810,6 +2523,22 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
 
   selectedStyleModel: TeamStyle = 'BALANCED';
 
+  selectedSwapStarterIdModel: string | null = null;
+
+  selectedSwapBenchIdModel: string | null = null;
+
+  playerSwapSeedCountModel = 3;
+
+  playerSwapBatteryModeModel: 'natural' | 'mixed' | 'stress' = 'natural';
+
+  playerSwapBatteryPrecisionModel: 'quick' | 'balanced' | 'reliable' = 'quick';
+
+  controlledTeamSideModel: ControlledTeamSide = 'USER';
+
+  scenarioBatteryGroupModel: 'ALL' | 'OFFENSE' | 'DEFENSE' | 'OPPONENT' = 'OFFENSE';
+
+  scenarioBatteryScopeModel: 'quick' | 'balanced' = 'quick';
+
   /** V24D24.2: seed for the "Replay with seed" button (null = non-reproducible). */
   seedInputModel: number | null = DEFAULT_REPLAY_SEED;
 
@@ -823,9 +2552,10 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
 
   readonly userTeamName = signal<string | null>(null);
 
-  /** Currently selected match (Panel C click → Panel A renders). */
+  /** Currently selected match (Panel C click ? Panel A renders). */
   readonly selectedMatchId = signal<string | null>(null);
   readonly detailPanelVisible = signal<boolean>(true);
+  readonly detailRefreshToken = signal<number>(0);
 
   readonly selectedMatch = signal<TestHarnessMatchRow | null>(null);
 
@@ -844,8 +2574,316 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   /** Formation comparison results for selected match + seed. */
   readonly formationReplayResults = signal<FormationReplayResult[]>([]);
 
+  /** Averaged formation comparison across multiple seeds. */
+  readonly formationMatrixSummaryResults = signal<FormationMatrixSummaryRow[]>([]);
+
+  /** One-click proof that the selected match was replayed with the current visual lineup. */
+  readonly currentLineupReplayResult = signal<CurrentLineupReplayResult | null>(null);
+
+  /** Current visual lineup averaged across multiple deterministic seeds. */
+  readonly currentLineupMultiSeedSummary = signal<CurrentLineupMultiSeedSummary | null>(null);
+
+  /** Automatic starter-vs-bench player swap comparison. */
+  readonly playerSwapMatrixSummary = signal<PlayerSwapMatrixSummary | null>(null);
+  readonly playerSwapBatterySummaries = signal<PlayerSwapMatrixSummary[]>([]);
+  readonly playerSwapPrecisionComparisonRows = signal<PlayerSwapPrecisionComparisonRow[]>([]);
+  readonly playerSwapBatterySummary = computed<PlayerSwapBatterySummary>(() => {
+    const rows = this.playerSwapBatterySummaries();
+    const reads: Record<string, number> = {};
+    const fits: Record<string, number> = {};
+    for (const row of rows) {
+      reads[row.swapRead] = (reads[row.swapRead] ?? 0) + 1;
+      fits[row.swapFit] = (fits[row.swapFit] ?? 0) + 1;
+    }
+    const sorted = [...rows].sort((a, b) => this.playerSwapDecisionScore(b) - this.playerSwapDecisionScore(a));
+    const seedCount = rows[0]?.seedCount ?? this.playerSwapSeedCountModel;
+    return {
+      total: rows.length,
+      mode: this.playerSwapBatteryModeModel,
+      precision: this.playerSwapBatteryPrecisionModel,
+      confidence: this.playerSwapBatteryConfidenceLabel(seedCount),
+      best: sorted[0] ?? null,
+      worst: sorted[sorted.length - 1] ?? null,
+      reads,
+      fits,
+    };
+  });
+
+  /** One-pixel starter movement comparison. */
+  readonly positionPixelMatrixSummary = signal<PositionPixelMatrixSummary | null>(null);
+  readonly positionPixelMatrixRows = signal<PositionPixelMatrixSummary[]>([]);
+  readonly positionPixelReadFilter = signal<PositionPixelReadFilter>('all');
+  readonly positionPixelSortMode = signal<PositionPixelSortMode>('default');
+
+  readonly displayedPositionPixelMatrixRows = computed(() => {
+    const filter = this.positionPixelReadFilter();
+    const sort = this.positionPixelSortMode();
+    const rows = this.positionPixelMatrixRows()
+      .filter((row) => filter === 'all' || this.positionPixelReadLevel(row) === filter)
+      .map((row, index) => ({ row, index }));
+
+    if (sort !== 'default') {
+      rows.sort((a, b) => {
+        if (sort === 'read-desc') {
+          return this.positionPixelReadSeverity(b.row) - this.positionPixelReadSeverity(a.row) || a.index - b.index;
+        }
+        if (sort === 'impact-desc') {
+          return this.positionPixelImpactScore(b.row) - this.positionPixelImpactScore(a.row) || a.index - b.index;
+        }
+        return this.positionPixelDistance(b.row) - this.positionPixelDistance(a.row) || a.index - b.index;
+      });
+    }
+
+    return rows.map((item) => item.row);
+  });
+
+  readonly playerSwapSlotOptions = signal<PlayerSwapSlotOption[]>([]);
+
+  readonly playerSwapBenchOptions = signal<PlayerSwapBenchOption[]>([]);
+
   /** Controlled live tactical scenarios for selected match + seed. */
   readonly scenarioMatrixResults = signal<ScenarioMatrixRow[]>([]);
+
+  /** Averaged controlled scenarios across multiple seeds. */
+  readonly scenarioMatrixSummaryResults = signal<ScenarioMatrixSummaryRow[]>([]);
+  readonly scenarioBatteryRows = signal<ScenarioBatteryRow[]>([]);
+  readonly scenarioBatteryProgress = signal<string>('');
+
+  readonly scenarioMatrixSummarySeedCount = signal<number>(20);
+  readonly scenarioSummaryReadFilter = signal<ScenarioSummaryReadFilter>('all');
+  readonly scenarioSummarySortMode = signal<ScenarioSummarySortMode>('read-desc');
+
+  readonly displayedScenarioMatrixSummaryRows = computed(() => {
+    const filter = this.scenarioSummaryReadFilter();
+    const sort = this.scenarioSummarySortMode();
+    const rows = this.scenarioMatrixSummaryResults()
+      .filter((row) => {
+        const level = this.scenarioSummaryReadLevel(row);
+        if (filter === 'all') return true;
+        if (filter === 'actionable') return level === 'review' || level === 'strong' || level === 'visible';
+        return level === filter;
+      })
+      .map((row, index) => ({ row, index }));
+
+    if (sort !== 'default') {
+      rows.sort((a, b) => {
+        if (sort === 'read-desc') {
+          return this.scenarioSummaryReadSeverity(b.row) - this.scenarioSummaryReadSeverity(a.row) || a.index - b.index;
+        }
+        if (sort === 'impact-desc') {
+          return this.scenarioSummaryImpactScore(b.row) - this.scenarioSummaryImpactScore(a.row) || a.index - b.index;
+        }
+        return Math.abs(b.row.avgUserXgDelta) - Math.abs(a.row.avgUserXgDelta) || a.index - b.index;
+      });
+    }
+
+    return rows.map((item) => item.row);
+  });
+
+  readonly scenarioScoutingNotes = computed<ScenarioScoutingNote[]>(() => {
+    const rows = this.scenarioMatrixSummaryResults()
+      .filter((row) => !row.scenario.includes('noop') && !row.scenario.startsWith('base-'));
+    if (rows.length === 0) {
+      return [];
+    }
+
+    const notes: ScenarioScoutingNote[] = [];
+
+    const channelCandidates = rows
+      .filter((row) => ['m45-central', 'm45-wide', 'm45-left', 'm45-right'].includes(row.scenario))
+      .filter((row) => row.avgUserXgDelta >= 0.06 && row.avgOpponentXgDelta <= 0.14)
+      .sort((a, b) => b.avgUserXgDelta - a.avgUserXgDelta);
+    const channelAttack = channelCandidates[0];
+    if (channelAttack) {
+      const runnerUp = channelCandidates[1];
+      const runnerUpDelta = runnerUp ? channelAttack.avgUserXgDelta - runnerUp.avgUserXgDelta : 0;
+      const runnerUpText = runnerUp
+        ? Math.abs(runnerUpDelta) < 0.005
+          ? ` Queda parejo con ${this.summaryActionLabel(runnerUp)}; conviene mirar xGA y zonas.`
+          : ` Supera a ${this.summaryActionLabel(runnerUp)} por ${this.fmtDeltaNumber(runnerUpDelta)} xG.`
+        : '';
+      notes.push({
+        title: 'Canal recomendado',
+        body: `${this.summaryActionLabel(channelAttack)}: ${this.scenarioSummaryUserChannelRead(channelAttack)} (${this.fmtDeltaNumber(channelAttack.avgUserXgDelta)} xG, xGA ${this.fmtDeltaNumber(channelAttack.avgOpponentXgDelta)}).${runnerUpText}`,
+        className: 'read-visible',
+      });
+    }
+
+    const shapeAttack = rows
+      .filter((row) => row.scenario.startsWith('m45-shape-'))
+      .filter((row) => row.avgUserXgDelta >= 0.08 && row.avgOpponentXgDelta <= 0.12)
+      .sort((a, b) => b.avgUserXgDelta - a.avgUserXgDelta)[0];
+    if (shapeAttack && (!channelAttack || shapeAttack.avgUserXgDelta >= channelAttack.avgUserXgDelta + 0.04)) {
+      const channelComparison = channelAttack
+        ? ` Mejora al canal puro por ${this.fmtDeltaNumber(shapeAttack.avgUserXgDelta - channelAttack.avgUserXgDelta)} xG.`
+        : '';
+      notes.push({
+        title: 'Mejor ajuste de forma',
+        body: `${this.summaryActionLabel(shapeAttack)}: ${this.scenarioSummaryUserChannelRead(shapeAttack)} (${this.fmtDeltaNumber(shapeAttack.avgUserXgDelta)} xG, xGA ${this.fmtDeltaNumber(shapeAttack.avgOpponentXgDelta)}).${channelComparison}`,
+        className: 'read-visible',
+      });
+    }
+
+    const bestProtection = rows
+      .filter((row) => row.avgOpponentXgDelta <= -0.06 || this.scenarioOpponentMinChannelXgDelta(row) <= -0.08)
+      .filter((row) => this.scenarioOpponentMaxChannelXgDelta(row) < 0.10)
+      .sort((a, b) => Math.min(a.avgOpponentXgDelta, this.scenarioOpponentMinChannelXgDelta(a))
+        - Math.min(b.avgOpponentXgDelta, this.scenarioOpponentMinChannelXgDelta(b)))[0];
+    if (bestProtection) {
+      const attackCost = bestProtection.avgUserXgDelta < -0.04
+        ? ` Coste ofensivo ${this.fmtDeltaNumber(bestProtection.avgUserXgDelta)} xG.`
+        : bestProtection.avgUserXgDelta > 0.04
+          ? ` Ademas suma ${this.fmtDeltaNumber(bestProtection.avgUserXgDelta)} xG.`
+          : '';
+      notes.push({
+        title: 'Mejor proteccion',
+        body: `${this.summaryActionLabel(bestProtection)}: ${this.scenarioSummaryOpponentChannelRead(bestProtection)} (xGA ${this.fmtDeltaNumber(bestProtection.avgOpponentXgDelta)}).${attackCost}`,
+        className: 'read-stable',
+      });
+    }
+
+    const biggestRisk = rows
+      .filter((row) => this.scenarioOpponentMaxChannelXgDelta(row) >= 0.10 || row.avgOpponentXgDelta >= 0.10)
+      .sort((a, b) => Math.max(b.avgOpponentXgDelta, this.scenarioOpponentMaxChannelXgDelta(b))
+        - Math.max(a.avgOpponentXgDelta, this.scenarioOpponentMaxChannelXgDelta(a)))[0];
+    if (biggestRisk) {
+      notes.push({
+        title: 'Cuidado',
+        body: `${this.summaryActionLabel(biggestRisk)} abre riesgo: ${this.scenarioOpponentRiskRead(biggestRisk)} (xGA ${this.fmtDeltaNumber(biggestRisk.avgOpponentXgDelta)}).`,
+        className: 'read-check',
+      });
+    }
+
+    return notes.slice(0, 4);
+  });
+
+  readonly scenarioDecisionCards = computed<ScenarioDecisionCard[]>(() =>
+    this.buildScenarioDecisionCards(this.scenarioMatrixSummaryResults())
+  );
+
+  scenarioBatteryCandidateMatches(): TestHarnessMatchRow[] {
+    const completed = this.rounds()
+      .flatMap((round) => round.matches)
+      .filter((match) => String(match.status).toUpperCase() === 'COMPLETED');
+    return completed.slice(0, this.scenarioBatteryMatchLimit());
+  }
+
+  private buildScenarioDecisionCards(summaryRows: ScenarioMatrixSummaryRow[]): ScenarioDecisionCard[] {
+    const rows = summaryRows
+      .filter((row) => !row.scenario.includes('noop') && !row.scenario.startsWith('base-'));
+    if (rows.length === 0) {
+      return [];
+    }
+
+    const cards: ScenarioDecisionCard[] = [];
+    const usedActionKeys = new Set<string>();
+    const ownRows = rows.filter((row) => !this.isOpponentScenarioRow(row));
+    const opponentRows = rows.filter((row) => this.isOpponentScenarioRow(row));
+    const baseline = summaryRows
+      .find((row) => row.scenario.includes('noop') || row.scenario.startsWith('base-'));
+    cards.push({
+      title: 'Plan actual',
+      label: baseline ? this.summaryActionLabel(baseline) : 'Baseline',
+      metrics: baseline
+        ? `xG ${this.fmtDeltaNumber(baseline.avgUserXgDelta)} / xGA ${this.fmtDeltaNumber(baseline.avgOpponentXgDelta)}`
+        : 'Referencia del partido',
+      detail: baseline
+        ? this.scenarioSummaryCoachRead(baseline)
+        : 'Punto de comparacion para medir cada ajuste.',
+      className: 'decision-neutral',
+    });
+
+    const twoWayAction = ownRows
+      .filter((row) => row.avgUserXgDelta >= 0.04 && row.avgOpponentXgDelta <= -0.04)
+      .sort((a, b) => this.scenarioTwoWayScore(b) - this.scenarioTwoWayScore(a))[0];
+    if (twoWayAction) {
+      cards.push(this.scenarioDecisionCardFromRow(
+        'Doble ganancia',
+        twoWayAction,
+        'decision-attack',
+        `${this.scenarioSummaryUserChannelRead(twoWayAction)} / ${this.scenarioOpponentProtectionRead(twoWayAction)}`,
+      ));
+      usedActionKeys.add(this.scenarioActionKey(twoWayAction));
+    }
+
+    const channelAttack = ownRows
+      .filter((row) => ['m45-central', 'm45-wide', 'm45-left', 'm45-right'].includes(row.scenario))
+      .filter((row) => !usedActionKeys.has(this.scenarioActionKey(row)))
+      .filter((row) => row.avgUserXgDelta >= 0.06 && row.avgOpponentXgDelta <= 0.14)
+      .sort((a, b) => b.avgUserXgDelta - a.avgUserXgDelta)[0];
+    if (channelAttack) {
+      cards.push(this.scenarioDecisionCardFromRow(
+        'Atacar',
+        channelAttack,
+        'decision-attack',
+        this.scenarioSummaryUserChannelRead(channelAttack),
+      ));
+      usedActionKeys.add(this.scenarioActionKey(channelAttack));
+    }
+
+    const shapeAttack = ownRows
+      .filter((row) => row.scenario.startsWith('m45-shape-'))
+      .filter((row) => !usedActionKeys.has(this.scenarioActionKey(row)))
+      .filter((row) => row.avgUserXgDelta >= 0.08 && row.avgOpponentXgDelta <= 0.12)
+      .sort((a, b) => b.avgUserXgDelta - a.avgUserXgDelta)[0];
+    if (shapeAttack && (!channelAttack || shapeAttack.avgUserXgDelta >= channelAttack.avgUserXgDelta + 0.04)) {
+      cards.push(this.scenarioDecisionCardFromRow(
+        'Forma',
+        shapeAttack,
+        'decision-shape',
+        this.scenarioSummaryUserChannelRead(shapeAttack),
+      ));
+      usedActionKeys.add(this.scenarioActionKey(shapeAttack));
+    }
+
+    const bestProtection = ownRows
+      .filter((row) => !usedActionKeys.has(this.scenarioActionKey(row)))
+      .filter((row) => this.scenarioProtectionCandidateIsCoachWorthy(row))
+      .filter((row) => row.avgOpponentXgDelta <= -0.06 || this.scenarioOpponentMinChannelXgDelta(row) <= -0.08)
+      .filter((row) => this.scenarioOpponentMaxChannelXgDelta(row) < 0.10)
+      .sort((a, b) => Math.min(a.avgOpponentXgDelta, this.scenarioOpponentMinChannelXgDelta(a))
+        - Math.min(b.avgOpponentXgDelta, this.scenarioOpponentMinChannelXgDelta(b)))[0];
+    if (bestProtection) {
+      cards.push(this.scenarioDecisionCardFromRow(
+        'Cuidar',
+        bestProtection,
+        'decision-safe',
+        this.scenarioOpponentProtectionRead(bestProtection),
+      ));
+      usedActionKeys.add(this.scenarioActionKey(bestProtection));
+    }
+
+    const biggestRisk = ownRows
+      .filter((row) => this.scenarioOpponentMaxChannelXgDelta(row) >= 0.10 || row.avgOpponentXgDelta >= 0.10)
+      .sort((a, b) => Math.max(b.avgOpponentXgDelta, this.scenarioOpponentMaxChannelXgDelta(b))
+        - Math.max(a.avgOpponentXgDelta, this.scenarioOpponentMaxChannelXgDelta(a)))[0];
+    if (biggestRisk) {
+      cards.push(this.scenarioDecisionCardFromRow(
+        'Evitar',
+        biggestRisk,
+        'decision-risk',
+        this.scenarioOpponentRiskRead(biggestRisk),
+      ));
+    }
+
+    const opponentThreat = opponentRows
+      .filter((row) => this.scenarioOpponentMaxChannelXgDelta(row) >= 0.025 || row.avgOpponentXgDelta >= 0.025)
+      .sort((a, b) => Math.max(b.avgOpponentXgDelta, this.scenarioOpponentMaxChannelXgDelta(b))
+        - Math.max(a.avgOpponentXgDelta, this.scenarioOpponentMaxChannelXgDelta(a)))[0];
+    if (opponentThreat) {
+      cards.push(this.scenarioDecisionCardFromRow(
+        'Amenaza rival',
+        opponentThreat,
+        'decision-risk',
+        this.scenarioOpponentRiskRead(opponentThreat),
+      ));
+    }
+
+    return cards.slice(0, 7);
+  }
+
+  /** User-facing pointer to the latest finished replay-analysis result. */
+  readonly analysisReadyMessage = signal<string | null>(null);
 
   /** True if there is an active career. */
   readonly hasCareer = computed(() => this.careerId() !== null);
@@ -933,6 +2971,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   // ============== Lifecycle ==============
 
   ngOnInit(): void {
+    this.loadFormationCoordinateCache();
     this.reload();
   }
 
@@ -941,6 +2980,20 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       clearTimeout(this.timelineFetchTimer);
       this.timelineFetchTimer = null;
     }
+  }
+
+  private loadFormationCoordinateCache(): void {
+    this.http.get<FormationDTO[]>(`${environment.apiUrl}/editor/formations`)
+      .pipe(catchError(() => of([] as FormationDTO[])))
+      .subscribe((formations) => {
+        const next: Record<string, FormationDTO['positions']> = {};
+        for (const formation of formations ?? []) {
+          if (formation?.name) {
+            next[formation.name] = formation.positions ?? [];
+          }
+        }
+        this.formationPositionsByName.set(next);
+      });
   }
 
   /** Re-load the career status and the match list. */
@@ -960,6 +3013,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         }
         this.careerId.set(status.careerId);
         this.userTeamName.set(status.userTeamName ?? null);
+        this.refreshLineupContext();
         this.loadMatches();
       },
       error: (err) => {
@@ -971,12 +3025,23 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     });
   }
 
-  /** Set the selected match (Panel C → Panel A re-render via @Input). */
+  /** Set the selected match (Panel C ? Panel A re-render via @Input). */
   selectMatch(m: TestHarnessMatchRow): void {
+    const previousMatchId = this.selectedMatchId();
     this.selectedMatchId.set(m.matchId);
     this.selectedMatch.set(m);
+    if (!this.selectedMatchIncludesUserTeam() && this.controlledTeamSideModel === 'USER') {
+      this.controlledTeamSideModel = 'HOME';
+    }
+    if (this.selectedMatchIncludesUserTeam() && this.controlledTeamSideModel !== 'USER') {
+      this.controlledTeamSideModel = 'USER';
+    }
     // Reset the scrubber to the start of the match when switching matches.
     this.selectedMinute.set(0);
+    if (previousMatchId !== m.matchId) {
+      this.clearReplayAnalysisForMatchChange(m);
+    }
+    this.refreshLineupContext();
   }
 
   /**
@@ -1063,7 +3128,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           'OK',
           { duration: 3000 }
         );
-        // Match list will change — reload.
+        // Match list will change ? reload.
         this.loadMatches();
       },
       error: (err) => {
@@ -1079,7 +3144,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
 
   fmtXg(value: number | null): string {
     if (value === null || value === undefined || !Number.isFinite(value)) {
-      return 'â€”';
+      return 'Ã¢â‚¬?';
     }
     return value.toFixed(2);
   }
@@ -1092,12 +3157,108 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     );
   }
 
+  copyCurrentLineupReplayJson(): void {
+    const payload = JSON.stringify(this.currentLineupReplayResult(), null, 2);
+    navigator.clipboard?.writeText(payload).then(
+      () => this.snackBar.open('Current lineup replay JSON copied.', 'OK', { duration: 2500 }),
+      () => this.snackBar.open(payload, 'OK', { duration: 5000 })
+    );
+  }
+
+  copyCurrentLineupMultiSeedJson(): void {
+    const payload = JSON.stringify(this.currentLineupMultiSeedSummary(), null, 2);
+    navigator.clipboard?.writeText(payload).then(
+      () => this.snackBar.open('Current lineup multi-seed JSON copied.', 'OK', { duration: 2500 }),
+      () => this.snackBar.open(payload, 'OK', { duration: 5000 })
+    );
+  }
+
+  copyPlayerSwapMatrixJson(): void {
+    const payload = JSON.stringify(this.playerSwapMatrixSummary(), null, 2);
+    navigator.clipboard?.writeText(payload).then(
+      () => this.snackBar.open('Player swap matrix JSON copied.', 'OK', { duration: 2500 }),
+      () => this.snackBar.open(payload, 'OK', { duration: 5000 })
+    );
+  }
+
+  copyPlayerSwapBatteryJson(): void {
+    const payload = JSON.stringify({
+      mode: this.playerSwapBatteryModeModel,
+      summary: this.playerSwapBatterySummary(),
+      rows: this.playerSwapBatterySummaries(),
+    }, null, 2);
+    navigator.clipboard?.writeText(payload).then(
+      () => this.snackBar.open('Player swap battery JSON copied.', 'OK', { duration: 2500 }),
+      () => this.snackBar.open(payload, 'OK', { duration: 5000 })
+    );
+  }
+
+  copyPlayerSwapBatteryReport(): void {
+    const payload = this.playerSwapBatteryMarkdownReport();
+    navigator.clipboard?.writeText(payload).then(
+      () => this.snackBar.open('Player swap battery report copied.', 'OK', { duration: 2500 }),
+      () => this.snackBar.open(payload, 'OK', { duration: 5000 })
+    );
+  }
+
+  copyPositionPixelMatrixJson(): void {
+    const payload = JSON.stringify(this.positionPixelExportPayload(), null, 2);
+    navigator.clipboard?.writeText(payload).then(
+      () => this.snackBar.open('Filtered position movement JSON copied.', 'OK', { duration: 2500 }),
+      () => this.snackBar.open(payload, 'OK', { duration: 5000 })
+    );
+  }
+
   copyScenarioMatrixJson(): void {
     const payload = JSON.stringify(this.scenarioMatrixResults(), null, 2);
     navigator.clipboard?.writeText(payload).then(
       () => this.snackBar.open('Scenario matrix JSON copied.', 'OK', { duration: 2500 }),
       () => this.snackBar.open(payload, 'OK', { duration: 5000 })
     );
+  }
+
+  copyScenarioMatrixSummaryJson(): void {
+    const payload = JSON.stringify(this.displayedScenarioMatrixSummaryRows(), null, 2);
+    navigator.clipboard?.writeText(payload).then(
+      () => this.snackBar.open('Multi-seed scenario summary JSON copied.', 'OK', { duration: 2500 }),
+      () => this.snackBar.open(payload, 'OK', { duration: 5000 })
+    );
+  }
+
+  copyScenarioBatteryJson(): void {
+    const payload = JSON.stringify(this.scenarioBatteryRows(), null, 2);
+    navigator.clipboard?.writeText(payload).then(
+      () => this.snackBar.open('Scenario battery JSON copied.', 'OK', { duration: 2500 }),
+      () => this.snackBar.open(payload, 'OK', { duration: 5000 })
+    );
+  }
+
+  summarySeedStart(): number {
+    return this.seedInputModel ?? 12345;
+  }
+
+  summarySeedEnd(): number {
+    return this.summarySeedStart() + this.scenarioMatrixSummarySeedCount() - 1;
+  }
+
+  scenarioMatrixSummaryEffectiveSeedCount(): number {
+    return Math.max(20, Math.min(50, Math.round(this.playerSwapSeedCountModel || 20)));
+  }
+
+  scenarioMatrixSmokeSeedCount(): number {
+    return 5;
+  }
+
+  scrollToReplayAnalysis(): void {
+    document.getElementById('test-harness-replay-analysis')?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    });
+  }
+
+  private markReplayAnalysisReady(message: string): void {
+    this.analysisReadyMessage.set(`${message} Resultados listos abajo.`);
+    window.setTimeout(() => this.scrollToReplayAnalysis(), 0);
   }
 
   downloadFormationMatrixCsv(): void {
@@ -1121,10 +3282,336 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     URL.revokeObjectURL(url);
   }
 
+  downloadPlayerSwapMatrixCsv(): void {
+    const row = this.playerSwapMatrixSummary();
+    if (!row) {
+      this.snackBar.open('Run Player swap matrix first.', 'OK', { duration: 2500 });
+      return;
+    }
+    const exportRow = this.playerSwapExportRow(row);
+    const header = [
+      'swapRead', 'swapReadDetail', 'swapFit', 'swapFitDetail',
+      'tacticalAttackRead', 'tacticalCentralControlRead', 'tacticalProtectionRead', 'tacticalChannelsRead', 'tacticalBreakdownDetail',
+      'formation', 'slotId', 'baselinePlayer', 'swapPlayer',
+      'baselinePlayerOverall', 'swapPlayerOverall', 'deltaPlayerOverall',
+      'seedStart', 'seedEnd', 'seedCount',
+      'deltaGoalsFor', 'deltaGoalsAgainst', 'deltaGoalDiff',
+      'deltaShotsFor', 'deltaShotsAgainst', 'deltaPossessionFor',
+      'deltaXgFor', 'deltaXgAgainst', 'deltaXgDiff',
+      'preAutoSubDeltaShotsFor', 'preAutoSubDeltaShotsAgainst',
+      'preAutoSubDeltaXgFor', 'preAutoSubDeltaXgAgainst', 'preAutoSubDeltaXgDiff',
+      'deltaCentralShotsFor', 'deltaWideShotsFor', 'deltaLongShotsFor',
+      'deltaCentralShotsAgainst', 'deltaWideShotsAgainst', 'deltaLongShotsAgainst',
+      'baselineAvgXgFor', 'baselineAvgXgAgainst', 'baselineAvgXgDiff',
+      'swappedAvgXgFor', 'swappedAvgXgAgainst', 'swappedAvgXgDiff',
+      'timestamp',
+    ];
+    const lines = [
+      header.join(','),
+      header.map((key) => this.csvCell((exportRow as Record<string, unknown>)[key])).join(','),
+    ];
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `player-swap-${row.formation}-${row.slotId}-${row.seedStart}-${row.seedEnd}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    this.snackBar.open('Player swap matrix CSV exported.', 'OK', { duration: 2500 });
+  }
+
+  downloadPlayerSwapBatteryCsv(): void {
+    const rows = this.playerSwapBatterySummaries();
+    if (rows.length === 0) {
+      this.snackBar.open('Run Player swap battery first.', 'OK', { duration: 2500 });
+      return;
+    }
+    const exportRows = rows.map((row) => this.playerSwapExportRow(row));
+    const header = [
+      'swapRead', 'swapReadDetail', 'swapFit', 'swapFitDetail',
+      'tacticalAttackRead', 'tacticalCentralControlRead', 'tacticalProtectionRead', 'tacticalChannelsRead', 'tacticalBreakdownDetail',
+      'formation', 'slotId', 'baselinePlayer', 'swapPlayer',
+      'baselinePlayerOverall', 'swapPlayerOverall', 'deltaPlayerOverall',
+      'seedStart', 'seedEnd', 'seedCount',
+      'deltaGoalsFor', 'deltaGoalsAgainst', 'deltaGoalDiff',
+      'deltaShotsFor', 'deltaShotsAgainst', 'deltaPossessionFor',
+      'deltaXgFor', 'deltaXgAgainst', 'deltaXgDiff',
+      'preAutoSubDeltaShotsFor', 'preAutoSubDeltaShotsAgainst',
+      'preAutoSubDeltaXgFor', 'preAutoSubDeltaXgAgainst', 'preAutoSubDeltaXgDiff',
+      'deltaCentralShotsFor', 'deltaWideShotsFor', 'deltaLongShotsFor',
+      'deltaCentralShotsAgainst', 'deltaWideShotsAgainst', 'deltaLongShotsAgainst',
+      'baselineAvgXgFor', 'baselineAvgXgAgainst', 'baselineAvgXgDiff',
+      'swappedAvgXgFor', 'swappedAvgXgAgainst', 'swappedAvgXgDiff',
+      'timestamp',
+    ];
+    const lines = [
+      header.join(','),
+      ...exportRows.map((row) => header.map((key) => this.csvCell(row[key])).join(',')),
+    ];
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `player-swap-battery-${this.playerSwapBatteryPrecisionModel}-${rows[0].formation}-${rows[0].seedStart}-${rows[0].seedEnd}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    this.snackBar.open(`Player swap battery CSV exported (${rows.length} rows).`, 'OK', { duration: 2500 });
+  }
+
+  downloadPositionPixelMatrixCsv(): void {
+    const rows = this.displayedPositionPixelMatrixRows().map((row) => this.positionPixelExportRow(row));
+    const header = [
+      'read', 'label', 'playerName', 'playerPosition', 'slotId',
+      'fromXPercent', 'fromYPercent', 'targetXPercent', 'targetYPercent',
+      'movementDistance', 'impactScore', 'shapeMove', 'shapeMoveDetail', 'tacticalRead', 'tacticalReadReason',
+      'attackGainScore', 'attackLossScore', 'defensiveRiskScore', 'defensiveGainScore',
+      'seedStart', 'seedEnd',
+      'deltaXgFor', 'deltaXgAgainst', 'deltaXgDiff', 'deltaShotsFor', 'deltaShotsAgainst', 'deltaPossessionFor',
+      'deltaCentralShotsFor', 'deltaWideShotsFor', 'deltaLongShotsFor',
+      'deltaCentralShotsAgainst', 'deltaWideShotsAgainst', 'deltaLongShotsAgainst',
+      'deltaCentralXgAgainst', 'deltaWideXgAgainst', 'deltaLongXgAgainst',
+      'baselineXgFor', 'baselineXgAgainst', 'movedXgFor', 'movedXgAgainst', 'timestamp',
+    ];
+    const lines = [
+      header.join(','),
+      ...rows.map((r) => header.map((key) => this.csvCell((r as unknown as Record<string, unknown>)[key])).join(',')),
+    ];
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `position-movement-${this.positionPixelReadFilter()}-${this.positionPixelSortMode()}-${this.seedInputModel ?? 'auto'}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    this.snackBar.open(`Position movement CSV exported (${rows.length} rows).`, 'OK', { duration: 2500 });
+  }
+
+  downloadScenarioMatrixSummaryCsv(): void {
+    const rows = this.displayedScenarioMatrixSummaryRows().map((row) => this.scenarioSummaryExportRow(row));
+    if (rows.length === 0) {
+      this.snackBar.open('No scenario rows match the current filters.', 'OK', { duration: 2500 });
+      return;
+    }
+    const header = [
+      'read', 'impactScore', 'readReason',
+      'coachRead', 'coachReadDetail', 'outcome', 'outcomeReason', 'attackGainScore', 'attackLossScore', 'defensiveGainScore', 'defensiveRiskScore',
+      'scenario', 'baselineScenario', 'actionType', 'actionDetail',
+      'seedStart', 'seedEnd', 'seedCount',
+      'avgUserXgDelta', 'minUserXgDelta', 'maxUserXgDelta', 'avgOpponentXgDelta',
+      'avgUserShotsDelta', 'avgOpponentShotsDelta', 'avgUserPossessionDelta',
+      'avgUserCentralDelta', 'avgUserWideDelta', 'avgOpponentCentralDelta', 'avgOpponentWideDelta',
+      'avgUserCentralXgDelta', 'avgUserWideXgDelta', 'avgOpponentCentralXgDelta', 'avgOpponentWideXgDelta',
+      'avgUserLeftWideDelta', 'avgUserRightWideDelta', 'avgOpponentLeftWideDelta', 'avgOpponentRightWideDelta',
+      'avgUserLeftWideXgDelta', 'avgUserRightWideXgDelta', 'avgOpponentLeftWideXgDelta', 'avgOpponentRightWideXgDelta',
+    ];
+    const lines = [
+      header.join(','),
+      ...rows.map((row) => header.map((key) => this.csvCell(row[key])).join(',')),
+    ];
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `scenario-summary-${this.scenarioSummaryReadFilter()}-${this.scenarioSummarySortMode()}-${this.summarySeedStart()}-${this.summarySeedEnd()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    this.snackBar.open(`Scenario summary CSV exported (${rows.length} rows).`, 'OK', { duration: 2500 });
+  }
+
+  downloadScenarioBatteryCsv(): void {
+    const rows = this.scenarioBatteryRows().map((row) => this.scenarioBatteryExportRow(row));
+    if (rows.length === 0) {
+      this.snackBar.open('Run Battery tablero first.', 'OK', { duration: 2500 });
+      return;
+    }
+    const header = [
+      'match', 'controlledTeam', 'controlledSide', 'scenarioGroup', 'seedStart', 'seedCount', 'scenarioCount',
+      'decision', 'decisionDetail',
+      'plan', 'twoWay', 'attack', 'shape', 'protect', 'avoid', 'opponentThreat',
+      'planDetail', 'twoWayDetail', 'attackDetail', 'shapeDetail', 'protectDetail', 'avoidDetail', 'opponentThreatDetail',
+    ];
+    const lines = [
+      header.join(','),
+      ...rows.map((row) => header.map((key) => this.csvCell(row[key])).join(',')),
+    ];
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `scenario-battery-${this.summarySeedStart()}-${this.summarySeedStart() + this.scenarioMatrixSmokeSeedCount() - 1}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    this.snackBar.open(`Scenario battery CSV exported (${rows.length} rows).`, 'OK', { duration: 2500 });
+  }
+
   private csvCell(value: unknown): string {
     if (value === null || value === undefined) return '';
     const text = String(value);
     return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+  }
+
+  private playerSwapExportRow(row: PlayerSwapMatrixSummary): Record<string, unknown> {
+    return {
+      swapRead: row.swapRead,
+      swapReadDetail: row.swapReadDetail,
+      swapFit: row.swapFit,
+      swapFitDetail: row.swapFitDetail,
+      tacticalAttackRead: row.tacticalAttackRead,
+      tacticalCentralControlRead: row.tacticalCentralControlRead,
+      tacticalProtectionRead: row.tacticalProtectionRead,
+      tacticalChannelsRead: row.tacticalChannelsRead,
+      tacticalBreakdownDetail: row.tacticalBreakdownDetail,
+      formation: row.formation,
+      slotId: row.slotId,
+      baselinePlayer: row.baselinePlayer,
+      swapPlayer: row.swapPlayer,
+      baselinePlayerOverall: row.baselinePlayerOverall,
+      swapPlayerOverall: row.swapPlayerOverall,
+      deltaPlayerOverall: row.deltaPlayerOverall,
+      seedStart: row.seedStart,
+      seedEnd: row.seedEnd,
+      seedCount: row.seedCount,
+      deltaGoalsFor: row.deltaGoalsFor,
+      deltaGoalsAgainst: row.deltaGoalsAgainst,
+      deltaGoalDiff: row.deltaGoalDiff,
+      deltaShotsFor: row.deltaShotsFor,
+      deltaShotsAgainst: row.deltaShotsAgainst,
+      deltaPossessionFor: row.deltaPossessionFor,
+      deltaXgFor: row.deltaXgFor,
+      deltaXgAgainst: row.deltaXgAgainst,
+      deltaXgDiff: row.deltaXgDiff,
+      preAutoSubDeltaShotsFor: row.preAutoSubDeltaShotsFor,
+      preAutoSubDeltaShotsAgainst: row.preAutoSubDeltaShotsAgainst,
+      preAutoSubDeltaXgFor: row.preAutoSubDeltaXgFor,
+      preAutoSubDeltaXgAgainst: row.preAutoSubDeltaXgAgainst,
+      preAutoSubDeltaXgDiff: row.preAutoSubDeltaXgDiff,
+      deltaCentralShotsFor: row.deltaCentralShotsFor,
+      deltaWideShotsFor: row.deltaWideShotsFor,
+      deltaLongShotsFor: row.deltaLongShotsFor,
+      deltaCentralShotsAgainst: row.deltaCentralShotsAgainst,
+      deltaWideShotsAgainst: row.deltaWideShotsAgainst,
+      deltaLongShotsAgainst: row.deltaLongShotsAgainst,
+      baselineAvgXgFor: row.baseline.avgXgFor,
+      baselineAvgXgAgainst: row.baseline.avgXgAgainst,
+      baselineAvgXgDiff: row.baseline.avgXgDiff,
+      swappedAvgXgFor: row.swapped.avgXgFor,
+      swappedAvgXgAgainst: row.swapped.avgXgAgainst,
+      swappedAvgXgDiff: row.swapped.avgXgDiff,
+      timestamp: row.timestamp,
+    };
+  }
+
+  private playerSwapBatteryMarkdownReport(): string {
+    const rows = this.playerSwapBatterySummaries();
+    const summary = this.playerSwapBatterySummary();
+    const match = this.selectedMatch();
+    const matchLabel = match ? `${match.homeTeamName} vs ${match.awayTeamName}` : 'Unknown match';
+    const first = rows[0] ?? null;
+    const lines = [
+      '# Player Swap Battery Report',
+      '',
+      `Match: ${matchLabel}`,
+      `Mode: ${summary.mode}`,
+      `Precision: ${summary.precision}`,
+      `Confidence: ${summary.confidence}`,
+      `Seeds: ${first ? `${first.seedStart}..${first.seedEnd}` : 'n/a'}`,
+      '',
+      `Best: ${this.playerSwapBatteryBestWorstText(summary.best)}`,
+      `Worst: ${this.playerSwapBatteryBestWorstText(summary.worst)}`,
+      '',
+      `Reads: ${this.playerSwapBatteryCounterText(summary.reads)}`,
+      `Fit: ${this.playerSwapBatteryCounterText(summary.fits)}`,
+      '',
+      `Coach read: ${this.playerSwapBatteryCoachRead(summary)}`,
+      '',
+      '| Swap | OVR | Fit | Read | Ataque | Control | Proteccion | Canales | Shots | Shots Ag. | xG For | xG Ag. | xG Diff | Pre xG Diff |',
+      '| --- | ---: | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |',
+      ...rows.map((row) =>
+        `| ${row.baselinePlayer} -> ${row.swapPlayer} | ${this.playerSwapOverallText(row)} | ${row.swapFit} | ${row.swapRead} | ${row.tacticalAttackRead} | ${row.tacticalCentralControlRead} | ${row.tacticalProtectionRead} | ${row.tacticalChannelsRead} | ${this.fmtDeltaNumber(row.deltaShotsFor)} | ${this.fmtDeltaNumber(row.deltaShotsAgainst)} | ${this.fmtDeltaNumber(row.deltaXgFor)} | ${this.fmtDeltaNumber(row.deltaXgAgainst)} | ${this.fmtDeltaNumber(row.deltaXgDiff)} | ${this.fmtDeltaNumber(row.preAutoSubDeltaXgDiff || 0)} |`
+      ),
+      '',
+      '## Tactical breakdown detail',
+      '',
+      ...rows.map((row) => `- ${row.baselinePlayer} -> ${row.swapPlayer}: ${row.tacticalBreakdownDetail}`),
+      '',
+    ];
+    return lines.join('\n');
+  }
+
+  private playerSwapBatteryCoachRead(summary: PlayerSwapBatterySummary): string {
+    if (summary.total === 0) {
+      return 'No hay swaps medidos todavia. Ejecutar Player swap battery antes de sacar conclusiones.';
+    }
+    const upgrades = summary.reads['Clear upgrade'] ?? 0;
+    const downgrades = summary.reads['Clear downgrade'] ?? 0;
+    const reviews = summary.reads['Needs review'] ?? 0;
+    const noise = summary.reads['Noise / neutral'] ?? 0;
+    const outOfRole = summary.fits['Out of role'] ?? 0;
+    const confidencePrefix = summary.precision === 'quick'
+      ? 'Smoke test de baja confianza: usar para detectar se?ales, no para decidir definitivo. '
+      : summary.precision === 'balanced'
+        ? 'Lectura balanceada: buena para decidir que casos repetir en Reliable. '
+        : 'Lectura reliable: apta para tomar decisiones de calibracion si la senal es consistente. ';
+    const fitWarning = outOfRole > 0
+      ? `Hay ${outOfRole} cambio(s) fuera de rol; separar esos experimentos de los cambios naturales. `
+      : '';
+
+    if (upgrades > 0 && downgrades === 0 && reviews === 0) {
+      return `${confidencePrefix}${fitWarning}La bateria favorece cambios positivos claros (${upgrades}/${summary.total}).`;
+    }
+    if (downgrades > 0 && upgrades === 0 && reviews === 0) {
+      return `${confidencePrefix}${fitWarning}La bateria detecta riesgo de empeorar el equipo (${downgrades}/${summary.total}).`;
+    }
+    if (upgrades > 0 || downgrades > 0 || reviews > 0) {
+      return `${confidencePrefix}${fitWarning}Hay senales mixtas: ${upgrades} upgrade(s), ${downgrades} downgrade(s), ${reviews} para revisar y ${noise} neutro(s). Repetir los casos decisivos con mas seeds.`;
+    }
+    return `${confidencePrefix}${fitWarning}No aparece una senal fuerte: los cambios medidos se comportan como ruido o impacto menor.`;
+  }
+
+  private positionPixelExportPayload(): {
+    metadata: {
+      matchId: string | null;
+      matchLabel: string | null;
+      readFilter: PositionPixelReadFilter;
+      sortMode: PositionPixelSortMode;
+      visibleRows: number;
+      totalRows: number;
+      readSummary: Array<{ label: string; level: PositionPixelReadLevel; count: number }>;
+      tacticalReadSummary: Array<{ label: string; count: number; className: string; hint: string }>;
+    };
+    rows: PositionPixelExportRow[];
+  } {
+    const match = this.selectedMatch();
+    return {
+      metadata: {
+        matchId: this.selectedMatchId(),
+        matchLabel: match ? `${match.homeTeamName} vs ${match.awayTeamName}` : null,
+        readFilter: this.positionPixelReadFilter(),
+        sortMode: this.positionPixelSortMode(),
+        visibleRows: this.displayedPositionPixelMatrixRows().length,
+        totalRows: this.positionPixelMatrixRows().length,
+        readSummary: this.positionPixelReadSummary(),
+        tacticalReadSummary: this.positionPixelTacticalReadSummary(),
+      },
+      rows: this.displayedPositionPixelMatrixRows().map((row) => this.positionPixelExportRow(row)),
+    };
+  }
+
+  private positionPixelExportRow(row: PositionPixelMatrixSummary): PositionPixelExportRow {
+    return {
+      ...row,
+      read: this.positionPixelRead(row),
+      tacticalRead: this.positionPixelTacticalRead(row),
+      tacticalReadReason: this.positionPixelTacticalReadReason(row),
+      shapeMove: this.positionPixelShapeMove(row),
+      shapeMoveDetail: this.positionPixelShapeMoveDetail(row),
+      movementDistance: Number(this.positionPixelDistance(row).toFixed(3)),
+      impactScore: Number(this.positionPixelImpactScore(row).toFixed(3)),
+      attackGainScore: Number(this.positionPixelAttackGainScore(row).toFixed(3)),
+      attackLossScore: Number(this.positionPixelAttackLossScore(row).toFixed(3)),
+      defensiveRiskScore: Number(this.positionPixelDefensiveRiskScore(row).toFixed(3)),
+      defensiveGainScore: Number(this.positionPixelDefensiveGainScore(row).toFixed(3)),
+    };
   }
 
   private buildFormationReplayResult(
@@ -1150,6 +3637,870 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       awayWideShots: zoneSummary.away.wide,
       awayLongShots: zoneSummary.away.long,
     };
+  }
+
+  private buildFormationReplayResultFromMatrix(row: FormationMatrixRow): FormationReplayResult {
+    return {
+      formation: row.formation as FormationCode,
+      homeGoals: row.homeGoals,
+      awayGoals: row.awayGoals,
+      homePossession: row.homePossession,
+      awayPossession: row.awayPossession,
+      homeShots: row.homeShots,
+      awayShots: row.awayShots,
+      homeXg: row.homeXg,
+      awayXg: row.awayXg,
+      homeCentralShots: row.homeCentralShots,
+      homeWideShots: row.homeWideShots,
+      homeLongShots: row.homeLongShots,
+      awayCentralShots: row.awayCentralShots,
+      awayWideShots: row.awayWideShots,
+      awayLongShots: row.awayLongShots,
+    };
+  }
+
+  private buildCurrentLineupReplayResult(
+    lineup: LineupDTO,
+    fixture: MatchFixture,
+    detail: MatchDetail | null
+  ): CurrentLineupReplayResult {
+    const zoneSummary = this.summarizeShotZones(detail);
+    const userIsHome = this.selectedUserTeamIsHome();
+    const goalsFor = userIsHome ? fixture?.result?.homeGoals : fixture?.result?.awayGoals;
+    const goalsAgainst = userIsHome ? fixture?.result?.awayGoals : fixture?.result?.homeGoals;
+    const possessionFor = userIsHome ? fixture?.result?.homePossession : fixture?.result?.awayPossession;
+    const possessionAgainst = userIsHome ? fixture?.result?.awayPossession : fixture?.result?.homePossession;
+    const shotsFor = userIsHome ? fixture?.result?.homeShots : fixture?.result?.awayShots;
+    const shotsAgainst = userIsHome ? fixture?.result?.awayShots : fixture?.result?.homeShots;
+    const xgFor = userIsHome ? detail?.homeXg : detail?.awayXg;
+    const xgAgainst = userIsHome ? detail?.awayXg : detail?.homeXg;
+    const zonesFor = userIsHome ? zoneSummary.home : zoneSummary.away;
+    const zonesAgainst = userIsHome ? zoneSummary.away : zoneSummary.home;
+
+    return {
+      label: `${this.userTeamName() || 'User team'} vs current opponent`,
+      formation: lineup?.formation ?? null,
+      seed: this.seedInputModel,
+      style: this.selectedStyleModel,
+      playerCount: lineup?.players?.length ?? 0,
+      starters: (lineup?.players ?? []).map((p) => `${p.name} (${p.position})`),
+      score: `${goalsFor ?? '?'}-${goalsAgainst ?? '?'}`,
+      possession: `${this.fmtPct(possessionFor ?? null)} / ${this.fmtPct(possessionAgainst ?? null)}`,
+      shots: `${shotsFor ?? '?'} / ${shotsAgainst ?? '?'}`,
+      xg: `${this.fmtXg(xgFor ?? null)} / ${this.fmtXg(xgAgainst ?? null)}`,
+      zones: `${zonesFor.central}/${zonesFor.wide}/${zonesFor.long} / ${zonesAgainst.central}/${zonesAgainst.wide}/${zonesAgainst.long}`,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  private buildCurrentLineupMultiSeedSummary(
+    samples: CurrentLineupReplaySample[]
+  ): CurrentLineupMultiSeedSummary | null {
+    if (samples.length === 0) {
+      return null;
+    }
+    const first = samples[0];
+    const sums = samples.reduce((acc, sample) => {
+      const metrics = this.currentLineupSampleMetrics(sample.fixture, sample.detail);
+      acc.goalsFor += metrics.goalsFor;
+      acc.goalsAgainst += metrics.goalsAgainst;
+      acc.possessionFor += metrics.possessionFor;
+      acc.shotsFor += metrics.shotsFor;
+      acc.shotsAgainst += metrics.shotsAgainst;
+      acc.xgFor += metrics.xgFor;
+      acc.xgAgainst += metrics.xgAgainst;
+      acc.centralShotsFor += metrics.centralShotsFor;
+      acc.wideShotsFor += metrics.wideShotsFor;
+      acc.longShotsFor += metrics.longShotsFor;
+      acc.centralShotsAgainst += metrics.centralShotsAgainst;
+      acc.wideShotsAgainst += metrics.wideShotsAgainst;
+      acc.longShotsAgainst += metrics.longShotsAgainst;
+      return acc;
+    }, {
+      goalsFor: 0,
+      goalsAgainst: 0,
+      possessionFor: 0,
+      shotsFor: 0,
+      shotsAgainst: 0,
+      xgFor: 0,
+      xgAgainst: 0,
+      centralShotsFor: 0,
+      wideShotsFor: 0,
+      longShotsFor: 0,
+      centralShotsAgainst: 0,
+      wideShotsAgainst: 0,
+      longShotsAgainst: 0,
+    });
+    const n = samples.length;
+    const avgGoalsFor = sums.goalsFor / n;
+    const avgGoalsAgainst = sums.goalsAgainst / n;
+    const avgShotsFor = sums.shotsFor / n;
+    const avgShotsAgainst = sums.shotsAgainst / n;
+    const avgXgFor = sums.xgFor / n;
+    const avgXgAgainst = sums.xgAgainst / n;
+    const seeds = samples.map((s) => s.seed);
+
+    return {
+      label: `${this.userTeamName() || 'User team'} vs current opponent`,
+      formation: first.lineup?.formation ?? null,
+      style: this.selectedStyleModel,
+      seedStart: Math.min(...seeds),
+      seedEnd: Math.max(...seeds),
+      seedCount: n,
+      playerCount: first.lineup?.players?.length ?? 0,
+      starters: (first.lineup?.players ?? []).map((p) => `${p.name} (${p.position})`),
+      avgGoalsFor,
+      avgGoalsAgainst,
+      avgGoalDiff: avgGoalsFor - avgGoalsAgainst,
+      avgPossessionFor: sums.possessionFor / n,
+      avgShotsFor,
+      avgShotsAgainst,
+      avgShotDiff: avgShotsFor - avgShotsAgainst,
+      avgXgFor,
+      avgXgAgainst,
+      avgXgDiff: avgXgFor - avgXgAgainst,
+      avgCentralShotsFor: sums.centralShotsFor / n,
+      avgWideShotsFor: sums.wideShotsFor / n,
+      avgLongShotsFor: sums.longShotsFor / n,
+      avgCentralShotsAgainst: sums.centralShotsAgainst / n,
+      avgWideShotsAgainst: sums.wideShotsAgainst / n,
+      avgLongShotsAgainst: sums.longShotsAgainst / n,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  private toPlayerSwapMatrixSummary(
+    row: PlayerSwapMatrixSummaryRow,
+    candidate: PlayerSwapCandidate | null
+  ): PlayerSwapMatrixSummary {
+    const baselinePlayer = row.baselinePlayerName || candidate?.starterName || row.baselinePlayerId;
+    const swapPlayer = row.swapPlayerName || candidate?.benchName || row.swapPlayerId;
+    const baseline: CurrentLineupMultiSeedSummary = {
+      label: `${baselinePlayer} como titular`,
+      formation: row.formation,
+      style: this.selectedStyleModel,
+      seedStart: row.seedStart,
+      seedEnd: row.seedEnd,
+      seedCount: row.seedCount,
+      playerCount: 11,
+      starters: [`${baselinePlayer} (${row.baselinePlayerPosition || 'starter'})`],
+      avgGoalsFor: row.baselineAvgGoalsFor,
+      avgGoalsAgainst: row.baselineAvgGoalsAgainst,
+      avgGoalDiff: row.baselineAvgGoalDiff,
+      avgPossessionFor: row.baselineAvgPossessionFor,
+      avgShotsFor: row.baselineAvgShotsFor,
+      avgShotsAgainst: row.baselineAvgShotsAgainst,
+      avgShotDiff: row.baselineAvgShotsFor - row.baselineAvgShotsAgainst,
+      avgXgFor: row.baselineAvgXgFor,
+      avgXgAgainst: row.baselineAvgXgAgainst,
+      avgXgDiff: row.baselineAvgXgDiff,
+      avgCentralShotsFor: row.baselineAvgCentralShotsFor,
+      avgWideShotsFor: row.baselineAvgWideShotsFor,
+      avgLongShotsFor: row.baselineAvgLongShotsFor,
+      avgCentralShotsAgainst: row.baselineAvgCentralShotsAgainst,
+      avgWideShotsAgainst: row.baselineAvgWideShotsAgainst,
+      avgLongShotsAgainst: row.baselineAvgLongShotsAgainst,
+      timestamp: new Date().toISOString(),
+    };
+    const swapped: CurrentLineupMultiSeedSummary = {
+      ...baseline,
+      label: `${swapPlayer} en el mismo slot`,
+      starters: [`${swapPlayer} (${row.swapPlayerPosition || 'bench'})`],
+      avgGoalsFor: row.swappedAvgGoalsFor,
+      avgGoalsAgainst: row.swappedAvgGoalsAgainst,
+      avgGoalDiff: row.swappedAvgGoalDiff,
+      avgPossessionFor: row.swappedAvgPossessionFor,
+      avgShotsFor: row.swappedAvgShotsFor,
+      avgShotsAgainst: row.swappedAvgShotsAgainst,
+      avgShotDiff: row.swappedAvgShotsFor - row.swappedAvgShotsAgainst,
+      avgXgFor: row.swappedAvgXgFor,
+      avgXgAgainst: row.swappedAvgXgAgainst,
+      avgXgDiff: row.swappedAvgXgDiff,
+      avgCentralShotsFor: row.swappedAvgCentralShotsFor,
+      avgWideShotsFor: row.swappedAvgWideShotsFor,
+      avgLongShotsFor: row.swappedAvgLongShotsFor,
+      avgCentralShotsAgainst: row.swappedAvgCentralShotsAgainst,
+      avgWideShotsAgainst: row.swappedAvgWideShotsAgainst,
+      avgLongShotsAgainst: row.swappedAvgLongShotsAgainst,
+    };
+    return {
+      slotId: row.slotId || candidate?.slotId || 'slot',
+      formation: row.formation,
+      seedStart: row.seedStart,
+      seedEnd: row.seedEnd,
+      seedCount: row.seedCount,
+      baselinePlayer,
+      swapPlayer,
+      baselinePlayerOverall: row.baselinePlayerOverall ?? null,
+      swapPlayerOverall: row.swapPlayerOverall ?? null,
+      deltaPlayerOverall: row.baselinePlayerOverall != null && row.swapPlayerOverall != null
+        ? row.swapPlayerOverall - row.baselinePlayerOverall
+        : null,
+      baseline,
+      swapped,
+      deltaGoalsFor: row.deltaGoalsFor,
+      deltaGoalsAgainst: row.deltaGoalsAgainst,
+      deltaGoalDiff: row.deltaGoalDiff,
+      deltaShotsFor: row.deltaShotsFor,
+      deltaShotsAgainst: row.deltaShotsAgainst,
+      deltaPossessionFor: row.deltaPossessionFor,
+      deltaXgFor: row.deltaXgFor,
+      deltaXgAgainst: row.deltaXgAgainst,
+      deltaXgDiff: row.deltaXgDiff,
+      deltaCentralShotsFor: row.deltaCentralShotsFor,
+      deltaWideShotsFor: row.deltaWideShotsFor,
+      deltaLongShotsFor: row.deltaLongShotsFor,
+      deltaCentralShotsAgainst: row.deltaCentralShotsAgainst,
+      deltaWideShotsAgainst: row.deltaWideShotsAgainst,
+      deltaLongShotsAgainst: row.deltaLongShotsAgainst,
+      preAutoSubDeltaShotsFor: row.preAutoSubDeltaShotsFor,
+      preAutoSubDeltaShotsAgainst: row.preAutoSubDeltaShotsAgainst,
+      preAutoSubDeltaXgFor: row.preAutoSubDeltaXgFor,
+      preAutoSubDeltaXgAgainst: row.preAutoSubDeltaXgAgainst,
+      preAutoSubDeltaXgDiff: row.preAutoSubDeltaXgDiff,
+      swapRead: this.playerSwapCoachRead(row),
+      swapReadDetail: this.playerSwapCoachReadDetail(row),
+      swapReadClass: this.playerSwapCoachReadClass(row),
+      swapFit: this.playerSwapFit(candidate),
+      swapFitDetail: this.playerSwapFitDetail(candidate),
+      swapFitClass: this.playerSwapFitClass(candidate),
+      ...this.playerSwapTacticalBreakdown(row, candidate),
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  playerSwapOverallText(row: PlayerSwapMatrixSummary): string {
+    if (row.baselinePlayerOverall == null || row.swapPlayerOverall == null || row.deltaPlayerOverall == null) {
+      return String.fromCharCode(8212);
+    }
+    return `${row.baselinePlayerOverall}${String.fromCharCode(8594)}${row.swapPlayerOverall} (${this.fmtDeltaNumber(row.deltaPlayerOverall)})`;
+  }
+
+  private toPositionPixelMatrixSummary(row: PositionPixelMatrixSummaryRow, label = '1px forward'): PositionPixelMatrixSummary {
+    return {
+      label,
+      playerName: row.playerName,
+      playerPosition: row.playerPosition,
+      slotId: row.slotId,
+      fromXPercent: row.fromXPercent,
+      fromYPercent: row.fromYPercent,
+      targetXPercent: row.targetXPercent,
+      targetYPercent: row.targetYPercent,
+      seedStart: row.seedStart,
+      seedEnd: row.seedEnd,
+      deltaShotsFor: row.deltaShotsFor,
+      deltaShotsAgainst: row.deltaShotsAgainst,
+      deltaPossessionFor: row.deltaPossessionFor,
+      deltaXgFor: row.deltaXgFor,
+      deltaXgAgainst: row.deltaXgAgainst,
+      deltaXgDiff: row.deltaXgDiff,
+      deltaCentralShotsFor: row.deltaCentralShotsFor,
+      deltaWideShotsFor: row.deltaWideShotsFor,
+      deltaLongShotsFor: row.deltaLongShotsFor,
+      deltaCentralShotsAgainst: row.deltaCentralShotsAgainst,
+      deltaWideShotsAgainst: row.deltaWideShotsAgainst,
+      deltaLongShotsAgainst: row.deltaLongShotsAgainst,
+      deltaCentralXgFor: row.deltaCentralXgFor,
+      deltaWideXgFor: row.deltaWideXgFor,
+      deltaLongXgFor: row.deltaLongXgFor,
+      deltaCentralXgAgainst: row.deltaCentralXgAgainst,
+      deltaWideXgAgainst: row.deltaWideXgAgainst,
+      deltaLongXgAgainst: row.deltaLongXgAgainst,
+      baselineXgFor: row.baselineAvgXgFor,
+      baselineXgAgainst: row.baselineAvgXgAgainst,
+      movedXgFor: row.movedAvgXgFor,
+      movedXgAgainst: row.movedAvgXgAgainst,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  private playerSwapCoachRead(row: PlayerSwapMatrixSummaryRow): string {
+    const read = this.playerSwapCoachReadLevel(row);
+    if (read === 'upgrade') return 'Clear upgrade';
+    if (read === 'downgrade') return 'Clear downgrade';
+    if (read === 'tradeoff') return 'Trade-off';
+    if (read === 'review') return 'Needs review';
+    return 'Noise / neutral';
+  }
+
+  private playerSwapCoachReadClass(row: PlayerSwapMatrixSummaryRow): string {
+    const read = this.playerSwapCoachReadLevel(row);
+    if (read === 'upgrade') return 'delta-positive';
+    if (read === 'downgrade') return 'delta-negative';
+    if (read === 'tradeoff') return 'read-strong';
+    if (read === 'review') return 'read-check';
+    return 'delta-neutral';
+  }
+
+  private playerSwapCoachReadDetail(row: PlayerSwapMatrixSummaryRow): string {
+    const read = this.playerSwapCoachRead(row);
+    const xgDiff = this.fmtDeltaNumber(row.deltaXgDiff);
+    const preXgDiff = this.fmtDeltaNumber(row.preAutoSubDeltaXgDiff || 0);
+    const xgFor = this.fmtDeltaNumber(row.deltaXgFor);
+    const xgAgainst = this.fmtDeltaNumber(row.deltaXgAgainst);
+    const shotsFor = this.fmtDeltaNumber(row.deltaShotsFor);
+    const shotsAgainst = this.fmtDeltaNumber(row.deltaShotsAgainst);
+    if (read === 'Clear upgrade') {
+      return `mejora el diferencial xG (${xgDiff}; pre-auto-sub ${preXgDiff}) con riesgo defensivo controlado. Shots ${shotsFor}, shots ag. ${shotsAgainst}.`;
+    }
+    if (read === 'Clear downgrade') {
+      return `empeora el balance esperado (${xgDiff}; pre-auto-sub ${preXgDiff}) o aumenta demasiado el riesgo defensivo. xG for ${xgFor}, xG ag. ${xgAgainst}.`;
+    }
+    if (read === 'Trade-off') {
+      return `gana algo en ataque, pero tambien concede mas. xG for ${xgFor}, xG ag. ${xgAgainst}, shots ag. ${shotsAgainst}.`;
+    }
+    if (read === 'Needs review') {
+      return `la senal es grande pero mezclada; conviene repetir con mas seeds o mirar eventos. xG diff ${xgDiff}, shots ${shotsFor}/${shotsAgainst}.`;
+    }
+    return `no hay senal suficiente para decidir por este cambio. xG diff ${xgDiff}, pre-auto-sub ${preXgDiff}.`;
+  }
+
+  private playerSwapCoachReadLevel(row: PlayerSwapMatrixSummaryRow): 'upgrade' | 'downgrade' | 'tradeoff' | 'neutral' | 'review' {
+    const net = this.playerSwapCoachNetScore(row);
+    const attack = this.playerSwapCoachAttackScore(row);
+    const risk = this.playerSwapCoachRiskScore(row);
+    const signal = Math.max(
+      Math.abs(row.deltaXgDiff),
+      Math.abs(row.preAutoSubDeltaXgDiff || 0),
+      Math.abs(row.deltaXgFor),
+      Math.abs(row.deltaXgAgainst),
+      Math.abs(row.deltaShotsFor) * 0.025,
+      Math.abs(row.deltaShotsAgainst) * 0.025,
+    );
+
+    if (signal < 0.035) return 'neutral';
+    if (net >= 0.08 && risk <= 0.16) return 'upgrade';
+    if (net <= -0.08 && (risk >= 0.10 || row.deltaXgFor <= 0)) return 'downgrade';
+    if (attack >= 0.12 && risk >= 0.12) return 'tradeoff';
+    if (signal >= 0.18 || Math.abs(net) >= 0.06) return 'review';
+    return 'neutral';
+  }
+
+  private playerSwapCoachNetScore(row: PlayerSwapMatrixSummaryRow): number {
+    const shotDiff = row.deltaShotsFor - row.deltaShotsAgainst;
+    return row.deltaXgDiff + (row.preAutoSubDeltaXgDiff || 0) * 0.60 + shotDiff * 0.015 + row.deltaPossessionFor * 0.0015;
+  }
+
+  private playerSwapCoachAttackScore(row: PlayerSwapMatrixSummaryRow): number {
+    return Math.max(0, row.deltaXgFor) + Math.max(0, row.preAutoSubDeltaXgFor || 0) * 0.60 + Math.max(0, row.deltaShotsFor) * 0.015;
+  }
+
+  private playerSwapCoachRiskScore(row: PlayerSwapMatrixSummaryRow): number {
+    return Math.max(0, row.deltaXgAgainst) + Math.max(0, row.preAutoSubDeltaXgAgainst || 0) * 0.60 + Math.max(0, row.deltaShotsAgainst) * 0.015;
+  }
+
+  private playerSwapTacticalBreakdown(row: PlayerSwapMatrixSummaryRow, candidate: PlayerSwapCandidate | null): Pick<
+    PlayerSwapMatrixSummary,
+    | 'tacticalAttackRead'
+    | 'tacticalAttackClass'
+    | 'tacticalCentralControlRead'
+    | 'tacticalCentralControlClass'
+    | 'tacticalProtectionRead'
+    | 'tacticalProtectionClass'
+    | 'tacticalChannelsRead'
+    | 'tacticalChannelsClass'
+    | 'tacticalBreakdownDetail'
+  > {
+    const attackScore =
+      row.deltaXgFor
+      + (row.preAutoSubDeltaXgFor || 0) * 0.55
+      + row.deltaShotsFor * 0.020;
+    const roleRisk = this.playerSwapRoleRisk(candidate);
+    const centralControlScore =
+      row.deltaPossessionFor * 0.010
+      + row.deltaCentralShotsFor * 0.030
+      - row.deltaCentralShotsAgainst * 0.035
+      + roleRisk.control;
+    const protectionScore =
+      -row.deltaXgAgainst
+      - (row.preAutoSubDeltaXgAgainst || 0) * 0.55
+      - row.deltaShotsAgainst * 0.018
+      + roleRisk.protection;
+    const channelScore =
+      (row.deltaWideShotsFor - row.deltaWideShotsAgainst) * 0.028
+      + (row.deltaLongShotsFor - row.deltaLongShotsAgainst) * 0.010;
+
+    const attack = this.playerSwapTacticalLabel(attackScore, 'Ataque');
+    const control = this.playerSwapTacticalLabel(centralControlScore, 'Control');
+    const protection = this.playerSwapTacticalLabel(protectionScore, 'Proteccion');
+    const channels = this.playerSwapTacticalLabel(channelScore, 'Canales');
+
+    return {
+      tacticalAttackRead: attack.label,
+      tacticalAttackClass: attack.cssClass,
+      tacticalCentralControlRead: control.label,
+      tacticalCentralControlClass: control.cssClass,
+      tacticalProtectionRead: protection.label,
+      tacticalProtectionClass: protection.cssClass,
+      tacticalChannelsRead: channels.label,
+      tacticalChannelsClass: channels.cssClass,
+      tacticalBreakdownDetail:
+        `Ataque ${this.fmtDeltaNumber(attackScore)} ? Control ${this.fmtDeltaNumber(centralControlScore)} ? `
+        + `Proteccion ${this.fmtDeltaNumber(protectionScore)} ? Canales ${this.fmtDeltaNumber(channelScore)}. `
+        + (roleRisk.detail ? `${roleRisk.detail}. ` : '')
+        + `Zonas for C/W/L ${this.fmtDeltaNumber(row.deltaCentralShotsFor)}/${this.fmtDeltaNumber(row.deltaWideShotsFor)}/${this.fmtDeltaNumber(row.deltaLongShotsFor)}; `
+        + `against C/W/L ${this.fmtDeltaNumber(row.deltaCentralShotsAgainst)}/${this.fmtDeltaNumber(row.deltaWideShotsAgainst)}/${this.fmtDeltaNumber(row.deltaLongShotsAgainst)}.`,
+    };
+  }
+
+  private playerSwapRoleRisk(candidate: PlayerSwapCandidate | null): { control: number; protection: number; detail: string } {
+    if (!candidate || this.playerSwapFitLevel(candidate) !== 'out') {
+      return { control: 0, protection: 0, detail: '' };
+    }
+    const starter = candidate.starterPosition;
+    const bench = candidate.benchPosition;
+    if (starter === 'MID' && (bench === 'ATT' || bench === 'WINGER')) {
+      return {
+        control: -0.055,
+        protection: -0.045,
+        detail: 'Alerta de rol: reemplaza un mediocampista por atacante/banda en zona de control',
+      };
+    }
+    if (starter === 'MID' && bench === 'DEF') {
+      return {
+        control: -0.040,
+        protection: -0.010,
+        detail: 'Alerta de rol: gana marca potencial, pero pierde gestion de pelota en el medio',
+      };
+    }
+    if (starter === 'DEF' && (bench === 'ATT' || bench === 'WINGER')) {
+      return {
+        control: -0.015,
+        protection: -0.055,
+        detail: 'Alerta de rol: cambia defensa por atacante/banda y expone proteccion',
+      };
+    }
+    if (starter === 'ATT' && (bench === 'DEF' || bench === 'MID')) {
+      return {
+        control: bench === 'MID' ? 0.020 : -0.010,
+        protection: bench === 'DEF' ? 0.025 : 0.010,
+        detail: 'Alerta de rol: cambia amenaza ofensiva por perfil mas conservador',
+      };
+    }
+    return { control: 0, protection: 0, detail: '' };
+  }
+
+  private playerSwapTacticalLabel(score: number, dimension: string): { label: string; cssClass: string } {
+    if (score >= 0.10) return { label: `${dimension} ++`, cssClass: 'delta-positive' };
+    if (score >= 0.035) return { label: `${dimension} +`, cssClass: 'delta-positive' };
+    if (score <= -0.10) return { label: `${dimension} --`, cssClass: 'delta-negative' };
+    if (score <= -0.035) return { label: `${dimension} -`, cssClass: 'delta-negative' };
+    return { label: `${dimension} =`, cssClass: 'delta-neutral' };
+  }
+
+  private playerSwapDecisionScore(row: PlayerSwapMatrixSummary): number {
+    const shotDiff = row.deltaShotsFor - row.deltaShotsAgainst;
+    return row.deltaXgDiff + (row.preAutoSubDeltaXgDiff || 0) * 0.60 + shotDiff * 0.015 + row.deltaPossessionFor * 0.0015;
+  }
+
+  private playerSwapFit(candidate: PlayerSwapCandidate | null): string {
+    const level = this.playerSwapFitLevel(candidate);
+    if (level === 'profile') return 'Same profile';
+    if (level === 'line') return 'Same line';
+    return 'Out of role';
+  }
+
+  private playerSwapFitClass(candidate: PlayerSwapCandidate | null): string {
+    const level = this.playerSwapFitLevel(candidate);
+    if (level === 'profile') return 'delta-positive';
+    if (level === 'line') return 'read-stable';
+    return 'read-check';
+  }
+
+  private playerSwapFitDetail(candidate: PlayerSwapCandidate | null): string {
+    if (!candidate) return 'No candidate metadata available.';
+    const starterProfile = this.playerSwapProfile(candidate.starterPosition);
+    const benchProfile = this.playerSwapProfile(candidate.benchPosition);
+    const starterLine = this.positionPixelLine(candidate.starterPosition) ?? 'NONE';
+    const benchLine = this.positionPixelLine(candidate.benchPosition) ?? 'NONE';
+    const fit = this.playerSwapFit(candidate);
+    return `${fit}: ${candidate.starterPosition}/${starterProfile}/${starterLine} -> ${candidate.benchPosition}/${benchProfile}/${benchLine}.`;
+  }
+
+  private playerSwapFitLevel(candidate: PlayerSwapCandidate | null): 'profile' | 'line' | 'out' {
+    if (!candidate) return 'out';
+    if (this.playerSwapProfile(candidate.starterPosition) === this.playerSwapProfile(candidate.benchPosition)) return 'profile';
+    if (this.positionPixelLine(candidate.starterPosition) === this.positionPixelLine(candidate.benchPosition)) return 'line';
+    return 'out';
+  }
+
+  private positionMovementPresets(fromX: number, fromY: number): Array<{ label: string; x: number; y: number }> {
+    const clamp = (value: number) => Math.max(0, Math.min(100, Math.round(value * 100) / 100));
+    const towardWide = fromX <= 50 ? fromX - 5 : fromX + 5;
+    const towardCenter = fromX <= 50 ? fromX + 5 : fromX - 5;
+    return [
+      { label: '1px forward', x: clamp(fromX), y: clamp(fromY - 1) },
+      { label: '5px forward', x: clamp(fromX), y: clamp(fromY - 5) },
+      { label: '5px deeper', x: clamp(fromX), y: clamp(fromY + 5) },
+      { label: '5px wide', x: clamp(towardWide), y: clamp(fromY) },
+      { label: '5px center', x: clamp(towardCenter), y: clamp(fromY) },
+      { label: 'big zone cross', x: clamp(50), y: clamp(fromY <= 50 ? fromY + 18 : fromY - 18) },
+    ];
+  }
+
+  private positionMicroMovementPresets(fromX: number, fromY: number): Array<{ label: string; x: number; y: number }> {
+    const clamp = (value: number) => Math.max(0, Math.min(100, Math.round(value * 100) / 100));
+    const towardWide = fromX <= 50 ? fromX - 1 : fromX + 1;
+    const towardCenter = fromX <= 50 ? fromX + 1 : fromX - 1;
+    return [
+      { label: '1px forward', x: clamp(fromX), y: clamp(fromY - 1) },
+      { label: '1px deeper', x: clamp(fromX), y: clamp(fromY + 1) },
+      { label: '1px wide', x: clamp(towardWide), y: clamp(fromY) },
+      { label: '1px center', x: clamp(towardCenter), y: clamp(fromY) },
+    ];
+  }
+
+  private fallbackYForPosition(position: string | null | undefined): number {
+    const p = String(position ?? '').toUpperCase();
+    if (p === 'GK') return 94;
+    if (p === 'DEF') return 78;
+    if (p === 'ATT' || p === 'WINGER' || p === 'ST' || p === 'CF' || p === 'LW' || p === 'RW') return 18;
+    return 52;
+  }
+
+  private canonicalXPercent(formation: string | null | undefined, slot: LineupSlotDTO | null | undefined): number | null {
+    const position = this.canonicalFormationPosition(formation, slot);
+    if (position && Number.isFinite(position.xPercent)) {
+      return this.clampPercent(position.xPercent);
+    }
+    const parsed = this.parseSubdivision(slot?.subdivisionId);
+    if (!parsed) return null;
+    const [sector, subIndex] = parsed;
+    const sectorCol = (sector - 1) % 3;
+    const left = (sectorCol * 3 + (subIndex - 1)) * 11.11;
+    return this.clampPercent(left + 11.11 / 2);
+  }
+
+  private canonicalYPercent(formation: string | null | undefined, slot: LineupSlotDTO | null | undefined): number | null {
+    const position = this.canonicalFormationPosition(formation, slot);
+    if (position && Number.isFinite(position.yPercent)) {
+      return this.clampPercent(position.yPercent);
+    }
+    if (slot?.subdivisionId === 'GK-1') return 93;
+    const parsed = this.parseSubdivision(slot?.subdivisionId);
+    if (!parsed) return null;
+    const [sector] = parsed;
+    const sectorRow = Math.floor((sector - 1) / 3);
+    const top = sectorRow * 11.11;
+    return this.clampPercent(top + 11.11 / 2);
+  }
+
+  private canonicalFormationPosition(
+    formation: string | null | undefined,
+    slot: LineupSlotDTO | null | undefined
+  ): FormationDTO['positions'][number] | null {
+    const formationName = String(formation ?? '').trim();
+    const slotId = slot?.subdivisionId;
+    if (!formationName || !slotId) return null;
+    const positions = this.formationPositionsByName()[formationName] ?? [];
+    return positions.find((p) => p.subdivisionId === slotId) ?? null;
+  }
+
+  private parseSubdivision(subdivisionId: string | null | undefined): [number, number] | null {
+    if (!subdivisionId?.startsWith('S')) return null;
+    const dash = subdivisionId.indexOf('-');
+    if (dash < 0 || dash >= subdivisionId.length - 1) return null;
+    const sector = Number(subdivisionId.slice(1, dash));
+    const subIndex = Number(subdivisionId.slice(dash + 1));
+    if (!Number.isInteger(sector) || !Number.isInteger(subIndex)) return null;
+    if (sector < 1 || sector > 27 || subIndex < 1 || subIndex > 3) return null;
+    return [sector, subIndex];
+  }
+
+  private clampPercent(value: number): number {
+    return Math.max(0, Math.min(100, Math.round(value * 100) / 100));
+  }
+
+  private currentLineupSampleMetrics(
+    fixture: MatchFixture,
+    detail: MatchDetail | null
+  ): {
+    goalsFor: number;
+    goalsAgainst: number;
+    possessionFor: number;
+    shotsFor: number;
+    shotsAgainst: number;
+    xgFor: number;
+    xgAgainst: number;
+    centralShotsFor: number;
+    wideShotsFor: number;
+    longShotsFor: number;
+    centralShotsAgainst: number;
+    wideShotsAgainst: number;
+    longShotsAgainst: number;
+  } {
+    const zoneSummary = this.summarizeShotZones(detail);
+    const userIsHome = this.selectedUserTeamIsHome();
+    const zonesFor = userIsHome ? zoneSummary.home : zoneSummary.away;
+    const zonesAgainst = userIsHome ? zoneSummary.away : zoneSummary.home;
+    return {
+      goalsFor: userIsHome ? fixture?.result?.homeGoals ?? 0 : fixture?.result?.awayGoals ?? 0,
+      goalsAgainst: userIsHome ? fixture?.result?.awayGoals ?? 0 : fixture?.result?.homeGoals ?? 0,
+      possessionFor: userIsHome ? fixture?.result?.homePossession ?? 0 : fixture?.result?.awayPossession ?? 0,
+      shotsFor: userIsHome ? fixture?.result?.homeShots ?? 0 : fixture?.result?.awayShots ?? 0,
+      shotsAgainst: userIsHome ? fixture?.result?.awayShots ?? 0 : fixture?.result?.homeShots ?? 0,
+      xgFor: userIsHome ? detail?.homeXg ?? 0 : detail?.awayXg ?? 0,
+      xgAgainst: userIsHome ? detail?.awayXg ?? 0 : detail?.homeXg ?? 0,
+      centralShotsFor: zonesFor.central,
+      wideShotsFor: zonesFor.wide,
+      longShotsFor: zonesFor.long,
+      centralShotsAgainst: zonesAgainst.central,
+      wideShotsAgainst: zonesAgainst.wide,
+      longShotsAgainst: zonesAgainst.long,
+    };
+  }
+
+  private buildLineupSlots(lineup: LineupDTO): LineupSlotDTO[] {
+    const slotsByPlayer = new Map((lineup.slots ?? []).map((slot) => [slot.playerId, slot]));
+    return (lineup.players ?? [])
+      .map((player) => slotsByPlayer.get(player.playerId))
+      .filter((slot): slot is LineupSlotDTO => !!slot?.playerId && !!slot?.subdivisionId);
+  }
+
+  private swapLineupSlot(
+    slots: LineupSlotDTO[],
+    starterPlayerId: string,
+    benchPlayerId: string
+  ): LineupSlotDTO[] {
+    return slots.map((slot) =>
+      slot.playerId === starterPlayerId
+        ? { ...slot, playerId: benchPlayerId }
+        : { ...slot }
+    );
+  }
+
+  private lineupPlayerIdsFromSlots(slots: LineupSlotDTO[]): string[] {
+    return slots.map((slot) => slot.playerId);
+  }
+
+  private isAttackingPosition(position: string | null | undefined): boolean {
+    return ['ST', 'CF', 'LW', 'RW', 'LM', 'RM', 'CAM', 'WINGER', 'ATT'].includes(String(position ?? '').toUpperCase());
+  }
+
+  private positionPixelLine(position: string | null | undefined): 'DEF' | 'MID' | 'ATT' | null {
+    const p = String(position ?? '').toUpperCase();
+    if (p === 'GK') return null;
+    if (['DEF', 'CB', 'LB', 'RB', 'LWB', 'RWB'].includes(p)) return 'DEF';
+    if (['MID', 'CM', 'CDM', 'DM', 'CAM', 'AM', 'LM', 'RM'].includes(p)) return 'MID';
+    if (this.isAttackingPosition(p)) return 'ATT';
+    return 'MID';
+  }
+
+  private pickPositionPixelCandidates(lineup: LineupDTO): PositionPixelCandidate[] {
+    const slots = this.buildLineupSlots(lineup);
+    const slotByPlayer = new Map(slots.map((slot) => [slot.playerId, slot.subdivisionId]));
+    const playersWithSlots = (lineup.players ?? []).filter((player) => player.position !== 'GK' && slotByPlayer.has(player.playerId));
+    const selected = this.selectedSwapStarterIdModel
+      ? playersWithSlots.find((player) => player.playerId === this.selectedSwapStarterIdModel)
+      : null;
+    const byLine = new Map<'DEF' | 'MID' | 'ATT', typeof playersWithSlots[number]>();
+
+    for (const player of playersWithSlots) {
+      const line = this.positionPixelLine(player.position);
+      if (line && !byLine.has(line)) {
+        byLine.set(line, player);
+      }
+    }
+
+    const ordered = [
+      selected,
+      byLine.get('DEF') ?? null,
+      byLine.get('MID') ?? null,
+      byLine.get('ATT') ?? null,
+    ].filter((player): player is typeof playersWithSlots[number] => !!player);
+    const unique = new Map<string, typeof playersWithSlots[number]>();
+    for (const player of ordered) {
+      unique.set(player.playerId, player);
+    }
+
+    return Array.from(unique.values()).map((player) => ({
+      starterId: player.playerId,
+      starterName: player.name,
+      starterPosition: player.position,
+      slotId: slotByPlayer.get(player.playerId) ?? '',
+    }));
+  }
+
+  private pickAutomaticSwapCandidate(lineup: LineupDTO, squad: SessionPlayer[]): PlayerSwapCandidate | null {
+    const lineupIds = new Set((lineup.players ?? []).map((p) => p.playerId));
+    const slots = this.buildLineupSlots(lineup);
+    const slotByPlayer = new Map(slots.map((slot) => [slot.playerId, slot.subdivisionId]));
+    const starter =
+      (this.selectedSwapStarterIdModel
+        ? (lineup.players ?? []).find((player) => player.playerId === this.selectedSwapStarterIdModel && slotByPlayer.has(player.playerId))
+        : null)
+      ?? (lineup.players ?? []).find((player) => this.isAttackingPosition(player.position) && slotByPlayer.has(player.playerId))
+      ?? (lineup.players ?? []).find((player) => player.position !== 'GK' && slotByPlayer.has(player.playerId));
+    if (!starter) {
+      return null;
+    }
+
+    const eligibleBench = squad
+      .filter((player) => !lineupIds.has(player.sessionPlayerId) && !player.injured && !player.suspended && player.position !== 'GK');
+    const manualBench = this.selectedSwapBenchIdModel
+      ? eligibleBench.find((player) => player.sessionPlayerId === this.selectedSwapBenchIdModel)
+      : null;
+    const bench =
+      manualBench
+      ?? squad
+        .filter((player) => !lineupIds.has(player.sessionPlayerId) && !player.injured && !player.suspended)
+        .filter((player) => this.isAttackingPosition(player.position))
+        .sort((a, b) => (b.attack + b.technique + b.speed) - (a.attack + a.technique + a.speed))[0]
+      ?? squad
+        .filter((player) => !lineupIds.has(player.sessionPlayerId) && !player.injured && !player.suspended && player.position !== 'GK')
+        .sort((a, b) => (b.attack + b.technique + b.speed) - (a.attack + a.technique + a.speed))[0];
+    if (!bench) {
+      return null;
+    }
+
+    return {
+      starterId: starter.playerId,
+      starterName: starter.name,
+      starterPosition: starter.position,
+      benchId: bench.sessionPlayerId,
+      benchName: bench.name,
+      benchPosition: bench.position,
+      slotId: slotByPlayer.get(starter.playerId) ?? '',
+    };
+  }
+
+  private pickPlayerSwapBatteryCandidates(lineup: LineupDTO, squad: SessionPlayer[], limit = 6): PlayerSwapCandidate[] {
+    const lineupIds = new Set((lineup.players ?? []).map((p) => p.playerId));
+    const slots = this.buildLineupSlots(lineup);
+    const slotByPlayer = new Map(slots.map((slot) => [slot.playerId, slot.subdivisionId]));
+    const starters = (lineup.players ?? [])
+      .filter((player) => player.position !== 'GK' && slotByPlayer.has(player.playerId));
+    const eligibleBench = squad
+      .filter((player) => !lineupIds.has(player.sessionPlayerId) && !player.injured && !player.suspended && player.position !== 'GK')
+      .sort((a, b) => this.playerSwapBenchScore(b) - this.playerSwapBenchScore(a));
+
+    const profileOrder = ['ST', 'WIDE', 'AM', 'CM', 'DM', 'FB', 'CB', 'ATT', 'MID', 'DEF'];
+    const orderedStarters = [...starters].sort((a, b) => {
+      const profileA = this.playerSwapProfile(a.position);
+      const profileB = this.playerSwapProfile(b.position);
+      return profileOrder.indexOf(profileA) - profileOrder.indexOf(profileB);
+    });
+
+    if (this.playerSwapBatteryModeModel === 'stress') {
+      return this.buildPlayerSwapBatteryCandidates(orderedStarters, eligibleBench, slotByPlayer, limit, 'out');
+    }
+
+    const natural = this.buildPlayerSwapBatteryCandidates(orderedStarters, eligibleBench, slotByPlayer, limit, 'natural');
+    if (this.playerSwapBatteryModeModel === 'natural' || natural.length >= limit) {
+      return natural;
+    }
+    return this.buildPlayerSwapBatteryCandidates(orderedStarters, eligibleBench, slotByPlayer, limit, 'mixed', natural);
+  }
+
+  private buildPlayerSwapBatteryCandidates(
+    starters: LineupDTO['players'],
+    eligibleBench: SessionPlayer[],
+    slotByPlayer: Map<string, string>,
+    limit: number,
+    mode: 'natural' | 'mixed' | 'out',
+    seedCandidates: PlayerSwapCandidate[] = []
+  ): PlayerSwapCandidate[] {
+    const candidates = [...seedCandidates];
+    const usedPairs = new Set(candidates.map((candidate) => `${candidate.starterId}:${candidate.benchId}`));
+    const usedBenchIds = new Set(candidates.map((candidate) => candidate.benchId));
+
+    for (const starter of starters) {
+      const bench = this.pickBenchForBatteryMode(starter.position, eligibleBench, usedBenchIds, mode);
+      if (!bench) continue;
+      const key = `${starter.playerId}:${bench.sessionPlayerId}`;
+      if (usedPairs.has(key)) continue;
+      usedPairs.add(key);
+      usedBenchIds.add(bench.sessionPlayerId);
+      candidates.push({
+        starterId: starter.playerId,
+        starterName: starter.name,
+        starterPosition: starter.position,
+        benchId: bench.sessionPlayerId,
+        benchName: bench.name,
+        benchPosition: bench.position,
+        slotId: slotByPlayer.get(starter.playerId) ?? '',
+      });
+      if (candidates.length >= limit) break;
+    }
+
+    return candidates;
+  }
+
+  private pickBenchForBatteryMode(
+    starterPosition: string,
+    eligibleBench: SessionPlayer[],
+    usedBenchIds: Set<string>,
+    mode: 'natural' | 'mixed' | 'out'
+  ): SessionPlayer | null {
+    const starterProfile = this.playerSwapProfile(starterPosition);
+    const starterLine = this.positionPixelLine(starterPosition);
+    const unused = eligibleBench.filter((player) => !usedBenchIds.has(player.sessionPlayerId));
+    const pool = unused.length > 0 ? unused : eligibleBench;
+    if (mode === 'out') {
+      return pool.find((player) => this.positionPixelLine(player.position) !== starterLine)
+        ?? pool.find((player) => this.playerSwapProfile(player.position) !== starterProfile)
+        ?? null;
+    }
+    if (mode === 'natural') {
+      return pool.find((player) => this.playerSwapProfile(player.position) === starterProfile)
+        ?? pool.find((player) => this.positionPixelLine(player.position) === starterLine)
+        ?? null;
+    }
+    return pool.find((player) => this.playerSwapProfile(player.position) === starterProfile)
+      ?? pool.find((player) => this.positionPixelLine(player.position) === starterLine)
+      ?? pool[0]
+      ?? null;
+  }
+
+  private pickDiverseBenchForStarter(
+    starterPosition: string,
+    eligibleBench: SessionPlayer[],
+    usedBenchIds: Set<string>
+  ): SessionPlayer | null {
+    const starterProfile = this.playerSwapProfile(starterPosition);
+    const starterLine = this.positionPixelLine(starterPosition);
+    return eligibleBench.find((player) => !usedBenchIds.has(player.sessionPlayerId) && this.playerSwapProfile(player.position) === starterProfile)
+      ?? eligibleBench.find((player) => !usedBenchIds.has(player.sessionPlayerId) && this.positionPixelLine(player.position) === starterLine)
+      ?? eligibleBench.find((player) => !usedBenchIds.has(player.sessionPlayerId))
+      ?? null;
+  }
+
+  private playerSwapProfile(position: string | null | undefined): string {
+    const p = String(position ?? '').toUpperCase();
+    if (['ST', 'CF', 'ATT'].includes(p)) return 'ST';
+    if (['LW', 'RW', 'LM', 'RM', 'WINGER'].includes(p)) return 'WIDE';
+    if (['CAM', 'AM'].includes(p)) return 'AM';
+    if (['CDM', 'DM'].includes(p)) return 'DM';
+    if (['CM', 'MID'].includes(p)) return 'CM';
+    if (['LB', 'RB', 'LWB', 'RWB'].includes(p)) return 'FB';
+    if (['CB', 'DEF'].includes(p)) return 'CB';
+    return this.positionPixelLine(p) ?? 'MID';
+  }
+
+  private playerSwapBenchScore(player: SessionPlayer): number {
+    return player.attack + player.defense + player.technique + player.speed + player.stamina + player.mentality;
+  }
+
+  private runLineupSamples(
+    lineup: LineupDTO,
+    matchId: string,
+    careerId: string,
+    seeds: number[]
+  ): Observable<CurrentLineupReplaySample | null> {
+    return from(seeds).pipe(
+      concatMap((seed) =>
+        this.harness.replayMatch(matchId, seed).pipe(
+          switchMap((fixture) =>
+            this.matchDetailApi.getMatchDetail(careerId, matchId).pipe(
+              catchError(() => of(null)),
+              map((detail) => ({ lineup, fixture, detail, seed }))
+            )
+          ),
+          timeout(CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS),
+          catchError(() => of(null))
+        )
+      )
+    );
   }
 
   private summarizeShotZones(detail: MatchDetail | null): {
@@ -1253,7 +4604,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
 
   /**
    * Two-way binding shim for the seed number input. Empty / NaN input
-   * → null (non-reproducible replay). Otherwise coerce to a number.
+   * ? null (non-reproducible replay). Otherwise coerce to a number.
    */
   onSeedChange(value: unknown): void {
     if (value === null || value === undefined || value === '') {
@@ -1269,8 +4620,25 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     this.selectedRoundModel = typeof value === 'number' ? value : null;
   }
 
+  onPlayerSwapSeedCountChange(value: unknown): void {
+    const n = typeof value === 'number' ? value : Number(value);
+    if (!Number.isFinite(n)) {
+      this.playerSwapSeedCountModel = 3;
+      return;
+    }
+    this.playerSwapSeedCountModel = Math.max(1, Math.min(50, Math.round(n)));
+  }
+
+  onPlayerSwapBatteryPrecisionChange(value: string): void {
+    const allowed: Array<typeof this.playerSwapBatteryPrecisionModel> = ['quick', 'balanced', 'reliable'];
+    this.playerSwapBatteryPrecisionModel = allowed.includes(value as typeof this.playerSwapBatteryPrecisionModel)
+      ? (value as typeof this.playerSwapBatteryPrecisionModel)
+      : 'quick';
+    this.playerSwapSeedCountModel = this.playerSwapBatteryPrecisionSeedCount(this.playerSwapBatteryPrecisionModel);
+  }
+
   /**
-   * V24D24.2: replay the currently-selected match (Panel C click → selected
+   * V24D24.2: replay the currently-selected match (Panel C click ? selected
    * match) with the seed typed in Panel B. Refresca Panel A + D via
    * {@link refreshDetailAfterMutation}.
    *
@@ -1298,14 +4666,14 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
             : 'non-reproducible seed';
         const score =
           fixture?.result != null
-            ? ` → ${fixture.result.homeGoals}-${fixture.result.awayGoals}`
+            ? ` ? ${fixture.result.homeGoals}-${fixture.result.awayGoals}`
             : '';
         this.snackBar.open(
           `Match replayed (${seedDesc}, ${this.selectedStyleLabel()})${score}.`,
           'OK',
           { duration: 3000 }
         );
-        // The match list will update too — reload so Panel C reflects the
+        // The match list will update too ? reload so Panel C reflects the
         // new score, then refresh Panel A + D (existing pattern).
         this.loadMatches();
         this.refreshDetailAfterMutation();
@@ -1323,12 +4691,557 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   }
 
   /**
+   * Manager-lab proof button: replay the selected match using the currently
+   * persisted visual lineup (players + manual slot coordinates), then render a
+   * compact evidence card. This avoids confusing an old completed timeline with
+   * the latest modal state.
+   */
+  onReplayCurrentLineup(): void {
+    const matchId = this.selectedMatchId();
+    const careerId = this.careerId();
+    if (!matchId || !careerId) {
+      this.snackBar.open('Select a match in Panel C first.', 'OK', {
+        duration: 3000,
+      });
+      return;
+    }
+    if (!this.selectedMatchIncludesUserTeam()) {
+      this.snackBar.open(
+        `Pick a match involving ${this.userTeamName() || 'your team'} before replaying the current lineup.`,
+        'OK',
+        { duration: 5000 }
+      );
+      return;
+    }
+
+    this.currentLineupReplayResult.set(null);
+    this.mutationInFlight.set(true);
+    this.harness.getCurrentLineup().pipe(
+      switchMap((lineup) =>
+        this.harness.setStyle(this.selectedStyleModel).pipe(
+          switchMap(() => this.harness.replayMatch(matchId, this.seedInputModel)),
+          switchMap((fixture) =>
+            this.matchDetailApi.getMatchDetail(careerId, matchId).pipe(
+              catchError(() => of(null)),
+              map((detail) => this.buildCurrentLineupReplayResult(lineup, fixture, detail))
+            )
+          )
+        )
+      )
+    ).subscribe({
+      next: (result) => {
+        this.currentLineupReplayResult.set(result);
+        this.mutationInFlight.set(false);
+        this.snackBar.open(
+          `Current lineup replayed (${result.score}, seed=${result.seed ?? 'auto'}).`,
+          'OK',
+          { duration: 3500 }
+        );
+        this.markReplayAnalysisReady('Current lineup replay listo en Panel E.');
+        this.loadMatches();
+        this.refreshDetailAfterMutation();
+        this.refreshDetailAfterMutation(1200);
+      },
+      error: (err) => {
+        this.mutationInFlight.set(false);
+        this.snackBar.open(
+          this.fmtError(err, 'Failed to replay current lineup'),
+          'OK',
+          { duration: 5000 }
+        );
+      },
+    });
+  }
+
+  /**
+   * Multi-seed version of current-lineup replay. This is the reproducible
+   * "does the modal matter?" smoke: edit lineup visually, close modal, then
+   * average the exact persisted lineup across consecutive seeds.
+   */
+  onRunCurrentLineupMultiSeed(): void {
+    const matchId = this.selectedMatchId();
+    const careerId = this.careerId();
+    if (!matchId || !careerId) {
+      this.snackBar.open('Select a match in Panel C first.', 'OK', {
+        duration: 3000,
+      });
+      return;
+    }
+    if (!this.selectedMatchIncludesUserTeam()) {
+      this.snackBar.open(
+        `Pick a match involving ${this.userTeamName() || 'your team'} before running the current lineup multi-seed summary.`,
+        'OK',
+        { duration: 5000 }
+      );
+      return;
+    }
+
+    const seedStart = this.seedInputModel ?? DEFAULT_REPLAY_SEED;
+    const seedCount = CURRENT_LINEUP_MULTI_SEED_COUNT;
+    const seeds = Array.from({ length: seedCount }, (_, i) => seedStart + i);
+    const samples: CurrentLineupReplaySample[] = [];
+
+    this.currentLineupMultiSeedSummary.set(null);
+    this.mutationInFlight.set(true);
+    this.harness.getCurrentLineup().pipe(
+      switchMap((lineup) =>
+        this.harness.setStyle(this.selectedStyleModel).pipe(
+          switchMap(() => this.runLineupSamples(lineup, matchId, careerId, seeds))
+        )
+      )
+    ).subscribe({
+      next: (sample) => {
+        if (sample) {
+          samples.push(sample);
+        }
+      },
+      error: (err) => {
+        this.mutationInFlight.set(false);
+        this.snackBar.open(
+          this.fmtError(err, 'Failed to run current lineup multi-seed summary'),
+          'OK',
+          { duration: 5000 }
+        );
+      },
+      complete: () => {
+        const summary = this.buildCurrentLineupMultiSeedSummary(samples);
+        this.currentLineupMultiSeedSummary.set(summary);
+        this.mutationInFlight.set(false);
+        this.snackBar.open(
+          summary
+            ? `Current lineup multi-seed complete (${summary.seedCount} seeds, avg xG ${this.fmtXg(summary.avgXgFor)}-${this.fmtXg(summary.avgXgAgainst)}).`
+            : 'Current lineup multi-seed completed with no samples.',
+          'OK',
+          { duration: 4500 }
+        );
+        this.markReplayAnalysisReady('Current lineup multi-seed listo en Panel E.');
+        this.loadMatches();
+        this.refreshDetailAfterMutation();
+        this.refreshDetailAfterMutation(1200);
+      },
+    });
+  }
+
+  onRunAutoPlayerSwapMatrix(): void {
+    const matchId = this.selectedMatchId();
+    const careerId = this.careerId();
+    if (!matchId || !careerId) {
+      this.snackBar.open('Select a match in Panel C first.', 'OK', {
+        duration: 3000,
+      });
+      return;
+    }
+    if (!this.selectedMatchIncludesUserTeam()) {
+      this.snackBar.open(
+        `Pick a match involving ${this.userTeamName() || 'your team'} before running player swap matrix.`,
+        'OK',
+        { duration: 5000 }
+      );
+      return;
+    }
+
+    const seedStart = this.seedInputModel ?? DEFAULT_REPLAY_SEED;
+    const seedCount = Math.max(1, Math.min(50, Math.round(this.playerSwapSeedCountModel || 3)));
+    this.playerSwapSeedCountModel = seedCount;
+    let candidate: PlayerSwapCandidate | null = null;
+
+    this.playerSwapMatrixSummary.set(null);
+    this.mutationInFlight.set(true);
+    forkJoin({
+      lineup: this.harness.getCurrentLineup(),
+      squad: this.http.get<SessionPlayer[]>(`${environment.apiUrl}/career/players/squad`).pipe(
+        catchError(() => of([] as SessionPlayer[]))
+      ),
+    }).pipe(
+      switchMap(({ lineup, squad }) => {
+        candidate = this.pickAutomaticSwapCandidate(lineup, squad);
+        if (!candidate) {
+          throw new Error('No suitable starter/bench attacking swap candidate found.');
+        }
+        return this.harness.setStyle(this.selectedStyleModel).pipe(
+          switchMap(() =>
+            this.harness.runPlayerSwapMatrixSummary(matchId, {
+              starterPlayerId: candidate!.starterId,
+              benchPlayerId: candidate!.benchId,
+              slotId: candidate!.slotId,
+              seedStart,
+              seedCount,
+            })
+          )
+        );
+      })
+    ).subscribe({
+      next: (row) => {
+        this.playerSwapMatrixSummary.set(this.toPlayerSwapMatrixSummary(row, candidate));
+      },
+      error: (err) => {
+        this.mutationInFlight.set(false);
+        this.snackBar.open(
+          this.fmtError(err, 'Failed to run player swap matrix'),
+          'OK',
+          { duration: 5000 }
+        );
+        this.refreshLineupContext();
+      },
+      complete: () => {
+        this.mutationInFlight.set(false);
+        const summary = this.playerSwapMatrixSummary();
+        this.snackBar.open(
+          summary
+            ? `Player swap matrix complete: ${summary.baselinePlayer} vs ${summary.swapPlayer}, ?xG ${this.fmtDeltaNumber(summary.deltaXgFor)}.`
+            : 'Player swap matrix completed with insufficient samples.',
+          'OK',
+          { duration: 4500 }
+        );
+        this.markReplayAnalysisReady('Player swap matrix listo en Panel E.');
+        this.refreshLineupContext();
+        this.loadMatches();
+        this.refreshDetailAfterMutation();
+        this.refreshDetailAfterMutation(1200);
+      },
+    });
+  }
+
+  onRunPlayerSwapBattery(): void {
+    const matchId = this.selectedMatchId();
+    const careerId = this.careerId();
+    if (!matchId || !careerId) {
+      this.snackBar.open('Select a match in Panel C first.', 'OK', { duration: 3000 });
+      return;
+    }
+    if (!this.selectedMatchIncludesUserTeam()) {
+      this.snackBar.open(
+        `Pick a match involving ${this.userTeamName() || 'your team'} before running player swap battery.`,
+        'OK',
+        { duration: 5000 }
+      );
+      return;
+    }
+
+    const seedStart = this.seedInputModel ?? DEFAULT_REPLAY_SEED;
+    const seedCount = this.playerSwapBatteryPrecisionSeedCount(this.playerSwapBatteryPrecisionModel);
+    this.playerSwapSeedCountModel = seedCount;
+
+    this.playerSwapBatterySummaries.set([]);
+    this.mutationInFlight.set(true);
+    forkJoin({
+      lineup: this.harness.getCurrentLineup(),
+      squad: this.http.get<SessionPlayer[]>(`${environment.apiUrl}/career/players/squad`).pipe(
+        catchError(() => of([] as SessionPlayer[]))
+      ),
+    }).pipe(
+      switchMap(({ lineup, squad }) => {
+        const candidates = this.pickPlayerSwapBatteryCandidates(lineup, squad, 6);
+        if (candidates.length === 0) {
+          throw new Error('No suitable starter/bench swap candidates found.');
+        }
+        return this.harness.setStyle(this.selectedStyleModel).pipe(
+          switchMap(() => from(candidates).pipe(
+            concatMap((candidate) =>
+              this.harness.runPlayerSwapMatrixSummary(matchId, {
+                starterPlayerId: candidate.starterId,
+                benchPlayerId: candidate.benchId,
+                slotId: candidate.slotId,
+                seedStart,
+                seedCount,
+              }).pipe(map((row) => this.toPlayerSwapMatrixSummary(row, candidate)))
+            ),
+            toArray()
+          ))
+        );
+      })
+    ).subscribe({
+      next: (summaries) => {
+        this.playerSwapBatterySummaries.set(summaries);
+        this.playerSwapMatrixSummary.set(summaries[0] ?? null);
+      },
+      error: (err) => {
+        this.mutationInFlight.set(false);
+        this.snackBar.open(this.fmtError(err, 'Failed to run player swap battery'), 'OK', { duration: 5000 });
+        this.refreshLineupContext();
+      },
+      complete: () => {
+        this.mutationInFlight.set(false);
+        const count = this.playerSwapBatterySummaries().length;
+        this.snackBar.open(
+          count > 0 ? `Player swap battery complete: ${count} swaps measured.` : 'Player swap battery completed with insufficient samples.',
+          'OK',
+          { duration: 4500 }
+        );
+        this.markReplayAnalysisReady('Player swap battery lista en Panel E.');
+        this.refreshLineupContext();
+      },
+    });
+  }
+
+  onRunPlayerSwapPrecisionCompare(): void {
+    const matchId = this.selectedMatchId();
+    const careerId = this.careerId();
+    if (!matchId || !careerId) {
+      this.snackBar.open('Select a match in Panel C first.', 'OK', { duration: 3000 });
+      return;
+    }
+    if (!this.selectedMatchIncludesUserTeam()) {
+      this.snackBar.open(
+        `Pick a match involving ${this.userTeamName() || 'your team'} before comparing precision.`,
+        'OK',
+        { duration: 5000 }
+      );
+      return;
+    }
+
+    const seedStart = this.seedInputModel ?? DEFAULT_REPLAY_SEED;
+    this.playerSwapPrecisionComparisonRows.set([]);
+    this.mutationInFlight.set(true);
+    forkJoin({
+      lineup: this.harness.getCurrentLineup(),
+      squad: this.http.get<SessionPlayer[]>(`${environment.apiUrl}/career/players/squad`).pipe(
+        catchError(() => of([] as SessionPlayer[]))
+      ),
+    }).pipe(
+      switchMap(({ lineup, squad }) => {
+        const candidates = this.pickPlayerSwapBatteryCandidates(lineup, squad, 6);
+        if (candidates.length === 0) {
+          throw new Error('No suitable starter/bench swap candidates found.');
+        }
+        return this.harness.setStyle(this.selectedStyleModel).pipe(
+          switchMap(() => this.runPlayerSwapCandidates(matchId, candidates, seedStart, 3)),
+          switchMap((quick) =>
+            this.runPlayerSwapCandidates(matchId, candidates, seedStart, 10).pipe(
+              map((balanced) => this.buildPlayerSwapPrecisionComparisonRows(quick, balanced))
+            )
+          )
+        );
+      })
+    ).subscribe({
+      next: (rows) => {
+        this.playerSwapPrecisionComparisonRows.set(rows);
+      },
+      error: (err) => {
+        this.mutationInFlight.set(false);
+        this.snackBar.open(this.fmtError(err, 'Failed to compare player swap precision'), 'OK', { duration: 5000 });
+        this.refreshLineupContext();
+      },
+      complete: () => {
+        this.mutationInFlight.set(false);
+        const changed = this.playerSwapPrecisionComparisonRows().filter((row) => row.stability !== 'Stable read').length;
+        this.snackBar.open(
+          `Precision compare complete: ${changed} changed/needs review.`,
+          'OK',
+          { duration: 4500 }
+        );
+        this.markReplayAnalysisReady('Precision compare listo en Panel E.');
+        this.refreshLineupContext();
+      },
+    });
+  }
+
+  private runPlayerSwapCandidates(
+    matchId: string,
+    candidates: PlayerSwapCandidate[],
+    seedStart: number,
+    seedCount: number
+  ): Observable<PlayerSwapMatrixSummary[]> {
+    return from(candidates).pipe(
+      concatMap((candidate) =>
+        this.harness.runPlayerSwapMatrixSummary(matchId, {
+          starterPlayerId: candidate.starterId,
+          benchPlayerId: candidate.benchId,
+          slotId: candidate.slotId,
+          seedStart,
+          seedCount,
+        }).pipe(map((row) => this.toPlayerSwapMatrixSummary(row, candidate)))
+      ),
+      toArray()
+    );
+  }
+
+  private buildPlayerSwapPrecisionComparisonRows(
+    quick: PlayerSwapMatrixSummary[],
+    balanced: PlayerSwapMatrixSummary[]
+  ): PlayerSwapPrecisionComparisonRow[] {
+    const balancedByKey = new Map(balanced.map((row) => [this.playerSwapComparisonKey(row), row]));
+    return quick
+      .map((quickRow) => {
+        const balancedRow = balancedByKey.get(this.playerSwapComparisonKey(quickRow));
+        if (!balancedRow) return null;
+        const stability = this.playerSwapPrecisionStability(quickRow, balancedRow);
+        return {
+          candidateKey: this.playerSwapComparisonKey(quickRow),
+          starter: quickRow.baselinePlayer,
+          bench: quickRow.swapPlayer,
+          slotId: quickRow.slotId,
+          fit: quickRow.swapFit,
+          quick: quickRow,
+          balanced: balancedRow,
+          stability,
+          stabilityClass: this.playerSwapPrecisionStabilityClass(stability),
+        };
+      })
+      .filter((row): row is PlayerSwapPrecisionComparisonRow => !!row);
+  }
+
+  private playerSwapComparisonKey(row: PlayerSwapMatrixSummary): string {
+    return `${row.slotId}:${row.baselinePlayer}:${row.swapPlayer}`;
+  }
+
+  private playerSwapPrecisionStability(quick: PlayerSwapMatrixSummary, balanced: PlayerSwapMatrixSummary): string {
+    if (quick.swapRead === balanced.swapRead) return 'Stable read';
+    const quickScore = this.playerSwapDecisionScore(quick);
+    const balancedScore = this.playerSwapDecisionScore(balanced);
+    if (Math.sign(quickScore) !== Math.sign(balancedScore) || Math.abs(quickScore - balancedScore) > 0.12) {
+      return 'Changed read';
+    }
+    return 'Needs more seeds';
+  }
+
+  private playerSwapPrecisionStabilityClass(stability: string): string {
+    if (stability === 'Stable read') return 'delta-positive';
+    if (stability === 'Changed read') return 'delta-negative';
+    return 'read-check';
+  }
+
+  onRunPositionPixelMatrix(): void {
+    // Position movement is more sensitive than a simple smoke replay. Keep this
+    // at medium confidence by default so a 5px move is not over-read from only
+    // three seeds inherited from the swap-battery quick mode.
+    const seedCount = Math.max(10, Math.min(50, Math.round(this.playerSwapSeedCountModel || 10)));
+    this.runPositionPixelMatrixWithPresets(
+      seedCount,
+      (fromX, fromY) => this.positionMovementPresets(fromX, fromY),
+      'Position presets matrix'
+    );
+  }
+
+  onRunPositionSensitivityCheck(): void {
+    const seedCount = Math.max(20, Math.min(50, Math.round(this.playerSwapSeedCountModel || 20)));
+    this.runPositionPixelMatrixWithPresets(
+      seedCount,
+      (fromX, fromY) => this.positionMicroMovementPresets(fromX, fromY),
+      'Sensitivity check'
+    );
+  }
+
+  onRunPositionCalibrationSweep(): void {
+    const seedCount = Math.max(10, Math.min(30, Math.round(this.playerSwapSeedCountModel || 10)));
+    const matches = this.userTeamMatches().slice(0, 3);
+    if (matches.length === 0) {
+      this.snackBar.open(`No ${this.userTeamName() || 'user team'} matches available for calibration.`, 'OK', { duration: 4000 });
+      return;
+    }
+    this.runPositionPixelMatrixWithPresets(
+      seedCount,
+      (fromX, fromY) => this.positionMovementPresets(fromX, fromY)
+        .filter((preset) => ['5px forward', '5px deeper', '5px wide', '5px center', 'big zone cross'].includes(preset.label)),
+      'Calibration sweep',
+      matches
+    );
+  }
+
+  private runPositionPixelMatrixWithPresets(
+    seedCount: number,
+    presetsFor: (fromX: number, fromY: number) => Array<{ label: string; x: number; y: number }>,
+    label: string,
+    targetMatches: TestHarnessMatchRow[] | null = null
+  ): void {
+    const selectedMatchId = this.selectedMatchId();
+    const matches = targetMatches ?? (this.selectedMatch() ? [this.selectedMatch()!] : []);
+    if (!selectedMatchId && matches.length === 0) {
+      this.snackBar.open('Select a match in Panel C first.', 'OK', { duration: 3000 });
+      return;
+    }
+    if (!targetMatches && !this.selectedMatchIncludesUserTeam()) {
+      this.snackBar.open(
+        `Pick a match involving ${this.userTeamName() || 'your team'} before running position pixel matrix.`,
+        'OK',
+        { duration: 5000 }
+      );
+      return;
+    }
+    const seedStart = this.seedInputModel ?? DEFAULT_REPLAY_SEED;
+    this.playerSwapSeedCountModel = seedCount;
+
+    this.positionPixelMatrixSummary.set(null);
+    this.positionPixelMatrixRows.set([]);
+    this.mutationInFlight.set(true);
+    this.harness.getCurrentLineup().pipe(
+      switchMap((lineup) => {
+        const candidates = this.pickPositionPixelCandidates(lineup);
+        if (candidates.length === 0) {
+          throw new Error('No suitable non-GK starters found for pixel movement.');
+        }
+        const slots = this.buildLineupSlots(lineup);
+        const requests = candidates.flatMap((candidate) => {
+          const slot = slots.find((s) => s.playerId === candidate.starterId);
+          const fromX = slot?.customXPercent ?? this.canonicalXPercent(lineup.formation, slot) ?? 50;
+          const fromY = slot?.customYPercent ?? this.canonicalYPercent(lineup.formation, slot) ?? this.fallbackYForPosition(candidate.starterPosition);
+          const presets = presetsFor(fromX, fromY);
+          return matches.flatMap((match) =>
+            presets.map((preset) =>
+              this.harness.runPositionPixelMatrixSummary(match.matchId, {
+                playerId: candidate.starterId,
+                targetXPercent: preset.x,
+                targetYPercent: preset.y,
+                seedStart,
+                seedCount,
+              }).pipe(map((row) => ({ label: this.calibrationLabel(match, preset.label), row })))
+            )
+          );
+        });
+        return forkJoin(
+          requests
+        );
+      })
+    ).subscribe({
+      next: (items) => {
+        const rows = items.map((item) => this.toPositionPixelMatrixSummary(item.row, item.label));
+        this.positionPixelMatrixRows.set(rows);
+        this.positionPixelMatrixSummary.set(rows[0] ?? null);
+      },
+      error: (err) => {
+        this.mutationInFlight.set(false);
+        this.snackBar.open(
+          this.fmtError(err, 'Failed to run position pixel matrix'),
+          'OK',
+          { duration: 5000 }
+        );
+      },
+      complete: () => {
+        this.mutationInFlight.set(false);
+        const summary = this.positionPixelMatrixSummary();
+        this.snackBar.open(
+          summary
+            ? `${label} complete: ${this.positionPixelMatrixRows().length} player/move rows, ${seedCount} seeds.`
+            : 'Position pixel matrix completed with no summary.',
+          'OK',
+          { duration: 4500 }
+        );
+        this.markReplayAnalysisReady(`${label} listo en Panel E.`);
+      },
+    });
+  }
+
+  private userTeamMatches(): TestHarnessMatchRow[] {
+    const team = this.userTeamName();
+    if (!team) return [];
+    return this.rounds()
+      .flatMap((round) => round.matches)
+      .filter((match) => match.homeTeamName === team || match.awayTeamName === team);
+  }
+
+  private calibrationLabel(match: TestHarnessMatchRow, presetLabel: string): string {
+    const team = this.userTeamName();
+    const opponent = team && match.homeTeamName === team ? match.awayTeamName : match.homeTeamName;
+    return `R${match.round} vs ${opponent} ? ${presetLabel}`;
+  }
+
+  /**
    * V24D24.2: simulate the selected round (Panel B dropdown). Extracts the
    * matches of that round from {@code rounds()}, builds the request body,
    * and POSTs to {@code /api/v1/match-engine/rounds/start}.
    *
-   * <p>The backend runs the simulation async — we get back the initial
-   * RoundStateResponse and let Iván watch the scores land by reloading
+   * <p>The backend runs the simulation async ? we get back the initial
+   * RoundStateResponse and let Iv?n watch the scores land by reloading
    * Panel C (the round will eventually mark matches COMPLETED).
    */
   onSimulateRound(): void {
@@ -1348,7 +5261,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       );
       return;
     }
-    // Pick the roundId from the first match — all matches of the round
+    // Pick the roundId from the first match ? all matches of the round
     // share the same deterministic UUID (F1 backend contract).
     const roundId = roundGroup.matches[0]?.roundId ?? null;
     if (!roundId) {
@@ -1374,9 +5287,9 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           'OK',
           { duration: 3000 }
         );
-        // The simulation is async — reload the match list once so the UI
+        // The simulation is async ? reload the match list once so the UI
         // catches up on whatever completed by the time the response lands.
-        // Iván can re-click Simulate or Replay later for further updates.
+        // Iv?n can re-click Simulate or Replay later for further updates.
         this.loadMatches();
       },
       error: (err) => {
@@ -1404,8 +5317,40 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return row.formation;
   }
 
+  trackByFormationSummary(_index: number, row: FormationMatrixSummaryRow): string {
+    return row.formation;
+  }
+
   trackByScenarioMatrix(_index: number, row: ScenarioMatrixRow): string {
     return row.scenario;
+  }
+
+  trackByScenarioMatrixSummary(_index: number, row: ScenarioMatrixSummaryRow): string {
+    return row.scenario;
+  }
+
+  trackByScenarioBattery(_index: number, row: ScenarioBatteryRow): string {
+    return `${row.matchId}:${row.controlledSide}:${row.seedStart}:${row.seedCount}`;
+  }
+
+  trackBySwapSlotOption(_index: number, option: PlayerSwapSlotOption): string {
+    return option.playerId;
+  }
+
+  trackBySwapBenchOption(_index: number, option: PlayerSwapBenchOption): string {
+    return option.playerId;
+  }
+
+  trackByPlayerSwapSummary(_index: number, summary: PlayerSwapMatrixSummary): string {
+    return `${summary.slotId}:${summary.baselinePlayer}:${summary.swapPlayer}:${summary.seedStart}:${summary.seedEnd}`;
+  }
+
+  trackByPlayerSwapPrecisionComparison(_index: number, row: PlayerSwapPrecisionComparisonRow): string {
+    return row.candidateKey;
+  }
+
+  trackByPositionPixelRow(_index: number, row: PositionPixelMatrixSummary): string {
+    return `${row.playerName}-${row.label}-${row.targetXPercent}-${row.targetYPercent}`;
   }
 
   selectedStyleLabel(): string {
@@ -1416,11 +5361,162 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return this.teamStyleOptions.find((o) => o.value === this.selectedStyleModel)?.hint ?? '';
   }
 
+  playerSwapBatteryModeHint(): string {
+    if (this.playerSwapBatteryModeModel === 'stress') return 'Busca swaps fuera de rol para testear limites.';
+    if (this.playerSwapBatteryModeModel === 'mixed') return 'Permite cambios naturales y experimentos.';
+    return 'Prioriza mismo perfil o misma linea.';
+  }
+
+  playerSwapBatteryPrecisionHint(): string {
+    const seeds = this.playerSwapBatteryPrecisionSeedCount(this.playerSwapBatteryPrecisionModel);
+    if (this.playerSwapBatteryPrecisionModel === 'reliable') return `${seeds} seeds ? High confidence.`;
+    if (this.playerSwapBatteryPrecisionModel === 'balanced') return `${seeds} seeds ? Medium confidence.`;
+    return `${seeds} seeds ? Low confidence, smoke rapido.`;
+  }
+
+  playerSwapBatteryConfidenceLabel(seedCount = this.playerSwapSeedCountModel): string {
+    if (seedCount >= 30) return 'High confidence';
+    if (seedCount >= 10) return 'Medium confidence';
+    return 'Low confidence';
+  }
+
+  private playerSwapBatteryPrecisionSeedCount(precision: typeof this.playerSwapBatteryPrecisionModel): number {
+    if (precision === 'reliable') return 30;
+    if (precision === 'balanced') return 10;
+    return 3;
+  }
+
+  playerSwapBatteryCounterText(counts: Record<string, number>): string {
+    const entries = Object.entries(counts).filter(([, count]) => count > 0);
+    return entries.length > 0 ? entries.map(([label, count]) => `${count} ${label}`).join(` ${String.fromCharCode(183)} `) : 'sin datos';
+  }
+
+  playerSwapBatteryBestWorstText(row: PlayerSwapMatrixSummary | null): string {
+    if (!row) return 'sin datos';
+    return `${row.baselinePlayer} -> ${row.swapPlayer} (${this.fmtDeltaNumber(row.deltaXgDiff)} xG diff, ${row.swapFit})`;
+  }
+
   styleShort(style: TeamStyle | null): string {
     if (!style) {
       return '-';
     }
     return this.teamStyleOptions.find((o) => o.value === style)?.label ?? style;
+  }
+
+  controlledTeamSideHint(): string {
+    const match = this.selectedMatch();
+    if (!match) {
+      return 'Elegí un partido para probar escenarios.';
+    }
+    if (this.controlledTeamSideModel === 'HOME') {
+      return `Controlando local: ${match.homeTeamName}`;
+    }
+    if (this.controlledTeamSideModel === 'AWAY') {
+      return `Controlando visitante: ${match.awayTeamName}`;
+    }
+    return this.selectedMatchIncludesUserTeam()
+      ? `Controlando mi equipo: ${this.userTeamName() || 'usuario'}`
+      : 'Mi equipo no juega este partido; elegí Local o Visitante.';
+  }
+
+  controlledTeamDisplayName(): string {
+    const match = this.selectedMatch();
+    if (!match) {
+      return this.userTeamName() || 'Sin partido';
+    }
+    if (this.controlledTeamSideModel === 'HOME') {
+      return `${match.homeTeamName} (local)`;
+    }
+    if (this.controlledTeamSideModel === 'AWAY') {
+      return `${match.awayTeamName} (visitante)`;
+    }
+    return `${this.userTeamName() || 'Mi equipo'} (mi equipo)`;
+  }
+
+  canRunScenarioSummaryForControlledSide(): boolean {
+    return this.controlledTeamSideModel === 'USER'
+      ? this.selectedMatchIncludesUserTeam()
+      : this.selectedMatchId() !== null;
+  }
+
+  scenarioBatteryScopeHint(): string {
+    return this.scenarioBatteryScopeModel === 'balanced'
+      ? 'Media: hasta 4 partidos x Local/Visitante.'
+      : 'Rapida: hasta 2 partidos x Local/Visitante.';
+  }
+
+  scenarioBatteryGroupHint(): string {
+    switch (this.scenarioBatteryGroupModel) {
+      case 'ALL':
+        return 'Todo: ataque, defensa y lectura del rival.';
+      case 'DEFENSE':
+        return 'Defensa: mide proteccion, riesgos y cierres.';
+      case 'OPPONENT':
+        return 'Rival: mide por donde nos puede atacar.';
+      default:
+        return 'Ataque: mide canales, forma y riesgo ofensivo.';
+    }
+  }
+
+  scenarioBatteryGroupLabel(group: 'ALL' | 'OFFENSE' | 'DEFENSE' | 'OPPONENT'): string {
+    switch (group) {
+      case 'ALL':
+        return 'Todo';
+      case 'DEFENSE':
+        return 'Defensa';
+      case 'OPPONENT':
+        return 'Rival';
+      default:
+        return 'Ataque';
+    }
+  }
+
+  private scenarioBatteryMatchLimit(): number {
+    return this.scenarioBatteryScopeModel === 'balanced' ? 4 : 2;
+  }
+
+  private styleLabelFromActionDetail(actionDetail: string | null | undefined): string | null {
+    if (!actionDetail) {
+      return null;
+    }
+    const normalized = actionDetail.trim().toUpperCase();
+    const option = this.teamStyleOptions.find((o) => o.value === normalized);
+    return option?.label ?? null;
+  }
+
+  private scenarioActionLabel(actionDetail: string | null | undefined): string | null {
+    if (!actionDetail) {
+      return null;
+    }
+    const detail = actionDetail.trim();
+    const normalized = detail.toUpperCase();
+    if (normalized.startsWith('OPPONENT ')) {
+      const opponentStyle = normalized.replace(/^OPPONENT\s+/, '');
+      const label = this.styleLabelFromActionDetail(opponentStyle);
+      return label ? `Rival: ${label.toLowerCase()}` : `Rival: ${detail.replace(/^Opponent\s+/i, '')}`;
+    }
+    const ownStyle = this.styleLabelFromActionDetail(detail);
+    if (ownStyle) {
+      return ownStyle;
+    }
+    const shapeLabel = this.scenarioShapeActionLabel(detail);
+    if (shapeLabel) {
+      return shapeLabel;
+    }
+    return detail;
+  }
+
+  private scenarioShapeActionLabel(actionDetail: string): string | null {
+    const normalized = actionDetail.trim().toLowerCase();
+    if (normalized.startsWith('right-overload')) return 'Sobrecarga derecha';
+    if (normalized.startsWith('left-overload')) return 'Sobrecarga izquierda';
+    if (normalized.startsWith('compact-center')) return 'Cerrar el centro';
+    if (normalized.startsWith('attacking-high')) return 'Ataque alto';
+    if (normalized.startsWith('attacking-step')) return 'Paso ofensivo';
+    if (normalized.startsWith('defensive-step')) return 'Paso defensivo';
+    if (normalized.startsWith('defensive-low')) return 'Bloque bajo';
+    if (normalized.startsWith('central-compact')) return 'Bloque compacto';
+    return null;
   }
 
   actionLabel(row: ScenarioMatrixRow): string {
@@ -1430,10 +5526,626 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     if (row.actionType === 'FORMATION') {
       return row.actionDetail || 'Formation';
     }
+    if (row.actionType === 'POSITION') {
+      return row.actionDetail || 'Position';
+    }
+    if (row.actionType === 'NOOP_REPLAY') {
+      return row.actionDetail || 'Replay sin cambio';
+    }
     if (row.actionType === 'SUBSTITUTION') {
       return row.actionDetail || 'Substitution';
     }
     return 'Base';
+  }
+
+  summaryActionLabel(row: ScenarioMatrixSummaryRow): string {
+    if (row.actionType === 'NONE') {
+      return 'Base';
+    }
+    if (row.actionType === 'STYLE') {
+      return this.scenarioActionLabel(row.actionDetail) ?? 'Estilo';
+    }
+    return this.scenarioActionLabel(row.actionDetail) ?? (row.actionDetail || row.actionType);
+  }
+
+  scenarioSummaryRead(row: ScenarioMatrixSummaryRow): string {
+    const level = this.scenarioSummaryReadLevel(row);
+    if (level === 'review') return 'Review';
+    if (level === 'strong') return 'Strong';
+    if (level === 'visible') return 'Visible';
+    if (level === 'small') return 'Small signal';
+    return 'Noise';
+  }
+
+  scenarioSummaryReadLevel(row: ScenarioMatrixSummaryRow): ScenarioSummaryReadLevel {
+    const score = this.scenarioSummaryImpactScore(row);
+    const check = this.scenarioSummaryNeedsReview(row);
+    if (check) return 'review';
+    if (score >= 3.0) return 'strong';
+    if (score >= 1.35) return 'visible';
+    if (this.scenarioSummaryCoherentSubstitutionSignal(row)) return 'small';
+    if (score >= 0.65) return 'small';
+    return 'noise';
+  }
+
+  scenarioSummaryReadClass(row: ScenarioMatrixSummaryRow): string {
+    const level = this.scenarioSummaryReadLevel(row);
+    if (level === 'review') return 'read-check';
+    if (level === 'strong') return 'read-strong';
+    if (level === 'visible') return 'read-visible';
+    if (level === 'small') return 'read-stable';
+    return 'delta-neutral';
+  }
+
+  scenarioSummaryReadSeverity(row: ScenarioMatrixSummaryRow): number {
+    const level = this.scenarioSummaryReadLevel(row);
+    if (level === 'review') return 5;
+    if (level === 'strong') return 4;
+    if (level === 'visible') return 3;
+    if (level === 'small') return 2;
+    return 1;
+  }
+
+  scenarioSummaryReadReason(row: ScenarioMatrixSummaryRow): string {
+    const parts = [
+      `impact ${this.scenarioSummaryImpactScore(row).toFixed(2)}`,
+      `xG ${this.fmtDeltaNumber(row.avgUserXgDelta)}`,
+      `xGA ${this.fmtDeltaNumber(row.avgOpponentXgDelta)}`,
+      `shots ${this.fmtDeltaNumber(row.avgUserShotsDelta)}/${this.fmtDeltaNumber(row.avgOpponentShotsDelta)}`,
+      `poss ${this.fmtDeltaNumber(row.avgUserPossessionDelta)}pp`,
+    ];
+    if (this.scenarioSummaryNeedsReview(row)) {
+      parts.unshift('Opposite/noisy sign for labelled substitution');
+    }
+    return parts.join(' ? ');
+  }
+
+  scenarioSummaryOutcome(row: ScenarioMatrixSummaryRow): string {
+    if (this.scenarioSummaryReadLevel(row) === 'noise') return 'Neutral';
+    if (row.scenario.startsWith('m45-opponent-')) {
+      const defensiveGain = this.scenarioSummaryDefensiveGainScore(row);
+      const defensiveRisk = this.scenarioSummaryDefensiveRiskScore(row);
+      const wideChannelExposure = Math.max(row.avgOpponentLeftWideXgDelta, row.avgOpponentRightWideXgDelta);
+      const centralExposure = row.avgOpponentCentralXgDelta;
+      const wideContained = Math.min(row.avgOpponentLeftWideXgDelta, row.avgOpponentRightWideXgDelta);
+      const channelExposure = Math.max(wideChannelExposure, centralExposure);
+      if (channelExposure >= 0.10 && row.avgOpponentXgDelta >= 0.04) return 'Exposure';
+      if (channelExposure >= 0.08) return 'Channel shift';
+      if (wideContained <= -0.08 || centralExposure <= -0.08) return 'Contained';
+      if (defensiveRisk >= 1.15 && row.avgOpponentXgDelta >= 0.04) return 'Exposure';
+      if (defensiveGain >= 1.15) return 'Contained';
+      return 'Neutral';
+    }
+
+    const attackGain = this.scenarioSummaryAttackGainScore(row);
+    const attackLoss = this.scenarioSummaryAttackLossScore(row);
+    const defensiveGain = this.scenarioSummaryDefensiveGainScore(row);
+    const defensiveRisk = this.scenarioSummaryDefensiveRiskScore(row);
+
+    if (attackGain >= 1.15 && defensiveGain >= 0.85) return 'Upgrade';
+    if (attackLoss >= 1.15 && defensiveRisk >= 0.85) return 'Downgrade';
+    if (attackGain >= 1.0 && defensiveRisk >= 0.8) return 'Tradeoff';
+    if (defensiveGain >= 1.0 && attackLoss >= 0.8) return 'Tradeoff';
+    if (attackGain >= 1.15 || defensiveGain >= 1.15) return 'Lean up';
+    if (attackLoss >= 1.15 || defensiveRisk >= 1.15) return 'Risk';
+    return 'Neutral';
+  }
+
+  scenarioSummaryOutcomeClass(row: ScenarioMatrixSummaryRow): string {
+    const outcome = this.scenarioSummaryOutcome(row);
+    if (outcome === 'Upgrade' || outcome === 'Lean up') return 'read-visible';
+    if (outcome === 'Contained') return 'read-visible';
+    if (outcome === 'Channel shift') return 'read-visible';
+    if (outcome === 'Tradeoff') return 'read-strong';
+    if (outcome === 'Downgrade' || outcome === 'Risk' || outcome === 'Exposure') return 'read-check';
+    return 'read-stable';
+  }
+
+  scenarioSummaryOutcomeReason(row: ScenarioMatrixSummaryRow): string {
+    return [
+      `attack gain ${this.scenarioSummaryAttackGainScore(row).toFixed(2)}`,
+      `attack loss ${this.scenarioSummaryAttackLossScore(row).toFixed(2)}`,
+      `defensive gain ${this.scenarioSummaryDefensiveGainScore(row).toFixed(2)}`,
+      `defensive risk ${this.scenarioSummaryDefensiveRiskScore(row).toFixed(2)}`,
+    ].join(' ? ');
+  }
+
+  scenarioSummaryCoachRead(row: ScenarioMatrixSummaryRow): string {
+    const attackGain = this.scenarioSummaryAttackGainScore(row);
+    const attackLoss = this.scenarioSummaryAttackLossScore(row);
+    const defensiveGain = this.scenarioSummaryDefensiveGainScore(row);
+    const defensiveRisk = this.scenarioSummaryDefensiveRiskScore(row);
+    const userChannel = this.scenarioSummaryUserChannelRead(row);
+    const opponentChannel = this.scenarioSummaryOpponentChannelRead(row);
+
+    if (row.scenario.startsWith('m45-opponent-')) {
+      const strongestOpponentChannel = Math.max(
+        row.avgOpponentCentralXgDelta,
+        row.avgOpponentLeftWideXgDelta,
+        row.avgOpponentRightWideXgDelta
+      );
+      if ((defensiveRisk >= 0.85 || row.avgOpponentXgDelta > 0.04) && row.avgOpponentXgDelta >= 0.04) {
+        return `rival amenaza: ${opponentChannel}`;
+      }
+      if (strongestOpponentChannel >= 0.08) return `rival cambia canal: ${opponentChannel}`;
+      if (defensiveGain >= 0.85 || row.avgOpponentXgDelta < -0.04) return `rival contenido: ${opponentChannel}`;
+      return opponentChannel;
+    }
+    if (this.scenarioSummaryReadLevel(row) === 'noise') {
+      return userChannel !== 'sin canal claro' ? `leve: ${userChannel}` : 'sin senal fuerte';
+    }
+    if (attackGain >= 1.15 && defensiveRisk >= 0.9) return `mas ataque, mas riesgo (${userChannel})`;
+    if (defensiveGain >= 1.15 && attackLoss >= 0.9) return `mas seguro, menos ataque (${opponentChannel})`;
+    if (attackGain >= 1.15) return `gana ataque: ${userChannel}`;
+    if (attackLoss >= 1.15) return `pierde ataque: ${userChannel}`;
+    if (defensiveRisk >= 1.15) return `abre riesgo: ${opponentChannel}`;
+    if (defensiveGain >= 1.15) return `protege mejor: ${opponentChannel}`;
+    return `${userChannel} / ${opponentChannel}`;
+  }
+
+  scenarioSummaryCoachReadDetail(row: ScenarioMatrixSummaryRow): string {
+    return [
+      this.scenarioSummaryCoachRead(row),
+      `usuario: ${this.scenarioSummaryUserChannelRead(row)}`,
+      `rival: ${this.scenarioSummaryOpponentChannelRead(row)}`,
+      `xG ${this.fmtDeltaNumber(row.avgUserXgDelta)} / xGA ${this.fmtDeltaNumber(row.avgOpponentXgDelta)}`,
+      `shots ${this.fmtDeltaNumber(row.avgUserShotsDelta)} / ag ${this.fmtDeltaNumber(row.avgOpponentShotsDelta)}`,
+      `wide L/R rival xG ${this.fmtDeltaNumber(row.avgOpponentLeftWideXgDelta)} / ${this.fmtDeltaNumber(row.avgOpponentRightWideXgDelta)}`,
+    ].join(' ? ');
+  }
+
+  private scenarioDecisionCardFromRow(
+    title: string,
+    row: ScenarioMatrixSummaryRow,
+    className: string,
+    detail: string,
+  ): ScenarioDecisionCard {
+    return {
+      title,
+      label: this.summaryActionLabel(row),
+      metrics: this.scenarioDecisionMetrics(title, row),
+      detail,
+      className,
+    };
+  }
+
+  private scenarioDecisionMetrics(title: string, row: ScenarioMatrixSummaryRow): string {
+    if (title === 'Amenaza rival' || this.isOpponentScenarioRow(row)) {
+      return `xGA ${this.fmtDeltaNumber(row.avgOpponentXgDelta)} / canal ${this.fmtDeltaNumber(this.scenarioOpponentMaxChannelXgDelta(row))} / ${this.scenarioDecisionConfidence(row)}`;
+    }
+    return `xG ${this.fmtDeltaNumber(row.avgUserXgDelta)} / xGA ${this.fmtDeltaNumber(row.avgOpponentXgDelta)} / ${this.scenarioDecisionConfidence(row)}`;
+  }
+
+  private isOpponentScenarioRow(row: ScenarioMatrixSummaryRow): boolean {
+    return row.scenario.startsWith('m45-opponent-') || row.actionType === 'OPPONENT_STYLE';
+  }
+
+  private scenarioActionKey(row: ScenarioMatrixSummaryRow): string {
+    return `${row.actionType}:${row.actionDetail || row.scenario}`;
+  }
+
+  private scenarioTwoWayScore(row: ScenarioMatrixSummaryRow): number {
+    return Math.max(0, row.avgUserXgDelta) + Math.max(0, -row.avgOpponentXgDelta);
+  }
+
+  private scenarioDecisionConfidence(row: ScenarioMatrixSummaryRow): string {
+    const level = this.scenarioSummaryReadLevel(row);
+    if (level === 'strong' || level === 'review') return 'fuerte';
+    if (level === 'visible') return 'media';
+    if (level === 'small') return 'leve';
+    return 'marginal';
+  }
+
+  private scenarioProtectionCandidateIsCoachWorthy(row: ScenarioMatrixSummaryRow): boolean {
+    const looksLikeSubstitution = row.actionType === 'SUBSTITUTION'
+      || (row.actionDetail ?? '').includes('->')
+      || this.summaryActionLabel(row).includes('->');
+    if (!looksLikeSubstitution) {
+      return true;
+    }
+    const defensiveImpact = Math.max(0, -row.avgOpponentXgDelta);
+    const shotImpact = Math.max(0, -row.avgOpponentShotsDelta);
+    return defensiveImpact >= 0.045 && (shotImpact >= 0.25 || defensiveImpact >= 0.065);
+  }
+
+  private buildScenarioBatteryRow(
+    match: TestHarnessMatchRow,
+    controlledSide: Exclude<ControlledTeamSide, 'USER'>,
+    scenarioGroup: 'ALL' | 'OFFENSE' | 'DEFENSE' | 'OPPONENT',
+    seedStart: number,
+    seedCount: number,
+    rows: ScenarioMatrixSummaryRow[]
+  ): ScenarioBatteryRow {
+    const cards = this.buildScenarioDecisionCards(rows);
+    const decision = this.scenarioBatteryDecision(cards);
+    return {
+      matchId: match.matchId,
+      matchLabel: `${match.homeTeamName} vs ${match.awayTeamName}`,
+      controlledSide,
+      controlledTeam: controlledSide === 'HOME' ? match.homeTeamName : match.awayTeamName,
+      scenarioGroup,
+      seedStart,
+      seedCount,
+      scenarioCount: rows.length,
+      decision: decision.label,
+      decisionDetail: decision.detail,
+      cards,
+    };
+  }
+
+  private scenarioBatteryDecision(cards: ScenarioDecisionCard[]): { label: string; detail: string } {
+    const card = (title: string) => cards.find((item) => item.title === title);
+    const twoWay = card('Doble ganancia');
+    if (twoWay) {
+      return {
+        label: `Aprovechar: ${twoWay.label}`,
+        detail: `${twoWay.label} da doble ganancia. ${twoWay.metrics}. ${twoWay.detail}`,
+      };
+    }
+    const attack = card('Atacar');
+    if (attack) {
+      return {
+        label: `Atacar: ${attack.label}`,
+        detail: `${attack.label} es el mejor plan ofensivo visible. ${attack.metrics}. ${attack.detail}`,
+      };
+    }
+    const shape = card('Forma');
+    if (shape) {
+      return {
+        label: `Ajustar forma: ${shape.label}`,
+        detail: `${shape.label} cambia la forma con impacto visible. ${shape.metrics}. ${shape.detail}`,
+      };
+    }
+    const protect = card('Cuidar');
+    if (protect) {
+      return {
+        label: `Proteger: ${protect.label}`,
+        detail: `${protect.label} es la mejor proteccion detectada. ${protect.metrics}. ${protect.detail}`,
+      };
+    }
+    const threat = card('Amenaza rival');
+    if (threat) {
+      return {
+        label: `Vigilar: ${threat.label}`,
+        detail: `${threat.label} es la amenaza principal del rival. ${threat.metrics}. ${threat.detail}`,
+      };
+    }
+    const avoid = card('Evitar');
+    if (avoid) {
+      return {
+        label: `No forzar: ${avoid.label}`,
+        detail: `${avoid.label} abre riesgo y conviene evitarlo salvo necesidad. ${avoid.metrics}. ${avoid.detail}`,
+      };
+    }
+    return {
+      label: 'Mantener equipo',
+      detail: 'No hay una senal suficientemente clara para recomendar un cambio de DT en esta bateria.',
+    };
+  }
+
+  scenarioBatteryCardSummary(row: ScenarioBatteryRow, title: string): string {
+    const card = row.cards.find((item) => item.title === title);
+    return card ? `${card.label} · ${card.metrics}` : '-';
+  }
+
+  scenarioBatteryCardDetail(row: ScenarioBatteryRow, title: string): string {
+    const card = row.cards.find((item) => item.title === title);
+    return card ? card.detail : 'Sin senal clara en esta bateria.';
+  }
+
+  private scenarioBatteryExportRow(row: ScenarioBatteryRow): Record<string, unknown> {
+    const summary = (title: string) => this.scenarioBatteryCardSummary(row, title);
+    const detail = (title: string) => this.scenarioBatteryCardDetail(row, title);
+    return {
+      match: row.matchLabel,
+      controlledTeam: row.controlledTeam,
+      controlledSide: row.controlledSide,
+      scenarioGroup: this.scenarioBatteryGroupLabel(row.scenarioGroup),
+      seedStart: row.seedStart,
+      seedCount: row.seedCount,
+      scenarioCount: row.scenarioCount,
+      decision: row.decision,
+      decisionDetail: row.decisionDetail,
+      plan: summary('Plan actual'),
+      twoWay: summary('Doble ganancia'),
+      attack: summary('Atacar'),
+      shape: summary('Forma'),
+      protect: summary('Cuidar'),
+      avoid: summary('Evitar'),
+      opponentThreat: summary('Amenaza rival'),
+      planDetail: detail('Plan actual'),
+      twoWayDetail: detail('Doble ganancia'),
+      attackDetail: detail('Atacar'),
+      shapeDetail: detail('Forma'),
+      protectDetail: detail('Cuidar'),
+      avoidDetail: detail('Evitar'),
+      opponentThreatDetail: detail('Amenaza rival'),
+    };
+  }
+
+  private scenarioOpponentMaxChannelXgDelta(row: ScenarioMatrixSummaryRow): number {
+    return Math.max(
+      row.avgOpponentCentralXgDelta,
+      row.avgOpponentLeftWideXgDelta,
+      row.avgOpponentRightWideXgDelta,
+    );
+  }
+
+  private scenarioOpponentMinChannelXgDelta(row: ScenarioMatrixSummaryRow): number {
+    return Math.min(
+      row.avgOpponentCentralXgDelta,
+      row.avgOpponentLeftWideXgDelta,
+      row.avgOpponentRightWideXgDelta,
+    );
+  }
+
+  private scenarioOpponentRiskRead(row: ScenarioMatrixSummaryRow): string {
+    const channels = [
+      { label: 'centro', value: row.avgOpponentCentralXgDelta },
+      { label: 'banda izquierda', value: row.avgOpponentLeftWideXgDelta },
+      { label: 'banda derecha', value: row.avgOpponentRightWideXgDelta },
+    ].sort((a, b) => b.value - a.value);
+    const top = channels[0];
+    if (top.value >= 0.025) {
+      return `rival amenaza por ${top.label} (${this.fmtDeltaNumber(top.value)} xG canal)`;
+    }
+    return this.scenarioSummaryOpponentChannelRead(row);
+  }
+
+  private scenarioOpponentProtectionRead(row: ScenarioMatrixSummaryRow): string {
+    const channels = [
+      { label: 'centro', value: row.avgOpponentCentralXgDelta },
+      { label: 'banda izquierda', value: row.avgOpponentLeftWideXgDelta },
+      { label: 'banda derecha', value: row.avgOpponentRightWideXgDelta },
+    ].sort((a, b) => a.value - b.value);
+    const best = channels[0];
+    if (best.value <= -0.025) {
+      return `rival contenido por ${best.label} (${this.fmtDeltaNumber(best.value)} xG canal)`;
+    }
+    return this.scenarioSummaryOpponentChannelRead(row);
+  }
+
+  private scenarioSummaryUserChannelRead(row: ScenarioMatrixSummaryRow): string {
+    const central = row.avgUserCentralXgDelta;
+    const wide = row.avgUserWideXgDelta;
+    const left = row.avgUserLeftWideXgDelta;
+    const right = row.avgUserRightWideXgDelta;
+    const bestWideSide = Math.abs(left) >= Math.abs(right) ? 'izquierda' : 'derecha';
+    const bestWideValue = Math.abs(left) >= Math.abs(right) ? left : right;
+
+    if (Math.abs(central) >= Math.abs(wide) && Math.abs(central) >= 0.025) {
+      return central > 0 ? 'mas peligro por centro' : 'menos peligro por centro';
+    }
+    if (Math.abs(wide) >= 0.025) {
+      if (Math.abs(bestWideValue) >= 0.018) {
+        return bestWideValue > 0 ? `mas peligro por banda ${bestWideSide}` : `menos peligro por banda ${bestWideSide}`;
+      }
+      return wide > 0 ? 'mas peligro por bandas' : 'menos peligro por bandas';
+    }
+    if (Math.abs(row.avgUserCentralDelta) > Math.abs(row.avgUserWideDelta) && Math.abs(row.avgUserCentralDelta) >= 0.5) {
+      return row.avgUserCentralDelta > 0 ? 'mas volumen por centro' : 'menos volumen por centro';
+    }
+    if (Math.abs(row.avgUserWideDelta) >= 0.5) {
+      return row.avgUserWideDelta > 0 ? 'mas volumen por bandas' : 'menos volumen por bandas';
+    }
+    return 'sin canal claro';
+  }
+
+  private scenarioSummaryOpponentChannelRead(row: ScenarioMatrixSummaryRow): string {
+    const central = row.avgOpponentCentralXgDelta;
+    const wide = row.avgOpponentWideXgDelta;
+    const left = row.avgOpponentLeftWideXgDelta;
+    const right = row.avgOpponentRightWideXgDelta;
+    const exposedSide = Math.abs(left) >= Math.abs(right) ? 'izquierda' : 'derecha';
+    const exposedValue = Math.abs(left) >= Math.abs(right) ? left : right;
+
+    if (Math.abs(central) >= Math.abs(wide) && Math.abs(central) >= 0.025) {
+      return central > 0 ? 'rival entra mas por centro' : 'rival contenido por centro';
+    }
+    if (Math.abs(wide) >= 0.025) {
+      if (Math.abs(exposedValue) >= 0.018) {
+        return exposedValue > 0 ? `rival entra mas por banda ${exposedSide}` : `rival contenido por banda ${exposedSide}`;
+      }
+      return wide > 0 ? 'rival entra mas por bandas' : 'rival contenido por bandas';
+    }
+    if (Math.abs(row.avgOpponentCentralDelta) > Math.abs(row.avgOpponentWideDelta) && Math.abs(row.avgOpponentCentralDelta) >= 0.5) {
+      return row.avgOpponentCentralDelta > 0 ? 'rival tira mas por centro' : 'rival tira menos por centro';
+    }
+    if (Math.abs(row.avgOpponentWideDelta) >= 0.5) {
+      return row.avgOpponentWideDelta > 0 ? 'rival tira mas por bandas' : 'rival tira menos por bandas';
+    }
+    return 'sin riesgo claro';
+  }
+
+  scenarioSummaryOutcomeSummary(): Array<{ label: string; count: number; className: string; hint: string }> {
+    const rows = this.scenarioMatrixSummaryResults();
+    const definitions = [
+      {
+        label: 'Upgrade',
+        className: 'read-visible',
+        hint: 'Mejora clara: sube ataque y/o baja amenaza rival sin coste fuerte.',
+        matches: (outcome: string) => outcome === 'Upgrade' || outcome === 'Lean up',
+      },
+      {
+        label: 'Tradeoff',
+        className: 'read-strong',
+        hint: 'Gana algo y paga algo: mejor ataque con m?s riesgo, o m?s protecci?n con menos ataque.',
+        matches: (outcome: string) => outcome === 'Tradeoff',
+      },
+      {
+        label: 'Risk/Exposure',
+        className: 'read-check',
+        hint: 'Empeora el equipo, abre riesgo importante o el rival expone un carril/zona.',
+        matches: (outcome: string) => outcome === 'Risk' || outcome === 'Downgrade' || outcome === 'Exposure',
+      },
+      {
+        label: 'Contained',
+        className: 'read-visible',
+        hint: 'El rival prueba un carril/plan pero queda contenido.',
+        matches: (outcome: string) => outcome === 'Contained',
+      },
+      {
+        label: 'Neutral',
+        className: 'read-stable',
+        hint: 'Sin cambio futbol?stico suficiente para tomar decisi?n.',
+        matches: (outcome: string) => outcome === 'Neutral',
+      },
+    ];
+
+    return definitions.map((definition) => ({
+      label: definition.label,
+      className: definition.className,
+      hint: definition.hint,
+      count: rows.filter((row) => definition.matches(this.scenarioSummaryOutcome(row))).length,
+    }));
+  }
+
+  private scenarioSummaryExportRow(row: ScenarioMatrixSummaryRow): Record<string, unknown> {
+    return {
+      read: this.scenarioSummaryRead(row),
+      impactScore: this.scenarioSummaryImpactScore(row).toFixed(3),
+      readReason: this.scenarioSummaryReadReason(row),
+      coachRead: this.scenarioSummaryCoachRead(row),
+      coachReadDetail: this.scenarioSummaryCoachReadDetail(row),
+      outcome: this.scenarioSummaryOutcome(row),
+      outcomeReason: this.scenarioSummaryOutcomeReason(row),
+      attackGainScore: this.scenarioSummaryAttackGainScore(row).toFixed(3),
+      attackLossScore: this.scenarioSummaryAttackLossScore(row).toFixed(3),
+      defensiveGainScore: this.scenarioSummaryDefensiveGainScore(row).toFixed(3),
+      defensiveRiskScore: this.scenarioSummaryDefensiveRiskScore(row).toFixed(3),
+      scenario: row.scenario,
+      baselineScenario: row.baselineScenario,
+      actionType: row.actionType,
+      actionDetail: row.actionDetail,
+      seedStart: this.summarySeedStart(),
+      seedEnd: this.summarySeedEnd(),
+      seedCount: row.seedCount,
+      avgUserXgDelta: row.avgUserXgDelta,
+      minUserXgDelta: row.minUserXgDelta,
+      maxUserXgDelta: row.maxUserXgDelta,
+      avgOpponentXgDelta: row.avgOpponentXgDelta,
+      avgUserShotsDelta: row.avgUserShotsDelta,
+      avgOpponentShotsDelta: row.avgOpponentShotsDelta,
+      avgUserPossessionDelta: row.avgUserPossessionDelta,
+      avgUserCentralDelta: row.avgUserCentralDelta,
+      avgUserWideDelta: row.avgUserWideDelta,
+      avgOpponentCentralDelta: row.avgOpponentCentralDelta,
+      avgOpponentWideDelta: row.avgOpponentWideDelta,
+      avgUserCentralXgDelta: row.avgUserCentralXgDelta,
+      avgUserWideXgDelta: row.avgUserWideXgDelta,
+      avgOpponentCentralXgDelta: row.avgOpponentCentralXgDelta,
+      avgOpponentWideXgDelta: row.avgOpponentWideXgDelta,
+      avgUserLeftWideDelta: row.avgUserLeftWideDelta,
+      avgUserRightWideDelta: row.avgUserRightWideDelta,
+      avgOpponentLeftWideDelta: row.avgOpponentLeftWideDelta,
+      avgOpponentRightWideDelta: row.avgOpponentRightWideDelta,
+      avgUserLeftWideXgDelta: row.avgUserLeftWideXgDelta,
+      avgUserRightWideXgDelta: row.avgUserRightWideXgDelta,
+      avgOpponentLeftWideXgDelta: row.avgOpponentLeftWideXgDelta,
+      avgOpponentRightWideXgDelta: row.avgOpponentRightWideXgDelta,
+    };
+  }
+
+  private scenarioSummaryImpactScore(row: ScenarioMatrixSummaryRow): number {
+    const userXg = Math.abs(row.avgUserXgDelta) / 0.12;
+    const opponentXg = Math.abs(row.avgOpponentXgDelta) / 0.10;
+    const userShots = Math.abs(row.avgUserShotsDelta) / 2.0;
+    const opponentShots = Math.abs(row.avgOpponentShotsDelta) / 2.0;
+    const possession = Math.abs(row.avgUserPossessionDelta) / 2.0;
+    const zoneShift = (
+      Math.abs(row.avgUserCentralDelta)
+      + Math.abs(row.avgUserWideDelta)
+      + Math.abs(row.avgOpponentCentralDelta)
+      + Math.abs(row.avgOpponentWideDelta)
+    ) / 5.0;
+    const channelXg = (
+      Math.abs(row.avgOpponentCentralXgDelta)
+      + Math.abs(row.avgOpponentWideXgDelta)
+      + Math.abs(row.avgOpponentLeftWideXgDelta)
+      + Math.abs(row.avgOpponentRightWideXgDelta)
+    ) / 0.16;
+    return Math.max(userXg, opponentXg, userShots, opponentShots, possession, zoneShift, channelXg);
+  }
+
+  private scenarioSummaryAttackGainScore(row: ScenarioMatrixSummaryRow): number {
+    return Math.max(0, row.avgUserXgDelta) / 0.08
+      + Math.max(0, row.avgUserShotsDelta) / 1.5
+      + Math.max(0, row.avgUserPossessionDelta) / 3.0
+      + Math.max(0, row.avgUserCentralDelta + row.avgUserWideDelta) / 3.0;
+  }
+
+  private scenarioSummaryAttackLossScore(row: ScenarioMatrixSummaryRow): number {
+    return Math.max(0, -row.avgUserXgDelta) / 0.08
+      + Math.max(0, -row.avgUserShotsDelta) / 1.5
+      + Math.max(0, -row.avgUserPossessionDelta) / 3.0
+      + Math.max(0, -(row.avgUserCentralDelta + row.avgUserWideDelta)) / 3.0;
+  }
+
+  private scenarioSummaryDefensiveGainScore(row: ScenarioMatrixSummaryRow): number {
+    return Math.max(0, -row.avgOpponentXgDelta) / 0.08
+      + Math.max(0, -row.avgOpponentShotsDelta) / 1.5
+      + Math.max(0, -(row.avgOpponentCentralDelta + row.avgOpponentWideDelta)) / 3.0
+      + Math.max(0, -(row.avgOpponentCentralXgDelta + row.avgOpponentWideXgDelta)) / 0.12;
+  }
+
+  private scenarioSummaryDefensiveRiskScore(row: ScenarioMatrixSummaryRow): number {
+    return Math.max(0, row.avgOpponentXgDelta) / 0.08
+      + Math.max(0, row.avgOpponentShotsDelta) / 1.5
+      + Math.max(0, row.avgOpponentCentralDelta + row.avgOpponentWideDelta) / 3.0
+      + Math.max(0, row.avgOpponentCentralXgDelta + row.avgOpponentWideXgDelta) / 0.12;
+  }
+
+  private scenarioSummaryNeedsReview(row: ScenarioMatrixSummaryRow): boolean {
+    if (row.actionType !== 'SUBSTITUTION') return false;
+    const detail = `${row.scenario} ${row.actionDetail}`.toLowerCase();
+    const isDowngrade = detail.includes('downgrade') || /\[-\d+/.test(detail);
+    const isUpgrade = detail.includes('upgrade') || /\[\+\d+/.test(detail);
+    if (isDowngrade && row.avgUserXgDelta > 0.08 && row.avgOpponentXgDelta <= 0.02) {
+      return true;
+    }
+    if (isUpgrade && row.avgUserXgDelta < -0.08 && row.avgOpponentXgDelta >= -0.02) {
+      return true;
+    }
+    return false;
+  }
+
+  private scenarioSummaryCoherentSubstitutionSignal(row: ScenarioMatrixSummaryRow): boolean {
+    if (row.actionType !== 'SUBSTITUTION') return false;
+    const detail = `${row.scenario} ${row.actionDetail}`.toLowerCase();
+    const isDowngrade = detail.includes('downgrade') || /\[-\d+/.test(detail);
+    const isUpgrade = detail.includes('upgrade') || /\[\+\d+/.test(detail);
+    const isDefensive = detail.includes('defensive') || detail.includes('(def)');
+    const isOffensive = detail.includes('offensive') || detail.includes('(att)');
+
+    if (isDowngrade && isDefensive) {
+      const xgaWorse = row.avgOpponentXgDelta >= 0.04;
+      const shotsWorse = row.avgOpponentShotsDelta >= 0.45;
+      const territoryWorse = (row.avgOpponentCentralDelta + row.avgOpponentWideDelta) >= 0.35;
+      const channelWorse = (row.avgOpponentCentralXgDelta + row.avgOpponentWideXgDelta
+        + Math.max(row.avgOpponentLeftWideXgDelta, 0)
+        + Math.max(row.avgOpponentRightWideXgDelta, 0)) >= 0.035;
+      return (xgaWorse && shotsWorse) || (xgaWorse && territoryWorse) || (shotsWorse && channelWorse);
+    }
+
+    if (isUpgrade && isDefensive) {
+      const xgaBetter = row.avgOpponentXgDelta <= -0.04;
+      const shotsBetter = row.avgOpponentShotsDelta <= -0.45;
+      const territoryBetter = (row.avgOpponentCentralDelta + row.avgOpponentWideDelta) <= -0.35;
+      const channelBetter = (row.avgOpponentCentralXgDelta + row.avgOpponentWideXgDelta
+        + Math.min(row.avgOpponentLeftWideXgDelta, 0)
+        + Math.min(row.avgOpponentRightWideXgDelta, 0)) <= -0.035;
+      return (xgaBetter && shotsBetter) || (xgaBetter && territoryBetter) || (shotsBetter && channelBetter);
+    }
+
+    if (isUpgrade && isOffensive) {
+      return row.avgUserXgDelta >= 0.04 && row.avgUserShotsDelta >= 0.35;
+    }
+
+    if (isDowngrade && isOffensive) {
+      return row.avgUserXgDelta <= -0.04 && row.avgUserShotsDelta <= -0.35;
+    }
+
+    return false;
   }
 
   scenarioGoalDiff(row: ScenarioMatrixRow): number {
@@ -1522,16 +6234,23 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
 
   fmtDeltaInt(value: number): string {
     if (!Number.isFinite(value) || value === 0) {
-      return '±0';
+      return '0';
     }
     return value > 0 ? `+${Math.round(value)}` : `${Math.round(value)}`;
   }
 
   fmtDeltaNumber(value: number): string {
     if (!Number.isFinite(value) || Math.abs(value) < 0.005) {
-      return '±0.00';
+      return '0.00';
     }
     return value > 0 ? `+${value.toFixed(2)}` : value.toFixed(2);
+  }
+
+  fmtDeltaMicro(value: number): string {
+    if (!Number.isFinite(value) || Math.abs(value) < 0.0005) {
+      return '\u00b10.000';
+    }
+    return value > 0 ? `+${value.toFixed(3)}` : value.toFixed(3);
   }
 
   deltaClass(value: number): string {
@@ -1539,6 +6258,334 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       return 'delta-neutral';
     }
     return value > 0 ? 'delta-positive' : 'delta-negative';
+  }
+
+  positionPixelRead(row: PositionPixelMatrixSummary): string {
+    const level = this.positionPixelReadLevel(row);
+    switch (level) {
+      case 'check':
+        return 'Check';
+      case 'strong':
+        return 'Strong';
+      case 'visible':
+        return 'Visible';
+      default:
+        return 'Stable';
+    }
+  }
+
+  positionPixelReadClass(row: PositionPixelMatrixSummary): string {
+    return `read-${this.positionPixelReadLevel(row)}`;
+  }
+
+  positionPixelTacticalRead(row: PositionPixelMatrixSummary): string {
+    const attackGain = this.positionPixelAttackGainScore(row);
+    const attackLoss = this.positionPixelAttackLossScore(row);
+    const defensiveRisk = this.positionPixelDefensiveRiskScore(row);
+    const defensiveGain = this.positionPixelDefensiveGainScore(row);
+    if (attackLoss >= 1.2 && defensiveGain >= 1.0) return 'Tradeoff: def+ / att-';
+    if (attackGain >= 1.2 && defensiveRisk >= 1.0) return 'Tradeoff: att+ / risk+';
+    if (attackLoss >= 1.0 && defensiveRisk >= 1.0) return 'Bad tradeoff';
+    if (attackGain >= 1.0 && defensiveGain >= 1.0) return 'Double gain';
+    if (defensiveRisk >= 1.6 && attackGain < 1.2) return 'Risk';
+    if (attackGain >= 1.6 && defensiveRisk >= 1.2) return 'Trade-off';
+    if (attackLoss >= 1.6 && defensiveGain < 1.0) return 'Attack loss';
+    if (attackGain >= 1.4 && defensiveRisk < 0.8) return 'Attack gain';
+    if (defensiveGain >= 1.4 && attackGain < 1.0) return 'Def. gain';
+    if (defensiveRisk >= 1.0 && defensiveGain >= 0.8) return 'Compensated';
+    if (attackGain >= 0.8 || attackLoss >= 0.8 || defensiveRisk >= 0.8 || defensiveGain >= 0.8) return 'Small signal';
+    return 'Neutral';
+  }
+
+  positionPixelTacticalReadClass(row: PositionPixelMatrixSummary): string {
+    const read = this.positionPixelTacticalRead(row);
+    if (read === 'Risk') return 'read-check';
+    if (read === 'Trade-off' || read === 'Tradeoff: att+ / risk+' || read === 'Bad tradeoff') return 'read-strong';
+    if (read === 'Tradeoff: def+ / att-') return 'read-visible';
+    if (read === 'Double gain') return 'read-visible';
+    if (read === 'Attack loss') return 'read-check';
+    if (read === 'Attack gain' || read === 'Def. gain') return 'read-visible';
+    if (read === 'Compensated' || read === 'Small signal') return 'read-stable';
+    return 'delta-neutral';
+  }
+
+  positionPixelTacticalReadReason(row: PositionPixelMatrixSummary): string {
+    const attackGain = this.positionPixelAttackGainScore(row);
+    const attackLoss = this.positionPixelAttackLossScore(row);
+    const defensiveRisk = this.positionPixelDefensiveRiskScore(row);
+    const defensiveGain = this.positionPixelDefensiveGainScore(row);
+    return [
+      `attack gain ${attackGain.toFixed(2)}`,
+      `attack loss ${attackLoss.toFixed(2)}`,
+      `defensive risk ${defensiveRisk.toFixed(2)}`,
+      `defensive gain ${defensiveGain.toFixed(2)}`
+    ].join(' ? ');
+  }
+
+  positionPixelShapeMove(row: PositionPixelMatrixSummary): string {
+    const fromLine = this.positionPixelVisualLine(row.fromYPercent);
+    const toLine = this.positionPixelVisualLine(row.targetYPercent);
+    const fromChannel = this.positionPixelVisualChannel(row.fromXPercent);
+    const toChannel = this.positionPixelVisualChannel(row.targetXPercent);
+
+    if (fromLine === toLine && fromChannel === toChannel) {
+      if (Math.abs(row.targetYPercent - row.fromYPercent) >= 4) {
+        return row.targetYPercent < row.fromYPercent
+          ? `${toLine} ${toChannel}: mas alto`
+          : `${toLine} ${toChannel}: mas bajo`;
+      }
+      if (Math.abs(row.targetXPercent - row.fromXPercent) >= 4) {
+        return row.targetXPercent < row.fromXPercent
+          ? `${toLine} ${toChannel}: mas izquierdo`
+          : `${toLine} ${toChannel}: mas derecho`;
+      }
+      return `${toLine} ${toChannel}: microajuste`;
+    }
+
+    const parts: string[] = [];
+    if (fromChannel !== toChannel) {
+      parts.push(`-${fromChannel} +${toChannel}`);
+    }
+    if (fromLine !== toLine) {
+      parts.push(`${fromLine}->${toLine}`);
+    }
+    return parts.length > 0 ? parts.join(' / ') : `${fromLine} ${fromChannel}->${toLine} ${toChannel}`;
+  }
+
+  positionPixelShapeMoveDetail(row: PositionPixelMatrixSummary): string {
+    const fromLine = this.positionPixelVisualLine(row.fromYPercent);
+    const toLine = this.positionPixelVisualLine(row.targetYPercent);
+    const fromChannel = this.positionPixelVisualChannel(row.fromXPercent);
+    const toChannel = this.positionPixelVisualChannel(row.targetXPercent);
+    const notes: string[] = [];
+
+    if (fromChannel !== toChannel) {
+      notes.push(`perdiste presencia en ${this.positionPixelChannelLabel(fromChannel)}`);
+      notes.push(`ganaste presencia en ${this.positionPixelChannelLabel(toChannel)}`);
+    }
+    if (fromLine !== toLine) {
+      notes.push(row.targetYPercent < row.fromYPercent
+        ? `subiste al jugador de ${fromLine} a ${toLine}`
+        : `bajaste al jugador de ${fromLine} a ${toLine}`);
+    }
+    if (fromLine === toLine && fromChannel === toChannel) {
+      const vertical = row.targetYPercent - row.fromYPercent;
+      const horizontal = row.targetXPercent - row.fromXPercent;
+      if (Math.abs(vertical) >= Math.abs(horizontal) && Math.abs(vertical) >= 1) {
+        notes.push(vertical < 0 ? 'ajuste fino: mas profundidad ofensiva' : 'ajuste fino: mas cobertura');
+      } else if (Math.abs(horizontal) >= 1) {
+        notes.push(horizontal < 0 ? 'ajuste fino: carga mas la izquierda' : 'ajuste fino: carga mas la derecha');
+      } else {
+        notes.push('microajuste visual sin cambio de zona');
+      }
+    }
+
+    return `${notes.join(' ? ')} ? ${this.positionPixelShapeDeltaText(fromLine, fromChannel, toLine, toChannel)}`;
+  }
+
+  private positionPixelShapeDeltaText(
+    fromLine: 'ATT' | 'MID' | 'DEF',
+    fromChannel: 'L' | 'C' | 'R',
+    toLine: 'ATT' | 'MID' | 'DEF',
+    toChannel: 'L' | 'C' | 'R'
+  ): string {
+    if (fromLine === toLine && fromChannel === toChannel) {
+      return `shape ${toLine} ${toChannel} sin cambio de casillero`;
+    }
+    return `shape ${fromLine} ${fromChannel} -1 / ${toLine} ${toChannel} +1`;
+  }
+
+  private positionPixelVisualChannel(xPercent: number): 'L' | 'C' | 'R' {
+    if (xPercent < 34) return 'L';
+    if (xPercent > 66) return 'R';
+    return 'C';
+  }
+
+  private positionPixelVisualLine(yPercent: number): 'ATT' | 'MID' | 'DEF' {
+    if (yPercent < 34) return 'ATT';
+    if (yPercent < 67) return 'MID';
+    return 'DEF';
+  }
+
+  private positionPixelChannelLabel(channel: 'L' | 'C' | 'R'): string {
+    if (channel === 'L') return 'banda izquierda';
+    if (channel === 'R') return 'banda derecha';
+    return 'el centro';
+  }
+
+  setPositionPixelReadFilter(value: string): void {
+    const allowed: PositionPixelReadFilter[] = ['all', 'stable', 'visible', 'strong', 'check'];
+    this.positionPixelReadFilter.set(allowed.includes(value as PositionPixelReadFilter) ? (value as PositionPixelReadFilter) : 'all');
+  }
+
+  setPositionPixelSortMode(value: string): void {
+    const allowed: PositionPixelSortMode[] = ['default', 'read-desc', 'impact-desc', 'distance-desc'];
+    this.positionPixelSortMode.set(allowed.includes(value as PositionPixelSortMode) ? (value as PositionPixelSortMode) : 'default');
+  }
+
+  setScenarioSummaryReadFilter(value: string): void {
+    const allowed: ScenarioSummaryReadFilter[] = ['all', 'actionable', 'review', 'strong', 'visible', 'small', 'noise'];
+    this.scenarioSummaryReadFilter.set(
+      allowed.includes(value as ScenarioSummaryReadFilter) ? (value as ScenarioSummaryReadFilter) : 'all'
+    );
+  }
+
+  setScenarioSummarySortMode(value: string): void {
+    const allowed: ScenarioSummarySortMode[] = ['default', 'read-desc', 'impact-desc', 'xg-desc'];
+    this.scenarioSummarySortMode.set(
+      allowed.includes(value as ScenarioSummarySortMode) ? (value as ScenarioSummarySortMode) : 'read-desc'
+    );
+  }
+
+  positionPixelReadSummary(): Array<{ label: string; level: PositionPixelReadLevel; count: number }> {
+    const counts: Record<PositionPixelReadLevel, number> = {
+      stable: 0,
+      visible: 0,
+      strong: 0,
+      check: 0,
+    };
+    for (const row of this.positionPixelMatrixRows()) {
+      counts[this.positionPixelReadLevel(row)] += 1;
+    }
+    return [
+      { label: 'Stable', level: 'stable', count: counts.stable },
+      { label: 'Visible', level: 'visible', count: counts.visible },
+      { label: 'Strong', level: 'strong', count: counts.strong },
+      { label: 'Check', level: 'check', count: counts.check },
+    ];
+  }
+
+  positionPixelTacticalReadSummary(): Array<{ label: string; count: number; className: string; hint: string }> {
+    const rows = this.positionPixelMatrixRows();
+    const definitions = [
+      {
+        label: 'Tradeoffs',
+        className: 'read-strong',
+        hint: 'Movimientos que ganan algo pero pagan algo: m?s ataque con m?s riesgo, o m?s protecci?n con menos ataque.',
+        matches: (read: string) => read.startsWith('Tradeoff'),
+      },
+      {
+        label: 'Double gain',
+        className: 'read-visible',
+        hint: 'Movimientos que mejoran ataque y defensa a la vez.',
+        matches: (read: string) => read === 'Double gain',
+      },
+      {
+        label: 'Attack gain',
+        className: 'read-visible',
+        hint: 'Movimientos que mejoran amenaza ofensiva sin abrir demasiado riesgo.',
+        matches: (read: string) => read === 'Attack gain',
+      },
+      {
+        label: 'Def. gain',
+        className: 'read-visible',
+        hint: 'Movimientos que protegen mejor sin una p?rdida ofensiva fuerte.',
+        matches: (read: string) => read === 'Def. gain',
+      },
+      {
+        label: 'Risk/Bad',
+        className: 'read-check',
+        hint: 'Movimientos que abren riesgo defensivo o empeoran ataque y defensa.',
+        matches: (read: string) => read === 'Risk' || read === 'Bad tradeoff',
+      },
+      {
+        label: 'Neutral/Small',
+        className: 'read-stable',
+        hint: 'Movimientos con se?al chica, compensada o neutra.',
+        matches: (read: string) => read === 'Neutral' || read === 'Small signal' || read === 'Compensated',
+      },
+    ];
+
+    return definitions.map((definition) => ({
+      label: definition.label,
+      className: definition.className,
+      hint: definition.hint,
+      count: rows.filter((row) => definition.matches(this.positionPixelTacticalRead(row))).length,
+    }));
+  }
+
+  positionPixelHasChecks(): boolean {
+    return this.positionPixelMatrixRows().some((row) => this.positionPixelReadLevel(row) === 'check');
+  }
+
+  private positionPixelReadLevel(row: PositionPixelMatrixSummary): PositionPixelReadLevel {
+    const distance = this.positionPixelDistance(row);
+    const xg = Math.max(Math.abs(row.deltaXgFor), Math.abs(row.deltaXgAgainst), Math.abs(row.deltaXgDiff));
+    const shots = Math.max(Math.abs(row.deltaShotsFor), Math.abs(row.deltaShotsAgainst));
+    const poss = Math.abs(row.deltaPossessionFor);
+    const zoneShots = Math.max(
+      Math.abs(row.deltaCentralShotsFor) + Math.abs(row.deltaWideShotsFor) + Math.abs(row.deltaLongShotsFor),
+      Math.abs(row.deltaCentralShotsAgainst) + Math.abs(row.deltaWideShotsAgainst) + Math.abs(row.deltaLongShotsAgainst),
+    );
+
+    if (distance <= 1.25) {
+      return xg > 0.08 || shots > 1.25 || poss > 1.75 || zoneShots > 2.50 ? 'check' : 'stable';
+    }
+    if (distance <= 6.0) {
+      if (xg > 0.22 || shots > 4.0 || poss > 4.0 || zoneShots > 5.0) return 'check';
+      if (xg > 0.06 || shots > 1.0 || poss > 1.0 || zoneShots > 1.5) return 'visible';
+      return 'stable';
+    }
+    if (xg > 0.22 || shots > 4.0 || poss > 4.0 || zoneShots > 5.0) return 'strong';
+    if (xg > 0.06 || shots > 1.0 || poss > 1.0 || zoneShots > 1.5) return 'visible';
+    return 'stable';
+  }
+
+  private positionPixelReadSeverity(row: PositionPixelMatrixSummary): number {
+    switch (this.positionPixelReadLevel(row)) {
+      case 'check':
+        return 4;
+      case 'strong':
+        return 3;
+      case 'visible':
+        return 2;
+      default:
+        return 1;
+    }
+  }
+
+  private positionPixelImpactScore(row: PositionPixelMatrixSummary): number {
+    return (
+      Math.abs(row.deltaXgFor) * 10 +
+      Math.abs(row.deltaXgAgainst) * 10 +
+      Math.abs(row.deltaXgDiff) * 8 +
+      Math.abs(row.deltaShotsFor) +
+      Math.abs(row.deltaShotsAgainst) +
+      Math.abs(row.deltaPossessionFor) * 0.4 +
+      (Math.abs(row.deltaCentralShotsFor) + Math.abs(row.deltaWideShotsFor) + Math.abs(row.deltaLongShotsFor)) * 0.5 +
+      (Math.abs(row.deltaCentralShotsAgainst) + Math.abs(row.deltaWideShotsAgainst) + Math.abs(row.deltaLongShotsAgainst)) * 0.5
+    );
+  }
+
+  private positionPixelAttackGainScore(row: PositionPixelMatrixSummary): number {
+    return Math.max(0, row.deltaXgFor) * 10
+      + Math.max(0, row.deltaShotsFor) * 0.75
+      + Math.max(0, row.deltaPossessionFor) * 0.25
+      + Math.max(0, row.deltaCentralShotsFor + row.deltaWideShotsFor + row.deltaLongShotsFor) * 0.35;
+  }
+
+  private positionPixelAttackLossScore(row: PositionPixelMatrixSummary): number {
+    return Math.max(0, -row.deltaXgFor) * 10
+      + Math.max(0, -row.deltaShotsFor) * 0.75
+      + Math.max(0, -row.deltaPossessionFor) * 0.25
+      + Math.max(0, -(row.deltaCentralShotsFor + row.deltaWideShotsFor + row.deltaLongShotsFor)) * 0.35;
+  }
+
+  private positionPixelDefensiveRiskScore(row: PositionPixelMatrixSummary): number {
+    return Math.max(0, row.deltaXgAgainst) * 12
+      + Math.max(0, row.deltaShotsAgainst) * 0.85
+      + Math.max(0, row.deltaCentralShotsAgainst + row.deltaWideShotsAgainst + row.deltaLongShotsAgainst) * 0.45
+      + Math.max(0, row.deltaCentralXgAgainst + row.deltaWideXgAgainst + row.deltaLongXgAgainst) * 8;
+  }
+
+  private positionPixelDefensiveGainScore(row: PositionPixelMatrixSummary): number {
+    return Math.max(0, -row.deltaXgAgainst) * 12
+      + Math.max(0, -row.deltaShotsAgainst) * 0.85
+      + Math.max(0, -(row.deltaCentralShotsAgainst + row.deltaWideShotsAgainst + row.deltaLongShotsAgainst)) * 0.45;
+  }
+
+  private positionPixelDistance(row: PositionPixelMatrixSummary): number {
+    return Math.hypot(row.targetXPercent - row.fromXPercent, row.targetYPercent - row.fromYPercent);
   }
 
   private scenarioBaseline(): ScenarioMatrixRow | null {
@@ -1557,17 +6604,20 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
 
   fmtPct(value: number | null): string {
     if (value === null || value === undefined || !Number.isFinite(value)) {
-      return '—';
+      return '?';
     }
     return `${Math.round(value)}%`;
   }
 
   /**
    * Replay-lab shortcut: run the selected match once per formation with the
-   * same seed, then render the score/possession/shot table in Panel B.
+   * same seed, then render the score/possession/shot/xG/zone table in Panel E.
    *
-   * The calls run sequentially through the existing set-formation + replay
-   * endpoints so the engine sees exactly the formation being measured.
+   * V25D99.59: uses the backend in-memory formation-matrix endpoint instead
+   * of 12 full replay+detail-persist cycles. The backend still applies the
+   * real formation label plus canonical visual slots, so the engine sees the
+   * same geometry contract as the squad modal without paying the Redis detail
+   * cost for every row.
    */
   onRunFormationMatrix(): void {
     const matchId = this.selectedMatchId();
@@ -1612,42 +6662,24 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         }
 
         return this.harness.setStyle(this.selectedStyleModel).pipe(
-          switchMap(() => from(this.formationCodes)),
-      concatMap((formation) =>
-        this.harness.manualSelectLineup(formation, originalPlayerIds).pipe(
-          switchMap(() => this.harness.replayMatch(matchId, seed)),
-          switchMap((fixture) =>
-            this.matchDetailApi.getMatchDetail(careerId, matchId).pipe(
-              catchError(() => of(null)),
-              map((detail) => this.buildFormationReplayResult(formation, fixture, detail))
-            )
-          )
-        )
-      ),
-          switchMap((row) => {
-            this.formationReplayResults.update((rows) => [...rows, row]);
-            return of(row);
-          }),
-          // Restore the exact original lineup after the last measured formation.
-          // The restore is part of the observable chain so `complete` only fires
-          // after the user squad is back where it started.
-          switchMap((row, index) => {
-            const isLast = index === this.formationCodes.length - 1;
-            if (!isLast || !originalFormation) {
-              return of(row);
+          switchMap(() => this.harness.runFormationMatrix(matchId, seed)),
+          switchMap((rows) => {
+            const mappedRows = rows.map((row) => this.buildFormationReplayResultFromMatrix(row));
+            this.formationReplayResults.set(mappedRows);
+            if (!originalFormation) {
+              return of(mappedRows);
             }
             return this.harness.manualSelectLineup(
               originalFormation,
               originalPlayerIds,
               originalSlots
-            ).pipe(map(() => row));
+            ).pipe(map(() => mappedRows));
           })
         );
       })
     ).subscribe({
-      next: (row) => {
-        // Rows are appended inside the chain so they appear progressively before
-        // the restore request runs. Keep next side-effect free.
+      next: () => {
+        // The backend returns the complete matrix in one response.
       },
       error: (err) => {
         this.mutationInFlight.set(false);
@@ -1665,9 +6697,57 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           'OK',
           { duration: 3000 }
         );
+        this.markReplayAnalysisReady('Formation matrix lista en Panel E.');
         this.loadMatches();
         this.refreshDetailAfterMutation();
         this.refreshDetailAfterMutation(1200);
+      },
+    });
+  }
+
+  onRunFormationMatrixSummary(): void {
+    const matchId = this.selectedMatchId();
+    if (!matchId) {
+      this.snackBar.open('Select a match in Panel C first.', 'OK', { duration: 3000 });
+      return;
+    }
+    if (!this.selectedMatchIncludesUserTeam()) {
+      this.snackBar.open(
+        `Pick a match involving ${this.userTeamName() || 'your team'} before running formation averages.`,
+        'OK',
+        { duration: 5000 }
+      );
+      return;
+    }
+
+    const seedStart = this.summarySeedStart();
+    const seedCount = this.scenarioMatrixSummaryEffectiveSeedCount();
+    this.scenarioMatrixSummarySeedCount.set(seedCount);
+    this.formationMatrixSummaryResults.set([]);
+    this.mutationInFlight.set(true);
+
+    this.harness.setStyle(this.selectedStyleModel).pipe(
+      switchMap(() => this.harness.runFormationMatrixSummary(matchId, seedStart, seedCount))
+    ).subscribe({
+      next: (rows) => {
+        this.formationMatrixSummaryResults.set(rows ?? []);
+        this.snackBar.open(
+          `Formation averages completed (${rows?.length ?? 0} formations ? ${seedCount} seeds).`,
+          'OK',
+          { duration: 3000 }
+        );
+        this.markReplayAnalysisReady('Formation averages listas en Panel E.');
+      },
+      error: (err) => {
+        this.mutationInFlight.set(false);
+        this.snackBar.open(
+          this.fmtError(err, 'Failed to run formation averages'),
+          'OK',
+          { duration: 5000 }
+        );
+      },
+      complete: () => {
+        this.mutationInFlight.set(false);
       },
     });
   }
@@ -1690,6 +6770,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     }
 
     this.scenarioMatrixResults.set([]);
+    this.scenarioMatrixSummaryResults.set([]);
     this.mutationInFlight.set(true);
     this.harness.runScenarioMatrix(matchId, this.seedInputModel).subscribe({
       next: (rows) => {
@@ -1700,6 +6781,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           'OK',
           { duration: 3000 }
         );
+        this.markReplayAnalysisReady('Scenario matrix lista en Panel E.');
       },
       error: (err) => {
         this.mutationInFlight.set(false);
@@ -1710,6 +6792,502 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         );
       },
     });
+  }
+
+  onRunScenarioMatrixSummary(): void {
+    this.runScenarioMatrixSummaryWithSeedCount(
+      this.scenarioMatrixSummaryEffectiveSeedCount(),
+      'Multi-seed matrix',
+      'Multi-seed matrix lista en Panel E.',
+      'ALL'
+    );
+  }
+
+  onRunScenarioMatrixSmoke(): void {
+    this.runScenarioMatrixSummaryWithSeedCount(
+      this.scenarioMatrixSmokeSeedCount(),
+      'Scenario smoke',
+      'Scenario smoke listo en Panel E.',
+      'ALL'
+    );
+  }
+
+  onRunScenarioMatrixBlockSmoke(group: 'OFFENSE' | 'DEFENSE' | 'OPPONENT'): void {
+    const label = group === 'OFFENSE'
+      ? 'Smoke ataque'
+      : group === 'DEFENSE'
+        ? 'Smoke defensa'
+        : 'Smoke rival';
+    this.runScenarioMatrixSummaryWithSeedCount(
+      this.scenarioMatrixSmokeSeedCount(),
+      label,
+      `${label} listo en Panel E.`,
+      group
+    );
+  }
+
+  onRunScenarioBatteryBoard(): void {
+    const matches = this.scenarioBatteryCandidateMatches();
+    if (matches.length === 0) {
+      this.snackBar.open('No hay partidos completados para armar la bateria.', 'OK', { duration: 3000 });
+      return;
+    }
+
+    const seedStart = this.seedInputModel ?? 12345;
+    const seedCount = this.scenarioMatrixSmokeSeedCount();
+    const scenarioGroup = this.scenarioBatteryGroupModel;
+    const jobs = matches.flatMap((match) => ([
+      { match, controlledSide: 'HOME' as const },
+      { match, controlledSide: 'AWAY' as const },
+    ]));
+    const partialRows: Array<ScenarioBatteryRow | undefined> = [];
+
+    this.scenarioBatteryRows.set([]);
+    this.scenarioMatrixSummarySeedCount.set(seedCount);
+    this.scenarioBatteryProgress.set(`Battery tablero: 0/${jobs.length} lecturas...`);
+    this.mutationInFlight.set(true);
+
+    from(jobs).pipe(
+      mergeMap((job, index) =>
+        this.harness.runScenarioMatrixSummary(
+          job.match.matchId,
+          seedStart,
+          seedCount,
+          scenarioGroup,
+          job.controlledSide
+        ).pipe(
+          map((rows) => {
+            const row = this.buildScenarioBatteryRow(
+              job.match,
+              job.controlledSide,
+              scenarioGroup,
+              seedStart,
+              seedCount,
+              rows ?? []
+            );
+            partialRows[index] = row;
+            const completedRows = partialRows.filter((item): item is ScenarioBatteryRow => !!item);
+            this.scenarioBatteryRows.set(completedRows);
+            this.scenarioBatteryProgress.set(
+              `Battery tablero: ${completedRows.length}/${jobs.length} lecturas...`
+            );
+            return row;
+          })
+        )
+      , 2),
+      toArray()
+    ).subscribe({
+      next: () => {
+        this.scenarioBatteryRows.set(partialRows.filter((item): item is ScenarioBatteryRow => !!item));
+        this.mutationInFlight.set(false);
+        this.scenarioBatteryProgress.set('');
+        this.markReplayAnalysisReady(`Battery tablero listo: ${partialRows.filter(Boolean).length} lecturas (${this.scenarioBatteryGroupLabel(scenarioGroup)}, ${matches.length} partidos x local/visitante).`);
+        this.snackBar.open(`Battery tablero completo: ${partialRows.filter(Boolean).length} lecturas (${this.scenarioBatteryGroupLabel(scenarioGroup)}).`, 'OK', { duration: 3500 });
+      },
+      error: (err) => {
+        this.mutationInFlight.set(false);
+        this.scenarioBatteryProgress.set('');
+        this.snackBar.open(
+          this.fmtError(err, 'Failed to run tactical battery board'),
+          'OK',
+          { duration: 5000 }
+        );
+      },
+    });
+  }
+
+  private runScenarioMatrixSummaryWithSeedCount(
+    seedCount: number,
+    label: string,
+    readyMessage: string,
+    scenarioGroup: 'ALL' | 'OFFENSE' | 'DEFENSE' | 'OPPONENT'
+  ): void {
+    const matchId = this.selectedMatchId();
+    if (!matchId) {
+      this.snackBar.open('Select a match in Panel C first.', 'OK', {
+        duration: 3000,
+      });
+      return;
+    }
+    if (!this.canRunScenarioSummaryForControlledSide()) {
+      this.snackBar.open(
+        `Elegí Local o Visitante para correr ${label} en un partido sin ${this.userTeamName() || 'tu equipo'}.`,
+        'OK',
+        { duration: 5000 }
+      );
+      return;
+    }
+
+    const seedStart = this.seedInputModel ?? 12345;
+    this.scenarioMatrixSummarySeedCount.set(seedCount);
+
+    this.scenarioMatrixSummaryResults.set([]);
+    this.mutationInFlight.set(true);
+    this.harness.runScenarioMatrixSummary(
+      matchId,
+      seedStart,
+      seedCount,
+      scenarioGroup,
+      this.controlledTeamSideModel
+    ).subscribe({
+      next: (rows) => {
+        const safeRows = rows ?? [];
+        this.scenarioMatrixSummaryResults.set(safeRows);
+        this.mutationInFlight.set(false);
+        this.snackBar.open(
+          `${label} completed (${safeRows.length} scenarios x ${seedCount} seeds).`,
+          'OK',
+          { duration: 3500 }
+        );
+        if (safeRows.length > 0) {
+          this.markReplayAnalysisReady(readyMessage);
+        } else {
+          this.analysisReadyMessage.set(
+            `${label} no devolvio escenarios para Panel E. Verifica que el partido siga seleccionado y que el grupo tenga escenarios.`
+          );
+        }
+      },
+      error: (err) => {
+        this.mutationInFlight.set(false);
+        this.snackBar.open(
+          this.fmtError(err, `Failed to run ${label.toLowerCase()}`),
+          'OK',
+          { duration: 5000 }
+        );
+      },
+    });
+  }
+  onPrepareOffensiveUpgradeLab(): void {
+    this.mutationInFlight.set(true);
+    this.harness.prepareOffensiveUpgradeLab().subscribe({
+      next: (result) => {
+        this.mutationInFlight.set(false);
+        this.scenarioMatrixResults.set([]);
+        this.scenarioMatrixSummaryResults.set([]);
+        this.snackBar.open(
+          `${result.message}. Run Scenario matrix to measure m60-offensive-upgrade-sub.`,
+          'OK',
+          { duration: 5000 }
+        );
+      },
+      error: (err) => {
+        this.mutationInFlight.set(false);
+        this.snackBar.open(
+          this.fmtError(err, 'Failed to prepare offensive lab'),
+          'OK',
+          { duration: 6000 }
+        );
+      },
+    });
+  }
+
+  onRestoreOffensiveUpgradeLab(): void {
+    this.mutationInFlight.set(true);
+    this.harness.restoreOffensiveUpgradeLab().subscribe({
+      next: (result) => {
+        this.mutationInFlight.set(false);
+        this.scenarioMatrixResults.set([]);
+        this.scenarioMatrixSummaryResults.set([]);
+        this.snackBar.open(
+          `${result.message}. Run Scenario matrix again for baseline squad.`,
+          'OK',
+          { duration: 5000 }
+        );
+      },
+      error: (err) => {
+        this.mutationInFlight.set(false);
+        this.snackBar.open(
+          this.fmtError(err, 'Failed to restore offensive lab'),
+          'OK',
+          { duration: 6000 }
+        );
+      },
+    });
+  }
+
+  onPrepareDefensiveDowngradeLab(): void {
+    this.mutationInFlight.set(true);
+    this.harness.prepareDefensiveDowngradeLab().subscribe({
+      next: (result) => {
+        this.mutationInFlight.set(false);
+        this.scenarioMatrixResults.set([]);
+        this.scenarioMatrixSummaryResults.set([]);
+        this.snackBar.open(
+          `${result.message}. Run Scenario matrix to measure m60-defensive-downgrade-sub.`,
+          'OK',
+          { duration: 5000 }
+        );
+      },
+      error: (err) => {
+        this.mutationInFlight.set(false);
+        this.snackBar.open(
+          this.fmtError(err, 'Failed to prepare defensive lab'),
+          'OK',
+          { duration: 6000 }
+        );
+      },
+    });
+  }
+
+  onRestoreDefensiveDowngradeLab(): void {
+    this.mutationInFlight.set(true);
+    this.harness.restoreDefensiveDowngradeLab().subscribe({
+      next: (result) => {
+        this.mutationInFlight.set(false);
+        this.scenarioMatrixResults.set([]);
+        this.scenarioMatrixSummaryResults.set([]);
+        this.snackBar.open(
+          `${result.message}. Run Scenario matrix again for baseline squad.`,
+          'OK',
+          { duration: 5000 }
+        );
+      },
+      error: (err) => {
+        this.mutationInFlight.set(false);
+        this.snackBar.open(
+          this.fmtError(err, 'Failed to restore defensive lab'),
+          'OK',
+          { duration: 6000 }
+        );
+      },
+    });
+  }
+
+  onPrepareWeakWideDefendersLab(): void {
+    this.mutationInFlight.set(true);
+    this.harness.prepareWeakWideDefendersLab().subscribe({
+      next: (result) => {
+        this.handleLabMutationSuccess();
+        this.snackBar.open(
+          `${result.message}. Run Multi-seed matrix and inspect m45-opponent-wide.`,
+          'OK',
+          { duration: 6000 }
+        );
+      },
+      error: (err) => {
+        this.mutationInFlight.set(false);
+        this.snackBar.open(
+          this.fmtError(err, 'Failed to prepare weak wide DEF lab'),
+          'OK',
+          { duration: 6000 }
+        );
+      },
+    });
+  }
+
+  onRestoreWeakWideDefendersLab(): void {
+    this.mutationInFlight.set(true);
+    this.harness.restoreWeakWideDefendersLab().subscribe({
+      next: (result) => {
+        this.handleLabMutationSuccess();
+        this.snackBar.open(
+          `${result.message}. Run Multi-seed matrix again for baseline wide defense.`,
+          'OK',
+          { duration: 6000 }
+        );
+      },
+      error: (err) => {
+        this.mutationInFlight.set(false);
+        this.snackBar.open(
+          this.fmtError(err, 'Failed to restore weak wide DEF lab'),
+          'OK',
+          { duration: 6000 }
+        );
+      },
+    });
+  }
+
+  onPrepareOpponentWeakWideDefendersLab(): void {
+    const matchId = this.selectedMatchId();
+    if (!matchId) return;
+    this.runLabMutation(
+      () => this.harness.prepareOpponentWeakWideDefendersLab(matchId),
+      'Failed to prepare rival weak wide DEF lab',
+      'Run Formation avg with Bandas vs Centro to inspect offensive wide exploitation.'
+    );
+  }
+
+  onRestoreOpponentWeakWideDefendersLab(): void {
+    const matchId = this.selectedMatchId();
+    if (!matchId) return;
+    this.runLabMutation(
+      () => this.harness.restoreOpponentWeakWideDefendersLab(matchId),
+      'Failed to restore rival weak wide DEF lab',
+      'Rival wide defense restored for this selected match.'
+    );
+  }
+
+  onPrepareOpponentWeakLeftDefenderLab(): void {
+    const matchId = this.selectedMatchId();
+    if (!matchId) return;
+    this.runLabMutation(
+      () => this.harness.prepareOpponentWeakLeftDefenderLab(matchId),
+      'Failed to prepare rival weak left DEF lab',
+      'Run Smoke ataque and inspect right-side/wide exploitation.'
+    );
+  }
+
+  onRestoreOpponentWeakLeftDefenderLab(): void {
+    const matchId = this.selectedMatchId();
+    if (!matchId) return;
+    this.runLabMutation(
+      () => this.harness.restoreOpponentWeakLeftDefenderLab(matchId),
+      'Failed to restore rival weak left DEF lab',
+      'Rival left defender restored for this selected match.'
+    );
+  }
+
+  onPrepareOpponentWeakRightDefenderLab(): void {
+    const matchId = this.selectedMatchId();
+    if (!matchId) return;
+    this.runLabMutation(
+      () => this.harness.prepareOpponentWeakRightDefenderLab(matchId),
+      'Failed to prepare rival weak right DEF lab',
+      'Run Smoke ataque and inspect left-side/wide exploitation.'
+    );
+  }
+
+  onRestoreOpponentWeakRightDefenderLab(): void {
+    const matchId = this.selectedMatchId();
+    if (!matchId) return;
+    this.runLabMutation(
+      () => this.harness.restoreOpponentWeakRightDefenderLab(matchId),
+      'Failed to restore rival weak right DEF lab',
+      'Rival right defender restored for this selected match.'
+    );
+  }
+
+  onPrepareOpponentWeakCenterBacksLab(): void {
+    const matchId = this.selectedMatchId();
+    if (!matchId) return;
+    this.runLabMutation(
+      () => this.harness.prepareOpponentWeakCenterBacksLab(matchId),
+      'Failed to prepare rival weak CB lab',
+      'Run Formation avg with Centro vs Bandas to inspect offensive central exploitation.'
+    );
+  }
+
+  onRestoreOpponentWeakCenterBacksLab(): void {
+    const matchId = this.selectedMatchId();
+    if (!matchId) return;
+    this.runLabMutation(
+      () => this.harness.restoreOpponentWeakCenterBacksLab(matchId),
+      'Failed to restore rival weak CB lab',
+      'Rival center backs restored for this selected match.'
+    );
+  }
+
+  onPrepareWeakLeftDefenderLab(): void {
+    this.runLabMutation(
+      () => this.harness.prepareWeakLeftDefenderLab(),
+      'Failed to prepare weak left DEF lab',
+      'Run Multi-seed matrix and inspect opponent wide xG.'
+    );
+  }
+
+  onRestoreWeakLeftDefenderLab(): void {
+    this.runLabMutation(
+      () => this.harness.restoreWeakLeftDefenderLab(),
+      'Failed to restore weak left DEF lab',
+      'Baseline left channel restored.'
+    );
+  }
+
+  onPrepareWeakRightDefenderLab(): void {
+    this.runLabMutation(
+      () => this.harness.prepareWeakRightDefenderLab(),
+      'Failed to prepare weak right DEF lab',
+      'Run Multi-seed matrix and inspect opponent wide xG.'
+    );
+  }
+
+  onRestoreWeakRightDefenderLab(): void {
+    this.runLabMutation(
+      () => this.harness.restoreWeakRightDefenderLab(),
+      'Failed to restore weak right DEF lab',
+      'Baseline right channel restored.'
+    );
+  }
+
+  onPrepareWeakCenterBacksLab(): void {
+    this.runLabMutation(
+      () => this.harness.prepareWeakCenterBacksLab(),
+      'Failed to prepare weak CB lab',
+      'Run Multi-seed matrix and inspect opponent central xG.'
+    );
+  }
+
+  onRestoreWeakCenterBacksLab(): void {
+    this.runLabMutation(
+      () => this.harness.restoreWeakCenterBacksLab(),
+      'Failed to restore weak CB lab',
+      'Baseline central defense restored.'
+    );
+  }
+
+  private runLabMutation(
+    action: () => Observable<LabMutationResult>,
+    errorMessage: string,
+    successHint: string
+  ): void {
+    this.mutationInFlight.set(true);
+    action().subscribe({
+      next: (result) => {
+        this.handleLabMutationSuccess();
+        this.snackBar.open(
+          `${result.message}. ${successHint}`,
+          'OK',
+          { duration: 6000 }
+        );
+      },
+      error: (err) => {
+        this.mutationInFlight.set(false);
+        this.snackBar.open(
+          this.fmtError(err, errorMessage),
+          'OK',
+          { duration: 6000 }
+        );
+      },
+    });
+  }
+
+  /**
+   * Lab mutations intentionally invalidate Panel E because the same scenario
+   * table would now compare against stale player qualities. Keep the selected
+   * match stable, refresh the visible detail/lineup context, and show an
+   * explicit "rerun" message instead of leaving a stale "ready" banner.
+   */
+  private handleLabMutationSuccess(): void {
+    this.mutationInFlight.set(false);
+    this.scenarioMatrixResults.set([]);
+    this.scenarioMatrixSummaryResults.set([]);
+    this.analysisReadyMessage.set(
+      'Lab aplicado. El partido sigue seleccionado; corre el smoke/matriz otra vez para regenerar Panel E.'
+    );
+    this.refreshLineupContext();
+    this.refreshDetailAfterMutation();
+  }
+
+  private clearReplayAnalysisForMatchChange(match: TestHarnessMatchRow): void {
+    this.currentLineupReplayResult.set(null);
+    this.currentLineupMultiSeedSummary.set(null);
+    this.playerSwapMatrixSummary.set(null);
+    this.playerSwapBatterySummaries.set([]);
+    this.playerSwapPrecisionComparisonRows.set([]);
+    this.positionPixelMatrixSummary.set(null);
+    this.positionPixelMatrixRows.set([]);
+    this.formationReplayResults.set([]);
+    this.formationMatrixSummaryResults.set([]);
+    this.scenarioMatrixResults.set([]);
+    this.scenarioMatrixSummaryResults.set([]);
+
+    const teamName = this.userTeamName() || 'tu equipo';
+    const matchName = `${match.homeTeamName} vs ${match.awayTeamName}`;
+    this.analysisReadyMessage.set(
+      match.homeTeamName === teamName || match.awayTeamName === teamName
+        ? `Panel E limpiado para ${matchName}. Corre un smoke/matriz para este partido.`
+        : `Panel E limpiado para ${matchName}. Controlar quedo en Local; podes correr smokes multi-seed para este partido.`
+    );
   }
 
   // ============== Internal helpers ==============
@@ -1794,8 +7372,9 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const current = this.selectedMatchId();
     if (current) {
       const remount = () => {
+        this.detailRefreshToken.update((value) => value + 1);
         this.detailPanelVisible.set(false);
-        Promise.resolve().then(() => this.detailPanelVisible.set(true));
+        setTimeout(() => this.detailPanelVisible.set(true), 0);
       };
       if (delayMs > 0) {
         setTimeout(remount, delayMs);
@@ -1806,17 +7385,75 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   }
 
   private refreshLineupContext(): void {
-    this.http.get<{ formation?: string | null }>(`${environment.apiUrl}/career/lineup/current`)
+    if (typeof this.harness.getCurrentLineup !== 'function') {
+      return;
+    }
+    const lineup$ = this.harness.getCurrentLineup();
+    if (!lineup$ || typeof lineup$.pipe !== 'function') {
+      return;
+    }
+    forkJoin({
+      lineup: lineup$.pipe(catchError(() => of(null))),
+      squad: this.http.get<SessionPlayer[]>(`${environment.apiUrl}/career/players/squad`).pipe(
+        catchError(() => of([] as SessionPlayer[]))
+      ),
+    })
       .pipe(catchError(() => of(null)))
-      .subscribe((lineup) => {
+      .subscribe((context) => {
+        const lineup = context?.lineup ?? null;
+        const squad = context?.squad ?? [];
         const formation = lineup?.formation;
         if (formation && this.formationCodes.includes(formation as FormationCode)) {
           this.selectedFormationModel = formation as FormationCode;
         }
+        this.rebuildPlayerSwapOptions(lineup, squad);
       });
+  }
+
+  private rebuildPlayerSwapOptions(lineup: LineupDTO | null, squad: SessionPlayer[]): void {
+    if (!lineup) {
+      this.playerSwapSlotOptions.set([]);
+      this.playerSwapBenchOptions.set([]);
+      return;
+    }
+    const slots = this.buildLineupSlots(lineup);
+    const slotByPlayer = new Map(slots.map((slot) => [slot.playerId, slot.subdivisionId]));
+    const lineupIds = new Set((lineup.players ?? []).map((player) => player.playerId));
+
+    const slotOptions = (lineup.players ?? [])
+      .filter((player) => player.position !== 'GK' && slotByPlayer.has(player.playerId))
+      .map((player) => ({
+        playerId: player.playerId,
+        playerName: player.name,
+        position: player.position,
+        slotId: slotByPlayer.get(player.playerId) ?? '',
+        label: `${player.name} (${player.position}) ? ${slotByPlayer.get(player.playerId) ?? 'slot'}`,
+      }));
+
+    const benchOptions = squad
+      .filter((player) => !lineupIds.has(player.sessionPlayerId) && !player.injured && !player.suspended && player.position !== 'GK')
+      .map((player) => ({
+        playerId: player.sessionPlayerId,
+        playerName: player.name,
+        position: player.position,
+        score: player.attack + player.technique + player.speed,
+        label: `${player.name} (${player.position}) ? atk ${player.attack} ? tech ${player.technique} ? pace ${player.speed}`,
+      }))
+      .sort((a, b) => b.score - a.score);
+
+    this.playerSwapSlotOptions.set(slotOptions);
+    this.playerSwapBenchOptions.set(benchOptions);
+
+    if (this.selectedSwapStarterIdModel && !slotOptions.some((option) => option.playerId === this.selectedSwapStarterIdModel)) {
+      this.selectedSwapStarterIdModel = null;
+    }
+    if (this.selectedSwapBenchIdModel && !benchOptions.some((option) => option.playerId === this.selectedSwapBenchIdModel)) {
+      this.selectedSwapBenchIdModel = null;
+    }
   }
 
   private fmtError(err: any, fallback: string): string {
     return err?.error?.message ?? err?.message ?? fallback;
   }
 }
+

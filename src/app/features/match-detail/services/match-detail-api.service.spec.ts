@@ -3,9 +3,9 @@
 // match-compare-api.service.spec.ts: spy on HttpClient, verify request
 // shape, return mapping.
 
-import { HttpClient, HttpParams, HttpResponse } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse, HttpParams, HttpResponse } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { MatchDetailApiService } from './match-detail-api.service';
 import { MatchDetail, TimelineSnapshot } from '../models/match-detail.model';
 
@@ -41,6 +41,15 @@ describe('MatchDetailApiService', () => {
 
     it('returns null on 404 (detail unavailable)', (done) => {
       httpSpy.get.and.returnValue(of(new HttpResponse({ body: null, status: 404 })));
+
+      service.getMatchDetail('career-1', 'match-1').subscribe((result) => {
+        expect(result).toBeNull();
+        done();
+      });
+    });
+
+    it('returns null when Angular emits HttpErrorResponse 404', (done) => {
+      httpSpy.get.and.returnValue(throwError(() => new HttpErrorResponse({ status: 404 })));
 
       service.getMatchDetail('career-1', 'match-1').subscribe((result) => {
         expect(result).toBeNull();
@@ -115,6 +124,15 @@ describe('MatchDetailApiService', () => {
 
     it('returns null on 404 (feature off or no detail)', (done) => {
       httpSpy.get.and.returnValue(of(new HttpResponse({ body: null, status: 404 })));
+
+      service.getMatchTimeline('career-1', 'match-1', 45).subscribe((result) => {
+        expect(result).toBeNull();
+        done();
+      });
+    });
+
+    it('returns null when Angular emits HttpErrorResponse 404 for timeline', (done) => {
+      httpSpy.get.and.returnValue(throwError(() => new HttpErrorResponse({ status: 404 })));
 
       service.getMatchTimeline('career-1', 'match-1', 45).subscribe((result) => {
         expect(result).toBeNull();

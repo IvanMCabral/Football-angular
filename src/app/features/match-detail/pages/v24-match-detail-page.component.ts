@@ -901,6 +901,7 @@ export class V24MatchDetailPageComponent implements OnInit, OnChanges {
   // /careers/:careerId/matches/:matchId/detail).
   private _inputCareerId: string | null | undefined = undefined;
   private _inputMatchId: string | null | undefined = undefined;
+  private _inputRefreshToken = 0;
   private _initialised = false;
 
   @Input()
@@ -927,6 +928,17 @@ export class V24MatchDetailPageComponent implements OnInit, OnChanges {
     }
   }
   get inputMatchId(): string | null | undefined { return this._inputMatchId; }
+
+  @Input()
+  set inputRefreshToken(value: number | null | undefined) {
+    const normalized = value ?? 0;
+    const isNew = normalized !== this._inputRefreshToken;
+    this._inputRefreshToken = normalized;
+    if (this._initialised && isNew && this._inputCareerId && this._inputMatchId) {
+      this.fetchDetail(this._inputCareerId, this._inputMatchId);
+    }
+  }
+  get inputRefreshToken(): number { return this._inputRefreshToken; }
 
   ngOnInit(): void {
     // P1a: scroll to top on entry to this view (avoid stale scroll position when navigating between matches)
@@ -962,6 +974,8 @@ export class V24MatchDetailPageComponent implements OnInit, OnChanges {
     if (changes['inputMatchId'] && careerId && matchId) {
       this.fetchDetail(careerId, matchId);
     } else if (changes['inputCareerId'] && careerId && matchId) {
+      this.fetchDetail(careerId, matchId);
+    } else if (changes['inputRefreshToken'] && careerId && matchId) {
       this.fetchDetail(careerId, matchId);
     }
   }

@@ -335,6 +335,38 @@ import { SessionPlayer } from '../../shared/models/player.model';
             </div>
           </section>
 
+          <!-- V25D99.76-FRONT: tactical shape derived from exact visual
+               x/y player positions. This is intentionally separate from the
+               engine ATT/MID/DEF ratings: it explains what the manager is
+               visually building (wide/narrow, left/center/right coverage)
+               before those concepts are fully wired into the match engine. -->
+          <section class="tsp-section">
+            <h3 class="tsp-title">🧭 Shape & canales</h3>
+            <div class="tsp-shape-grid">
+              <div class="tsp-shape-row" *ngFor="let row of tacticalShapeMatrix">
+                <span class="tsp-shape-zone">{{ row.zone }}</span>
+                <span class="tsp-shape-cell"
+                      [class.empty]="row.left === 0"
+                      [class.strong]="row.left >= 2">L {{ row.left }}</span>
+                <span class="tsp-shape-cell"
+                      [class.empty]="row.center === 0"
+                      [class.strong]="row.center >= 2">C {{ row.center }}</span>
+                <span class="tsp-shape-cell"
+                      [class.empty]="row.right === 0"
+                      [class.strong]="row.right >= 2">R {{ row.right }}</span>
+              </div>
+            </div>
+            <div class="tsp-shape-chips">
+              <span class="tsp-shape-chip">Ancho {{ tacticalShapeSummary.width }}%</span>
+              <span class="tsp-shape-chip">Compact. {{ tacticalShapeSummary.compactness }}%</span>
+              <span class="tsp-shape-chip">Bloque {{ tacticalShapeSummary.blockHeight }}%</span>
+              <span class="tsp-shape-chip">Prof. DEF {{ tacticalShapeSummary.defensiveDepth }}%</span>
+            </div>
+            <div class="tsp-warning-line" *ngIf="tacticalShapeWarnings.length">
+              {{ tacticalShapeWarnings[0] }}
+            </div>
+          </section>
+
           <!-- 3b. V25D99.14-FRONT: Off-role players section. Lists each
                player whose natural role family doesn't match the zone
                they're placed in. Hidden when everyone is on-role. -->
@@ -527,6 +559,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
                        [style.height.%]="sub.height"
 [class.occupied]="isSlotOccupied(sub)"
 [class.recommended]="isRecommendedSlot(sub)"
+                      (cdkDropListDropped)="handleSlotDrop($event)"
                       (click)="onSlotClick(sub)">
                 </div>
               </ng-container>
@@ -547,6 +580,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
                      [class.attack]="sub.zone === 'ATTACK'"
                      [class.midfield]="sub.zone === 'MIDFIELD'"
                      [class.defense]="sub.zone === 'DEFENSE'"
+                     (cdkDropListDropped)="handleSlotDrop($event)"
                      (click)="onSlotClick(sub)">
                  </div>
                </ng-container>
@@ -665,7 +699,8 @@ import { SessionPlayer } from '../../shared/models/player.model';
            cdkDropList
            [id]="BENCH_DROP_LIST_ID"
            [cdkDropListConnectedTo]="slotDropListIds"
-           [cdkDropListData]="'bench'">
+           [cdkDropListData]="'bench'"
+           (cdkDropListDropped)="handleBenchDrop($event)">
         <span class="bench-label">
           Banca ({{ benchPlayers?.length || 0 }})
         </span>
@@ -712,6 +747,17 @@ import { SessionPlayer } from '../../shared/models/player.model';
             <span>{{player.position}}</span>
             <button mat-button color="warn" (click)="removePlayerFromSlot(player)">
               Quitar
+            </button>
+            <select [(ngModel)]="selectedPlayerToAssign" class="player-select">
+              <option value="">Cambiar por...</option>
+              <option *ngFor="let p of benchPlayers" [value]="p.playerId">
+                {{p.name}} ({{p.position}})
+              </option>
+            </select>
+            <button mat-raised-button color="primary"
+                    [disabled]="!selectedPlayerToAssign"
+                    (click)="assignPlayerToSlot()">
+              Cambiar
             </button>
           </div>
           <div *ngIf="!getPlayerInSlot(selectedSlot)" class="unassigned-slot">
@@ -1453,6 +1499,58 @@ import { SessionPlayer } from '../../shared/models/player.model';
       color: #f6ad55;
       font-size: 10px;
       font-weight: 700;
+    }
+    .tsp-shape-grid {
+      display: grid;
+      gap: 4px;
+      margin-top: 6px;
+    }
+    .tsp-shape-row {
+      display: grid;
+      grid-template-columns: 34px repeat(3, 1fr);
+      gap: 4px;
+      align-items: center;
+    }
+    .tsp-shape-zone {
+      font-size: 10px;
+      font-weight: 800;
+      color: rgba(255,255,255,0.7);
+      letter-spacing: 0.04em;
+    }
+    .tsp-shape-cell {
+      padding: 3px 4px;
+      border-radius: 4px;
+      text-align: center;
+      font-size: 10px;
+      font-weight: 800;
+      color: #d7f7df;
+      background: rgba(72,187,120,0.13);
+      border: 1px solid rgba(72,187,120,0.18);
+    }
+    .tsp-shape-cell.empty {
+      color: #f6ad55;
+      background: rgba(246,173,85,0.10);
+      border-color: rgba(246,173,85,0.16);
+    }
+    .tsp-shape-cell.strong {
+      color: #ffffff;
+      background: rgba(72,187,120,0.24);
+      border-color: rgba(72,187,120,0.36);
+    }
+    .tsp-shape-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 7px;
+    }
+    .tsp-shape-chip {
+      padding: 2px 6px;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 700;
+      color: rgba(255,255,255,0.82);
+      background: rgba(255,255,255,0.055);
+      border: 1px solid rgba(255,255,255,0.08);
     }
     .tsp-rating-row {
       display: grid;
@@ -2243,7 +2341,11 @@ import { SessionPlayer } from '../../shared/models/player.model';
          (56px) and MID (44px) need different offsets to keep their
          centers on style.top.
          (The height overrides below are V25D93-FRONT F3.) */
-      .player-marker.color-gk { height: 38px; margin-top: -19px; }
+      /* V25D99.72-FRONT: GK sits visually deeper inside the small goal area.
+         Existing saves may still carry GK-1 at y=96%; using a softer vertical
+         offset keeps old and new careers from visually touching the centre-backs
+         while the canonical FormationService now authors GK at y=98%. */
+      .player-marker.color-gk { height: 38px; margin-top: -10px; }
       .player-marker.color-def { height: 48px; margin-top: -24px; }
       .player-marker.color-mid { height: 44px; margin-top: -22px; }
       .player-marker.color-att { height: 48px; margin-top: -24px; }
@@ -3226,6 +3328,88 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   }
 
   /**
+   * V25D99.76-FRONT: visual tactical matrix derived from exact marker
+   * coordinates. It deliberately answers a different question than the
+   * engine ratings: "where did the manager actually put bodies?".
+   *
+   * Field convention in this modal:
+   * - low y% = attack
+   * - high y% = defense
+   * - x% < 33 = left channel, x% > 67 = right channel
+   */
+  get tacticalShapeMatrix(): Array<{ zone: 'ATT' | 'MID' | 'DEF'; left: number; center: number; right: number }> {
+    const rows: Array<{ zone: 'ATT' | 'MID' | 'DEF'; left: number; center: number; right: number }> = [
+      { zone: 'ATT', left: 0, center: 0, right: 0 },
+      { zone: 'MID', left: 0, center: 0, right: 0 },
+      { zone: 'DEF', left: 0, center: 0, right: 0 },
+    ];
+    const byZone = new Map(rows.map(r => [r.zone, r]));
+    for (const player of this.getUniqueValidHomePlayers()) {
+      if (this.isGoalkeeperPlayer(player)) { continue; }
+      const zone = this.getVisualLine(player);
+      const channel = this.getVisualChannel(player);
+      const row = byZone.get(zone);
+      if (!row) { continue; }
+      if (channel === 'L') { row.left += 1; }
+      else if (channel === 'R') { row.right += 1; }
+      else { row.center += 1; }
+    }
+    return rows;
+  }
+
+  get tacticalShapeSummary(): { width: number; compactness: number; blockHeight: number; defensiveDepth: number } {
+    const players = this.getUniqueValidHomePlayers().filter(p => !this.isGoalkeeperPlayer(p));
+    if (players.length === 0) {
+      return { width: 0, compactness: 0, blockHeight: 0, defensiveDepth: 0 };
+    }
+    const xs = players.map(p => this.getMarkerX(p));
+    const ys = players.map(p => this.getMarkerY(p));
+    const widthSpan = Math.max(...xs) - Math.min(...xs);
+    const heightSpan = Math.max(...ys) - Math.min(...ys);
+    const avgY = ys.reduce((acc, y) => acc + y, 0) / ys.length;
+    const defenders = players.filter(p => this.getVisualLine(p) === 'DEF');
+    const defensiveDepth = defenders.length === 0
+      ? 0
+      : defenders.reduce((acc, p) => acc + this.getMarkerY(p), 0) / defenders.length;
+    return {
+      width: Math.round(widthSpan),
+      compactness: Math.max(0, Math.min(100, Math.round(100 - heightSpan))),
+      blockHeight: Math.max(0, Math.min(100, Math.round(100 - avgY))),
+      defensiveDepth: Math.max(0, Math.min(100, Math.round(defensiveDepth))),
+    };
+  }
+
+  get tacticalShapeWarnings(): string[] {
+    const matrix = this.tacticalShapeMatrix;
+    const summary = this.tacticalShapeSummary;
+    const warnings: string[] = [];
+    const totalLeft = matrix.reduce((acc, r) => acc + r.left, 0);
+    const totalCenter = matrix.reduce((acc, r) => acc + r.center, 0);
+    const totalRight = matrix.reduce((acc, r) => acc + r.right, 0);
+    if (totalLeft <= 1) { warnings.push('Banda izquierda muy expuesta'); }
+    if (totalRight <= 1) { warnings.push('Banda derecha muy expuesta'); }
+    if (totalCenter <= 2) { warnings.push('Centro con poca presencia'); }
+    if (summary.width < 45) { warnings.push('Equipo muy cerrado: vulnerable por fuera'); }
+    if (summary.width > 75) { warnings.push('Equipo muy ancho: puede partirse por dentro'); }
+    if (summary.compactness < 45) { warnings.push('Bloque largo: líneas separadas'); }
+    return warnings;
+  }
+
+  private getVisualChannel(player: PlayerOnFieldDto): 'L' | 'C' | 'R' {
+    const x = this.getMarkerX(player);
+    if (x < 33) { return 'L'; }
+    if (x > 67) { return 'R'; }
+    return 'C';
+  }
+
+  private getVisualLine(player: PlayerOnFieldDto): 'ATT' | 'MID' | 'DEF' {
+    const y = this.getMarkerY(player);
+    if (y < 34) { return 'ATT'; }
+    if (y < 67) { return 'MID'; }
+    return 'DEF';
+  }
+
+  /**
    * V25D99.14-FRONT: classify a player's xPct into one of three columns:
    * LEFT (xPct < 33), CENTER (33 â‰¤ xPct < 67), RIGHT (xPct â‰¥ 67). The
    * field's vertical orientation has top% small = ATAQUE and bottom =
@@ -3987,7 +4171,9 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
    * (no drag) fires this click handler, drag fires cdkDragEnded.
    */
   onMarkerClick(player: PlayerOnFieldDto): void {
-    this.selectedSlot = null;
+    this.selectedSlot = player?.slotId
+      ? this.subdivisions.find(s => s.subdivisionId === player.slotId) ?? null
+      : null;
     this.selectedPlayerToAssign = '';
   }
 
@@ -4007,6 +4193,19 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     // Quitar jugador de su slot anterior si tenía uno
     if (player.slotId) {
       delete this.slotPlayerMap[player.slotId];
+    }
+
+    const occupant = this.slotPlayerMap[this.selectedSlot.subdivisionId];
+    if (occupant && occupant.playerId !== player.playerId) {
+      occupant.slotId = '';
+      delete occupant.xPercent;
+      delete occupant.yPercent;
+      if (!this.benchPlayers$.value.some(p => p.playerId === occupant.playerId)) {
+        this.benchPlayers$.next([...this.benchPlayers$.value, occupant]);
+      }
+      this.homePlayers$.next(
+        this.homePlayers$.value.filter(p => p.playerId !== occupant.playerId)
+      );
     }
 
     // Asignar al nuevo slot

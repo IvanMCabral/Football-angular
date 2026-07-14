@@ -1,6 +1,6 @@
-import { HttpClient, HttpResponse, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpResponse, HttpParams, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable, map } from 'rxjs';
+import { Observable, catchError, map, of, throwError } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { MatchDetail, TimelineSnapshot } from '../models/match-detail.model';
 
@@ -59,6 +59,12 @@ export class MatchDetailApiService {
         }
         // 404 is expected when detail is unavailable — return null
         return null;
+      }),
+      catchError((error: unknown) => {
+        if (error instanceof HttpErrorResponse && error.status === 404) {
+          return of(null);
+        }
+        return throwError(() => error);
       })
     );
   }
@@ -103,6 +109,12 @@ export class MatchDetailApiService {
           // 404 = feature flag off or no detail stored — treat as "not
           // available" so the UI can render an empty/disabled state.
           return null;
+        }),
+        catchError((error: unknown) => {
+          if (error instanceof HttpErrorResponse && error.status === 404) {
+            return of(null);
+          }
+          return throwError(() => error);
         })
       );
   }

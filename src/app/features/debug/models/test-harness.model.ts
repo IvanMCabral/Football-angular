@@ -43,6 +43,8 @@ export type TeamStyle =
   | 'COUNTER'
   | 'POSSESSION'
   | 'WIDE_PLAY'
+  | 'LEFT_FLANK'
+  | 'RIGHT_FLANK'
   | 'CENTRAL_PLAY';
 
 /** Body for POST /api/v1/test-harness/career/set-style. */
@@ -75,6 +77,12 @@ export interface TestHarnessMutationResponse {
   // Present on /replace-fixtures
   fixtureCount?: number;
   maxRound?: number;
+}
+
+export interface LabMutationResult {
+  labKey: string;
+  message: string;
+  details?: Record<string, unknown>;
 }
 
 /**
@@ -116,6 +124,65 @@ export interface TestHarnessMatchRow {
  */
 export interface ReplayMatchRequest {
   seed: number | null;
+}
+
+export interface FormationMatrixRow {
+  formation: string;
+  homeGoals: number;
+  awayGoals: number;
+  homeXg: number;
+  awayXg: number;
+  homeShots: number;
+  awayShots: number;
+  homePossession: number;
+  awayPossession: number;
+  homeCentralShots: number;
+  homeWideShots: number;
+  homeLongShots: number;
+  awayCentralShots: number;
+  awayWideShots: number;
+  awayLongShots: number;
+  shapePossessionMultiplier: number;
+  shapeAttackVolumeMultiplier: number;
+  shapeDefensiveResistanceMultiplier: number;
+  shapeAttackLeft: number;
+  shapeAttackCenter: number;
+  shapeAttackRight: number;
+  shapeDefenseLeft: number;
+  shapeDefenseCenter: number;
+  shapeDefenseRight: number;
+}
+
+export interface FormationMatrixSummaryRow {
+  formation: string;
+  seedStart: number;
+  seedEnd: number;
+  seedCount: number;
+  avgGoalsFor: number;
+  avgGoalsAgainst: number;
+  avgGoalDiff: number;
+  avgPossessionFor: number;
+  avgShotsFor: number;
+  avgShotsAgainst: number;
+  avgShotDiff: number;
+  avgXgFor: number;
+  avgXgAgainst: number;
+  avgXgDiff: number;
+  avgCentralShotsFor: number;
+  avgWideShotsFor: number;
+  avgLongShotsFor: number;
+  avgCentralShotsAgainst: number;
+  avgWideShotsAgainst: number;
+  avgLongShotsAgainst: number;
+  avgShapePossessionMultiplier: number;
+  avgShapeAttackVolumeMultiplier: number;
+  avgShapeDefensiveResistanceMultiplier: number;
+  avgShapeAttackLeft: number;
+  avgShapeAttackCenter: number;
+  avgShapeAttackRight: number;
+  avgShapeDefenseLeft: number;
+  avgShapeDefenseCenter: number;
+  avgShapeDefenseRight: number;
 }
 
 /**
@@ -185,8 +252,212 @@ export interface ScenarioMatrixRow {
   awayCentralShots: number;
   awayWideShots: number;
   awayLongShots: number;
+  homeCentralXg: number;
+  homeWideXg: number;
+  homeLongXg: number;
+  homeLeftWideShots: number;
+  homeRightWideShots: number;
+  homeLeftWideXg: number;
+  homeRightWideXg: number;
+  awayCentralXg: number;
+  awayWideXg: number;
+  awayLongXg: number;
+  awayLeftWideShots: number;
+  awayRightWideShots: number;
+  awayLeftWideXg: number;
+  awayRightWideXg: number;
   tacticalChanges: number;
   substitutions: number;
+}
+
+export interface ScenarioMatrixSummaryRequest {
+  seedStart: number;
+  seedCount: number;
+  scenarioGroup?: 'ALL' | 'OFFENSE' | 'DEFENSE' | 'OPPONENT';
+  controlledTeamSide?: 'USER' | 'HOME' | 'AWAY';
+}
+
+export interface PlayerSwapMatrixSummaryRequest {
+  starterPlayerId: string;
+  benchPlayerId: string;
+  slotId?: string | null;
+  seedStart: number;
+  seedCount: number;
+}
+
+export interface PlayerSwapMatrixSummaryRow {
+  matchId: string;
+  formation: string;
+  slotId: string | null;
+  seedStart: number;
+  seedEnd: number;
+  seedCount: number;
+  baselinePlayerId: string;
+  baselinePlayerName: string;
+  baselinePlayerPosition: string;
+  baselinePlayerOverall: number | null;
+  swapPlayerId: string;
+  swapPlayerName: string;
+  swapPlayerPosition: string;
+  swapPlayerOverall: number | null;
+  baselineAvgGoalsFor: number;
+  baselineAvgGoalsAgainst: number;
+  baselineAvgGoalDiff: number;
+  baselineAvgShotsFor: number;
+  baselineAvgShotsAgainst: number;
+  baselineAvgPossessionFor: number;
+  baselineAvgXgFor: number;
+  baselineAvgXgAgainst: number;
+  baselineAvgXgDiff: number;
+  baselineAvgCentralShotsFor: number;
+  baselineAvgWideShotsFor: number;
+  baselineAvgLongShotsFor: number;
+  baselineAvgCentralShotsAgainst: number;
+  baselineAvgWideShotsAgainst: number;
+  baselineAvgLongShotsAgainst: number;
+  baselineAvgCentralXgFor: number;
+  baselineAvgWideXgFor: number;
+  baselineAvgLongXgFor: number;
+  baselineAvgCentralXgAgainst: number;
+  baselineAvgWideXgAgainst: number;
+  baselineAvgLongXgAgainst: number;
+  swappedAvgGoalsFor: number;
+  swappedAvgGoalsAgainst: number;
+  swappedAvgGoalDiff: number;
+  swappedAvgShotsFor: number;
+  swappedAvgShotsAgainst: number;
+  swappedAvgPossessionFor: number;
+  swappedAvgXgFor: number;
+  swappedAvgXgAgainst: number;
+  swappedAvgXgDiff: number;
+  swappedAvgCentralShotsFor: number;
+  swappedAvgWideShotsFor: number;
+  swappedAvgLongShotsFor: number;
+  swappedAvgCentralShotsAgainst: number;
+  swappedAvgWideShotsAgainst: number;
+  swappedAvgLongShotsAgainst: number;
+  swappedAvgCentralXgFor: number;
+  swappedAvgWideXgFor: number;
+  swappedAvgLongXgFor: number;
+  swappedAvgCentralXgAgainst: number;
+  swappedAvgWideXgAgainst: number;
+  swappedAvgLongXgAgainst: number;
+  deltaGoalsFor: number;
+  deltaGoalsAgainst: number;
+  deltaGoalDiff: number;
+  deltaShotsFor: number;
+  deltaShotsAgainst: number;
+  deltaPossessionFor: number;
+  deltaXgFor: number;
+  deltaXgAgainst: number;
+  deltaXgDiff: number;
+  deltaCentralShotsFor: number;
+  deltaWideShotsFor: number;
+  deltaLongShotsFor: number;
+  deltaCentralShotsAgainst: number;
+  deltaWideShotsAgainst: number;
+  deltaLongShotsAgainst: number;
+  deltaCentralXgFor: number;
+  deltaWideXgFor: number;
+  deltaLongXgFor: number;
+  deltaCentralXgAgainst: number;
+  deltaWideXgAgainst: number;
+  deltaLongXgAgainst: number;
+  preAutoSubDeltaShotsFor?: number;
+  preAutoSubDeltaShotsAgainst?: number;
+  preAutoSubDeltaXgFor?: number;
+  preAutoSubDeltaXgAgainst?: number;
+  preAutoSubDeltaXgDiff?: number;
+}
+
+export interface PositionPixelMatrixSummaryRequest {
+  playerId: string;
+  targetXPercent: number;
+  targetYPercent: number;
+  seedStart: number;
+  seedCount: number;
+}
+
+export interface PositionPixelMatrixSummaryRow {
+  matchId: string;
+  formation: string;
+  playerId: string;
+  playerName: string;
+  playerPosition: string;
+  slotId: string;
+  fromXPercent: number;
+  fromYPercent: number;
+  targetXPercent: number;
+  targetYPercent: number;
+  seedStart: number;
+  seedEnd: number;
+  seedCount: number;
+  baselineAvgShotsFor: number;
+  baselineAvgPossessionFor: number;
+  baselineAvgXgFor: number;
+  baselineAvgXgAgainst: number;
+  movedAvgShotsFor: number;
+  movedAvgPossessionFor: number;
+  movedAvgXgFor: number;
+  movedAvgXgAgainst: number;
+  deltaGoalsFor: number;
+  deltaGoalsAgainst: number;
+  deltaGoalDiff: number;
+  deltaShotsFor: number;
+  deltaShotsAgainst: number;
+  deltaPossessionFor: number;
+  deltaXgFor: number;
+  deltaXgAgainst: number;
+  deltaXgDiff: number;
+  deltaCentralShotsFor: number;
+  deltaWideShotsFor: number;
+  deltaLongShotsFor: number;
+  deltaCentralShotsAgainst: number;
+  deltaWideShotsAgainst: number;
+  deltaLongShotsAgainst: number;
+  deltaCentralXgFor: number;
+  deltaWideXgFor: number;
+  deltaLongXgFor: number;
+  deltaCentralXgAgainst: number;
+  deltaWideXgAgainst: number;
+  deltaLongXgAgainst: number;
+  baselineAvgCentralShotsAgainst: number;
+  baselineAvgWideShotsAgainst: number;
+  baselineAvgLongShotsAgainst: number;
+  movedAvgCentralShotsAgainst: number;
+  movedAvgWideShotsAgainst: number;
+  movedAvgLongShotsAgainst: number;
+}
+
+export interface ScenarioMatrixSummaryRow {
+  scenario: string;
+  actionType: 'NONE' | 'STYLE' | 'FORMATION' | 'SUBSTITUTION' | string;
+  actionDetail: string;
+  seedCount: number;
+  avgUserXgDelta: number;
+  minUserXgDelta: number;
+  maxUserXgDelta: number;
+  avgOpponentXgDelta: number;
+  avgUserShotsDelta: number;
+  avgOpponentShotsDelta: number;
+  avgUserPossessionDelta: number;
+  avgUserCentralDelta: number;
+  avgUserWideDelta: number;
+  avgOpponentCentralDelta: number;
+  avgOpponentWideDelta: number;
+  avgUserCentralXgDelta: number;
+  avgUserWideXgDelta: number;
+  avgOpponentCentralXgDelta: number;
+  avgOpponentWideXgDelta: number;
+  avgUserLeftWideDelta: number;
+  avgUserRightWideDelta: number;
+  avgOpponentLeftWideDelta: number;
+  avgOpponentRightWideDelta: number;
+  avgUserLeftWideXgDelta: number;
+  avgUserRightWideXgDelta: number;
+  avgOpponentLeftWideXgDelta: number;
+  avgOpponentRightWideXgDelta: number;
+  baselineScenario: string;
 }
 
 /**
