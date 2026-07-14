@@ -18,7 +18,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { HttpClient } from '@angular/common/http';
-import { Observable, catchError, concatMap, forkJoin, from, map, mergeMap, of, switchMap, timeout, toArray } from 'rxjs';
+import { Observable, catchError, concatMap, forkJoin, from, map, mergeMap, of, switchMap, take, timeout, toArray } from 'rxjs';
 
 import { CareerService } from '../../../core/services/career.service';
 import { Fixture } from '../../../core/services/career.model';
@@ -122,6 +122,7 @@ interface CurrentLineupReplaySample {
 }
 
 interface PlayerSwapMatrixSummary {
+  testCase: string;
   slotId: string;
   formation: string;
   seedStart: number;
@@ -169,6 +170,10 @@ interface PlayerSwapMatrixSummary {
   tacticalChannelsRead: string;
   tacticalChannelsClass: string;
   tacticalBreakdownDetail: string;
+  signalScore: number;
+  signalRead: string;
+  signalClass: string;
+  signalDetail: string;
   timestamp: string;
 }
 
@@ -196,6 +201,7 @@ interface PlayerSwapCandidate {
   benchName: string;
   benchPosition: string;
   slotId: string;
+  testCase?: string;
 }
 
 interface PlayerSwapBatterySummary {
@@ -262,7 +268,50 @@ interface PositionPixelMatrixSummary {
   baselineXgAgainst: number;
   movedXgFor: number;
   movedXgAgainst: number;
+  signalScore: number;
+  signalRead: string;
+  signalClass: string;
+  signalDetail: string;
   timestamp: string;
+}
+
+interface PositionPixelMatchSmokeSummary {
+  matchLabel: string;
+  rows: number;
+  stable: number;
+  visible: number;
+  strong: number;
+  check: number;
+  microReview: number;
+  visibleRisk: number;
+  visibleAttackLoss: number;
+  bigBadTradeoff: number;
+  avgSignal: number;
+  worstSignal: number;
+  worstMove: string;
+  worstTacticalRead: string;
+  dominantCause: string;
+  fivePxRiskRows: number;
+  bigMoveRows: number;
+  bigMoveStrongRows: number;
+  verdict: string;
+  verdictClass: string;
+}
+
+interface PositionPixelPlayerSmokeSummary {
+  key: string;
+  playerName: string;
+  playerPosition: string;
+  rows: number;
+  fivePxRiskRows: number;
+  bigMoveStrongRows: number;
+  bigMoveRows: number;
+  avgSignal: number;
+  worstSignal: number;
+  worstMove: string;
+  dominantCause: string;
+  verdict: string;
+  verdictClass: string;
 }
 
 type PositionPixelReadLevel = 'stable' | 'visible' | 'strong' | 'check';
@@ -308,6 +357,9 @@ type PositionPixelExportRow = PositionPixelMatrixSummary & {
   shapeMoveDetail: string;
   movementDistance: number;
   impactScore: number;
+  signalScore: number;
+  signalRead: string;
+  signalDetail: string;
   attackGainScore: number;
   attackLossScore: number;
   defensiveRiskScore: number;
@@ -665,6 +717,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
               </button>
               <button
                 mat-stroked-button
+                data-testid="player-swap-matrix-button"
                 (click)="onRunAutoPlayerSwapMatrix()"
                 [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
                 aria-label="Compare a starter attacker against a bench attacker across multiple seeds"
@@ -673,6 +726,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
               </button>
               <button
                 mat-stroked-button
+                data-testid="player-swap-battery-button"
                 (click)="onRunPlayerSwapBattery()"
                 [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
                 aria-label="Compare several starter and bench player swaps across multiple seeds"
@@ -710,9 +764,9 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 mat-stroked-button
                 (click)="onRunPositionCalibrationSweep()"
                 [disabled]="mutationInFlight() || !userTeamName()"
-                aria-label="Run position calibration sweep across multiple user-team matches"
+                aria-label="Run position movement smoke across multiple completed user-team matches"
               >
-                Calibration sweep
+                Multi-match position smoke
               </button>
               <button
                 mat-stroked-button
@@ -724,6 +778,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
               </button>
               <button
                 mat-stroked-button
+                data-testid="formation-avg-button"
                 (click)="onRunFormationMatrixSummary()"
                 [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
                 aria-label="Average every formation across multiple seeds"
@@ -1219,6 +1274,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
               <table>
                 <thead>
                   <tr>
+                    <th>Caso</th>
                     <th>Read</th>
                     <th>Fit</th>
                     <th>Starter</th>
@@ -1231,6 +1287,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                     <th>xG Ag.</th>
                     <th>xG Diff</th>
                     <th>Pre xG Diff</th>
+                    <th>Señal</th>
                     <th>Ataque</th>
                     <th>Control</th>
                     <th>Proteccion</th>
@@ -1239,6 +1296,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 </thead>
                 <tbody>
                   <tr *ngFor="let swap of playerSwapBatterySummaries(); trackBy: trackByPlayerSwapSummary">
+                    <td>{{ swap.testCase }}</td>
                     <td [class]="swap.swapReadClass">{{ swap.swapRead }}</td>
                     <td [class]="swap.swapFitClass">{{ swap.swapFit }}</td>
                     <td>{{ swap.baselinePlayer }}</td>
@@ -1253,6 +1311,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                     <td [class]="deltaClass(-swap.deltaXgAgainst)">{{ fmtDeltaNumber(swap.deltaXgAgainst) }}</td>
                     <td [class]="deltaClass(swap.deltaXgDiff)">{{ fmtDeltaNumber(swap.deltaXgDiff) }}</td>
                     <td [class]="deltaClass(swap.preAutoSubDeltaXgDiff || 0)">{{ fmtDeltaNumber(swap.preAutoSubDeltaXgDiff || 0) }}</td>
+                    <td [class]="swap.signalClass" [title]="swap.signalDetail">{{ swap.signalRead }}</td>
                     <td [class]="swap.tacticalAttackClass">{{ swap.tacticalAttackRead }}</td>
                     <td [class]="swap.tacticalCentralControlClass">{{ swap.tacticalCentralControlRead }}</td>
                     <td [class]="swap.tacticalProtectionClass">{{ swap.tacticalProtectionRead }}</td>
@@ -1387,6 +1446,76 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 {{ item.label }} {{ item.count }}
               </span>
             </div>
+            <div *ngIf="positionPixelMatchSmokeSummary().length > 1" class="matrix-scroll position-smoke-summary">
+              <div class="matrix-table position-smoke-table" role="table" aria-label="Multi-match position smoke summary">
+                <div class="matrix-row formation-matrix-row matrix-row-head" role="row">
+                  <span role="columnheader">Match</span>
+                  <span role="columnheader">Rows</span>
+                  <span role="columnheader">Stable</span>
+                  <span role="columnheader">Visible</span>
+                  <span role="columnheader">Strong</span>
+                  <span role="columnheader">Check</span>
+                  <span role="columnheader">Micro</span>
+                  <span role="columnheader">Visible risk</span>
+                  <span role="columnheader">Att loss</span>
+                  <span role="columnheader">Big bad</span>
+                  <span role="columnheader">5px risk</span>
+                  <span role="columnheader">Big strong</span>
+                  <span role="columnheader">Avg señal</span>
+                  <span role="columnheader">Worst</span>
+                  <span role="columnheader">Worst move</span>
+                  <span role="columnheader">Cause</span>
+                  <span role="columnheader">Verdict</span>
+                </div>
+                <div *ngFor="let item of positionPixelMatchSmokeSummary()" class="matrix-row formation-matrix-row" role="row">
+                  <span role="cell">{{ item.matchLabel }}</span>
+                  <span role="cell">{{ item.rows }}</span>
+                  <span role="cell">{{ item.stable }}</span>
+                  <span role="cell">{{ item.visible }}</span>
+                  <span role="cell">{{ item.strong }}</span>
+                  <span role="cell">{{ item.check }}</span>
+                  <span role="cell">{{ item.microReview }}</span>
+                  <span role="cell">{{ item.visibleRisk }}</span>
+                  <span role="cell">{{ item.visibleAttackLoss }}</span>
+                  <span role="cell">{{ item.bigBadTradeoff }}</span>
+                  <span role="cell">{{ item.fivePxRiskRows }}</span>
+                  <span role="cell">{{ item.bigMoveStrongRows }}/{{ item.bigMoveRows }}</span>
+                  <span role="cell">{{ item.avgSignal.toFixed(3) }}</span>
+                  <span role="cell" [title]="item.worstMove">{{ item.worstSignal.toFixed(3) }}</span>
+                  <span role="cell" [title]="item.worstTacticalRead">{{ item.worstMove }}</span>
+                  <span role="cell" [title]="item.dominantCause">{{ item.dominantCause }}</span>
+                  <span role="cell" [class]="item.verdictClass">{{ item.verdict }}</span>
+                </div>
+              </div>
+            </div>
+            <div *ngIf="positionPixelPlayerSmokeSummary().length > 1" class="matrix-scroll position-smoke-summary">
+              <div class="matrix-table position-smoke-table" role="table" aria-label="Position smoke summary by player">
+                <div class="matrix-row formation-matrix-row matrix-row-head" role="row">
+                  <span role="columnheader">Player</span>
+                  <span role="columnheader">Pos</span>
+                  <span role="columnheader">Rows</span>
+                  <span role="columnheader">5px risk</span>
+                  <span role="columnheader">Big strong</span>
+                  <span role="columnheader">Avg señal</span>
+                  <span role="columnheader">Worst</span>
+                  <span role="columnheader">Worst move</span>
+                  <span role="columnheader">Cause</span>
+                  <span role="columnheader">Verdict</span>
+                </div>
+                <div *ngFor="let item of positionPixelPlayerSmokeSummary()" class="matrix-row formation-matrix-row" role="row">
+                  <span role="cell">{{ item.playerName }}</span>
+                  <span role="cell">{{ item.playerPosition }}</span>
+                  <span role="cell">{{ item.rows }}</span>
+                  <span role="cell">{{ item.fivePxRiskRows }}</span>
+                  <span role="cell">{{ item.bigMoveStrongRows }}/{{ item.bigMoveRows }}</span>
+                  <span role="cell">{{ item.avgSignal.toFixed(3) }}</span>
+                  <span role="cell">{{ item.worstSignal.toFixed(3) }}</span>
+                  <span role="cell">{{ item.worstMove }}</span>
+                  <span role="cell" [title]="item.dominantCause">{{ item.dominantCause }}</span>
+                  <span role="cell" [class]="item.verdictClass">{{ item.verdict }}</span>
+                </div>
+              </div>
+            </div>
             <div class="position-read-controls" aria-label="Position movement table controls">
               <label>
                 Read
@@ -1429,6 +1558,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                   <span role="columnheader">xG Ag. C/W/L</span>
                   <span role="columnheader">Wide L/R</span>
                   <span role="columnheader">Wide Ag. L/R</span>
+                  <span role="columnheader">Señal</span>
                   <span role="columnheader">Shape move</span>
                   <span role="columnheader">Tactical read</span>
                   <span role="columnheader">Read</span>
@@ -1460,6 +1590,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                   <span role="cell" [class]="deltaClass(-(row.deltaLeftWideXgAgainst + row.deltaRightWideXgAgainst))" [title]="'shots ag. L/R ' + fmtDeltaNumber(row.deltaLeftWideShotsAgainst) + '/' + fmtDeltaNumber(row.deltaRightWideShotsAgainst)">
                     xG {{ fmtDeltaMicro(row.deltaLeftWideXgAgainst) }}/{{ fmtDeltaMicro(row.deltaRightWideXgAgainst) }}
                   </span>
+                  <span role="cell" [class]="row.signalClass" [title]="row.signalDetail">{{ row.signalRead }}</span>
                   <span role="cell" class="shape-move-read" [title]="positionPixelShapeMoveDetail(row)">
                     {{ positionPixelShapeMove(row) }}
                   </span>
@@ -2511,6 +2642,8 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   private snackBar = inject(MatSnackBar);
   private dialog = inject(MatDialog);
   private http = inject(HttpClient);
+  private readonly AUTO_PLAYER_SWAP_STARTER = '__AUTO_STARTER';
+  private readonly AUTO_PLAYER_SWAP_BENCH = '__AUTO_BENCH';
   private readonly formationPositionsByName = signal<Record<string, FormationDTO['positions']>>({});
 
   /** Allowed formation codes (UI select options). */
@@ -2658,6 +2791,26 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     }
 
     return rows.map((item) => item.row);
+  });
+
+  readonly positionPixelMatchSmokeSummary = computed<PositionPixelMatchSmokeSummary[]>(() => {
+    const groups = new Map<string, PositionPixelMatrixSummary[]>();
+    for (const row of this.positionPixelMatrixRows()) {
+      const key = this.positionPixelMatchLabel(row);
+      groups.set(key, [...(groups.get(key) ?? []), row]);
+    }
+    return [...groups.entries()].map(([matchLabel, rows]) => this.toPositionPixelMatchSmokeSummary(matchLabel, rows));
+  });
+
+  readonly positionPixelPlayerSmokeSummary = computed<PositionPixelPlayerSmokeSummary[]>(() => {
+    const groups = new Map<string, PositionPixelMatrixSummary[]>();
+    for (const row of this.positionPixelMatrixRows()) {
+      const key = `${row.playerName}|${row.playerPosition}|${row.slotId}`;
+      groups.set(key, [...(groups.get(key) ?? []), row]);
+    }
+    return [...groups.entries()]
+      .map(([key, rows]) => this.toPositionPixelPlayerSmokeSummary(key, rows))
+      .sort((a, b) => this.positionPixelPlayerSmokeSeverity(b) - this.positionPixelPlayerSmokeSeverity(a) || b.fivePxRiskRows - a.fivePxRiskRows);
   });
 
   readonly playerSwapSlotOptions = signal<PlayerSwapSlotOption[]>([]);
@@ -3284,6 +3437,21 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     window.setTimeout(() => this.scrollToReplayAnalysis(), 0);
   }
 
+  private clearReplayAnalysisResults(): void {
+    this.currentLineupReplayResult.set(null);
+    this.currentLineupMultiSeedSummary.set(null);
+    this.playerSwapMatrixSummary.set(null);
+    this.playerSwapBatterySummaries.set([]);
+    this.playerSwapPrecisionComparisonRows.set([]);
+    this.positionPixelMatrixSummary.set(null);
+    this.positionPixelMatrixRows.set([]);
+    this.formationReplayResults.set([]);
+    this.formationMatrixSummaryResults.set([]);
+    this.scenarioMatrixResults.set([]);
+    this.scenarioMatrixSummaryResults.set([]);
+    this.scenarioBatteryRows.set([]);
+  }
+
   downloadFormationMatrixCsv(): void {
     const rows = this.formationReplayResults();
     const header = [
@@ -3475,10 +3643,14 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
 
   private playerSwapExportRow(row: PlayerSwapMatrixSummary): Record<string, unknown> {
     return {
+      testCase: row.testCase,
       swapRead: row.swapRead,
       swapReadDetail: row.swapReadDetail,
       swapFit: row.swapFit,
       swapFitDetail: row.swapFitDetail,
+      signalScore: row.signalScore,
+      signalRead: row.signalRead,
+      signalDetail: row.signalDetail,
       tacticalAttackRead: row.tacticalAttackRead,
       tacticalCentralControlRead: row.tacticalCentralControlRead,
       tacticalProtectionRead: row.tacticalProtectionRead,
@@ -3547,10 +3719,10 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       '',
       `Coach read: ${this.playerSwapBatteryCoachRead(summary)}`,
       '',
-      '| Swap | OVR | Fit | Read | Ataque | Control | Proteccion | Canales | Shots | Shots Ag. | xG For | xG Ag. | xG Diff | Pre xG Diff |',
-      '| --- | ---: | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |',
+      '| Swap | OVR | Fit | Read | Señal | Ataque | Control | Proteccion | Canales | Shots | Shots Ag. | xG For | xG Ag. | xG Diff | Pre xG Diff |',
+      '| --- | ---: | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |',
       ...rows.map((row) =>
-        `| ${row.baselinePlayer} -> ${row.swapPlayer} | ${this.playerSwapOverallText(row)} | ${row.swapFit} | ${row.swapRead} | ${row.tacticalAttackRead} | ${row.tacticalCentralControlRead} | ${row.tacticalProtectionRead} | ${row.tacticalChannelsRead} | ${this.fmtDeltaNumber(row.deltaShotsFor)} | ${this.fmtDeltaNumber(row.deltaShotsAgainst)} | ${this.fmtDeltaNumber(row.deltaXgFor)} | ${this.fmtDeltaNumber(row.deltaXgAgainst)} | ${this.fmtDeltaNumber(row.deltaXgDiff)} | ${this.fmtDeltaNumber(row.preAutoSubDeltaXgDiff || 0)} |`
+        `| ${row.baselinePlayer} -> ${row.swapPlayer} | ${this.playerSwapOverallText(row)} | ${row.swapFit} | ${row.swapRead} | ${row.signalRead} | ${row.tacticalAttackRead} | ${row.tacticalCentralControlRead} | ${row.tacticalProtectionRead} | ${row.tacticalChannelsRead} | ${this.fmtDeltaNumber(row.deltaShotsFor)} | ${this.fmtDeltaNumber(row.deltaShotsAgainst)} | ${this.fmtDeltaNumber(row.deltaXgFor)} | ${this.fmtDeltaNumber(row.deltaXgAgainst)} | ${this.fmtDeltaNumber(row.deltaXgDiff)} | ${this.fmtDeltaNumber(row.preAutoSubDeltaXgDiff || 0)} |`
       ),
       '',
       '## Tactical breakdown detail',
@@ -3630,6 +3802,9 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       shapeMoveDetail: this.positionPixelShapeMoveDetail(row),
       movementDistance: Number(this.positionPixelDistance(row).toFixed(3)),
       impactScore: Number(this.positionPixelImpactScore(row).toFixed(3)),
+      signalScore: Number(row.signalScore.toFixed(3)),
+      signalRead: row.signalRead,
+      signalDetail: row.signalDetail,
       attackGainScore: Number(this.positionPixelAttackGainScore(row).toFixed(3)),
       attackLossScore: Number(this.positionPixelAttackLossScore(row).toFixed(3)),
       defensiveRiskScore: Number(this.positionPixelDefensiveRiskScore(row).toFixed(3)),
@@ -3798,6 +3973,15 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   ): PlayerSwapMatrixSummary {
     const baselinePlayer = row.baselinePlayerName || candidate?.starterName || row.baselinePlayerId;
     const swapPlayer = row.swapPlayerName || candidate?.benchName || row.swapPlayerId;
+    const fitCandidate: PlayerSwapCandidate | null = candidate
+      ? {
+          ...candidate,
+          starterName: baselinePlayer,
+          benchName: swapPlayer,
+          starterPosition: row.baselinePlayerPosition || candidate.starterPosition,
+          benchPosition: row.swapPlayerPosition || candidate.benchPosition,
+        }
+      : null;
     const baseline: CurrentLineupMultiSeedSummary = {
       label: `${baselinePlayer} como titular`,
       formation: row.formation,
@@ -3847,6 +4031,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       avgLongShotsAgainst: row.swappedAvgLongShotsAgainst,
     };
     return {
+      testCase: candidate?.testCase ?? this.playerSwapFit(candidate),
       slotId: row.slotId || candidate?.slotId || 'slot',
       formation: row.formation,
       seedStart: row.seedStart,
@@ -3881,13 +4066,17 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       preAutoSubDeltaXgFor: row.preAutoSubDeltaXgFor,
       preAutoSubDeltaXgAgainst: row.preAutoSubDeltaXgAgainst,
       preAutoSubDeltaXgDiff: row.preAutoSubDeltaXgDiff,
-      swapRead: this.playerSwapCoachRead(row),
-      swapReadDetail: this.playerSwapCoachReadDetail(row),
-      swapReadClass: this.playerSwapCoachReadClass(row),
-      swapFit: this.playerSwapFit(candidate),
-      swapFitDetail: this.playerSwapFitDetail(candidate),
-      swapFitClass: this.playerSwapFitClass(candidate),
-      ...this.playerSwapTacticalBreakdown(row, candidate),
+      swapRead: this.playerSwapCoachRead(row, fitCandidate),
+      swapReadDetail: this.playerSwapCoachReadDetail(row, fitCandidate),
+      swapReadClass: this.playerSwapCoachReadClass(row, fitCandidate),
+      swapFit: this.playerSwapFit(fitCandidate),
+      swapFitDetail: this.playerSwapFitDetail(fitCandidate),
+      swapFitClass: this.playerSwapFitClass(fitCandidate),
+      signalScore: this.playerSwapSignalScore(row, fitCandidate),
+      signalRead: this.playerSwapSignalRead(row, fitCandidate),
+      signalClass: this.playerSwapSignalClass(row, fitCandidate),
+      signalDetail: this.playerSwapSignalDetail(row, fitCandidate),
+      ...this.playerSwapTacticalBreakdown(row, fitCandidate),
       timestamp: new Date().toISOString(),
     };
   }
@@ -3941,12 +4130,16 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       baselineXgAgainst: row.baselineAvgXgAgainst,
       movedXgFor: row.movedAvgXgFor,
       movedXgAgainst: row.movedAvgXgAgainst,
+      signalScore: this.positionPixelSignalScoreFromRow(row),
+      signalRead: this.positionPixelSignalReadFromRow(row),
+      signalClass: this.positionPixelSignalClassFromRow(row),
+      signalDetail: this.positionPixelSignalDetailFromRow(row),
       timestamp: new Date().toISOString(),
     };
   }
 
-  private playerSwapCoachRead(row: PlayerSwapMatrixSummaryRow): string {
-    const read = this.playerSwapCoachReadLevel(row);
+  private playerSwapCoachRead(row: PlayerSwapMatrixSummaryRow, candidate: PlayerSwapCandidate | null = null): string {
+    const read = this.playerSwapCoachReadLevel(row, candidate);
     if (read === 'upgrade') return 'Clear upgrade';
     if (read === 'downgrade') return 'Clear downgrade';
     if (read === 'tradeoff') return 'Trade-off';
@@ -3954,8 +4147,8 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return 'Noise / neutral';
   }
 
-  private playerSwapCoachReadClass(row: PlayerSwapMatrixSummaryRow): string {
-    const read = this.playerSwapCoachReadLevel(row);
+  private playerSwapCoachReadClass(row: PlayerSwapMatrixSummaryRow, candidate: PlayerSwapCandidate | null = null): string {
+    const read = this.playerSwapCoachReadLevel(row, candidate);
     if (read === 'upgrade') return 'delta-positive';
     if (read === 'downgrade') return 'delta-negative';
     if (read === 'tradeoff') return 'read-strong';
@@ -3963,8 +4156,8 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return 'delta-neutral';
   }
 
-  private playerSwapCoachReadDetail(row: PlayerSwapMatrixSummaryRow): string {
-    const read = this.playerSwapCoachRead(row);
+  private playerSwapCoachReadDetail(row: PlayerSwapMatrixSummaryRow, candidate: PlayerSwapCandidate | null = null): string {
+    const read = this.playerSwapCoachRead(row, candidate);
     const xgDiff = this.fmtDeltaNumber(row.deltaXgDiff);
     const preXgDiff = this.fmtDeltaNumber(row.preAutoSubDeltaXgDiff || 0);
     const xgFor = this.fmtDeltaNumber(row.deltaXgFor);
@@ -3983,13 +4176,17 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     if (read === 'Needs review') {
       return `la senal es grande pero mezclada; conviene repetir con mas seeds o mirar eventos. xG diff ${xgDiff}, shots ${shotsFor}/${shotsAgainst}.`;
     }
-    return `no hay senal suficiente para decidir por este cambio. xG diff ${xgDiff}, pre-auto-sub ${preXgDiff}.`;
+    const roleRisk = this.playerSwapRoleRisk(candidate);
+    const roleDetail = roleRisk.detail ? ` ${roleRisk.detail}.` : '';
+    return `no hay senal suficiente de resultado para decidir por este cambio. xG diff ${xgDiff}, pre-auto-sub ${preXgDiff}.${roleDetail}`;
   }
 
-  private playerSwapCoachReadLevel(row: PlayerSwapMatrixSummaryRow): 'upgrade' | 'downgrade' | 'tradeoff' | 'neutral' | 'review' {
+  private playerSwapCoachReadLevel(row: PlayerSwapMatrixSummaryRow, candidate: PlayerSwapCandidate | null = null): 'upgrade' | 'downgrade' | 'tradeoff' | 'neutral' | 'review' {
     const net = this.playerSwapCoachNetScore(row);
     const attack = this.playerSwapCoachAttackScore(row);
     const risk = this.playerSwapCoachRiskScore(row);
+    const roleRisk = this.playerSwapRoleRisk(candidate);
+    const roleSignal = Math.max(Math.abs(roleRisk.attack), Math.abs(roleRisk.control), Math.abs(roleRisk.protection));
     const signal = Math.max(
       Math.abs(row.deltaXgDiff),
       Math.abs(row.preAutoSubDeltaXgDiff || 0),
@@ -3997,9 +4194,12 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       Math.abs(row.deltaXgAgainst),
       Math.abs(row.deltaShotsFor) * 0.025,
       Math.abs(row.deltaShotsAgainst) * 0.025,
+      roleSignal,
     );
 
     if (signal < 0.035) return 'neutral';
+    if (roleSignal >= 0.050 && risk < 0.08 && Math.abs(net) < 0.05) return 'review';
+    if (this.playerSwapRoleTradeoff(row, candidate)) return 'tradeoff';
     if (net >= 0.08 && risk <= 0.16) return 'upgrade';
     if (net <= -0.08 && (risk >= 0.10 || row.deltaXgFor <= 0)) return 'downgrade';
     if (attack >= 0.12 && risk >= 0.12) return 'tradeoff';
@@ -4020,6 +4220,68 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return Math.max(0, row.deltaXgAgainst) + Math.max(0, row.preAutoSubDeltaXgAgainst || 0) * 0.60 + Math.max(0, row.deltaShotsAgainst) * 0.015;
   }
 
+  private playerSwapRoleTradeoff(row: PlayerSwapMatrixSummaryRow, candidate: PlayerSwapCandidate | null = null): boolean {
+    const roleRisk = this.playerSwapRoleRisk(candidate);
+    const defensiveGain =
+      Math.max(0, -row.deltaXgAgainst)
+      + Math.max(0, -(row.preAutoSubDeltaXgAgainst || 0)) * 0.60
+      + Math.max(0, -row.deltaShotsAgainst) * 0.015
+      + Math.max(0, roleRisk.protection);
+    const attackCost =
+      Math.max(0, -row.deltaXgFor)
+      + Math.max(0, -(row.preAutoSubDeltaXgFor || 0)) * 0.60
+      + Math.max(0, -row.deltaShotsFor) * 0.015
+      + Math.max(0, -roleRisk.attack);
+    const protectionCost = Math.max(0, -roleRisk.protection);
+    const attackGain = this.playerSwapCoachAttackScore(row) + Math.max(0, roleRisk.attack);
+
+    if (attackCost >= 0.050 && defensiveGain >= 0.060) return true;
+    if (protectionCost >= 0.050 && attackGain >= 0.050) return true;
+    return false;
+  }
+
+  private playerSwapSignalScore(row: PlayerSwapMatrixSummaryRow, candidate: PlayerSwapCandidate | null = null): number {
+    const roleRisk = this.playerSwapRoleRisk(candidate);
+    return Math.max(
+      Math.abs(row.deltaXgDiff),
+      Math.abs(row.preAutoSubDeltaXgDiff || 0),
+      Math.abs(row.deltaXgFor),
+      Math.abs(row.deltaXgAgainst),
+      Math.abs(row.deltaShotsFor) * 0.025,
+      Math.abs(row.deltaShotsAgainst) * 0.025,
+      Math.abs(roleRisk.attack),
+      Math.abs(roleRisk.control),
+      Math.abs(roleRisk.protection),
+    );
+  }
+
+  private playerSwapSignalRead(row: PlayerSwapMatrixSummaryRow, candidate: PlayerSwapCandidate | null = null): string {
+    const score = this.playerSwapSignalScore(row, candidate);
+    if (score >= 0.120) return `Alta ${score.toFixed(3)}`;
+    if (score >= 0.050) return `Media ${score.toFixed(3)}`;
+    if (score >= 0.020) return `Baja ${score.toFixed(3)}`;
+    return `Micro ${score.toFixed(3)}`;
+  }
+
+  private playerSwapSignalClass(row: PlayerSwapMatrixSummaryRow, candidate: PlayerSwapCandidate | null = null): string {
+    const score = this.playerSwapSignalScore(row, candidate);
+    if (score >= 0.120) return 'delta-negative';
+    if (score >= 0.050) return 'read-check';
+    if (score >= 0.020) return 'read-stable';
+    return 'delta-neutral';
+  }
+
+  private playerSwapSignalDetail(row: PlayerSwapMatrixSummaryRow, candidate: PlayerSwapCandidate | null = null): string {
+    const roleRisk = this.playerSwapRoleRisk(candidate);
+    return [
+      `senal ${this.playerSwapSignalScore(row, candidate).toFixed(3)}`,
+      `xG diff ${this.fmtDeltaNumber(row.deltaXgDiff)}`,
+      `pre-auto-sub ${this.fmtDeltaNumber(row.preAutoSubDeltaXgDiff || 0)}`,
+      `shots ${this.fmtDeltaNumber(row.deltaShotsFor)}/${this.fmtDeltaNumber(row.deltaShotsAgainst)}`,
+      `rol att/control/prot ${roleRisk.attack.toFixed(3)}/${roleRisk.control.toFixed(3)}/${roleRisk.protection.toFixed(3)}`,
+    ].join(' · ');
+  }
+
   private playerSwapTacticalBreakdown(row: PlayerSwapMatrixSummaryRow, candidate: PlayerSwapCandidate | null): Pick<
     PlayerSwapMatrixSummary,
     | 'tacticalAttackRead'
@@ -4032,11 +4294,12 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     | 'tacticalChannelsClass'
     | 'tacticalBreakdownDetail'
   > {
+    const roleRisk = this.playerSwapRoleRisk(candidate);
     const attackScore =
       row.deltaXgFor
       + (row.preAutoSubDeltaXgFor || 0) * 0.55
-      + row.deltaShotsFor * 0.020;
-    const roleRisk = this.playerSwapRoleRisk(candidate);
+      + row.deltaShotsFor * 0.020
+      + roleRisk.attack;
     const centralControlScore =
       row.deltaPossessionFor * 0.010
       + row.deltaCentralShotsFor * 0.030
@@ -4074,14 +4337,15 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     };
   }
 
-  private playerSwapRoleRisk(candidate: PlayerSwapCandidate | null): { control: number; protection: number; detail: string } {
+  private playerSwapRoleRisk(candidate: PlayerSwapCandidate | null): { attack: number; control: number; protection: number; detail: string } {
     if (!candidate || this.playerSwapFitLevel(candidate) !== 'out') {
-      return { control: 0, protection: 0, detail: '' };
+      return { attack: 0, control: 0, protection: 0, detail: '' };
     }
-    const starter = candidate.starterPosition;
-    const bench = candidate.benchPosition;
-    if (starter === 'MID' && (bench === 'ATT' || bench === 'WINGER')) {
+    const starter = this.positionPixelLine(candidate.starterPosition);
+    const bench = this.positionPixelLine(candidate.benchPosition);
+    if (starter === 'MID' && bench === 'ATT') {
       return {
+        attack: 0.020,
         control: -0.055,
         protection: -0.045,
         detail: 'Alerta de rol: reemplaza un mediocampista por atacante/banda en zona de control',
@@ -4089,13 +4353,15 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     }
     if (starter === 'MID' && bench === 'DEF') {
       return {
+        attack: -0.010,
         control: -0.040,
         protection: -0.010,
         detail: 'Alerta de rol: gana marca potencial, pero pierde gestion de pelota en el medio',
       };
     }
-    if (starter === 'DEF' && (bench === 'ATT' || bench === 'WINGER')) {
+    if (starter === 'DEF' && bench === 'ATT') {
       return {
+        attack: 0.025,
         control: -0.015,
         protection: -0.055,
         detail: 'Alerta de rol: cambia defensa por atacante/banda y expone proteccion',
@@ -4103,12 +4369,13 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     }
     if (starter === 'ATT' && (bench === 'DEF' || bench === 'MID')) {
       return {
+        attack: -0.055,
         control: bench === 'MID' ? 0.020 : -0.010,
         protection: bench === 'DEF' ? 0.025 : 0.010,
         detail: 'Alerta de rol: cambia amenaza ofensiva por perfil mas conservador',
       };
     }
-    return { control: 0, protection: 0, detail: '' };
+    return { attack: 0, control: 0, protection: 0, detail: '' };
   }
 
   private playerSwapTacticalLabel(score: number, dimension: string): { label: string; cssClass: string } {
@@ -4155,29 +4422,30 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return 'out';
   }
 
-  private positionMovementPresets(fromX: number, fromY: number): Array<{ label: string; x: number; y: number }> {
+  private positionMovementPresets(fromX: number, fromY: number): Array<{ label: string; x: number; y: number; dx: number; dy: number }> {
     const clamp = (value: number) => Math.max(0, Math.min(100, Math.round(value * 100) / 100));
-    const towardWide = fromX <= 50 ? fromX - 5 : fromX + 5;
-    const towardCenter = fromX <= 50 ? fromX + 5 : fromX - 5;
+    const wideDelta = fromX <= 50 ? -5 : 5;
+    const centerDelta = fromX <= 50 ? 5 : -5;
+    const crossDelta = fromY <= 50 ? 18 : -18;
     return [
-      { label: '1px forward', x: clamp(fromX), y: clamp(fromY - 1) },
-      { label: '5px forward', x: clamp(fromX), y: clamp(fromY - 5) },
-      { label: '5px deeper', x: clamp(fromX), y: clamp(fromY + 5) },
-      { label: '5px wide', x: clamp(towardWide), y: clamp(fromY) },
-      { label: '5px center', x: clamp(towardCenter), y: clamp(fromY) },
-      { label: 'big zone cross', x: clamp(50), y: clamp(fromY <= 50 ? fromY + 18 : fromY - 18) },
+      { label: '1px forward', x: clamp(fromX), y: clamp(fromY - 1), dx: 0, dy: -1 },
+      { label: '5px forward', x: clamp(fromX), y: clamp(fromY - 5), dx: 0, dy: -5 },
+      { label: '5px deeper', x: clamp(fromX), y: clamp(fromY + 5), dx: 0, dy: 5 },
+      { label: '5px wide', x: clamp(fromX + wideDelta), y: clamp(fromY), dx: wideDelta, dy: 0 },
+      { label: '5px center', x: clamp(fromX + centerDelta), y: clamp(fromY), dx: centerDelta, dy: 0 },
+      { label: 'big zone cross', x: clamp(50), y: clamp(fromY + crossDelta), dx: clamp(50) - clamp(fromX), dy: crossDelta },
     ];
   }
 
-  private positionMicroMovementPresets(fromX: number, fromY: number): Array<{ label: string; x: number; y: number }> {
+  private positionMicroMovementPresets(fromX: number, fromY: number): Array<{ label: string; x: number; y: number; dx: number; dy: number }> {
     const clamp = (value: number) => Math.max(0, Math.min(100, Math.round(value * 100) / 100));
-    const towardWide = fromX <= 50 ? fromX - 1 : fromX + 1;
-    const towardCenter = fromX <= 50 ? fromX + 1 : fromX - 1;
+    const wideDelta = fromX <= 50 ? -1 : 1;
+    const centerDelta = fromX <= 50 ? 1 : -1;
     return [
-      { label: '1px forward', x: clamp(fromX), y: clamp(fromY - 1) },
-      { label: '1px deeper', x: clamp(fromX), y: clamp(fromY + 1) },
-      { label: '1px wide', x: clamp(towardWide), y: clamp(fromY) },
-      { label: '1px center', x: clamp(towardCenter), y: clamp(fromY) },
+      { label: '1px forward', x: clamp(fromX), y: clamp(fromY - 1), dx: 0, dy: -1 },
+      { label: '1px deeper', x: clamp(fromX), y: clamp(fromY + 1), dx: 0, dy: 1 },
+      { label: '1px wide', x: clamp(fromX + wideDelta), y: clamp(fromY), dx: wideDelta, dy: 0 },
+      { label: '1px center', x: clamp(fromX + centerDelta), y: clamp(fromY), dx: centerDelta, dy: 0 },
     ];
   }
 
@@ -4209,6 +4477,39 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     }
     if (slot?.subdivisionId === 'GK-1') return 93;
     const parsed = this.parseSubdivision(slot?.subdivisionId);
+    if (!parsed) return null;
+    const [sector] = parsed;
+    const sectorRow = Math.floor((sector - 1) / 3);
+    const top = sectorRow * 11.11;
+    return this.clampPercent(top + 11.11 / 2);
+  }
+
+  private matchContextXPercent(slot: LineupSlotDTO | null | undefined): number | null {
+    if (typeof slot?.customXPercent === 'number' && Number.isFinite(slot.customXPercent)) {
+      return this.clampPercent(slot.customXPercent);
+    }
+    return this.subdivisionXPercent(slot?.subdivisionId);
+  }
+
+  private matchContextYPercent(slot: LineupSlotDTO | null | undefined): number | null {
+    if (typeof slot?.customYPercent === 'number' && Number.isFinite(slot.customYPercent)) {
+      return this.clampPercent(slot.customYPercent);
+    }
+    return this.subdivisionYPercent(slot?.subdivisionId);
+  }
+
+  private subdivisionXPercent(subdivisionId: string | null | undefined): number | null {
+    const parsed = this.parseSubdivision(subdivisionId);
+    if (!parsed) return null;
+    const [sector, subIndex] = parsed;
+    const sectorCol = (sector - 1) % 3;
+    const left = (sectorCol * 3 + (subIndex - 1)) * 11.11;
+    return this.clampPercent(left + 11.11 / 2);
+  }
+
+  private subdivisionYPercent(subdivisionId: string | null | undefined): number | null {
+    if (subdivisionId === 'GK-1') return 93;
+    const parsed = this.parseSubdivision(subdivisionId);
     if (!parsed) return null;
     const [sector] = parsed;
     const sectorRow = Math.floor((sector - 1) / 3);
@@ -4364,12 +4665,15 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const lineupIds = new Set((lineup.players ?? []).map((p) => p.playerId));
     const slots = this.buildLineupSlots(lineup);
     const slotByPlayer = new Map(slots.map((slot) => [slot.playerId, slot.subdivisionId]));
+    const starters = (lineup.players ?? []).filter((player) => player.position !== 'GK');
     const starter =
       (this.selectedSwapStarterIdModel
-        ? (lineup.players ?? []).find((player) => player.playerId === this.selectedSwapStarterIdModel && slotByPlayer.has(player.playerId))
+        ? starters.find((player) => player.playerId === this.selectedSwapStarterIdModel)
         : null)
-      ?? (lineup.players ?? []).find((player) => this.isAttackingPosition(player.position) && slotByPlayer.has(player.playerId))
-      ?? (lineup.players ?? []).find((player) => player.position !== 'GK' && slotByPlayer.has(player.playerId));
+      ?? starters.find((player) => this.isAttackingPosition(player.position) && slotByPlayer.has(player.playerId))
+      ?? starters.find((player) => this.isAttackingPosition(player.position))
+      ?? starters.find((player) => slotByPlayer.has(player.playerId))
+      ?? starters[0];
     if (!starter) {
       return null;
     }
@@ -4403,12 +4707,48 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     };
   }
 
+  private autoBackendPlayerSwapCandidate(): PlayerSwapCandidate {
+    return {
+      starterId: this.AUTO_PLAYER_SWAP_STARTER,
+      starterName: 'Auto starter',
+      starterPosition: 'AUTO',
+      benchId: this.AUTO_PLAYER_SWAP_BENCH,
+      benchName: 'Auto bench',
+      benchPosition: 'AUTO',
+      slotId: '',
+    };
+  }
+
+  private autoBackendStressSwapCandidates(): PlayerSwapCandidate[] {
+    return [
+      this.autoBackendStressSwapCandidate('ATT_TO_DEF', 'Stress: atacante por defensor'),
+      this.autoBackendStressSwapCandidate('DEF_TO_ATT', 'Stress: defensor por atacante'),
+      this.autoBackendStressSwapCandidate('MID_TO_ATT', 'Stress: medio por atacante'),
+      this.autoBackendStressSwapCandidate('MID_TO_DEF', 'Stress: medio por defensor'),
+      this.autoBackendStressSwapCandidate('OUT_OF_LINE', 'Stress: fuera de linea'),
+      this.autoBackendStressSwapCandidate('DOWNGRADE', 'Stress: downgrade OVR'),
+    ];
+  }
+
+  private autoBackendStressSwapCandidate(mode: string, testCase: string): PlayerSwapCandidate {
+    return {
+      starterId: `__AUTO_SWAP_${mode}`,
+      starterName: `Auto ${mode}`,
+      starterPosition: 'AUTO',
+      benchId: this.AUTO_PLAYER_SWAP_BENCH,
+      benchName: 'Auto bench',
+      benchPosition: 'AUTO',
+      slotId: '',
+      testCase,
+    };
+  }
+
   private pickPlayerSwapBatteryCandidates(lineup: LineupDTO, squad: SessionPlayer[], limit = 6): PlayerSwapCandidate[] {
     const lineupIds = new Set((lineup.players ?? []).map((p) => p.playerId));
     const slots = this.buildLineupSlots(lineup);
     const slotByPlayer = new Map(slots.map((slot) => [slot.playerId, slot.subdivisionId]));
     const starters = (lineup.players ?? [])
-      .filter((player) => player.position !== 'GK' && slotByPlayer.has(player.playerId));
+      .filter((player) => player.position !== 'GK');
     const eligibleBench = squad
       .filter((player) => !lineupIds.has(player.sessionPlayerId) && !player.injured && !player.suspended && player.position !== 'GK')
       .sort((a, b) => this.playerSwapBenchScore(b) - this.playerSwapBenchScore(a));
@@ -4421,7 +4761,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     });
 
     if (this.playerSwapBatteryModeModel === 'stress') {
-      return this.buildPlayerSwapBatteryCandidates(orderedStarters, eligibleBench, slotByPlayer, limit, 'out');
+      return this.buildStressPlayerSwapBatteryCandidates(orderedStarters, eligibleBench, slotByPlayer, limit);
     }
 
     const natural = this.buildPlayerSwapBatteryCandidates(orderedStarters, eligibleBench, slotByPlayer, limit, 'natural');
@@ -4429,6 +4769,80 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       return natural;
     }
     return this.buildPlayerSwapBatteryCandidates(orderedStarters, eligibleBench, slotByPlayer, limit, 'mixed', natural);
+  }
+
+  private buildStressPlayerSwapBatteryCandidates(
+    starters: LineupDTO['players'],
+    eligibleBench: SessionPlayer[],
+    slotByPlayer: Map<string, string>,
+    limit: number
+  ): PlayerSwapCandidate[] {
+    const candidates: PlayerSwapCandidate[] = [];
+    const usedPairs = new Set<string>();
+    const usedBenchIds = new Set<string>();
+
+    const addCase = (
+      testCase: string,
+      starterPredicate: (starter: LineupDTO['players'][number]) => boolean,
+      benchPredicate: (bench: SessionPlayer, starter: LineupDTO['players'][number]) => boolean,
+      preferWorstBench = false
+    ): void => {
+      if (candidates.length >= limit) return;
+      const starterPool = starters.filter(starterPredicate);
+      for (const starter of starterPool) {
+        const benchPool = eligibleBench
+          .filter((bench) => !usedBenchIds.has(bench.sessionPlayerId) && benchPredicate(bench, starter))
+          .sort((a, b) => preferWorstBench
+            ? this.playerSwapBenchScore(a) - this.playerSwapBenchScore(b)
+            : this.playerSwapBenchScore(b) - this.playerSwapBenchScore(a));
+        const bench = benchPool[0];
+        if (!bench) continue;
+        const key = `${starter.playerId}:${bench.sessionPlayerId}`;
+        if (usedPairs.has(key)) continue;
+        usedPairs.add(key);
+        usedBenchIds.add(bench.sessionPlayerId);
+        candidates.push(this.buildPlayerSwapCandidate(starter, bench, slotByPlayer, testCase));
+        break;
+      }
+    };
+
+    addCase(
+      'Stress: atacante por defensor',
+      (starter) => this.positionPixelLine(starter.position) === 'ATT',
+      (bench) => this.positionPixelLine(bench.position) === 'DEF'
+    );
+    addCase(
+      'Stress: defensor por atacante',
+      (starter) => this.positionPixelLine(starter.position) === 'DEF',
+      (bench) => this.positionPixelLine(bench.position) === 'ATT'
+    );
+    addCase(
+      'Stress: medio por banda/ataque',
+      (starter) => this.positionPixelLine(starter.position) === 'MID',
+      (bench) => this.positionPixelLine(bench.position) === 'ATT'
+    );
+    addCase(
+      'Stress: fuera de linea',
+      () => true,
+      (bench, starter) => this.positionPixelLine(bench.position) !== this.positionPixelLine(starter.position)
+    );
+    addCase(
+      'Stress: downgrade OVR',
+      () => true,
+      (bench, starter) => this.sessionPlayerOverall(bench) <= starter.overall - 4,
+      true
+    );
+    addCase(
+      'Stress: upgrade OVR',
+      () => true,
+      (bench, starter) => this.sessionPlayerOverall(bench) >= starter.overall + 4
+    );
+
+    if (candidates.length >= limit) {
+      return candidates.slice(0, limit);
+    }
+
+    return this.buildPlayerSwapBatteryCandidates(starters, eligibleBench, slotByPlayer, limit, 'out', candidates);
   }
 
   private buildPlayerSwapBatteryCandidates(
@@ -4450,19 +4864,35 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       if (usedPairs.has(key)) continue;
       usedPairs.add(key);
       usedBenchIds.add(bench.sessionPlayerId);
-      candidates.push({
-        starterId: starter.playerId,
-        starterName: starter.name,
-        starterPosition: starter.position,
-        benchId: bench.sessionPlayerId,
-        benchName: bench.name,
-        benchPosition: bench.position,
-        slotId: slotByPlayer.get(starter.playerId) ?? '',
-      });
+      candidates.push(this.buildPlayerSwapCandidate(starter, bench, slotByPlayer, `Battery: ${mode}`));
       if (candidates.length >= limit) break;
     }
 
     return candidates;
+  }
+
+  private buildPlayerSwapCandidate(
+    starter: LineupDTO['players'][number],
+    bench: SessionPlayer,
+    slotByPlayer: Map<string, string>,
+    testCase: string
+  ): PlayerSwapCandidate {
+    return {
+      starterId: starter.playerId,
+      starterName: starter.name,
+      starterPosition: starter.position,
+      benchId: bench.sessionPlayerId,
+      benchName: bench.name,
+      benchPosition: bench.position,
+      slotId: slotByPlayer.get(starter.playerId) ?? '',
+      testCase,
+    };
+  }
+
+  private sessionPlayerOverall(player: SessionPlayer): number {
+    const raw = (player as SessionPlayer & { overall?: number }).overall;
+    if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
+    return Math.round(this.playerSwapBenchScore(player) / 6);
   }
 
   private pickBenchForBatteryMode(
@@ -4884,25 +5314,28 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     this.playerSwapSeedCountModel = seedCount;
     let candidate: PlayerSwapCandidate | null = null;
 
-    this.playerSwapMatrixSummary.set(null);
+    this.clearReplayAnalysisResults();
+    this.analysisReadyMessage.set(`Player swap matrix corriendo: ${seedCount} seeds...`);
     this.mutationInFlight.set(true);
     forkJoin({
-      lineup: this.harness.getCurrentLineup(),
+      lineup: this.harness.getCurrentLineup().pipe(
+        take(1),
+        timeout(10_000)
+      ),
       squad: this.http.get<SessionPlayer[]>(`${environment.apiUrl}/career/players/squad`).pipe(
+        take(1),
+        timeout(10_000),
         catchError(() => of([] as SessionPlayer[]))
       ),
     }).pipe(
       switchMap(({ lineup, squad }) => {
         candidate = this.pickAutomaticSwapCandidate(lineup, squad);
-        if (!candidate) {
-          throw new Error('No suitable starter/bench attacking swap candidate found.');
-        }
         return this.harness.setStyle(this.selectedStyleModel).pipe(
           switchMap(() =>
             this.harness.runPlayerSwapMatrixSummary(matchId, {
-              starterPlayerId: candidate!.starterId,
-              benchPlayerId: candidate!.benchId,
-              slotId: candidate!.slotId,
+              starterPlayerId: candidate?.starterId ?? this.AUTO_PLAYER_SWAP_STARTER,
+              benchPlayerId: candidate?.benchId ?? this.AUTO_PLAYER_SWAP_BENCH,
+              slotId: candidate?.slotId ?? '',
               seedStart,
               seedCount,
             })
@@ -4915,6 +5348,9 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.mutationInFlight.set(false);
+        this.analysisReadyMessage.set(
+          this.fmtError(err, 'Player swap matrix falló antes de generar Panel E')
+        );
         this.snackBar.open(
           this.fmtError(err, 'Failed to run player swap matrix'),
           'OK',
@@ -4958,24 +5394,32 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     }
 
     const seedStart = this.seedInputModel ?? DEFAULT_REPLAY_SEED;
-    const seedCount = this.playerSwapBatteryPrecisionSeedCount(this.playerSwapBatteryPrecisionModel);
+    const seedCount = this.playerSwapBatteryEffectiveSeedCount();
     this.playerSwapSeedCountModel = seedCount;
 
-    this.playerSwapBatterySummaries.set([]);
+    this.clearReplayAnalysisResults();
+    this.analysisReadyMessage.set(`Player swap battery corriendo: ${seedCount} seeds por cambio...`);
     this.mutationInFlight.set(true);
     forkJoin({
-      lineup: this.harness.getCurrentLineup(),
+      lineup: this.harness.getCurrentLineup().pipe(
+        take(1),
+        timeout(10_000)
+      ),
       squad: this.http.get<SessionPlayer[]>(`${environment.apiUrl}/career/players/squad`).pipe(
+        take(1),
+        timeout(10_000),
         catchError(() => of([] as SessionPlayer[]))
       ),
     }).pipe(
       switchMap(({ lineup, squad }) => {
-        const candidates = this.pickPlayerSwapBatteryCandidates(lineup, squad, 6);
-        if (candidates.length === 0) {
-          throw new Error('No suitable starter/bench swap candidates found.');
-        }
+          const candidates = this.pickPlayerSwapBatteryCandidates(lineup, squad, 6);
+          const effectiveCandidates = candidates.length > 0
+            ? candidates
+            : this.playerSwapBatteryModeModel === 'stress'
+              ? this.autoBackendStressSwapCandidates()
+              : [this.autoBackendPlayerSwapCandidate()];
         return this.harness.setStyle(this.selectedStyleModel).pipe(
-          switchMap(() => from(candidates).pipe(
+          switchMap(() => from(effectiveCandidates).pipe(
             concatMap((candidate) =>
               this.harness.runPlayerSwapMatrixSummary(matchId, {
                 starterPlayerId: candidate.starterId,
@@ -4996,6 +5440,9 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.mutationInFlight.set(false);
+        this.analysisReadyMessage.set(
+          this.fmtError(err, 'Player swap battery falló antes de generar Panel E')
+        );
         this.snackBar.open(this.fmtError(err, 'Failed to run player swap battery'), 'OK', { duration: 5000 });
         this.refreshLineupContext();
       },
@@ -5030,23 +5477,28 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     }
 
     const seedStart = this.seedInputModel ?? DEFAULT_REPLAY_SEED;
-    this.playerSwapPrecisionComparisonRows.set([]);
+    this.clearReplayAnalysisResults();
+    this.analysisReadyMessage.set('Precision compare corriendo...');
     this.mutationInFlight.set(true);
     forkJoin({
-      lineup: this.harness.getCurrentLineup(),
+      lineup: this.harness.getCurrentLineup().pipe(take(1), timeout(10_000)),
       squad: this.http.get<SessionPlayer[]>(`${environment.apiUrl}/career/players/squad`).pipe(
+        take(1),
+        timeout(10_000),
         catchError(() => of([] as SessionPlayer[]))
       ),
     }).pipe(
       switchMap(({ lineup, squad }) => {
         const candidates = this.pickPlayerSwapBatteryCandidates(lineup, squad, 6);
-        if (candidates.length === 0) {
-          throw new Error('No suitable starter/bench swap candidates found.');
-        }
+        const effectiveCandidates = candidates.length > 0
+          ? candidates
+          : this.playerSwapBatteryModeModel === 'stress'
+            ? this.autoBackendStressSwapCandidates()
+            : [this.autoBackendPlayerSwapCandidate()];
         return this.harness.setStyle(this.selectedStyleModel).pipe(
-          switchMap(() => this.runPlayerSwapCandidates(matchId, candidates, seedStart, 3)),
+          switchMap(() => this.runPlayerSwapCandidates(matchId, effectiveCandidates, seedStart, 3)),
           switchMap((quick) =>
-            this.runPlayerSwapCandidates(matchId, candidates, seedStart, 10).pipe(
+            this.runPlayerSwapCandidates(matchId, effectiveCandidates, seedStart, 10).pipe(
               map((balanced) => this.buildPlayerSwapPrecisionComparisonRows(quick, balanced))
             )
           )
@@ -5058,6 +5510,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.mutationInFlight.set(false);
+        this.analysisReadyMessage.set(this.fmtError(err, 'Precision compare falló'));
         this.snackBar.open(this.fmtError(err, 'Failed to compare player swap precision'), 'OK', { duration: 5000 });
         this.refreshLineupContext();
       },
@@ -5163,9 +5616,11 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
 
   onRunPositionCalibrationSweep(): void {
     const seedCount = Math.max(10, Math.min(30, Math.round(this.playerSwapSeedCountModel || 10)));
-    const matches = this.userTeamMatches().slice(0, 3);
+    const matches = this.userTeamMatches()
+      .filter((match) => match.status === 'COMPLETED')
+      .slice(0, 3);
     if (matches.length === 0) {
-      this.snackBar.open(`No ${this.userTeamName() || 'user team'} matches available for calibration.`, 'OK', { duration: 4000 });
+      this.snackBar.open(`No completed ${this.userTeamName() || 'user team'} matches available for position smoke.`, 'OK', { duration: 4000 });
       return;
     }
     this.runPositionPixelMatrixWithPresets(
@@ -5179,7 +5634,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
 
   private runPositionPixelMatrixWithPresets(
     seedCount: number,
-    presetsFor: (fromX: number, fromY: number) => Array<{ label: string; x: number; y: number }>,
+    presetsFor: (fromX: number, fromY: number) => Array<{ label: string; x: number; y: number; dx: number; dy: number }>,
     label: string,
     targetMatches: TestHarnessMatchRow[] | null = null
   ): void {
@@ -5200,8 +5655,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const seedStart = this.seedInputModel ?? DEFAULT_REPLAY_SEED;
     this.playerSwapSeedCountModel = seedCount;
 
-    this.positionPixelMatrixSummary.set(null);
-    this.positionPixelMatrixRows.set([]);
+    this.clearReplayAnalysisResults();
     this.mutationInFlight.set(true);
     this.analysisReadyMessage.set(`${label} corriendo: preparando titulares, movimientos y ${seedCount} seeds...`);
     window.setTimeout(() => this.scrollToReplayAnalysis(), 0);
@@ -5226,8 +5680,8 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         const slots = this.buildLineupSlots(lineup);
         const requests = candidates.flatMap((candidate) => {
           const slot = slots.find((s) => s.playerId === candidate.starterId);
-          const fromX = slot?.customXPercent ?? this.canonicalXPercent(lineup.formation, slot) ?? 50;
-          const fromY = slot?.customYPercent ?? this.canonicalYPercent(lineup.formation, slot) ?? this.fallbackYForPosition(candidate.starterPosition);
+          const fromX = this.matchContextXPercent(slot) ?? this.canonicalXPercent(lineup.formation, slot) ?? 50;
+          const fromY = this.matchContextYPercent(slot) ?? this.canonicalYPercent(lineup.formation, slot) ?? this.fallbackYForPosition(candidate.starterPosition);
           const presets = presetsFor(fromX, fromY);
           return matches.flatMap((match) =>
             presets.map((preset) =>
@@ -5235,6 +5689,8 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
                 playerId: candidate.starterId,
                 targetXPercent: preset.x,
                 targetYPercent: preset.y,
+                deltaXPercent: preset.dx,
+                deltaYPercent: preset.dy,
                 seedStart,
                 seedCount,
               }).pipe(map((row) => ({ label: this.calibrationLabel(match, preset.label), row })))
@@ -5501,7 +5957,10 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   }
 
   playerSwapBatteryPrecisionHint(): string {
-    const seeds = this.playerSwapBatteryPrecisionSeedCount(this.playerSwapBatteryPrecisionModel);
+    const seeds = this.playerSwapBatteryEffectiveSeedCount();
+    if (this.playerSwapBatteryModeModel === 'stress' && this.playerSwapBatteryPrecisionModel === 'quick') {
+      return `${seeds} seeds ? Stress test usa minimo 10 para evitar ruido.`;
+    }
     if (this.playerSwapBatteryPrecisionModel === 'reliable') return `${seeds} seeds ? High confidence.`;
     if (this.playerSwapBatteryPrecisionModel === 'balanced') return `${seeds} seeds ? Medium confidence.`;
     return `${seeds} seeds ? Low confidence, smoke rapido.`;
@@ -5517,6 +5976,11 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     if (precision === 'reliable') return 30;
     if (precision === 'balanced') return 10;
     return 3;
+  }
+
+  private playerSwapBatteryEffectiveSeedCount(): number {
+    const baseSeedCount = this.playerSwapBatteryPrecisionSeedCount(this.playerSwapBatteryPrecisionModel);
+    return this.playerSwapBatteryModeModel === 'stress' ? Math.max(10, baseSeedCount) : baseSeedCount;
   }
 
   playerSwapBatteryCounterText(counts: Record<string, number>): string {
@@ -6411,11 +6875,93 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return `read-${this.positionPixelReadLevel(row)}`;
   }
 
+  private positionPixelSignalScoreFromRow(row: PositionPixelMatrixSummaryRow): number {
+    const distance = Math.hypot(row.targetXPercent - row.fromXPercent, row.targetYPercent - row.fromYPercent);
+    const xgSignal = Math.max(
+      Math.abs(row.deltaXgFor),
+      Math.abs(row.deltaXgAgainst),
+      Math.abs(row.deltaXgDiff),
+      Math.abs(row.deltaCentralXgFor),
+      Math.abs(row.deltaWideXgFor),
+      Math.abs(row.deltaLongXgFor),
+      Math.abs(row.deltaCentralXgAgainst),
+      Math.abs(row.deltaWideXgAgainst),
+      Math.abs(row.deltaLongXgAgainst),
+      Math.abs(row.deltaLeftWideXgFor ?? 0),
+      Math.abs(row.deltaRightWideXgFor ?? 0),
+      Math.abs(row.deltaLeftWideXgAgainst ?? 0),
+      Math.abs(row.deltaRightWideXgAgainst ?? 0),
+    );
+    const shotSignal = Math.max(
+      Math.abs(row.deltaShotsFor),
+      Math.abs(row.deltaShotsAgainst),
+      Math.abs(row.deltaCentralShotsFor) + Math.abs(row.deltaWideShotsFor) + Math.abs(row.deltaLongShotsFor),
+      Math.abs(row.deltaCentralShotsAgainst) + Math.abs(row.deltaWideShotsAgainst) + Math.abs(row.deltaLongShotsAgainst),
+    ) * 0.025;
+    const possSignal = Math.abs(row.deltaPossessionFor) * 0.010;
+    const distanceSignal = Math.min(0.050, distance * 0.004);
+    const rawSignal = Math.max(xgSignal, shotSignal, possSignal, distanceSignal);
+    return rawSignal * this.positionPixelMovementConfidence(distance);
+  }
+
+  private positionPixelSignalReadFromRow(row: PositionPixelMatrixSummaryRow): string {
+    const score = this.positionPixelSignalScoreFromRow(row);
+    const distance = Math.hypot(row.targetXPercent - row.fromXPercent, row.targetYPercent - row.fromYPercent);
+    if (distance <= 1.25 && score >= 0.050) return `Micro-check ${score.toFixed(3)}`;
+    if (score >= 0.120) return `Alta ${score.toFixed(3)}`;
+    if (score >= 0.050) return `Media ${score.toFixed(3)}`;
+    if (score >= 0.020) return `Baja ${score.toFixed(3)}`;
+    return `Micro ${score.toFixed(3)}`;
+  }
+
+  private positionPixelSignalClassFromRow(row: PositionPixelMatrixSummaryRow): string {
+    const score = this.positionPixelSignalScoreFromRow(row);
+    const distance = Math.hypot(row.targetXPercent - row.fromXPercent, row.targetYPercent - row.fromYPercent);
+    if (distance <= 1.25 && score >= 0.050) return 'read-check';
+    if (score >= 0.120) return 'delta-negative';
+    if (score >= 0.050) return 'read-check';
+    if (score >= 0.020) return 'read-stable';
+    return 'delta-neutral';
+  }
+
+  private positionPixelSignalDetailFromRow(row: PositionPixelMatrixSummaryRow): string {
+    return [
+      `senal ${this.positionPixelSignalScoreFromRow(row).toFixed(3)}`,
+      `xG for/ag/diff ${this.fmtDeltaMicro(row.deltaXgFor)}/${this.fmtDeltaMicro(row.deltaXgAgainst)}/${this.fmtDeltaMicro(row.deltaXgDiff)}`,
+      `shots for/ag ${this.fmtDeltaNumber(row.deltaShotsFor)}/${this.fmtDeltaNumber(row.deltaShotsAgainst)}`,
+      `poss ${this.fmtDeltaNumber(row.deltaPossessionFor)}%`,
+      `dist ${Math.hypot(row.targetXPercent - row.fromXPercent, row.targetYPercent - row.fromYPercent).toFixed(2)}px`,
+    ].join(' · ');
+  }
+
+  private positionPixelMovementConfidence(distance: number): number {
+    if (!Number.isFinite(distance)) return 1;
+    if (distance <= 1.25) return 0.35;
+    if (distance <= 6.0) return 0.70;
+    return 1;
+  }
+
   positionPixelTacticalRead(row: PositionPixelMatrixSummary): string {
     const attackGain = this.positionPixelAttackGainScore(row);
     const attackLoss = this.positionPixelAttackLossScore(row);
     const defensiveRisk = this.positionPixelDefensiveRiskScore(row);
     const defensiveGain = this.positionPixelDefensiveGainScore(row);
+    const distance = this.positionPixelDistance(row);
+    if (distance <= 1.25) {
+      return row.signalScore >= 0.050 ? 'Micro review' : 'Micro stable';
+    }
+    if (distance <= 6.0) {
+      if (attackLoss >= 1.0 && defensiveRisk >= 1.0) return 'Visible risk';
+      if (attackGain >= 1.0 && defensiveRisk >= 1.0) return 'Visible trade-off';
+      if (attackLoss >= 1.0 && defensiveGain >= 0.8) return 'Visible def+ / att-';
+      if (attackGain >= 1.0 && defensiveGain >= 0.8) return 'Visible double gain';
+      if (defensiveRisk >= 1.0) return 'Visible risk';
+      if (attackLoss >= 1.0) return 'Visible attack loss';
+      if (attackGain >= 1.0) return 'Visible attack gain';
+      if (defensiveGain >= 1.0) return 'Visible def. gain';
+      if (attackGain >= 0.6 || attackLoss >= 0.6 || defensiveRisk >= 0.6 || defensiveGain >= 0.6) return 'Visible small';
+      return 'Neutral';
+    }
     if (attackLoss >= 1.2 && defensiveGain >= 1.0) return 'Tradeoff: def+ / att-';
     if (attackGain >= 1.2 && defensiveRisk >= 1.0) return 'Tradeoff: att+ / risk+';
     if (attackLoss >= 1.0 && defensiveRisk >= 1.0) return 'Bad tradeoff';
@@ -6432,6 +6978,10 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
 
   positionPixelTacticalReadClass(row: PositionPixelMatrixSummary): string {
     const read = this.positionPixelTacticalRead(row);
+    if (read === 'Micro review') return 'read-check';
+    if (read === 'Micro stable') return 'read-stable';
+    if (read.startsWith('Visible risk') || read === 'Visible attack loss') return 'read-check';
+    if (read.startsWith('Visible')) return 'read-visible';
     if (read === 'Risk') return 'read-check';
     if (read === 'Trade-off' || read === 'Tradeoff: att+ / risk+' || read === 'Bad tradeoff') return 'read-strong';
     if (read === 'Tradeoff: def+ / att-') return 'read-visible';
@@ -6634,13 +7184,19 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         label: 'Risk/Bad',
         className: 'read-check',
         hint: 'Movimientos que abren riesgo defensivo o empeoran ataque y defensa.',
-        matches: (read: string) => read === 'Risk' || read === 'Bad tradeoff',
+        matches: (read: string) => read === 'Risk' || read === 'Bad tradeoff' || read === 'Visible risk' || read === 'Visible attack loss',
+      },
+      {
+        label: 'Micro review',
+        className: 'read-check',
+        hint: 'Micro-movimientos con senal llamativa: revisar con mas seeds antes de decidir.',
+        matches: (read: string) => read === 'Micro review',
       },
       {
         label: 'Neutral/Small',
         className: 'read-stable',
-        hint: 'Movimientos con se?al chica, compensada o neutra.',
-        matches: (read: string) => read === 'Neutral' || read === 'Small signal' || read === 'Compensated',
+        hint: 'Movimientos con se?al chica, compensada, micro o neutra.',
+        matches: (read: string) => read === 'Neutral' || read === 'Small signal' || read === 'Compensated' || read === 'Micro stable' || read === 'Visible small',
       },
     ];
 
@@ -6650,6 +7206,240 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       hint: definition.hint,
       count: rows.filter((row) => definition.matches(this.positionPixelTacticalRead(row))).length,
     }));
+  }
+
+  private positionPixelMatchLabel(row: PositionPixelMatrixSummary): string {
+    const marker = ' ? ';
+    const index = row.label.indexOf(marker);
+    return index >= 0 ? row.label.slice(0, index) : 'Selected match';
+  }
+
+  private positionPixelMoveLabel(row: PositionPixelMatrixSummary): string {
+    const marker = ' ? ';
+    const index = row.label.indexOf(marker);
+    return index >= 0 ? row.label.slice(index + marker.length) : row.label;
+  }
+
+  private toPositionPixelMatchSmokeSummary(
+    matchLabel: string,
+    rows: PositionPixelMatrixSummary[]
+  ): PositionPixelMatchSmokeSummary {
+    const readCounts: Record<PositionPixelReadLevel, number> = {
+      stable: 0,
+      visible: 0,
+      strong: 0,
+      check: 0,
+    };
+    let microReview = 0;
+    let visibleRisk = 0;
+    let visibleAttackLoss = 0;
+    let bigBadTradeoff = 0;
+    let fivePxRiskRows = 0;
+    let bigMoveRows = 0;
+    let bigMoveStrongRows = 0;
+    let signalSum = 0;
+    let worst: PositionPixelMatrixSummary | null = null;
+
+    for (const row of rows) {
+      readCounts[this.positionPixelReadLevel(row)] += 1;
+      const tacticalRead = this.positionPixelTacticalRead(row);
+      const moveLabel = this.positionPixelMoveLabel(row);
+      const isBigMove = moveLabel === 'big zone cross' || this.positionPixelDistance(row) > 6.0;
+      if (tacticalRead === 'Micro review') microReview += 1;
+      if (tacticalRead === 'Visible risk') visibleRisk += 1;
+      if (tacticalRead === 'Visible attack loss') visibleAttackLoss += 1;
+      if (tacticalRead === 'Bad tradeoff') bigBadTradeoff += 1;
+      if (!isBigMove && (tacticalRead === 'Visible risk' || tacticalRead === 'Visible attack loss')) fivePxRiskRows += 1;
+      if (isBigMove) {
+        bigMoveRows += 1;
+        if (this.positionPixelReadLevel(row) === 'strong' || tacticalRead === 'Bad tradeoff' || tacticalRead === 'Risk') {
+          bigMoveStrongRows += 1;
+        }
+      }
+      signalSum += row.signalScore;
+      if (!worst || row.signalScore > worst.signalScore) {
+        worst = row;
+      }
+    }
+
+    const avgSignal = rows.length > 0 ? signalSum / rows.length : 0;
+    const worstSignal = worst?.signalScore ?? 0;
+    const verdict = this.positionPixelMatchSmokeVerdict(
+      readCounts,
+      microReview,
+      visibleRisk,
+      visibleAttackLoss,
+      bigBadTradeoff,
+      fivePxRiskRows,
+      bigMoveRows,
+      bigMoveStrongRows,
+      avgSignal,
+      worstSignal
+    );
+    const worstMove = worst ? this.positionPixelMoveLabel(worst) : 'No rows';
+    return {
+      matchLabel,
+      rows: rows.length,
+      stable: readCounts.stable,
+      visible: readCounts.visible,
+      strong: readCounts.strong,
+      check: readCounts.check,
+      microReview,
+      visibleRisk,
+      visibleAttackLoss,
+      bigBadTradeoff,
+      fivePxRiskRows,
+      bigMoveRows,
+      bigMoveStrongRows,
+      avgSignal,
+      worstSignal,
+      worstMove,
+      worstTacticalRead: worst ? `${worst.playerName} - ${worstMove} - ${this.positionPixelTacticalRead(worst)}` : 'No rows',
+      dominantCause: this.positionPixelDominantCause(rows),
+      verdict,
+      verdictClass: this.positionPixelMatchSmokeVerdictClass(verdict),
+    };
+  }
+
+  private positionPixelMatchSmokeVerdict(
+    readCounts: Record<PositionPixelReadLevel, number>,
+    microReview: number,
+    visibleRisk: number,
+    visibleAttackLoss: number,
+    bigBadTradeoff: number,
+    fivePxRiskRows: number,
+    bigMoveRows: number,
+    bigMoveStrongRows: number,
+    avgSignal: number,
+    worstSignal: number
+  ): string {
+    if (fivePxRiskRows >= 6 && (avgSignal >= 0.075 || worstSignal >= 0.160)) return 'Repeated 5px bias';
+    if (fivePxRiskRows >= 3) return '5px visible pattern';
+    if (bigMoveRows > 0 && bigMoveStrongRows === bigMoveRows && readCounts.strong <= bigMoveStrongRows) return 'Big-move outlier';
+    if (bigBadTradeoff > 0 || readCounts.strong > 0) return 'Strong review';
+    if (readCounts.check > 1 || microReview > 1) return 'Needs seeds';
+    if (visibleRisk + visibleAttackLoss >= 4) return 'Visible bias';
+    if (readCounts.visible > 0) return 'Playable variation';
+    return 'Stable';
+  }
+
+  private positionPixelMatchSmokeVerdictClass(verdict: string): string {
+    if (verdict === 'Repeated 5px bias') return 'read-strong';
+    if (verdict === '5px visible pattern') return 'read-check';
+    if (verdict === 'Big-move outlier') return 'read-visible';
+    if (verdict === 'Strong review') return 'read-strong';
+    if (verdict === 'Needs seeds' || verdict === 'Visible bias') return 'read-check';
+    if (verdict === 'Playable variation') return 'read-visible';
+    return 'read-stable';
+  }
+
+  private toPositionPixelPlayerSmokeSummary(
+    key: string,
+    rows: PositionPixelMatrixSummary[]
+  ): PositionPixelPlayerSmokeSummary {
+    let fivePxRiskRows = 0;
+    let bigMoveRows = 0;
+    let bigMoveStrongRows = 0;
+    let signalSum = 0;
+    let worst: PositionPixelMatrixSummary | null = null;
+
+    for (const row of rows) {
+      const tacticalRead = this.positionPixelTacticalRead(row);
+      const moveLabel = this.positionPixelMoveLabel(row);
+      const isBigMove = moveLabel === 'big zone cross' || this.positionPixelDistance(row) > 6.0;
+      if (!isBigMove && (tacticalRead === 'Visible risk' || tacticalRead === 'Visible attack loss')) {
+        fivePxRiskRows += 1;
+      }
+      if (isBigMove) {
+        bigMoveRows += 1;
+        if (this.positionPixelReadLevel(row) === 'strong' || tacticalRead === 'Bad tradeoff' || tacticalRead === 'Risk') {
+          bigMoveStrongRows += 1;
+        }
+      }
+      signalSum += row.signalScore;
+      if (!worst || row.signalScore > worst.signalScore) {
+        worst = row;
+      }
+    }
+
+    const first = rows[0];
+    const avgSignal = rows.length > 0 ? signalSum / rows.length : 0;
+    const worstSignal = worst?.signalScore ?? 0;
+    const verdict = this.positionPixelPlayerSmokeVerdict(fivePxRiskRows, bigMoveRows, bigMoveStrongRows, avgSignal, worstSignal);
+    return {
+      key,
+      playerName: first?.playerName ?? key,
+      playerPosition: first?.playerPosition ?? '-',
+      rows: rows.length,
+      fivePxRiskRows,
+      bigMoveRows,
+      bigMoveStrongRows,
+      avgSignal,
+      worstSignal,
+      worstMove: worst ? this.positionPixelMoveLabel(worst) : 'No rows',
+      dominantCause: this.positionPixelDominantCause(rows),
+      verdict,
+      verdictClass: this.positionPixelMatchSmokeVerdictClass(verdict),
+    };
+  }
+
+  private positionPixelPlayerSmokeVerdict(
+    fivePxRiskRows: number,
+    bigMoveRows: number,
+    bigMoveStrongRows: number,
+    avgSignal: number,
+    worstSignal: number
+  ): string {
+    if (fivePxRiskRows >= 6 && (avgSignal >= 0.075 || worstSignal >= 0.160)) return 'Repeated 5px bias';
+    if (fivePxRiskRows >= 3) return '5px visible pattern';
+    if (bigMoveRows > 0 && bigMoveStrongRows === bigMoveRows) return 'Big-move outlier';
+    if (bigMoveStrongRows > 0) return 'Strong review';
+    return 'Stable';
+  }
+
+  private positionPixelPlayerSmokeSeverity(item: PositionPixelPlayerSmokeSummary): number {
+    if (item.verdict === 'Repeated 5px bias') return 5;
+    if (item.verdict === '5px visible pattern') return 4;
+    if (item.verdict === 'Strong review') return 3;
+    if (item.verdict === 'Big-move outlier') return 2;
+    return 1;
+  }
+
+  private positionPixelDominantCause(rows: PositionPixelMatrixSummary[]): string {
+    if (rows.length === 0) return 'No rows';
+    const totals = rows.reduce(
+      (acc, row) => {
+        acc.attackGain += this.positionPixelAttackGainScore(row);
+        acc.attackLoss += this.positionPixelAttackLossScore(row);
+        acc.defensiveRisk += this.positionPixelDefensiveRiskScore(row);
+        acc.defensiveGain += this.positionPixelDefensiveGainScore(row);
+        acc.wideShift += Math.abs(row.deltaLeftWideXgFor)
+          + Math.abs(row.deltaRightWideXgFor)
+          + Math.abs(row.deltaLeftWideXgAgainst)
+          + Math.abs(row.deltaRightWideXgAgainst);
+        acc.possession += Math.abs(row.deltaPossessionFor) * 0.10;
+        return acc;
+      },
+      {
+        attackGain: 0,
+        attackLoss: 0,
+        defensiveRisk: 0,
+        defensiveGain: 0,
+        wideShift: 0,
+        possession: 0,
+      }
+    );
+    const entries = [
+      ['attack+', totals.attackGain],
+      ['attack-', totals.attackLoss],
+      ['risk+', totals.defensiveRisk],
+      ['def+', totals.defensiveGain],
+      ['wide', totals.wideShift],
+      ['poss', totals.possession],
+    ] as const;
+    const [label, value] = entries.reduce((best, item) => item[1] > best[1] ? item : best, entries[0]);
+    if (value < 0.75) return 'low/noise';
+    return `${label} ${value.toFixed(1)}`;
   }
 
   positionPixelHasChecks(): boolean {
@@ -6673,9 +7463,11 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     );
 
     if (distance <= 1.25) {
-      return xg > 0.08 || sideXg > 0.05 || shots > 1.25 || poss > 1.75 || zoneShots > 2.50 ? 'check' : 'stable';
+      return row.signalScore >= 0.050 ? 'check' : 'stable';
     }
     if (distance <= 6.0) {
+      const tacticalRead = this.positionPixelTacticalRead(row);
+      if (tacticalRead.startsWith('Visible') && tacticalRead !== 'Visible small') return 'visible';
       if (xg > 0.22 || sideXg > 0.12 || shots > 4.0 || poss > 4.0 || zoneShots > 5.0) return 'check';
       if (xg > 0.06 || sideXg > 0.035 || shots > 1.0 || poss > 1.0 || zoneShots > 1.5) return 'visible';
       return 'stable';
@@ -6883,7 +7675,8 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const seedStart = this.summarySeedStart();
     const seedCount = this.scenarioMatrixSummaryEffectiveSeedCount();
     this.scenarioMatrixSummarySeedCount.set(seedCount);
-    this.formationMatrixSummaryResults.set([]);
+    this.clearReplayAnalysisResults();
+    this.analysisReadyMessage.set(`Formation averages corriendo: ${seedCount} seeds por formacion...`);
     this.mutationInFlight.set(true);
 
     this.harness.setStyle(this.selectedStyleModel).pipe(

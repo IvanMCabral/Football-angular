@@ -374,6 +374,8 @@ export interface PositionPixelMatrixSummaryRequest {
   playerId: string;
   targetXPercent: number;
   targetYPercent: number;
+  deltaXPercent?: number;
+  deltaYPercent?: number;
   seedStart: number;
   seedCount: number;
 }

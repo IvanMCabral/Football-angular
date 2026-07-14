@@ -1,4 +1,4 @@
-// V24D24: Tests for TestHarnessPageComponent.
+﻿// V24D24: Tests for TestHarnessPageComponent.
 //
 // These tests focus on the state-management contract (signals, handlers).
 // The full template rendering (Material modules, V24MatchDetailPageComponent
@@ -165,6 +165,37 @@ describe('TestHarnessPageComponent', () => {
     button?.click();
 
     expect(runSpy).toHaveBeenCalled();
+  });
+
+  it('exposes stable test ids for the main matrix buttons', () => {
+    component.selectMatch({
+      matchId: 'match-1',
+      round: 1,
+      homeTeamId: 'team-1',
+      homeTeamName: 'My Team',
+      awayTeamId: 'team-2',
+      awayTeamName: 'Rival',
+      status: 'PENDING',
+      homeGoals: null,
+      awayGoals: null,
+      homeFormation: null,
+      awayFormation: null,
+      roundId: 'round-uuid-1',
+    });
+    fixture.detectChanges();
+
+    for (const testId of [
+      'player-swap-matrix-button',
+      'player-swap-battery-button',
+      'position-presets-matrix-button',
+      'formation-avg-button',
+    ]) {
+      const button: HTMLButtonElement | null = fixture.nativeElement.querySelector(
+        `[data-testid="${testId}"]`
+      );
+      expect(button).withContext(`${testId} should be present`).not.toBeNull();
+      expect(button?.disabled).withContext(`${testId} should be enabled`).toBeFalse();
+    }
   });
 
   it('selectMatch updates the signal', () => {
@@ -955,6 +986,7 @@ describe('TestHarnessPageComponent', () => {
         deltaXgAgainst: 0.03,
         deltaXgDiff: 0.15,
         preAutoSubDeltaXgDiff: 0.11,
+        signalRead: 'Alta 0.150',
         tacticalAttackRead: 'Ataque +',
         tacticalCentralControlRead: 'Control =',
         tacticalProtectionRead: 'Proteccion =',
@@ -990,8 +1022,8 @@ describe('TestHarnessPageComponent', () => {
     expect(report).toContain('Reads: 1 Clear upgrade · 1 Clear downgrade');
     expect(report).toContain('Fit: 2 Same profile');
     expect(report).toContain('Coach read: Lectura balanceada');
-    expect(report).toContain('| Swap | OVR | Fit | Read | Ataque | Control | Proteccion | Canales | Shots | Shots Ag. | xG For | xG Ag. | xG Diff | Pre xG Diff |');
-    expect(report).toContain('| Jude Bellingham -> Endrick | — | Same profile | Clear upgrade | Ataque + | Control = | Proteccion = | Canales = | +2.25 | +0.50 | +0.18 | +0.03 | +0.15 | +0.11 |');
+    expect(report).toContain('| Swap | OVR | Fit | Read | Señal | Ataque | Control | Proteccion | Canales | Shots | Shots Ag. | xG For | xG Ag. | xG Diff | Pre xG Diff |');
+    expect(report).toContain('| Jude Bellingham -> Endrick | — | Same profile | Clear upgrade | Alta 0.150 | Ataque + | Control = | Proteccion = | Canales = | +2.25 | +0.50 | +0.18 | +0.03 | +0.15 | +0.11 |');
     expect(report).toContain('## Tactical breakdown detail');
     expect(snackBarSpy.open).toHaveBeenCalledWith('Player swap battery report copied.', 'OK', { duration: 2500 });
   });
@@ -1126,6 +1158,10 @@ function makePlayerSwapSummary(overrides: Record<string, unknown>) {
     swapFit: 'Same profile',
     swapFitDetail: 'test',
     swapFitClass: 'fit-good',
+    signalScore: 0,
+    signalRead: 'Micro 0.000',
+    signalClass: 'delta-neutral',
+    signalDetail: 'test',
     tacticalAttackRead: 'Ataque =',
     tacticalAttackClass: 'delta-neutral',
     tacticalCentralControlRead: 'Control =',
