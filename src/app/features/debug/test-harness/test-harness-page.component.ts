@@ -247,9 +247,17 @@ interface PositionPixelMatrixSummary {
   deltaCentralXgFor: number;
   deltaWideXgFor: number;
   deltaLongXgFor: number;
+  deltaLeftWideShotsFor: number;
+  deltaRightWideShotsFor: number;
+  deltaLeftWideXgFor: number;
+  deltaRightWideXgFor: number;
   deltaCentralXgAgainst: number;
   deltaWideXgAgainst: number;
   deltaLongXgAgainst: number;
+  deltaLeftWideShotsAgainst: number;
+  deltaRightWideShotsAgainst: number;
+  deltaLeftWideXgAgainst: number;
+  deltaRightWideXgAgainst: number;
   baselineXgFor: number;
   baselineXgAgainst: number;
   movedXgFor: number;
@@ -680,7 +688,9 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 Compare precision
               </button>
               <button
+                type="button"
                 mat-stroked-button
+                data-testid="position-presets-matrix-button"
                 (click)="onRunPositionPixelMatrix()"
                 [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
                 aria-label="Compare multiple pixel movement presets for the selected starter across seeds"
@@ -688,6 +698,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 Position presets matrix
               </button>
               <button
+                type="button"
                 mat-stroked-button
                 (click)="onRunPositionSensitivityCheck()"
                 [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
@@ -1416,6 +1427,8 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                   <span role="columnheader">Zones Ag. C/W/L</span>
                   <span role="columnheader">xG zones C/W/L</span>
                   <span role="columnheader">xG Ag. C/W/L</span>
+                  <span role="columnheader">Wide L/R</span>
+                  <span role="columnheader">Wide Ag. L/R</span>
                   <span role="columnheader">Shape move</span>
                   <span role="columnheader">Tactical read</span>
                   <span role="columnheader">Read</span>
@@ -1440,6 +1453,12 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                   </span>
                   <span role="cell" [class]="deltaClass(-(row.deltaCentralXgAgainst + row.deltaWideXgAgainst + row.deltaLongXgAgainst))">
                     {{ fmtDeltaMicro(row.deltaCentralXgAgainst) }}/{{ fmtDeltaMicro(row.deltaWideXgAgainst) }}/{{ fmtDeltaMicro(row.deltaLongXgAgainst) }}
+                  </span>
+                  <span role="cell" [class]="deltaClass(row.deltaLeftWideXgFor + row.deltaRightWideXgFor)" [title]="'shots L/R ' + fmtDeltaNumber(row.deltaLeftWideShotsFor) + '/' + fmtDeltaNumber(row.deltaRightWideShotsFor)">
+                    xG {{ fmtDeltaMicro(row.deltaLeftWideXgFor) }}/{{ fmtDeltaMicro(row.deltaRightWideXgFor) }}
+                  </span>
+                  <span role="cell" [class]="deltaClass(-(row.deltaLeftWideXgAgainst + row.deltaRightWideXgAgainst))" [title]="'shots ag. L/R ' + fmtDeltaNumber(row.deltaLeftWideShotsAgainst) + '/' + fmtDeltaNumber(row.deltaRightWideShotsAgainst)">
+                    xG {{ fmtDeltaMicro(row.deltaLeftWideXgAgainst) }}/{{ fmtDeltaMicro(row.deltaRightWideXgAgainst) }}
                   </span>
                   <span role="cell" class="shape-move-read" [title]="positionPixelShapeMoveDetail(row)">
                     {{ positionPixelShapeMove(row) }}
@@ -3907,9 +3926,17 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       deltaCentralXgFor: row.deltaCentralXgFor,
       deltaWideXgFor: row.deltaWideXgFor,
       deltaLongXgFor: row.deltaLongXgFor,
+      deltaLeftWideShotsFor: row.deltaLeftWideShotsFor ?? 0,
+      deltaRightWideShotsFor: row.deltaRightWideShotsFor ?? 0,
+      deltaLeftWideXgFor: row.deltaLeftWideXgFor ?? 0,
+      deltaRightWideXgFor: row.deltaRightWideXgFor ?? 0,
       deltaCentralXgAgainst: row.deltaCentralXgAgainst,
       deltaWideXgAgainst: row.deltaWideXgAgainst,
       deltaLongXgAgainst: row.deltaLongXgAgainst,
+      deltaLeftWideShotsAgainst: row.deltaLeftWideShotsAgainst ?? 0,
+      deltaRightWideShotsAgainst: row.deltaRightWideShotsAgainst ?? 0,
+      deltaLeftWideXgAgainst: row.deltaLeftWideXgAgainst ?? 0,
+      deltaRightWideXgAgainst: row.deltaRightWideXgAgainst ?? 0,
       baselineXgFor: row.baselineAvgXgFor,
       baselineXgAgainst: row.baselineAvgXgAgainst,
       movedXgFor: row.movedAvgXgFor,
@@ -4293,13 +4320,13 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   private pickPositionPixelCandidates(lineup: LineupDTO): PositionPixelCandidate[] {
     const slots = this.buildLineupSlots(lineup);
     const slotByPlayer = new Map(slots.map((slot) => [slot.playerId, slot.subdivisionId]));
-    const playersWithSlots = (lineup.players ?? []).filter((player) => player.position !== 'GK' && slotByPlayer.has(player.playerId));
+    const movablePlayers = (lineup.players ?? []).filter((player) => player.position !== 'GK');
     const selected = this.selectedSwapStarterIdModel
-      ? playersWithSlots.find((player) => player.playerId === this.selectedSwapStarterIdModel)
+      ? movablePlayers.find((player) => player.playerId === this.selectedSwapStarterIdModel)
       : null;
-    const byLine = new Map<'DEF' | 'MID' | 'ATT', typeof playersWithSlots[number]>();
+    const byLine = new Map<'DEF' | 'MID' | 'ATT', typeof movablePlayers[number]>();
 
-    for (const player of playersWithSlots) {
+    for (const player of movablePlayers) {
       const line = this.positionPixelLine(player.position);
       if (line && !byLine.has(line)) {
         byLine.set(line, player);
@@ -4311,8 +4338,8 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       byLine.get('DEF') ?? null,
       byLine.get('MID') ?? null,
       byLine.get('ATT') ?? null,
-    ].filter((player): player is typeof playersWithSlots[number] => !!player);
-    const unique = new Map<string, typeof playersWithSlots[number]>();
+    ].filter((player): player is typeof movablePlayers[number] => !!player);
+    const unique = new Map<string, typeof movablePlayers[number]>();
     for (const player of ordered) {
       unique.set(player.playerId, player);
     }
@@ -4323,6 +4350,14 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       starterPosition: player.position,
       slotId: slotByPlayer.get(player.playerId) ?? '',
     }));
+  }
+
+  private autoPositionPixelCandidates(): PositionPixelCandidate[] {
+    return [
+      { starterId: '__AUTO_DEF', starterName: 'Auto DEF', starterPosition: 'DEF', slotId: '' },
+      { starterId: '__AUTO_MID', starterName: 'Auto MID', starterPosition: 'MID', slotId: '' },
+      { starterId: '__AUTO_ATT', starterName: 'Auto ATT', starterPosition: 'ATT', slotId: '' },
+    ];
   }
 
   private pickAutomaticSwapCandidate(lineup: LineupDTO, squad: SessionPlayer[]): PlayerSwapCandidate | null {
@@ -5168,11 +5203,25 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     this.positionPixelMatrixSummary.set(null);
     this.positionPixelMatrixRows.set([]);
     this.mutationInFlight.set(true);
+    this.analysisReadyMessage.set(`${label} corriendo: preparando titulares, movimientos y ${seedCount} seeds...`);
+    window.setTimeout(() => this.scrollToReplayAnalysis(), 0);
     this.harness.getCurrentLineup().pipe(
       switchMap((lineup) => {
-        const candidates = this.pickPositionPixelCandidates(lineup);
+        let candidates = this.pickPositionPixelCandidates(lineup);
+        const playerCount = lineup.players?.length ?? 0;
+        const slotCount = lineup.slots?.length ?? 0;
+        const nonGkCount = (lineup.players ?? []).filter((player) => player.position !== 'GK').length;
+        if (candidates.length === 0 && playerCount === 0) {
+          candidates = this.autoPositionPixelCandidates();
+          this.analysisReadyMessage.set(
+            `${label} corriendo: current lineup vacío; usando Auto DEF/MID/ATT del XI real del partido.`
+          );
+        }
         if (candidates.length === 0) {
-          throw new Error('No suitable non-GK starters found for pixel movement.');
+          throw new Error(
+            `No suitable non-GK starters found for pixel movement. `
+            + `lineup players=${playerCount}, nonGK=${nonGkCount}, slots=${slotCount}, formation=${lineup.formation ?? 'unknown'}.`
+          );
         }
         const slots = this.buildLineupSlots(lineup);
         const requests = candidates.flatMap((candidate) => {
@@ -5192,9 +5241,13 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
             )
           );
         });
-        return forkJoin(
-          requests
+        if (requests.length === 0) {
+          throw new Error(`No pixel movement requests were built for ${label}. Check selected match, lineup slots and movement presets.`);
+        }
+        this.analysisReadyMessage.set(
+          `${label} corriendo: ${requests.length} jugador/movimiento requests x ${seedCount} seeds.`
         );
+        return forkJoin(requests);
       })
     ).subscribe({
       next: (items) => {
@@ -5204,6 +5257,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.mutationInFlight.set(false);
+        this.analysisReadyMessage.set(this.fmtError(err, `${label} falló antes de generar filas`));
         this.snackBar.open(
           this.fmtError(err, 'Failed to run position pixel matrix'),
           'OK',
@@ -5220,7 +5274,12 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           'OK',
           { duration: 4500 }
         );
-        this.markReplayAnalysisReady(`${label} listo en Panel E.`);
+        if (summary) {
+          this.markReplayAnalysisReady(`${label} listo en Panel E.`);
+        } else {
+          this.analysisReadyMessage.set(`${label} terminó sin filas. Revisar candidatos, slots y presets.`);
+          window.setTimeout(() => this.scrollToReplayAnalysis(), 0);
+        }
       },
     });
   }
@@ -6384,8 +6443,23 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       `attack gain ${attackGain.toFixed(2)}`,
       `attack loss ${attackLoss.toFixed(2)}`,
       `defensive risk ${defensiveRisk.toFixed(2)}`,
-      `defensive gain ${defensiveGain.toFixed(2)}`
+      `defensive gain ${defensiveGain.toFixed(2)}`,
+      this.positionPixelWideChannelReason(row)
     ].join(' ? ');
+  }
+
+  private positionPixelWideChannelReason(row: PositionPixelMatrixSummary): string {
+    const ownLeft = row.deltaLeftWideXgFor;
+    const ownRight = row.deltaRightWideXgFor;
+    const agLeft = row.deltaLeftWideXgAgainst;
+    const agRight = row.deltaRightWideXgAgainst;
+    const ownSide = Math.abs(ownLeft) >= Math.abs(ownRight)
+      ? `own L ${this.fmtDeltaMicro(ownLeft)}`
+      : `own R ${this.fmtDeltaMicro(ownRight)}`;
+    const agSide = Math.abs(agLeft) >= Math.abs(agRight)
+      ? `ag L ${this.fmtDeltaMicro(agLeft)}`
+      : `ag R ${this.fmtDeltaMicro(agRight)}`;
+    return `wide channel ${ownSide} / ${agSide}`;
   }
 
   positionPixelShapeMove(row: PositionPixelMatrixSummary): string {
@@ -6583,17 +6657,23 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       Math.abs(row.deltaCentralShotsFor) + Math.abs(row.deltaWideShotsFor) + Math.abs(row.deltaLongShotsFor),
       Math.abs(row.deltaCentralShotsAgainst) + Math.abs(row.deltaWideShotsAgainst) + Math.abs(row.deltaLongShotsAgainst),
     );
+    const sideXg = Math.max(
+      Math.abs(row.deltaLeftWideXgFor),
+      Math.abs(row.deltaRightWideXgFor),
+      Math.abs(row.deltaLeftWideXgAgainst),
+      Math.abs(row.deltaRightWideXgAgainst),
+    );
 
     if (distance <= 1.25) {
-      return xg > 0.08 || shots > 1.25 || poss > 1.75 || zoneShots > 2.50 ? 'check' : 'stable';
+      return xg > 0.08 || sideXg > 0.05 || shots > 1.25 || poss > 1.75 || zoneShots > 2.50 ? 'check' : 'stable';
     }
     if (distance <= 6.0) {
-      if (xg > 0.22 || shots > 4.0 || poss > 4.0 || zoneShots > 5.0) return 'check';
-      if (xg > 0.06 || shots > 1.0 || poss > 1.0 || zoneShots > 1.5) return 'visible';
+      if (xg > 0.22 || sideXg > 0.12 || shots > 4.0 || poss > 4.0 || zoneShots > 5.0) return 'check';
+      if (xg > 0.06 || sideXg > 0.035 || shots > 1.0 || poss > 1.0 || zoneShots > 1.5) return 'visible';
       return 'stable';
     }
-    if (xg > 0.22 || shots > 4.0 || poss > 4.0 || zoneShots > 5.0) return 'strong';
-    if (xg > 0.06 || shots > 1.0 || poss > 1.0 || zoneShots > 1.5) return 'visible';
+    if (xg > 0.22 || sideXg > 0.12 || shots > 4.0 || poss > 4.0 || zoneShots > 5.0) return 'strong';
+    if (xg > 0.06 || sideXg > 0.035 || shots > 1.0 || poss > 1.0 || zoneShots > 1.5) return 'visible';
     return 'stable';
   }
 
@@ -6619,7 +6699,9 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       Math.abs(row.deltaShotsAgainst) +
       Math.abs(row.deltaPossessionFor) * 0.4 +
       (Math.abs(row.deltaCentralShotsFor) + Math.abs(row.deltaWideShotsFor) + Math.abs(row.deltaLongShotsFor)) * 0.5 +
-      (Math.abs(row.deltaCentralShotsAgainst) + Math.abs(row.deltaWideShotsAgainst) + Math.abs(row.deltaLongShotsAgainst)) * 0.5
+      (Math.abs(row.deltaCentralShotsAgainst) + Math.abs(row.deltaWideShotsAgainst) + Math.abs(row.deltaLongShotsAgainst)) * 0.5 +
+      (Math.abs(row.deltaLeftWideXgFor) + Math.abs(row.deltaRightWideXgFor)
+        + Math.abs(row.deltaLeftWideXgAgainst) + Math.abs(row.deltaRightWideXgAgainst)) * 8
     );
   }
 
@@ -6627,27 +6709,31 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return Math.max(0, row.deltaXgFor) * 10
       + Math.max(0, row.deltaShotsFor) * 0.75
       + Math.max(0, row.deltaPossessionFor) * 0.25
-      + Math.max(0, row.deltaCentralShotsFor + row.deltaWideShotsFor + row.deltaLongShotsFor) * 0.35;
+      + Math.max(0, row.deltaCentralShotsFor + row.deltaWideShotsFor + row.deltaLongShotsFor) * 0.35
+      + Math.max(0, row.deltaLeftWideXgFor + row.deltaRightWideXgFor) * 8;
   }
 
   private positionPixelAttackLossScore(row: PositionPixelMatrixSummary): number {
     return Math.max(0, -row.deltaXgFor) * 10
       + Math.max(0, -row.deltaShotsFor) * 0.75
       + Math.max(0, -row.deltaPossessionFor) * 0.25
-      + Math.max(0, -(row.deltaCentralShotsFor + row.deltaWideShotsFor + row.deltaLongShotsFor)) * 0.35;
+      + Math.max(0, -(row.deltaCentralShotsFor + row.deltaWideShotsFor + row.deltaLongShotsFor)) * 0.35
+      + Math.max(0, -(row.deltaLeftWideXgFor + row.deltaRightWideXgFor)) * 8;
   }
 
   private positionPixelDefensiveRiskScore(row: PositionPixelMatrixSummary): number {
     return Math.max(0, row.deltaXgAgainst) * 12
       + Math.max(0, row.deltaShotsAgainst) * 0.85
       + Math.max(0, row.deltaCentralShotsAgainst + row.deltaWideShotsAgainst + row.deltaLongShotsAgainst) * 0.45
-      + Math.max(0, row.deltaCentralXgAgainst + row.deltaWideXgAgainst + row.deltaLongXgAgainst) * 8;
+      + Math.max(0, row.deltaCentralXgAgainst + row.deltaWideXgAgainst + row.deltaLongXgAgainst) * 8
+      + Math.max(0, row.deltaLeftWideXgAgainst + row.deltaRightWideXgAgainst) * 8;
   }
 
   private positionPixelDefensiveGainScore(row: PositionPixelMatrixSummary): number {
     return Math.max(0, -row.deltaXgAgainst) * 12
       + Math.max(0, -row.deltaShotsAgainst) * 0.85
-      + Math.max(0, -(row.deltaCentralShotsAgainst + row.deltaWideShotsAgainst + row.deltaLongShotsAgainst)) * 0.45;
+      + Math.max(0, -(row.deltaCentralShotsAgainst + row.deltaWideShotsAgainst + row.deltaLongShotsAgainst)) * 0.45
+      + Math.max(0, -(row.deltaLeftWideXgAgainst + row.deltaRightWideXgAgainst)) * 8;
   }
 
   private positionPixelDistance(row: PositionPixelMatrixSummary): number {

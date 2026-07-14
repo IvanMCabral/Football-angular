@@ -41,6 +41,7 @@ describe('TestHarnessPageComponent', () => {
       'replaceFixtures',
       'replayMatch',
       'simulateRound',
+      'runPositionPixelMatrixSummary',
     ]);
     matchDetailApi = jasmine.createSpyObj('MatchDetailApiService', [
       'getMatchTimeline',
@@ -133,6 +134,36 @@ describe('TestHarnessPageComponent', () => {
 
   it('starts with no selected match', () => {
     expect(component.selectedMatchId()).toBeNull();
+  });
+
+  it('wires the Position presets matrix button to the position pixel handler', () => {
+    const runSpy = spyOn(component, 'onRunPositionPixelMatrix');
+    component.selectMatch({
+      matchId: 'match-1',
+      round: 1,
+      homeTeamId: 'team-1',
+      homeTeamName: 'My Team',
+      awayTeamId: 'team-2',
+      awayTeamName: 'Rival',
+      status: 'PENDING',
+      homeGoals: null,
+      awayGoals: null,
+      homeFormation: null,
+      awayFormation: null,
+      roundId: 'round-uuid-1',
+    });
+    fixture.detectChanges();
+
+    const button: HTMLButtonElement | null = fixture.nativeElement.querySelector(
+      '[data-testid="position-presets-matrix-button"]'
+    );
+    expect(button).withContext('button should be present').not.toBeNull();
+    expect(button?.type).toBe('button');
+    expect(button?.disabled).toBeFalse();
+
+    button?.click();
+
+    expect(runSpy).toHaveBeenCalled();
   });
 
   it('selectMatch updates the signal', () => {

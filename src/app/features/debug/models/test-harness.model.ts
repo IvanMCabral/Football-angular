@@ -418,9 +418,17 @@ export interface PositionPixelMatrixSummaryRow {
   deltaCentralXgFor: number;
   deltaWideXgFor: number;
   deltaLongXgFor: number;
+  deltaLeftWideShotsFor: number;
+  deltaRightWideShotsFor: number;
+  deltaLeftWideXgFor: number;
+  deltaRightWideXgFor: number;
   deltaCentralXgAgainst: number;
   deltaWideXgAgainst: number;
   deltaLongXgAgainst: number;
+  deltaLeftWideShotsAgainst: number;
+  deltaRightWideShotsAgainst: number;
+  deltaLeftWideXgAgainst: number;
+  deltaRightWideXgAgainst: number;
   baselineAvgCentralShotsAgainst: number;
   baselineAvgWideShotsAgainst: number;
   baselineAvgLongShotsAgainst: number;

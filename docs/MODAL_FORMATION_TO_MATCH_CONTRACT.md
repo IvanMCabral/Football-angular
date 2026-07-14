@@ -3089,6 +3089,56 @@ Verification:
 - Front harness spec passed:
   - `test-harness-page.component.spec.ts` - 47 tests.
 
+## V25D99.60.1 - Position pixel matrix fallback when current lineup is empty
+
+Problem found visually:
+
+- In `/debug/test-harness`, `Position presets matrix` could fail with:
+  - `lineup players=0`
+  - or `playerId '__AUTO_DEF' not in user starting XI`
+- The button was wired correctly, but the UI depended on `/career/lineup/current`.
+- Some careers/match contexts can have a valid match XI while the current-lineup endpoint returns no players.
+
+Contract update:
+
+- The harness must test the selected match XI, not only the current squad editor state.
+- If current lineup has no players, the frontend now sends automatic candidates:
+  - `__AUTO_DEF`
+  - `__AUTO_MID`
+  - `__AUTO_ATT`
+- The backend resolves those against the real user starting XI built for the selected match.
+- The move is then applied to the resolved real player ID, so the match engine receives the same kind of pixel-position override as a manual player move.
+
+Visual validation:
+
+- Screen: `/debug/test-harness`
+- User team: `Vigo City 1`
+- Match: `Vigo City vs Vigo City 1`
+- Button: `Position presets matrix`
+- Result:
+  - no `lineup players=0`;
+  - no `__AUTO_DEF not in user starting XI`;
+  - table rendered with 18 rows;
+  - columns include `Wide L/R` and `Wide Ag. L/R`;
+  - first resolved player example: `Vigo City 1 RB #7719`, proving the auto candidate became a real starter.
+
+Startup note:
+
+- For local visual QA, backend must run with `local,v24-mutations`.
+- The reliable Windows launch shape is:
+  - set `DB_PASSWORD`, `DB_USER`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `JWT_SECRET`, `REDIS_PASSWORD` in the parent PowerShell process;
+  - then run `Start-Process mvn.cmd -ArgumentList "spring-boot:run","-Dspring-boot.run.profiles=local,v24-mutations"`.
+- Launching `mvn spring-boot:run "-Dspring-boot.run.profiles=..."` inside a nested PowerShell string can split the `-D` parameter incorrectly.
+
+Verification:
+
+- Backend focused tests passed:
+  - `TestHarnessFormationMatrixSlotAssignmentTest`
+  - `V24DetailedMatchEngineFormationTest`
+  - `TestHarnessControllerE2ETest`
+- Front harness spec passed:
+  - `test-harness-page.component.spec.ts` - 48 tests.
+
 ## V25D99.78 - Formation matrix assigns players by role, not list order
 
 Problem detected:
@@ -3146,6 +3196,50 @@ Product contract:
   - compare seeds;
   - read whether the improvement makes football sense;
   - detect real bugs when a reasonable visual shape produces absurd numbers.
+
+## V25D99.79 - Position pixel matrix exposes left/right wide impact
+
+Problem:
+
+- The position movement matrix already showed central/wide/long deltas.
+- For a professional DT tool, aggregated `wide` is not enough:
+  - moving a left back should be readable on the left channel;
+  - moving a right winger should be readable on the right channel;
+  - a defensive risk opened on one side should not be hidden inside a generic wide bucket.
+
+Change:
+
+- `PositionPixelMatrixSummaryRow` now includes left/right wide deltas:
+  - attacking wide shots L/R;
+  - attacking wide xG L/R;
+  - opponent wide shots L/R;
+  - opponent wide xG L/R.
+- The debug harness table now shows:
+  - `Wide L/R`;
+  - `Wide Ag. L/R`.
+- Tooltips include the related L/R shot deltas.
+- Tactical read reasons now include the dominant wide channel:
+  - own L/R xG;
+  - opponent L/R xG.
+- Read severity and impact scores now consider side-specific xG, so a small visual move can be flagged when it meaningfully shifts one flank.
+
+Why this matters:
+
+- Pixel movement is no longer just a visual/editor feature.
+- The harness can now answer:
+  - did this move help attack on the intended side?
+  - did it expose the opposite or same flank?
+  - is the global xG stable but one side becoming dangerous?
+
+Verification:
+
+- Backend:
+  - `TestHarnessFormationMatrixSlotAssignmentTest` OK.
+  - `V24DetailedMatchEngineFormationTest` OK.
+  - `TestHarnessControllerE2ETest` OK.
+- Frontend:
+  - `test-harness-page.component.spec.ts` OK, 47/47.
+  - development build OK.
 
 ## V25D99.77 - Formation averages coach read + low-block guardrails
 
