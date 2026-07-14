@@ -5435,9 +5435,17 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const controlledDefense = row.avgXgAgainst <= 1.05
       || row.avgShapeDefensiveResistanceMultiplier <= 0.82;
 
+    const acceptableAbsoluteResult = row.avgXgDiff >= -0.35 && row.avgXgAgainst <= 1.25;
+    const bestOfBadResult = row.avgXgDiff < -0.75 || row.avgXgAgainst >= 1.35;
+    const objectivelyBad = row.avgXgAgainst >= 1.80 || row.avgXgDiff <= -1.50;
+
     if (strongResult) return 'strong';
-    if (relativeDiffGap <= 0.12 && relativeXgaGap <= 0.35) return 'solid';
+    if (relativeDiffGap <= 0.12 && relativeXgaGap <= 0.35) {
+      return acceptableAbsoluteResult ? 'solid' : 'tradeoff';
+    }
+    if (bestOfBadResult && (relativeDiffGap <= 0.35 || relativeXgaGap <= 0.45)) return 'tradeoff';
     if (relativeDiffGap <= 0.35 && (relativeXgaGap <= 0.75 || row.avgShotDiff >= -9.0)) return 'tradeoff';
+    if (objectivelyBad) return 'review';
     if (overExposed && lowBlockProfile) return 'review';
     if (overExposed && relativeDiffGap >= 0.90) return 'review';
     if (lowBlockProfile && controlledDefense && bluntAttack) return 'tradeoff';

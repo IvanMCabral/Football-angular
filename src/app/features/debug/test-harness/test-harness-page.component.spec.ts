@@ -19,6 +19,7 @@ import { CareerService } from '../../../core/services/career.service';
 import { TestHarnessService } from '../services/test-harness.service';
 import { MatchDetailApiService } from '../../match-detail/services/match-detail-api.service';
 import { TimelineSnapshot } from '../../match-detail/models/match-detail.model';
+import { FormationMatrixSummaryRow } from '../models/test-harness.model';
 
 describe('TestHarnessPageComponent', () => {
   let component: TestHarnessPageComponent;
@@ -217,6 +218,56 @@ describe('TestHarnessPageComponent', () => {
     component.applyFormation();
     expect(component.mutationInFlight()).toBeFalse();
     expect(snackBarSpy.open).toHaveBeenCalled();
+  });
+
+  it('does not call a relative-best but objectively bad formation solid', () => {
+    const leastBad = makeFormationSummary({
+      formation: '3-5-2',
+      avgXgFor: 0.33,
+      avgXgAgainst: 1.43,
+      avgXgDiff: -1.10,
+      avgShotsFor: 12.2,
+      avgShotsAgainst: 20.85,
+      avgShotDiff: -8.65,
+    });
+    const worse = makeFormationSummary({
+      formation: '4-3-3',
+      avgXgFor: 0.36,
+      avgXgAgainst: 2.86,
+      avgXgDiff: -2.50,
+      avgShotsFor: 13.05,
+      avgShotsAgainst: 25.2,
+      avgShotDiff: -12.15,
+    });
+
+    component.formationMatrixSummaryResults.set([leastBad, worse]);
+
+    expect(component.formationSummaryRead(leastBad)).toBe('Tradeoff');
+  });
+
+  it('flags objectively bad formation averages for review instead of neutral', () => {
+    const bad = makeFormationSummary({
+      formation: '4-2-2-2',
+      avgXgFor: 0.38,
+      avgXgAgainst: 2.15,
+      avgXgDiff: -1.77,
+      avgShotsFor: 13.3,
+      avgShotsAgainst: 23.3,
+      avgShotDiff: -10,
+    });
+    const better = makeFormationSummary({
+      formation: '3-5-2',
+      avgXgFor: 0.33,
+      avgXgAgainst: 1.43,
+      avgXgDiff: -1.10,
+      avgShotsFor: 12.2,
+      avgShotsAgainst: 20.85,
+      avgShotDiff: -8.65,
+    });
+
+    component.formationMatrixSummaryResults.set([bad, better]);
+
+    expect(component.formationSummaryRead(bad)).toBe('Revisar');
   });
 
   it('onResetInjuries calls the service', () => {
@@ -960,6 +1011,41 @@ function makeMatchRow(matchId: string) {
     homeFormation: null,
     awayFormation: null,
     roundId: 'round-uuid-1',
+  };
+}
+
+function makeFormationSummary(overrides: Partial<FormationMatrixSummaryRow> = {}): FormationMatrixSummaryRow {
+  return {
+    formation: '4-4-2',
+    seedStart: 12345,
+    seedEnd: 12364,
+    seedCount: 20,
+    avgGoalsFor: 0.5,
+    avgGoalsAgainst: 0.5,
+    avgGoalDiff: 0,
+    avgPossessionFor: 50,
+    avgShotsFor: 10,
+    avgShotsAgainst: 10,
+    avgShotDiff: 0,
+    avgXgFor: 1,
+    avgXgAgainst: 1,
+    avgXgDiff: 0,
+    avgCentralShotsFor: 5,
+    avgWideShotsFor: 3,
+    avgLongShotsFor: 2,
+    avgCentralShotsAgainst: 5,
+    avgWideShotsAgainst: 3,
+    avgLongShotsAgainst: 2,
+    avgShapePossessionMultiplier: 0.84,
+    avgShapeAttackVolumeMultiplier: 0.95,
+    avgShapeDefensiveResistanceMultiplier: 1,
+    avgShapeAttackLeft: 0.35,
+    avgShapeAttackCenter: 0.6,
+    avgShapeAttackRight: 0.35,
+    avgShapeDefenseLeft: 0.7,
+    avgShapeDefenseCenter: 0.8,
+    avgShapeDefenseRight: 0.7,
+    ...overrides,
   };
 }
 

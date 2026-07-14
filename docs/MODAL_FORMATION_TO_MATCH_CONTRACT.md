@@ -3139,6 +3139,45 @@ Verification:
 - Front harness spec passed:
   - `test-harness-page.component.spec.ts` - 48 tests.
 
+## V25D99.60.2 - Formation average read must be absolute + relative
+
+Problem found visually:
+
+- In `/debug/test-harness`, `Formation avg` could label a formation as `Sólida` only because it was the best row in a bad set.
+- Example from `Vigo City vs Vigo City 1`:
+  - `3-5-2` had better relative numbers than the rest;
+  - but still produced roughly `0.33 / 1.43` xG and `-1.10` xG diff;
+  - calling that `Sólida` was misleading for a professional DT tool.
+
+Contract update:
+
+- Formation average read now combines:
+  - relative position against other formations in the same run;
+  - absolute xG diff;
+  - absolute xG against;
+  - shot pressure.
+- `Sólida` is only allowed when the result is also objectively acceptable.
+- “Best among bad options” becomes `Tradeoff`, not `Sólida`.
+- Clearly bad rows become `Revisar`, even if they are not the worst row.
+
+Visual validation:
+
+- Screen: `/debug/test-harness`
+- User team: `Vigo City 1`
+- Match: `Vigo City vs Vigo City 1`
+- Action: `Formation avg (20 seeds)`
+- Result after fix:
+  - `3-5-2`: `Tradeoff`, xG `0.33 / 1.43`, xG diff `-1.10`;
+  - `3-4-1-2`: `Tradeoff`, xG `0.35 / 1.49`, xG diff `-1.14`;
+  - `5-4-1`: `Revisar`, xG `0.25 / 2.41`, xG diff `-2.17`;
+  - `4-2-2-2`: `Revisar`, xG `0.38 / 2.15`, xG diff `-1.77`;
+  - no objectively bad row was labeled `Sólida`.
+
+Verification:
+
+- Front harness spec passed:
+  - `test-harness-page.component.spec.ts` - 50 tests.
+
 ## V25D99.78 - Formation matrix assigns players by role, not list order
 
 Problem detected:
