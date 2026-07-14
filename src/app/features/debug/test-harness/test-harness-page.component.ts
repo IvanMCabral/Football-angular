@@ -1511,6 +1511,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
               <div class="matrix-table formation-matrix-table" role="table" aria-label="Formation average comparison">
                 <div class="matrix-row formation-matrix-row matrix-row-head" role="row">
                   <span role="columnheader">Form.</span>
+                  <span role="columnheader">Read</span>
                   <span role="columnheader">Goals F/Ag.</span>
                   <span role="columnheader">Goal diff</span>
                   <span role="columnheader">Poss For</span>
@@ -1530,6 +1531,9 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                   role="row"
                 >
                   <span role="cell">{{ row.formation }}</span>
+                  <span role="cell" class="shape-move-read" [class]="formationSummaryReadClass(row)" [title]="formationSummaryReadDetail(row)">
+                    {{ formationSummaryRead(row) }}
+                  </span>
                   <span role="cell">{{ fmtXg(row.avgGoalsFor) }} / {{ fmtXg(row.avgGoalsAgainst) }}</span>
                   <span role="cell">{{ fmtDeltaNumber(row.avgGoalDiff) }}</span>
                   <span role="cell">{{ fmtPct(row.avgPossessionFor) }}</span>
@@ -5319,6 +5323,68 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
 
   trackByFormationSummary(_index: number, row: FormationMatrixSummaryRow): string {
     return row.formation;
+  }
+
+  formationSummaryRead(row: FormationMatrixSummaryRow): string {
+    const level = this.formationSummaryReadLevel(row);
+    switch (level) {
+      case 'strong': return 'Ventaja clara';
+      case 'solid': return 'Sólida';
+      case 'tradeoff': return 'Tradeoff';
+      case 'review': return 'Revisar';
+      default: return 'Neutra';
+    }
+  }
+
+  formationSummaryReadClass(row: FormationMatrixSummaryRow): string {
+    const level = this.formationSummaryReadLevel(row);
+    if (level === 'strong' || level === 'solid') return 'read-strong';
+    if (level === 'tradeoff') return 'read-visible';
+    if (level === 'review') return 'read-check';
+    return 'read-stable';
+  }
+
+  formationSummaryReadDetail(row: FormationMatrixSummaryRow): string {
+    const attackShape = `${this.fmtXg(row.avgShapeAttackVolumeMultiplier)} atkVol`;
+    const defenseShape = `${this.fmtXg(row.avgShapeDefensiveResistanceMultiplier)} defRes`;
+    const attackChannels = `Atk L/C/R ${this.fmtXg(row.avgShapeAttackLeft)}/${this.fmtXg(row.avgShapeAttackCenter)}/${this.fmtXg(row.avgShapeAttackRight)}`;
+    const defenseChannels = `Def L/C/R ${this.fmtXg(row.avgShapeDefenseLeft)}/${this.fmtXg(row.avgShapeDefenseCenter)}/${this.fmtXg(row.avgShapeDefenseRight)}`;
+    return [
+      this.formationSummaryRead(row),
+      `xG ${this.fmtXg(row.avgXgFor)} / xGA ${this.fmtXg(row.avgXgAgainst)} / diff ${this.fmtDeltaNumber(row.avgXgDiff)}`,
+      `shots ${this.fmtXg(row.avgShotsFor)} / ag ${this.fmtXg(row.avgShotsAgainst)}`,
+      `poss ${this.fmtPct(row.avgPossessionFor)}`,
+      `${attackShape}; ${defenseShape}`,
+      attackChannels,
+      defenseChannels,
+    ].join(' · ');
+  }
+
+  private formationSummaryReadLevel(row: FormationMatrixSummaryRow): 'neutral' | 'solid' | 'strong' | 'tradeoff' | 'review' {
+    const rows = this.formationMatrixSummaryResults();
+    const bestXgDiff = rows.length > 0 ? Math.max(...rows.map((candidate) => candidate.avgXgDiff)) : row.avgXgDiff;
+    const bestXga = rows.length > 0 ? Math.min(...rows.map((candidate) => candidate.avgXgAgainst)) : row.avgXgAgainst;
+    const relativeDiffGap = bestXgDiff - row.avgXgDiff;
+    const relativeXgaGap = row.avgXgAgainst - bestXga;
+    const strongResult = row.avgXgDiff >= 0.20 && row.avgShotDiff >= 1.0;
+    const solidResult = row.avgXgDiff >= 0.06 && row.avgXgAgainst <= 1.15;
+    const lowBlockProfile = row.avgShapeAttackVolumeMultiplier <= 0.92
+      && row.avgShapeDefensiveResistanceMultiplier <= 0.88;
+    const overExposed = row.avgXgAgainst >= 1.30
+      || (row.avgShotsAgainst >= 18.0 && row.avgXgAgainst >= 1.12);
+    const bluntAttack = row.avgXgFor <= 0.75 && row.avgShotsFor <= 13.0;
+    const controlledDefense = row.avgXgAgainst <= 1.05
+      || row.avgShapeDefensiveResistanceMultiplier <= 0.82;
+
+    if (strongResult) return 'strong';
+    if (relativeDiffGap <= 0.12 && relativeXgaGap <= 0.35) return 'solid';
+    if (relativeDiffGap <= 0.35 && (relativeXgaGap <= 0.75 || row.avgShotDiff >= -9.0)) return 'tradeoff';
+    if (overExposed && lowBlockProfile) return 'review';
+    if (overExposed && relativeDiffGap >= 0.90) return 'review';
+    if (lowBlockProfile && controlledDefense && bluntAttack) return 'tradeoff';
+    if (solidResult || (controlledDefense && row.avgXgDiff >= -0.05)) return 'solid';
+    if (bluntAttack && row.avgXgAgainst <= 1.12) return 'tradeoff';
+    return 'neutral';
   }
 
   trackByScenarioMatrix(_index: number, row: ScenarioMatrixRow): string {

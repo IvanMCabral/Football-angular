@@ -3089,6 +3089,123 @@ Verification:
 - Front harness spec passed:
   - `test-harness-page.component.spec.ts` - 47 tests.
 
+## V25D99.78 - Formation matrix assigns players by role, not list order
+
+Problem detected:
+
+- In `Formation avg`, some formations looked broken even when the visual shape should have been reasonable.
+- The clearest case was a weaker team tested in `/debug/test-harness`:
+  - before the fix, several formations produced average xGA around `10-14`;
+  - that was not a realistic football reading, it was a lineup construction bug.
+
+Cause:
+
+- The formation-matrix endpoint was assigning starters to slots by raw list order.
+- If the starter list arrived shuffled, the matrix could place a striker in a defensive position, a defender high up the pitch, or the goalkeeper outside the tactical GK slot.
+- That destroyed the team shape before the match engine received it.
+
+Change:
+
+- `buildFormationMatrixSlots` now picks players by role fit:
+  - GK prioritizes GK;
+  - DEF prioritizes central/wide defensive slots;
+  - MID can cover DM/MID/AM depending on the tactical slot;
+  - WINGER fits wide midfield or wide attack;
+  - ATT prioritizes forward slots.
+- The matrix still uses the available starters, but no longer depends on their raw list order.
+
+Visual validation:
+
+- Screen: `/debug/test-harness`.
+- Action: select the match where the user team was `Vigo City 1`, then run `Formation avg (20 seeds)`.
+- Result after the fix:
+  - xGA moved into a much more plausible band, roughly `1.4-2.9`;
+  - the table no longer marked every formation as `Revisar`;
+  - useful reads appeared, including `Solida`, `Tradeoff`, `Neutra`, and `Revisar`.
+
+Read calibration:
+
+- The `Read` column now combines absolute and relative judgement:
+  - it compares each formation against the best formation in the same table;
+  - it avoids over-penalizing a weak team just because its absolute numbers are modest;
+  - it still marks `Revisar` when defensive overexposure is clear.
+
+Technical verification:
+
+- Backend:
+  - `TestHarnessFormationMatrixSlotAssignmentTest` OK.
+  - `V24DetailedMatchEngineFormationTest` OK.
+- Frontend:
+  - `test-harness-page.component.spec.ts` OK, 47/47.
+  - development build OK.
+
+Product contract:
+
+- The harness is now more useful as a DT tool:
+  - change formation;
+  - compare seeds;
+  - read whether the improvement makes football sense;
+  - detect real bugs when a reasonable visual shape produces absurd numbers.
+
+## V25D99.77 - Formation averages coach read + low-block guardrails
+
+What changed:
+
+- Added explicit backend regression guardrails for tactical shape identity:
+  - `5-4-1` must behave as a low block:
+    - lower possession than `4-4-2`;
+    - lower attack volume;
+    - materially stronger defensive resistance;
+    - visibly stronger central lane protection.
+  - `4-2-2-2` must behave as a narrow-box tradeoff:
+    - vertical attack remains alive versus flat `4-4-2`;
+    - central protection improves;
+    - wide defense is a real tradeoff;
+    - global defensive resistance must not collapse.
+- Added a `Read` column to `/debug/test-harness` -> `Formation averages`.
+- The read classifies formation averages as:
+  - `Ventaja clara`;
+  - `Sólida`;
+  - `Tradeoff`;
+  - `Revisar`;
+  - `Neutra`.
+- The cell tooltip explains the read with:
+  - xG/xGA/xG diff;
+  - shots for/against;
+  - possession;
+  - shape attack volume and defensive resistance;
+  - attack L/C/R;
+  - defense L/C/R.
+
+Why:
+
+- The previous table exposed all raw numbers, but reviewing `5-4-1` and
+  `4-2-2-2` still required mentally combining too many columns.
+- For a professional manager/debug harness, the UI should quickly tell us
+  whether a formation is:
+  - genuinely working;
+  - a coherent football tradeoff;
+  - or a calibration candidate.
+
+Important interpretation:
+
+- This does not force a formation to be "better" by name.
+- It helps detect cases like:
+  - low block profile + high xGA/shots against -> `Revisar`;
+  - low attack + controlled defense -> `Tradeoff`;
+  - good xG diff + controlled xGA -> `Sólida`/`Ventaja clara`.
+
+Verification:
+
+- Backend focused test passed:
+  - `mvn -q -Dtest=V24DetailedMatchEngineFormationTest test`
+- Front harness spec passed:
+  - `npm test -- --watch=false --include='src/app/features/debug/test-harness/test-harness-page.component.spec.ts' --progress=false`
+  - `47 SUCCESS`
+- Front build passed:
+  - `npm run build -- --configuration development`
+  - only pre-existing Angular template warnings.
+
 ## V25D99.67 - Position pixel micro-read contract
 
 Problem:
