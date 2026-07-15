@@ -1339,8 +1339,30 @@ describe('TestHarnessPageComponent', () => {
       homeGoals: 2,
       awayGoals: 1,
     };
+    const awayWinning = {
+      ...makeMatchRow('match-away-winning'),
+      status: 'COMPLETED' as const,
+      homeGoals: 1,
+      awayGoals: 2,
+    };
     const draw = {
       ...makeMatchRow('match-draw'),
+      status: 'COMPLETED' as const,
+      homeGoals: 1,
+      awayGoals: 1,
+    };
+    const favoriteHomeDraw = {
+      ...makeMatchRow('match-favorite-home-draw'),
+      homeTeamName: 'Real Madrid',
+      awayTeamName: 'Mallorca',
+      status: 'COMPLETED' as const,
+      homeGoals: 1,
+      awayGoals: 1,
+    };
+    const underdogAwayDraw = {
+      ...makeMatchRow('match-underdog-away-draw'),
+      homeTeamName: 'Real Madrid',
+      awayTeamName: 'Mallorca',
       status: 'COMPLETED' as const,
       homeGoals: 1,
       awayGoals: 1,
@@ -1352,6 +1374,9 @@ describe('TestHarnessPageComponent', () => {
     expect((component as any).inferScenarioBatteryCoachObjective(winningLate, 'HOME')).toBe('PROTECT_RESULT');
     expect((component as any).inferScenarioBatteryCoachObjective(draw, 'HOME')).toBe('NEUTRAL');
     expect((component as any).inferScenarioBatteryCoachObjective(winningLate, 'HOME', 30)).toBe('NEUTRAL');
+    expect((component as any).inferScenarioBatteryCoachObjective(favoriteHomeDraw, 'HOME', 75)).toBe('NEED_GOAL');
+    expect((component as any).inferScenarioBatteryCoachObjective(underdogAwayDraw, 'AWAY', 75)).toBe('PROTECT_RESULT');
+    expect((component as any).inferScenarioBatteryCoachObjective(awayWinning, 'AWAY', 60)).toBe('PROTECT_RESULT');
   });
 
   it('renders scenario summary headers with stable separators', () => {

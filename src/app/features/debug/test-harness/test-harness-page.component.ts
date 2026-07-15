@@ -6901,6 +6901,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const label = this.scenarioBatteryCoachObjectiveLabel(objective);
     const minute = this.scenarioBatteryDecisionMinute(match);
     const goalDiff = this.scenarioBatteryGoalDiff(match, side);
+    const pressure = this.scenarioBatteryContextPressure(match, side);
     const diffText = goalDiff === null
       ? 'marcador desconocido'
       : goalDiff > 0
@@ -6908,7 +6909,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         : goalDiff < 0
           ? `perdiendo por ${Math.abs(goalDiff)}`
           : 'empatado';
-    return `Auto: ${label} (${diffText}, min ${minute}).`;
+    return `Auto: ${label} (${diffText}, min ${minute}, ${pressure.label}).`;
   }
 
   private scenarioBatteryEffectiveCoachObjective(
@@ -6929,13 +6930,54 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     if (goalDiff === null) {
       return 'NEUTRAL';
     }
-    if (goalDiff < 0 && (minute >= 55 || goalDiff <= -2)) {
+    const pressure = this.scenarioBatteryContextPressure(match, controlledSide);
+    if (goalDiff < 0 && (minute >= 50 || goalDiff <= -2)) {
       return 'NEED_GOAL';
     }
-    if (goalDiff > 0 && minute >= 65) {
+    if (goalDiff > 0 && (
+      minute >= 70
+      || (minute >= 60 && (pressure.away || pressure.reputationDelta <= 0))
+    )) {
       return 'PROTECT_RESULT';
     }
+    if (goalDiff === 0 && minute >= 70) {
+      if (!pressure.away && pressure.reputationDelta >= 2) {
+        return 'NEED_GOAL';
+      }
+      if (pressure.away && pressure.reputationDelta <= -2 && minute >= 75) {
+        return 'PROTECT_RESULT';
+      }
+    }
     return 'NEUTRAL';
+  }
+
+  private scenarioBatteryContextPressure(
+    match: TestHarnessMatchRow,
+    controlledSide: Exclude<ControlledTeamSide, 'USER'>
+  ): { label: string; reputationDelta: number; away: boolean } {
+    const ownName = controlledSide === 'HOME' ? match.homeTeamName : match.awayTeamName;
+    const rivalName = controlledSide === 'HOME' ? match.awayTeamName : match.homeTeamName;
+    const reputationDelta = this.scenarioBatteryTeamReputation(ownName) - this.scenarioBatteryTeamReputation(rivalName);
+    const away = controlledSide === 'AWAY';
+    const venue = away ? 'visitante' : 'local';
+    const level = reputationDelta >= 2
+      ? 'favorito'
+      : reputationDelta <= -2
+        ? 'underdog'
+        : 'parejo';
+    return { label: `${venue}/${level}`, reputationDelta, away };
+  }
+
+  private scenarioBatteryTeamReputation(teamName: string): number {
+    const normalized = teamName
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+    if (/(real madrid|barcelona|atletico madrid)/.test(normalized)) return 5;
+    if (/(sevilla|real sociedad|athletic club|villarreal|real betis|valencia)/.test(normalized)) return 4;
+    if (/(girona|celta vigo|osasuna|mallorca|getafe|rayo vallecano|espanyol|leganes|las palmas|alaves)/.test(normalized)) return 3;
+    if (/(granada|malaga|murcia|zaragoza|valladolid|santander|coruna|pamplona|bilbao|vigo|san sebastian|madrid reserve|barcelona b|valencia city|sevilla athletic)/.test(normalized)) return 2;
+    return 3;
   }
 
   private scenarioBatteryGoalDiff(
