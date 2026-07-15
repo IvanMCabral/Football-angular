@@ -265,10 +265,8 @@ export class CareerSetupComponent implements OnInit {
    */
   ngOnInit(): void {
     this.leagues$.pipe(take(1)).subscribe(leagues => {
-      if (leagues && leagues.length > 0) {
-        // V25D82.2: pre-load teams but do NOT auto-select the league.
-        // selectedLeagueId stays null until the user picks from the dropdown.
-        this.leagueChangeSubject.next(leagues[0].realLeagueId);
+      if (leagues && leagues.length > 0 && !this.selectedLeagueId) {
+        this.selectedLeagueId = leagues[0].realLeagueId;
       }
     });
   }

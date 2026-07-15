@@ -119,3 +119,10 @@ Ejecutar en `/debug/test-harness` para calibracion fina:
   - Si se corre solo `Compare precision`, el `Professional QA checklist` ya toma esas filas como evidencia de `Player swap signal`.
   - Checklist visual confirmado: `6 precision swaps · 4 stable · 1 changed · 1 need more seeds` -> `Review`, accion `Trust balanced reads; quick is smoke only.`
 - Test frontend harness especifico: 55/55 OK.
+
+## V25D99.123 - Suite frontend completa verde
+
+- Fix CareerSetupComponent: auto-selecciona primera liga disponible si no habia seleccion del usuario.
+- Fix SquadManagementComponent: confirmacion usa slots/subdivisiones persistidas como verdad del lineup, no players stale.
+- Tests especificos career+squad: 61/61 OK.
+- Suite frontend completa: 526 SUCCESS, 2 skipped.

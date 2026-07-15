@@ -199,16 +199,14 @@ export class SquadManagementComponent implements OnInit {
         return 0;
       }
       if (lineup.slots != null && lineup.slots.length > 0) {
-        const uniquePlayerIds = new Set<string>();
         const uniqueSubdivisionIds = new Set<string>();
         for (const slot of lineup.slots) {
-          if (!slot?.playerId || !slot?.subdivisionId) {
+          if (!slot?.subdivisionId) {
             continue;
           }
-          if (uniquePlayerIds.has(slot.playerId) || uniqueSubdivisionIds.has(slot.subdivisionId)) {
+          if (uniqueSubdivisionIds.has(slot.subdivisionId)) {
             continue;
           }
-          uniquePlayerIds.add(slot.playerId);
           uniqueSubdivisionIds.add(slot.subdivisionId);
         }
         return uniqueSubdivisionIds.size;
@@ -664,7 +662,7 @@ openVisualEditor(): void {
 
     onConfirmLineup(): void {
      const currentLineup = this.lineupSubject$.value;
-     const playerCount = currentLineup?.players?.length ?? 0;
+     const playerCount = this.lineupSlotsCount;
 
      // V24D6U3: Guard against confirming with <7 or >11. Block client-side
      // without sending the request — the backend would 422 anyway.
