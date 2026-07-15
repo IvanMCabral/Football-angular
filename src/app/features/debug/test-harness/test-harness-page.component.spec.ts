@@ -1200,6 +1200,32 @@ describe('TestHarnessPageComponent', () => {
     expect(subRead).toContain('pierde ataque');
     expect(opponentRead).toContain('rival: rival amenaza');
   });
+
+  it('turns scenario reads into DT recommendations', () => {
+    const upgrade = makeScenarioSummaryRow({
+      actionType: 'FORMATION',
+      avgUserXgDelta: 0.18,
+      avgUserShotsDelta: 2.2,
+      avgOpponentXgDelta: -0.08,
+      avgOpponentShotsDelta: -1.0,
+    });
+    const risk = makeScenarioSummaryRow({
+      actionType: 'POSITION',
+      avgOpponentXgDelta: 0.14,
+      avgOpponentShotsDelta: 2.5,
+    });
+    const review = makeScenarioSummaryRow({
+      actionType: 'SUBSTITUTION',
+      actionDetail: 'offensive-upgrade-sub',
+      avgUserXgDelta: -0.16,
+      avgUserShotsDelta: -2.5,
+    });
+
+    expect(component.scenarioSummaryRecommendation(upgrade)).toBe('Usar como plan A');
+    expect(component.scenarioSummaryRecommendation(risk)).toBe('Evitar si defendes');
+    expect(component.scenarioSummaryRecommendation(review)).toBe('Revisar con mas seeds');
+    expect(component.scenarioSummaryRecommendationDetail(upgrade)).toContain('lectura:');
+  });
 });
 
 function makeMatchRow(matchId: string) {

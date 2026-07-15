@@ -201,3 +201,16 @@ Ejecutar en `/debug/test-harness` para calibracion fina:
 - Lectura:
   - Primer puente entre modal y harness: ambos explican el impacto como decision de DT, no como numero aislado.
   - Siguiente paso recomendado: agregar una mini tarjeta de "decision recomendada" por fila o grupo, usando esta lectura contextual.
+
+## V25D99.129 - DT tip por escenario multi-seed
+
+- Harness `/debug/test-harness`:
+  - El Scenario summary suma columna `DT tip`.
+  - Cada fila traduce la lectura tactica a una recomendacion directa: `Usar como plan A`, `Usar si necesitas empujar`, `Usar para proteger`, `Usar solo por contexto`, `Evitar si defendes`, `Evitar salvo urgencia`, `Revisar con mas seeds` o `No decidir con esto`.
+  - El tip tambien se exporta en JSON/CSV como `recommendation` y `recommendationDetail`.
+- Test:
+  - `test-harness-page.component.spec.ts`: cubre upgrade usable, riesgo defensivo y caso review.
+  - Resultado: `57 SUCCESS`.
+- Lectura:
+  - El harness ya funciona mas como herramienta de DT: ve cambio, impacto, outcome y recomendacion accionable en una misma fila.
+  - Siguiente paso recomendado: validar visualmente en navegador con una corrida real de Scenario smoke/Multi-seed.

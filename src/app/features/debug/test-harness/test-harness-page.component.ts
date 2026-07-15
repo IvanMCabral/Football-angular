@@ -2068,6 +2068,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                   <span role="columnheader">Baseline</span>
                   <span role="columnheader">Action</span>
                   <span role="columnheader">Coach read</span>
+                  <span role="columnheader">DT tip</span>
                   <span role="columnheader">Read</span>
                   <span role="columnheader">Outcome</span>
                   <span role="columnheader">Seeds</span>
@@ -2091,6 +2092,9 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                   <span role="cell" [title]="row.actionDetail">{{ summaryActionLabel(row) }}</span>
                   <span role="cell" class="shape-move-read" [title]="scenarioSummaryCoachReadDetail(row)">
                     {{ scenarioSummaryCoachRead(row) }}
+                  </span>
+                  <span role="cell" class="shape-move-read" [class]="scenarioSummaryRecommendationClass(row)" [title]="scenarioSummaryRecommendationDetail(row)">
+                    {{ scenarioSummaryRecommendation(row) }}
                   </span>
                   <span
                     role="cell"
@@ -7083,6 +7087,40 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     ].join(' ? ');
   }
 
+  scenarioSummaryRecommendation(row: ScenarioMatrixSummaryRow): string {
+    const level = this.scenarioSummaryReadLevel(row);
+    const outcome = this.scenarioSummaryOutcome(row);
+    const prefix = this.scenarioSummaryCoachReadPrefix(row);
+    if (level === 'noise') return 'No decidir con esto';
+    if (level === 'review') return 'Revisar con mas seeds';
+    if (outcome === 'Upgrade') return prefix === 'rival' ? 'Plan rival peligroso' : 'Usar como plan A';
+    if (outcome === 'Lean up') return prefix === 'rival' ? 'Vigilar ese canal' : 'Usar si necesitas empujar';
+    if (outcome === 'Contained') return 'Usar para proteger';
+    if (outcome === 'Channel shift') return 'Usar para cambiar foco';
+    if (outcome === 'Tradeoff') return 'Usar solo por contexto';
+    if (outcome === 'Downgrade') return 'Evitar salvo urgencia';
+    if (outcome === 'Risk' || outcome === 'Exposure') return 'Evitar si defendes';
+    return 'Senal leve: confirmar';
+  }
+
+  scenarioSummaryRecommendationClass(row: ScenarioMatrixSummaryRow): string {
+    const recommendation = this.scenarioSummaryRecommendation(row);
+    if (recommendation.startsWith('Usar como plan A') || recommendation.startsWith('Usar para proteger')) return 'read-visible';
+    if (recommendation.startsWith('Usar si') || recommendation.startsWith('Usar para cambiar') || recommendation.startsWith('Plan rival')) return 'read-visible';
+    if (recommendation.startsWith('Usar solo') || recommendation.startsWith('Revisar') || recommendation.startsWith('Vigilar')) return 'read-check';
+    if (recommendation.startsWith('Evitar')) return 'read-strong';
+    return 'read-stable';
+  }
+
+  scenarioSummaryRecommendationDetail(row: ScenarioMatrixSummaryRow): string {
+    return [
+      this.scenarioSummaryRecommendation(row),
+      `lectura: ${this.scenarioSummaryRead(row)}`,
+      `resultado: ${this.scenarioSummaryOutcome(row)}`,
+      this.scenarioSummaryCoachReadDetail(row),
+    ].join(' ? ');
+  }
+
   private scenarioDecisionCardFromRow(
     title: string,
     row: ScenarioMatrixSummaryRow,
@@ -7396,6 +7434,8 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       readReason: this.scenarioSummaryReadReason(row),
       coachRead: this.scenarioSummaryCoachRead(row),
       coachReadDetail: this.scenarioSummaryCoachReadDetail(row),
+      recommendation: this.scenarioSummaryRecommendation(row),
+      recommendationDetail: this.scenarioSummaryRecommendationDetail(row),
       outcome: this.scenarioSummaryOutcome(row),
       outcomeReason: this.scenarioSummaryOutcomeReason(row),
       attackGainScore: this.scenarioSummaryAttackGainScore(row).toFixed(3),
