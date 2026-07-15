@@ -933,6 +933,9 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
               <span *ngIf="scenarioBatteryProgress()" class="inline-progress" aria-live="polite">
                 {{ scenarioBatteryProgress() }}
               </span>
+              <span *ngIf="scenarioBatteryWorkload()" class="inline-progress">
+                {{ scenarioBatteryWorkload() }}
+              </span>
               <button
                 mat-stroked-button
                 (click)="onPrepareOffensiveUpgradeLab()"
@@ -3143,6 +3146,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   readonly scenarioMatrixSummaryResults = signal<ScenarioMatrixSummaryRow[]>([]);
   readonly scenarioBatteryRows = signal<ScenarioBatteryRow[]>([]);
   readonly scenarioBatteryProgress = signal<string>('');
+  readonly scenarioBatteryWorkload = signal<string>('');
 
   readonly scenarioMatrixSummarySeedCount = signal<number>(20);
   readonly scenarioSummaryReadFilter = signal<ScenarioSummaryReadFilter>('all');
@@ -3837,6 +3841,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     this.scenarioMatrixResults.set([]);
     this.scenarioMatrixSummaryResults.set([]);
     this.scenarioBatteryRows.set([]);
+    this.scenarioBatteryWorkload.set('');
   }
 
   private clearPlayerSwapAnalysisResults(): void {
@@ -8690,11 +8695,16 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       { match, controlledSide: 'AWAY' as const },
     ]));
     const partialRows: Array<ScenarioBatteryRow | undefined> = [];
+    const estimatedScenarios = this.scenarioBatteryScenarioCountEstimate(scenarioGroup);
+    const estimatedRuns = jobs.length * estimatedScenarios * seedCount;
 
     this.scenarioBatteryRows.set([]);
+    this.scenarioBatteryWorkload.set(
+      `${jobs.length} lecturas x ${estimatedScenarios} escenarios x ${seedCount} seeds = ${estimatedRuns} simulaciones estimadas.`
+    );
     this.scenarioMatrixSummarySeedCount.set(seedCount);
     this.scenarioBatteryProgress.set(
-      `Battery tablero: 0/${jobs.length} lecturas (${matches.length}/${this.scenarioBatteryMatchLimit()} partidos)...`
+      this.scenarioBatteryProgressText(0, jobs.length, matches.length, this.scenarioBatteryMatchLimit(), jobs[0])
     );
     this.mutationInFlight.set(true);
 
@@ -8719,8 +8729,9 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
             partialRows[index] = row;
             const completedRows = partialRows.filter((item): item is ScenarioBatteryRow => !!item);
             this.scenarioBatteryRows.set(completedRows);
+            const nextJob = jobs[completedRows.length] ?? null;
             this.scenarioBatteryProgress.set(
-              `Battery tablero: ${completedRows.length}/${jobs.length} lecturas (${matches.length}/${this.scenarioBatteryMatchLimit()} partidos)...`
+              this.scenarioBatteryProgressText(completedRows.length, jobs.length, matches.length, this.scenarioBatteryMatchLimit(), nextJob)
             );
             return row;
           })
@@ -8732,12 +8743,14 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         this.scenarioBatteryRows.set(partialRows.filter((item): item is ScenarioBatteryRow => !!item));
         this.mutationInFlight.set(false);
         this.scenarioBatteryProgress.set('');
+        this.scenarioBatteryWorkload.set('');
         this.markReplayAnalysisReady(`Battery tablero listo: ${partialRows.filter(Boolean).length} lecturas (${this.scenarioBatteryGroupLabel(scenarioGroup)}, ${matches.length} partidos x local/visitante).`);
         this.snackBar.open(`Battery tablero completo: ${partialRows.filter(Boolean).length} lecturas (${this.scenarioBatteryGroupLabel(scenarioGroup)}).`, 'OK', { duration: 3500 });
       },
       error: (err) => {
         this.mutationInFlight.set(false);
         this.scenarioBatteryProgress.set('');
+        this.scenarioBatteryWorkload.set('');
         this.snackBar.open(
           this.fmtError(err, 'Failed to run tactical battery board'),
           'OK',
@@ -9168,6 +9181,32 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         this.loading.set(false);
       },
     });
+  }
+
+  private scenarioBatteryProgressText(
+    completed: number,
+    total: number,
+    availableMatches: number,
+    targetMatches: number,
+    nextJob: { match: TestHarnessMatchRow; controlledSide: 'HOME' | 'AWAY' } | null | undefined
+  ): string {
+    const next = nextJob
+      ? ` Proximo: ${nextJob.match.homeTeamName} vs ${nextJob.match.awayTeamName} (${nextJob.controlledSide === 'HOME' ? 'local' : 'visitante'}).`
+      : ' Cerrando tablero...';
+    return `Battery tablero: ${completed}/${total} lecturas (${availableMatches}/${targetMatches} partidos).${next}`;
+  }
+
+  private scenarioBatteryScenarioCountEstimate(group: 'ALL' | 'OFFENSE' | 'DEFENSE' | 'OPPONENT'): number {
+    switch (group) {
+      case 'ALL':
+        return 29;
+      case 'DEFENSE':
+        return 7;
+      case 'OPPONENT':
+        return 5;
+      default:
+        return 19;
+    }
   }
 
   private scheduleRoundCompletionRefresh(roundNumber: number, expectedMatchCount: number): void {
