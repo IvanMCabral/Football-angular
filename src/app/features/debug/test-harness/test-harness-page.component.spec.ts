@@ -1271,6 +1271,32 @@ describe('TestHarnessPageComponent', () => {
     expect(component.scenarioSummaryRecommendationDetail(upgrade)).toContain('lectura:');
   });
 
+  it('labels attacking upside with defensive exposure as high risk instead of no-forzar', () => {
+    const rows = [
+      makeScenarioSummaryRow({
+        scenario: 'base-balanced',
+        actionType: 'NONE',
+        actionDetail: 'Baseline',
+      }),
+      makeScenarioSummaryRow({
+        scenario: 'm45-position-mid-up',
+        actionType: 'POSITION',
+        actionDetail: 'CM -> x50/y40',
+        avgUserXgDelta: 0.10,
+        avgOpponentXgDelta: 0.16,
+        avgOpponentShotsDelta: 1.6,
+      }),
+    ];
+
+    const cards = (component as any).buildScenarioDecisionCards(rows);
+    const decision = (component as any).scenarioBatteryDecision(cards);
+
+    expect(cards.some((card: any) => card.title === 'Riesgo ofensivo')).toBeTrue();
+    expect(decision.label).toContain('Riesgo alto: CM -> x50/y40');
+    expect(decision.label).not.toContain('No forzar');
+    expect(decision.detail).toContain('mejora el ataque pero abre espacios');
+  });
+
   it('renders scenario summary headers with stable separators', () => {
     component.scenarioMatrixSummaryResults.set([
       makeScenarioSummaryRow({

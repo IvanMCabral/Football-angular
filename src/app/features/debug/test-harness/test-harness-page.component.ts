@@ -3358,11 +3358,14 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       .sort((a, b) => Math.max(b.avgOpponentXgDelta, this.scenarioOpponentMaxChannelXgDelta(b))
         - Math.max(a.avgOpponentXgDelta, this.scenarioOpponentMaxChannelXgDelta(a)))[0];
     if (biggestRisk) {
+      const offensiveRisk = biggestRisk.avgUserXgDelta >= 0.04;
       cards.push(this.scenarioDecisionCardFromRow(
-        'Evitar',
+        offensiveRisk ? 'Riesgo ofensivo' : 'Evitar',
         biggestRisk,
         'decision-risk',
-        this.scenarioOpponentRiskRead(biggestRisk),
+        offensiveRisk
+          ? `${this.scenarioSummaryUserChannelRead(biggestRisk)} / ${this.scenarioOpponentRiskRead(biggestRisk)}`
+          : this.scenarioOpponentRiskRead(biggestRisk),
       ));
     }
 
@@ -7275,6 +7278,13 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       return {
         label: `Vigilar: ${threat.label}`,
         detail: `${threat.label} es la amenaza principal del rival. ${threat.metrics}. ${threat.detail}`,
+      };
+    }
+    const offensiveRisk = card('Riesgo ofensivo');
+    if (offensiveRisk) {
+      return {
+        label: `Riesgo alto: ${offensiveRisk.label}`,
+        detail: `${offensiveRisk.label} mejora el ataque pero abre espacios. Usarlo si necesitas gol o aceptas intercambio. ${offensiveRisk.metrics}. ${offensiveRisk.detail}`,
       };
     }
     const avoid = card('Evitar');
