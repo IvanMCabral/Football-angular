@@ -157,3 +157,21 @@ Ejecutar en `/debug/test-harness` para calibracion fina:
 - Lectura:
   - Cerrado el bug de autoselect que usaba delanteros centrales como banda cuando habia wingers naturales.
   - Quedan reviews reales en lineas de 3/5 por escasez de carrileros/defensores adecuados; siguiente calibracion tactica, no inconsistencia del modal.
+
+## V25D99.126 - Carrileros segun linea real de la formacion
+
+- Backend:
+  - Las necesidades `DEF/MID/ATT` salen del contrato declarado de la formacion, no de interpretar `LWB/RWB` siempre como defensa.
+  - `LW/RW` se tratan como ataque solo cuando el cupo ATT permite extremos + delantero central; si no, son mediapuntas de la linea MID (`4-2-3-1`).
+- Tests:
+  - `LineupCommandUseCaseImplAutoSelectTest` + `LineupCommandUseCaseImplSubdivisionTest`: 39/39 OK.
+  - Nuevo pin para `3-5-2`: carrileros/CM quedan en MID; un central extra no invade la linea media.
+  - Nuevo pin para `4-2-3-1`: wingers cubren `LW/RW` mediapunta sin generar 12 jugadores.
+- Smoke visual Celta:
+  - `All formations line audit`: `36/36 rows · 34 OK · 0 fallback · 2 review`.
+  - OK nuevo: `3-5-2`, `3-4-3`, `3-5-2-CDM`, `3-4-1-2`, `4-2-3-1`.
+  - Reviews restantes:
+    - `5-3-2 MID`: 1 defensor como CM.
+    - `5-4-1 MID`: 2 defensores como linea media.
+- Lectura:
+  - Los 2 reviews restantes son coherentes con una plantilla corta para jugar con 5 atras; deben mostrarse/penalizarse, no ocultarse.
