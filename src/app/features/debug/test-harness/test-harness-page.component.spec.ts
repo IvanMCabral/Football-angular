@@ -45,6 +45,7 @@ describe('TestHarnessPageComponent', () => {
       'replayMatch',
       'simulateRound',
       'runPositionPixelMatrixSummary',
+      'runScenarioMatrixSummary',
     ]);
     matchDetailApi = jasmine.createSpyObj('MatchDetailApiService', [
       'getMatchTimeline',
@@ -105,6 +106,7 @@ describe('TestHarnessPageComponent', () => {
     harness.getCurrentLineup.and.returnValue(of(sampleLineup('4-4-2')) as any);
     harness.autoSelectLineup.and.returnValue(of(sampleLineup('4-4-2')) as any);
     harness.manualSelectLineup.and.returnValue(of(sampleLineup('4-4-2')) as any);
+    harness.runScenarioMatrixSummary.and.returnValue(of([]) as any);
 
     await TestBed.configureTestingModule({
       imports: [TestHarnessPageComponent, NoopAnimationsModule],
@@ -1225,6 +1227,19 @@ describe('TestHarnessPageComponent', () => {
     expect(component.scenarioSummaryRecommendation(risk)).toBe('Evitar si defendes');
     expect(component.scenarioSummaryRecommendation(review)).toBe('Revisar con mas seeds');
     expect(component.scenarioSummaryRecommendationDetail(upgrade)).toContain('lectura:');
+  });
+
+  it('keeps scenario smoke errors visible in Panel E state', () => {
+    harness.runScenarioMatrixSummary.and.returnValue(
+      throwError(() => ({ status: 404, message: 'Not Found' })) as any
+    );
+    component.selectMatch(makeMatchRow('match-1') as any);
+
+    component.onRunScenarioMatrixSmoke();
+
+    expect(component.analysisReadyMessage()).toContain('Scenario smoke no pudo generar Panel E');
+    expect(component.analysisReadyMessage()).toContain('Not Found');
+    expect(snackBarSpy.open).toHaveBeenCalled();
   });
 });
 

@@ -214,3 +214,19 @@ Ejecutar en `/debug/test-harness` para calibracion fina:
 - Lectura:
   - El harness ya funciona mas como herramienta de DT: ve cambio, impacto, outcome y recomendacion accionable en una misma fila.
   - Siguiente paso recomendado: validar visualmente en navegador con una corrida real de Scenario smoke/Multi-seed.
+
+## V25D99.130 - Smoke visual del harness y error persistente
+
+- Smoke visual en `/debug/test-harness`:
+  - Caso probado: `Atletico Madrid vs Sevilla`, `Smoke ataque`.
+  - Resultado visible: el endpoint `scenario-matrix/summary` devuelve `404 Not Found` para el `matchId` seleccionado desde Panel C.
+  - La ruta backend existe: una llamada directa sin autenticacion devuelve `401`, por lo tanto el bloqueo no parece ser ruta ausente sino mismatch de `matchId`/carrera/fixture usado por el harness.
+- Fix frontend:
+  - Los errores de Scenario summary ya no quedan solo como snackbar fugaz.
+  - Panel E/estado de analisis conserva el error con el texto `... no pudo generar Panel E: ...`, para que el QA visual no pierda la pista.
+- Test:
+  - `test-harness-page.component.spec.ts`: cubre que el error de Scenario smoke quede visible en el estado de Panel E.
+  - Resultado: `58 SUCCESS`.
+- Lectura:
+  - Mejoro la trazabilidad visual del harness: cuando falla un smoke, ahora sabemos exactamente que fallo.
+  - Pendiente real: investigar por que los `matchId` visibles en Panel C no son aceptados por `TestHarnessUseCase`/fixtures del torneo actual para `scenario-matrix/summary`.

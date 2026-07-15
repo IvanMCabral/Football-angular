@@ -8764,8 +8764,12 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.mutationInFlight.set(false);
+        const message = this.fmtError(err, `Failed to run ${label.toLowerCase()}`);
+        this.analysisReadyMessage.set(
+          `${label} no pudo generar Panel E: ${message}`
+        );
         this.snackBar.open(
-          this.fmtError(err, `Failed to run ${label.toLowerCase()}`),
+          message,
           'OK',
           { duration: 5000 }
         );
