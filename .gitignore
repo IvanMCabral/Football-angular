@@ -2,6 +2,9 @@
 dist
 node_modules
 .env
+*.log
+*.err
+*.err.log
 
 # V24D14: src/assets/ contiene ~200 archivos de una exploracion de sprites
 # (sprites PNG, mockup-pitch.html, scripts Python de generacion) que NUNCA
