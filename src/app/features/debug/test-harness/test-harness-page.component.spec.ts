@@ -988,6 +988,30 @@ describe('TestHarnessPageComponent', () => {
     expect(snackBarSpy.open).toHaveBeenCalled();
   });
 
+  it('does not label a defensive action as Cuidar when total xGA gets clearly worse', () => {
+    const cards = (component as any).buildScenarioDecisionCards([
+      makeScenarioSummaryRow({
+        scenario: 'base-noop',
+        actionType: 'NONE',
+        actionDetail: 'noop',
+      }),
+      makeScenarioSummaryRow({
+        scenario: 'm45-shape-defensive-step',
+        actionType: 'STYLE',
+        actionDetail: 'Paso defensivo',
+        avgUserXgDelta: -0.38,
+        avgOpponentXgDelta: 0.11,
+        avgOpponentCentralXgDelta: -0.11,
+        avgOpponentWideXgDelta: 0.02,
+        avgOpponentLeftWideXgDelta: 0.02,
+        avgOpponentRightWideXgDelta: 0.01,
+      }),
+    ]) as Array<{ title: string; label: string }>;
+
+    expect(cards.some((card) => card.title === 'Cuidar' && card.label === 'Paso defensivo')).toBeFalse();
+    expect(cards.some((card) => card.title === 'Evitar' && card.label === 'Paso defensivo')).toBeTrue();
+  });
+
   it('copies a professional Markdown report for the player swap battery', async () => {
     const writeText = jasmine.createSpy('writeText').and.returnValue(Promise.resolve());
     Object.defineProperty(navigator, 'clipboard', {

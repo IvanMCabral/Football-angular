@@ -3338,6 +3338,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const bestProtection = ownRows
       .filter((row) => !usedActionKeys.has(this.scenarioActionKey(row)))
       .filter((row) => this.scenarioProtectionCandidateIsCoachWorthy(row))
+      .filter((row) => row.avgOpponentXgDelta <= 0.03)
       .filter((row) => row.avgOpponentXgDelta <= -0.06 || this.scenarioOpponentMinChannelXgDelta(row) <= -0.08)
       .filter((row) => this.scenarioOpponentMaxChannelXgDelta(row) < 0.10)
       .sort((a, b) => Math.min(a.avgOpponentXgDelta, this.scenarioOpponentMinChannelXgDelta(a))
