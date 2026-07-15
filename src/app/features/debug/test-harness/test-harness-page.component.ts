@@ -346,6 +346,8 @@ interface ScenarioBatteryRow {
   controlledTeam: string;
   scenarioGroup: 'ALL' | 'OFFENSE' | 'DEFENSE' | 'OPPONENT';
   coachObjective: ScenarioBatteryCoachObjective;
+  coachContext: string;
+  coachContextDetail: string;
   seedStart: number;
   seedCount: number;
   scenarioCount: number;
@@ -2206,6 +2208,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                   <span role="columnheader">Controlando</span>
                   <span role="columnheader">Grupo</span>
                   <span role="columnheader">Objetivo</span>
+                  <span role="columnheader">Contexto</span>
                   <span role="columnheader">Decision</span>
                   <span role="columnheader">Plan</span>
                   <span role="columnheader">Doble</span>
@@ -2225,6 +2228,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                   <span role="cell">{{ row.controlledTeam }} ({{ row.controlledSide === 'HOME' ? 'local' : 'visitante' }})</span>
                   <span role="cell">{{ scenarioBatteryGroupLabel(row.scenarioGroup) }}</span>
                   <span role="cell">{{ scenarioBatteryCoachObjectiveLabel(row.coachObjective) }}</span>
+                  <span role="cell" [title]="row.coachContextDetail">{{ row.coachContext }}</span>
                   <span role="cell" [title]="row.decisionDetail">{{ row.decision }}</span>
                   <span role="cell" [title]="scenarioBatteryCardDetail(row, 'Plan actual')">
                     {{ scenarioBatteryCardSummary(row, 'Plan actual') }}
@@ -4052,7 +4056,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       return;
     }
     const header = [
-      'match', 'controlledTeam', 'controlledSide', 'scenarioGroup', 'coachObjective', 'seedStart', 'seedCount', 'scenarioCount',
+      'match', 'controlledTeam', 'controlledSide', 'scenarioGroup', 'coachObjective', 'coachContext', 'coachContextDetail', 'seedStart', 'seedCount', 'scenarioCount',
       'decision', 'decisionDetail',
       'plan', 'twoWay', 'attack', 'shape', 'protect', 'avoid', 'opponentThreat',
       'planDetail', 'twoWayDetail', 'attackDetail', 'shapeDetail', 'protectDetail', 'avoidDetail', 'opponentThreatDetail',
@@ -6988,6 +6992,47 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     };
   }
 
+  private scenarioBatteryCoachContext(
+    match: TestHarnessMatchRow,
+    controlledSide: Exclude<ControlledTeamSide, 'USER'>
+  ): { summary: string; detail: string } {
+    const ownName = controlledSide === 'HOME' ? match.homeTeamName : match.awayTeamName;
+    const rivalName = controlledSide === 'HOME' ? match.awayTeamName : match.homeTeamName;
+    const ownStrength = controlledSide === 'HOME' ? match.homeStrength : match.awayStrength;
+    const rivalStrength = controlledSide === 'HOME' ? match.awayStrength : match.homeStrength;
+    const pressure = this.scenarioBatteryContextPressure(match, controlledSide);
+    const ownRating = this.scenarioBatteryTeamRating(ownName, ownStrength ?? null);
+    const rivalRating = this.scenarioBatteryTeamRating(rivalName, rivalStrength ?? null);
+    const ownEnergy = this.scenarioBatteryMetricText(ownStrength?.avgEnergy, 'EN');
+    const ownForm = this.scenarioBatteryMetricText(ownStrength?.avgForm, 'FOR');
+    const ownStamina = this.scenarioBatteryMetricText(ownStrength?.avgStamina, 'STA');
+    const source = ownRating.source === 'strength' && rivalRating.source === 'strength' ? 'OVR real' : 'fallback nombre';
+    const summary = `${pressure.label} · OVR ${ownRating.value}-${rivalRating.value} · ${ownEnergy}`;
+    const detail = [
+      `${ownName} vs ${rivalName}`,
+      `Contexto: ${pressure.label}`,
+      `Fuente: ${source}`,
+      `OVR propio/rival: ${ownRating.value}/${rivalRating.value}`,
+      `Condicion propia: ${ownEnergy}, ${ownForm}, ${ownStamina}`,
+      `Plantel propio: ${this.scenarioBatterySquadText(ownStrength ?? null)}`,
+      `Plantel rival: ${this.scenarioBatterySquadText(rivalStrength ?? null)}`,
+    ].join(' · ');
+    return { summary, detail };
+  }
+
+  private scenarioBatteryMetricText(value: number | null | undefined, label: string): string {
+    return value === null || value === undefined ? `${label} ?` : `${label} ${Math.round(value)}`;
+  }
+
+  private scenarioBatterySquadText(strength: TestHarnessMatchRow['homeStrength'] | null): string {
+    if (!strength) return 'sin strength';
+    const squad = strength.squadOvr ?? '?';
+    const starters = strength.startingOvr ?? '?';
+    const size = strength.squadSize ?? '?';
+    const starterCount = strength.starterCount ?? '?';
+    return `squadOvr ${squad}, startingOvr ${starters}, squad ${size}, XI ${starterCount}`;
+  }
+
   private scenarioBatteryTeamCondition(
     strength: TestHarnessMatchRow['homeStrength'] | null
   ): { label: string; tired: boolean; fresh: boolean } {
@@ -7443,6 +7488,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   ): ScenarioBatteryRow {
     const cards = this.buildScenarioDecisionCards(rows);
     const coachObjective = this.scenarioBatteryEffectiveCoachObjective(match, controlledSide);
+    const coachContext = this.scenarioBatteryCoachContext(match, controlledSide);
     const decision = this.scenarioBatteryDecision(cards, coachObjective);
     return {
       matchId: match.matchId,
@@ -7451,6 +7497,8 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       controlledTeam: controlledSide === 'HOME' ? match.homeTeamName : match.awayTeamName,
       scenarioGroup,
       coachObjective,
+      coachContext: coachContext.summary,
+      coachContextDetail: coachContext.detail,
       seedStart,
       seedCount,
       scenarioCount: rows.length,
@@ -7583,6 +7631,8 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       controlledSide: row.controlledSide,
       scenarioGroup: this.scenarioBatteryGroupLabel(row.scenarioGroup),
       coachObjective: this.scenarioBatteryCoachObjectiveLabel(row.coachObjective),
+      coachContext: row.coachContext,
+      coachContextDetail: row.coachContextDetail,
       seedStart: row.seedStart,
       seedCount: row.seedCount,
       scenarioCount: row.scenarioCount,
