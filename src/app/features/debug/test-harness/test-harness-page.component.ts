@@ -6450,10 +6450,16 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const natural = String(naturalPosition ?? '').trim().toUpperCase();
     const role = String(tacticalRole ?? '').trim().toUpperCase();
     if (!natural || !role) return false;
+    if (this.isAcceptableFormationLineFallback(natural, role)) return false;
     const naturalLine = this.strictPositionPixelLine(natural);
     const roleLine = this.strictPositionPixelLine(role);
     if (!naturalLine || !roleLine) return false;
     return naturalLine !== roleLine;
+  }
+
+  private isAcceptableFormationLineFallback(naturalPosition: string, tacticalRole: string): boolean {
+    return ['CDM', 'CM', 'CAM'].includes(tacticalRole)
+      && ['WINGER', 'LW', 'RW', 'LM', 'RM', 'LWB', 'RWB'].includes(naturalPosition);
   }
 
   private runPositionPixelMatrixWithPresets(
