@@ -1441,6 +1441,17 @@ describe('TestHarnessPageComponent', () => {
     expect((component as any).scenarioBatteryDecisionReview('NEED_GOAL', 'Riesgo asumible: Player -> x60/y30', [
       { title: 'Riesgo ofensivo', label: 'Player -> x60/y30', metrics: 'xG +0.10 / xGA +0.20 / media', detail: 'test' },
     ]).label).toBe('OK');
+    component.scenarioBatteryRows.set([
+      { review: 'OK' },
+      { review: 'OK' },
+    ] as any);
+    expect(component.scenarioBatteryReviewHint()).toContain('Revision OK: 2/2');
+    component.scenarioBatteryRows.set([
+      { review: 'OK' },
+      { review: 'Revisar: poco gol' },
+    ] as any);
+    expect(component.scenarioBatteryReviewCount()).toBe(1);
+    expect(component.scenarioBatteryReviewHint()).toContain('1/2 para mirar');
   });
 
   it('renders scenario summary headers with stable separators', () => {

@@ -2202,6 +2202,9 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
               <span class="read-pill tactical-read-pill read-noise">
                 {{ scenarioBatteryCoverageHint() }}
               </span>
+              <span class="read-pill tactical-read-pill" [class.read-visible]="scenarioBatteryReviewCount() === 0" [class.read-noise]="scenarioBatteryReviewCount() > 0">
+                {{ scenarioBatteryReviewHint() }}
+              </span>
             </div>
             <div class="matrix-scroll">
               <div class="matrix-table scenario-battery-table" role="table" aria-label="Tactical battery board">
@@ -7164,6 +7167,28 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return this.scenarioBatteryScopeModel === 'balanced'
       ? `Cobertura media: ${coverage}; usar para decidir tendencias.`
       : `Cobertura smoke: ${coverage}; usar para detectar senales, no para cerrar balance.`;
+  }
+
+  scenarioBatteryReviewCount(): number {
+    return this.scenarioBatteryRows().filter((row) => row.review.startsWith('Revisar')).length;
+  }
+
+  scenarioBatteryReviewHint(): string {
+    const rows = this.scenarioBatteryRows();
+    if (rows.length === 0) {
+      return 'Revision pendiente: corre Battery tablero.';
+    }
+    const reviewCount = this.scenarioBatteryReviewCount();
+    if (reviewCount === 0) {
+      return `Revision OK: ${rows.length}/${rows.length} lecturas coherentes.`;
+    }
+    const labels = Array.from(new Set(rows
+      .filter((row) => row.review.startsWith('Revisar'))
+      .map((row) => row.review)
+    ));
+    const sample = labels.slice(0, 2).join(' + ');
+    const suffix = labels.length > 2 ? ` +${labels.length - 2}` : '';
+    return `Revision: ${reviewCount}/${rows.length} para mirar (${sample}${suffix}).`;
   }
 
   scenarioBatteryGroupLabel(group: 'ALL' | 'OFFENSE' | 'DEFENSE' | 'OPPONENT'): string {
