@@ -3056,6 +3056,12 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       && row.verdict === 'OK'
       && row.slotRoles === 'ST · ST'
     );
+    const camFallback = rows.some((row) =>
+      row.formation === '3-4-1-2'
+      && row.line === 'MID'
+      && row.verdict === 'Fallback'
+      && row.slotRoles.includes('CAM')
+    );
       const pixelVisibleRows = pixelRows.filter((row) => this.positionPixelReadLevel(row) !== 'stable').length;
       const pixelCliffRows = pixelRows.filter((row) => this.positionPixelDistance(row) <= 1.5 && this.positionPixelReadLevel(row) === 'strong').length;
       const pixelRepeatedFivePxRows = pixelMatchSummaries.filter((row) => row.verdict === 'Repeated 5px bias').length;
@@ -3103,9 +3109,9 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       {
         check: '3-4-1-2 spine',
         expected: 'CAM natural in CAM and two CF/ST preserved for both ST slots.',
-        observed: hasAudit ? `CAM ${camOk ? 'OK' : 'missing'} · ST pair ${strikerOk ? 'OK' : 'missing'}` : 'Not run yet',
-        verdict: !hasAudit ? 'Pending' : camOk && strikerOk ? 'OK' : 'Review',
-        next: !hasAudit ? 'Run formation audit.' : camOk && strikerOk ? 'Pinned by backend test.' : 'Recheck auto-select reservation.',
+        observed: hasAudit ? `CAM ${camOk ? 'OK' : camFallback ? 'fallback' : 'missing'} · ST pair ${strikerOk ? 'OK' : 'missing'}` : 'Not run yet',
+        verdict: !hasAudit ? 'Pending' : camOk && strikerOk ? 'OK' : strikerOk && camFallback ? 'Fallback' : 'Review',
+        next: !hasAudit ? 'Run formation audit.' : camOk && strikerOk ? 'Pinned by backend test.' : strikerOk && camFallback ? 'Acceptable if squad lacks natural CAM; calibrate penalty.' : 'Recheck auto-select reservation.',
       },
       {
         check: 'Wide-role scarcity',
