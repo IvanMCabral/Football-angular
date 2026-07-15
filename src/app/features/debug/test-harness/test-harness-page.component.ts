@@ -793,7 +793,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 mat-stroked-button
                 data-testid="player-swap-matrix-button"
                 (click)="onRunAutoPlayerSwapMatrix()"
-                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                [disabled]="mutationInFlight() || !selectedMatchId()"
                 aria-label="Compare a starter attacker against a bench attacker across multiple seeds"
               >
                 Player swap matrix
@@ -802,7 +802,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 mat-stroked-button
                 data-testid="player-swap-battery-button"
                 (click)="onRunPlayerSwapBattery()"
-                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                [disabled]="mutationInFlight() || !selectedMatchId()"
                 aria-label="Compare several starter and bench player swaps across multiple seeds"
               >
                 Player swap battery
@@ -810,7 +810,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
               <button
                 mat-stroked-button
                 (click)="onRunPlayerSwapPrecisionCompare()"
-                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                [disabled]="mutationInFlight() || !selectedMatchId()"
                 aria-label="Compare player swap battery reads between quick and balanced precision"
               >
                 Compare precision
@@ -820,7 +820,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 mat-stroked-button
                 data-testid="position-presets-matrix-button"
                 (click)="onRunPositionPixelMatrix()"
-                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                [disabled]="mutationInFlight() || !selectedMatchId()"
                 aria-label="Compare multiple pixel movement presets for the selected starter across seeds"
               >
                 Position presets matrix
@@ -829,7 +829,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 type="button"
                 mat-stroked-button
                 (click)="onRunPositionSensitivityCheck()"
-                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                [disabled]="mutationInFlight() || !selectedMatchId()"
                 aria-label="Run high-seed micro-movement sensitivity check for position pixels"
               >
                 Sensitivity check
@@ -1138,8 +1138,8 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
               class="harness-warning"
               role="status"
             >
-              Formation matrix/avg now affect the side selected in Controlar.
-              Player/pixel matrices still use {{ userTeamName() || 'your team' }} until we generalize that block too.
+              Formation, player-swap and pixel matrices now affect the side selected in Controlar.
+              Multi-match line audits still use {{ userTeamName() || 'your team' }}.
             </p>
 
             <p
@@ -5911,14 +5911,6 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       });
       return;
     }
-    if (!this.selectedMatchIncludesUserTeam()) {
-      this.snackBar.open(
-        `Pick a match involving ${this.userTeamName() || 'your team'} before running player swap matrix.`,
-        'OK',
-        { duration: 5000 }
-      );
-      return;
-    }
 
     const seedStart = this.seedInputModel ?? DEFAULT_REPLAY_SEED;
     const seedCount = Math.max(1, Math.min(50, Math.round(this.playerSwapSeedCountModel || 3)));
@@ -5928,19 +5920,20 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     this.clearPlayerSwapAnalysisResults();
     this.analysisReadyMessage.set(`Player swap matrix corriendo: ${seedCount} seeds...`);
     this.mutationInFlight.set(true);
-    forkJoin({
-      lineup: this.harness.getCurrentLineup().pipe(
-        take(1),
-        timeout(10_000)
-      ),
-      squad: this.http.get<SessionPlayer[]>(`${environment.apiUrl}/career/players/squad`).pipe(
-        take(1),
-        timeout(10_000),
-        catchError(() => of([] as SessionPlayer[]))
-      ),
-    }).pipe(
+    const source$ = this.selectedMatchIncludesUserTeam()
+      ? forkJoin({
+          lineup: this.harness.getCurrentLineup().pipe(take(1), timeout(10_000)),
+          squad: this.http.get<SessionPlayer[]>(`${environment.apiUrl}/career/players/squad`).pipe(
+            take(1),
+            timeout(10_000),
+            catchError(() => of([] as SessionPlayer[]))
+          ),
+        })
+      : of({ lineup: null as LineupDTO | null, squad: [] as SessionPlayer[] });
+
+    source$.pipe(
       switchMap(({ lineup, squad }) => {
-        candidate = this.pickAutomaticSwapCandidate(lineup, squad);
+        candidate = lineup ? this.pickAutomaticSwapCandidate(lineup, squad) : this.autoBackendPlayerSwapCandidate();
         return this.harness.setStyle(this.selectedStyleModel).pipe(
           switchMap(() =>
             this.harness.runPlayerSwapMatrixSummary(matchId, {
@@ -5949,6 +5942,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
               slotId: candidate?.slotId ?? '',
               seedStart,
               seedCount,
+              controlledTeamSide: this.controlledTeamSideModel,
             })
           )
         );
@@ -5995,15 +5989,6 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       this.snackBar.open('Select a match in Panel C first.', 'OK', { duration: 3000 });
       return;
     }
-    if (!this.selectedMatchIncludesUserTeam()) {
-      this.snackBar.open(
-        `Pick a match involving ${this.userTeamName() || 'your team'} before running player swap battery.`,
-        'OK',
-        { duration: 5000 }
-      );
-      return;
-    }
-
     const seedStart = this.seedInputModel ?? DEFAULT_REPLAY_SEED;
     const seedCount = this.playerSwapBatteryEffectiveSeedCount();
     this.playerSwapSeedCountModel = seedCount;
@@ -6011,19 +5996,20 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     this.clearPlayerSwapAnalysisResults();
     this.analysisReadyMessage.set(`Player swap battery corriendo: ${seedCount} seeds por cambio...`);
     this.mutationInFlight.set(true);
-    forkJoin({
-      lineup: this.harness.getCurrentLineup().pipe(
-        take(1),
-        timeout(10_000)
-      ),
-      squad: this.http.get<SessionPlayer[]>(`${environment.apiUrl}/career/players/squad`).pipe(
-        take(1),
-        timeout(10_000),
-        catchError(() => of([] as SessionPlayer[]))
-      ),
-    }).pipe(
+    const source$ = this.selectedMatchIncludesUserTeam()
+      ? forkJoin({
+          lineup: this.harness.getCurrentLineup().pipe(take(1), timeout(10_000)),
+          squad: this.http.get<SessionPlayer[]>(`${environment.apiUrl}/career/players/squad`).pipe(
+            take(1),
+            timeout(10_000),
+            catchError(() => of([] as SessionPlayer[]))
+          ),
+        })
+      : of({ lineup: null as LineupDTO | null, squad: [] as SessionPlayer[] });
+
+    source$.pipe(
       switchMap(({ lineup, squad }) => {
-          const candidates = this.pickPlayerSwapBatteryCandidates(lineup, squad, 6);
+          const candidates = lineup ? this.pickPlayerSwapBatteryCandidates(lineup, squad, 6) : [];
           const effectiveCandidates = candidates.length > 0
             ? candidates
             : this.playerSwapBatteryModeModel === 'stress'
@@ -6038,6 +6024,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
                 slotId: candidate.slotId,
                 seedStart,
                 seedCount,
+                controlledTeamSide: this.controlledTeamSideModel,
               }).pipe(map((row) => this.toPlayerSwapMatrixSummary(row, candidate)))
             ),
             toArray()
@@ -6078,29 +6065,24 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       this.snackBar.open('Select a match in Panel C first.', 'OK', { duration: 3000 });
       return;
     }
-    if (!this.selectedMatchIncludesUserTeam()) {
-      this.snackBar.open(
-        `Pick a match involving ${this.userTeamName() || 'your team'} before comparing precision.`,
-        'OK',
-        { duration: 5000 }
-      );
-      return;
-    }
-
     const seedStart = this.seedInputModel ?? DEFAULT_REPLAY_SEED;
     this.clearPlayerSwapAnalysisResults();
     this.analysisReadyMessage.set('Precision compare corriendo...');
     this.mutationInFlight.set(true);
-    forkJoin({
-      lineup: this.harness.getCurrentLineup().pipe(take(1), timeout(10_000)),
-      squad: this.http.get<SessionPlayer[]>(`${environment.apiUrl}/career/players/squad`).pipe(
-        take(1),
-        timeout(10_000),
-        catchError(() => of([] as SessionPlayer[]))
-      ),
-    }).pipe(
+    const source$ = this.selectedMatchIncludesUserTeam()
+      ? forkJoin({
+          lineup: this.harness.getCurrentLineup().pipe(take(1), timeout(10_000)),
+          squad: this.http.get<SessionPlayer[]>(`${environment.apiUrl}/career/players/squad`).pipe(
+            take(1),
+            timeout(10_000),
+            catchError(() => of([] as SessionPlayer[]))
+          ),
+        })
+      : of({ lineup: null as LineupDTO | null, squad: [] as SessionPlayer[] });
+
+    source$.pipe(
       switchMap(({ lineup, squad }) => {
-        const candidates = this.pickPlayerSwapBatteryCandidates(lineup, squad, 6);
+        const candidates = lineup ? this.pickPlayerSwapBatteryCandidates(lineup, squad, 6) : [];
         const effectiveCandidates = candidates.length > 0
           ? candidates
           : this.playerSwapBatteryModeModel === 'stress'
@@ -6153,6 +6135,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           slotId: candidate.slotId,
           seedStart,
           seedCount,
+          controlledTeamSide: this.controlledTeamSideModel,
         }).pipe(map((row) => this.toPlayerSwapMatrixSummary(row, candidate)))
       ),
       toArray()
@@ -6482,14 +6465,6 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       this.snackBar.open('Select a match in Panel C first.', 'OK', { duration: 3000 });
       return;
     }
-    if (!targetMatches && !this.selectedMatchIncludesUserTeam()) {
-      this.snackBar.open(
-        `Pick a match involving ${this.userTeamName() || 'your team'} before running position pixel matrix.`,
-        'OK',
-        { duration: 5000 }
-      );
-      return;
-    }
     const seedStart = this.seedInputModel ?? DEFAULT_REPLAY_SEED;
     this.playerSwapSeedCountModel = seedCount;
 
@@ -6497,13 +6472,20 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     this.mutationInFlight.set(true);
     this.analysisReadyMessage.set(`${label} corriendo: preparando titulares, movimientos y ${seedCount} seeds...`);
     window.setTimeout(() => this.scrollToReplayAnalysis(), 0);
-    this.currentOrAutoSelectedLineup(this.selectedFormationModel ?? '4-4-2').pipe(
+    const lineup$ = this.selectedMatchIncludesUserTeam()
+      ? this.currentOrAutoSelectedLineup(this.selectedFormationModel ?? '4-4-2')
+      : of({
+          formation: this.selectedFormationModel ?? 'AUTO',
+          players: [] as LineupDTO['players'],
+          slots: [] as LineupDTO['slots'],
+        } as LineupDTO);
+    lineup$.pipe(
       switchMap((lineup) => {
         let candidates = candidatesFor ? candidatesFor(lineup) : this.pickPositionPixelCandidates(lineup);
         const playerCount = lineup.players?.length ?? 0;
         const slotCount = lineup.slots?.length ?? 0;
         const nonGkCount = (lineup.players ?? []).filter((player) => player.position !== 'GK').length;
-        if (candidates.length === 0 && playerCount === 0) {
+        if ((candidates.length === 0 && playerCount === 0) || !this.selectedMatchIncludesUserTeam()) {
           candidates = this.autoPositionPixelCandidates();
           this.analysisReadyMessage.set(
             `${label} corriendo: current lineup vacío; usando Auto DEF/MID/ATT del XI real del partido.`
@@ -6548,6 +6530,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
                 deltaYPercent: preset.dy,
                 seedStart,
                 seedCount,
+                controlledTeamSide: this.controlledTeamSideModel,
               }).pipe(map((row) => ({ label: this.calibrationLabel(match, preset.label), row })))
             )
           );

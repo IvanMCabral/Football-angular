@@ -296,6 +296,7 @@ export interface PlayerSwapMatrixSummaryRequest {
   slotId?: string | null;
   seedStart: number;
   seedCount: number;
+  controlledTeamSide?: 'USER' | 'HOME' | 'AWAY';
 }
 
 export interface PlayerSwapMatrixSummaryRow {
@@ -391,6 +392,7 @@ export interface PositionPixelMatrixSummaryRequest {
   deltaYPercent?: number;
   seedStart: number;
   seedCount: number;
+  controlledTeamSide?: 'USER' | 'HOME' | 'AWAY';
 }
 
 export interface PositionPixelMatrixSummaryRow {
