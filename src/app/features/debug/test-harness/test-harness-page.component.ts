@@ -1976,8 +1976,8 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
             <div class="matrix-header">
               <strong>Multi-seed scenario summary</strong>
               <span>
-                Same match ? seeds {{ summarySeedStart() }}..{{ summarySeedEnd() }}
-                ? averages vs minute baselines
+                Same match - seeds {{ summarySeedStart() }}..{{ summarySeedEnd() }}
+                - averages vs minute baselines
               </span>
               <span class="controlled-team-badge">
                 Controlando: {{ controlledTeamDisplayName() }}
@@ -2072,15 +2072,15 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                   <span role="columnheader">Read</span>
                   <span role="columnheader">Outcome</span>
                   <span role="columnheader">Seeds</span>
-                  <span role="columnheader">?xG For avg</span>
-                  <span role="columnheader">?xG For min/max</span>
-                  <span role="columnheader">?xG Ag.</span>
-                  <span role="columnheader">?Shots For/Ag.</span>
-                  <span role="columnheader">?Poss</span>
-                  <span role="columnheader">?Zones C/W</span>
-                  <span role="columnheader">?Opp zones C/W</span>
-                  <span role="columnheader">?Opp xG C/W</span>
-                  <span role="columnheader">?Opp wide L/R xG</span>
+                  <span role="columnheader">Delta xG For avg</span>
+                  <span role="columnheader">Delta xG For min/max</span>
+                  <span role="columnheader">Delta xG Ag.</span>
+                  <span role="columnheader">Delta Shots For/Ag.</span>
+                  <span role="columnheader">Delta Poss</span>
+                  <span role="columnheader">Delta Zones C/W</span>
+                  <span role="columnheader">Delta Opp zones C/W</span>
+                  <span role="columnheader">Delta Opp xG C/W</span>
+                  <span role="columnheader">Delta Opp wide L/R xG</span>
                 </div>
                 <div
                   *ngFor="let row of displayedScenarioMatrixSummaryRows(); trackBy: trackByScenarioMatrixSummary"
@@ -2124,7 +2124,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                     <span [class]="deltaClass(row.avgUserShotsDelta)">
                       F {{ fmtDeltaNumber(row.avgUserShotsDelta) }}
                     </span>
-                    ?
+                    vs
                     <span [class]="deltaClass(-row.avgOpponentShotsDelta)">
                       Ag {{ fmtDeltaNumber(row.avgOpponentShotsDelta) }}
                     </span>
@@ -2134,19 +2134,19 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                   </span>
                   <span role="cell">
                     C {{ fmtDeltaNumber(row.avgUserCentralDelta) }}
-                    ? W {{ fmtDeltaNumber(row.avgUserWideDelta) }}
+                    | W {{ fmtDeltaNumber(row.avgUserWideDelta) }}
                   </span>
                   <span role="cell">
                     C {{ fmtDeltaNumber(row.avgOpponentCentralDelta) }}
-                    ? W {{ fmtDeltaNumber(row.avgOpponentWideDelta) }}
+                    | W {{ fmtDeltaNumber(row.avgOpponentWideDelta) }}
                   </span>
                   <span role="cell">
                     C {{ fmtDeltaNumber(row.avgOpponentCentralXgDelta) }}
-                    ? W {{ fmtDeltaNumber(row.avgOpponentWideXgDelta) }}
+                    | W {{ fmtDeltaNumber(row.avgOpponentWideXgDelta) }}
                   </span>
                   <span role="cell">
                     L {{ fmtDeltaNumber(row.avgOpponentLeftWideXgDelta) }}
-                    ? R {{ fmtDeltaNumber(row.avgOpponentRightWideXgDelta) }}
+                    | R {{ fmtDeltaNumber(row.avgOpponentRightWideXgDelta) }}
                   </span>
                 </div>
               </div>
@@ -2157,8 +2157,8 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
             <div class="matrix-header">
               <strong>Battery tablero tactico</strong>
               <span>
-                {{ scenarioBatteryRows().length }} lecturas ? seeds {{ summarySeedStart() }}..{{ summarySeedStart() + scenarioMatrixSmokeSeedCount() - 1 }}
-                ? {{ scenarioBatteryGroupLabel(scenarioBatteryRows()[0]?.scenarioGroup || scenarioBatteryGroupModel) }}
+                {{ scenarioBatteryRows().length }} lecturas - seeds {{ summarySeedStart() }}..{{ summarySeedStart() + scenarioMatrixSmokeSeedCount() - 1 }}
+                - {{ scenarioBatteryGroupLabel(scenarioBatteryRows()[0]?.scenarioGroup || scenarioBatteryGroupModel) }}
               </span>
               <button type="button" class="matrix-export" (click)="copyScenarioBatteryJson()">
                 Copy JSON

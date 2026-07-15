@@ -1247,6 +1247,29 @@ describe('TestHarnessPageComponent', () => {
     expect(component.scenarioSummaryRecommendationDetail(upgrade)).toContain('lectura:');
   });
 
+  it('renders scenario summary headers with stable separators', () => {
+    component.scenarioMatrixSummaryResults.set([
+      makeScenarioSummaryRow({
+        scenario: 'm45-shape-wide-overload',
+        actionType: 'POSITION',
+        actionDetail: 'wide-overload -> x50/y50',
+        avgUserXgDelta: -0.23,
+        avgOpponentXgDelta: 0.23,
+        avgUserShotsDelta: -1.8,
+        avgOpponentShotsDelta: 1.8,
+      }),
+    ]);
+    fixture.detectChanges();
+
+    const panel: HTMLElement | null = fixture.nativeElement.querySelector('.scenario-matrix');
+    expect(panel?.textContent).toContain('Same match - seeds');
+    expect(panel?.textContent).toContain('Delta xG For avg');
+    expect(panel?.textContent).toContain('F -1.80');
+    expect(panel?.textContent).toContain('vs');
+    expect(panel?.textContent).not.toContain('?xG');
+    expect(panel?.textContent).not.toContain(' ? ');
+  });
+
   it('keeps scenario smoke errors visible in Panel E state', () => {
     harness.runScenarioMatrixSummary.and.returnValue(
       throwError(() => ({ status: 404, message: 'Not Found' })) as any
