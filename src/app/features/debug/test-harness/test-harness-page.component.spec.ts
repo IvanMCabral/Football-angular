@@ -1429,6 +1429,18 @@ describe('TestHarnessPageComponent', () => {
     expect(context.summary).toContain('/fresco');
     expect(context.detail).toContain('empatado');
     expect(context.detail).toContain('startingOvr 78');
+    expect((component as any).scenarioBatteryDecisionReview('NEED_GOAL', 'No arriesgar: Player -> x40/y50', [
+      { title: 'Riesgo ofensivo', label: 'Player -> x40/y50', metrics: 'xG +0.10 / xGA +0.20 / media', detail: 'test' },
+    ]).label).toContain('Revisar');
+    expect((component as any).scenarioBatteryDecisionReview('PROTECT_RESULT', 'Riesgo asumible: Player -> x60/y30', [
+      { title: 'Riesgo ofensivo', label: 'Player -> x60/y30', metrics: 'xG +0.10 / xGA +0.20 / media', detail: 'test' },
+    ]).label).toContain('Revisar');
+    expect((component as any).scenarioBatteryDecisionReview('PROTECT_RESULT', 'No arriesgar: Player -> x60/y30', [
+      { title: 'Riesgo ofensivo', label: 'Player -> x60/y30', metrics: 'xG +0.10 / xGA +0.20 / media', detail: 'test' },
+    ]).label).toBe('OK');
+    expect((component as any).scenarioBatteryDecisionReview('NEED_GOAL', 'Riesgo asumible: Player -> x60/y30', [
+      { title: 'Riesgo ofensivo', label: 'Player -> x60/y30', metrics: 'xG +0.10 / xGA +0.20 / media', detail: 'test' },
+    ]).label).toBe('OK');
   });
 
   it('renders scenario summary headers with stable separators', () => {

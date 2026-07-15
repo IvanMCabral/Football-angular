@@ -353,6 +353,8 @@ interface ScenarioBatteryRow {
   scenarioCount: number;
   decision: string;
   decisionDetail: string;
+  review: string;
+  reviewDetail: string;
   cards: ScenarioDecisionCard[];
 }
 
@@ -2210,6 +2212,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                   <span role="columnheader">Objetivo</span>
                   <span role="columnheader">Contexto</span>
                   <span role="columnheader">Decision</span>
+                  <span role="columnheader">Revision</span>
                   <span role="columnheader">Plan</span>
                   <span role="columnheader">Doble</span>
                   <span role="columnheader">Atacar</span>
@@ -2230,6 +2233,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                   <span role="cell">{{ scenarioBatteryCoachObjectiveLabel(row.coachObjective) }}</span>
                   <span role="cell" [title]="row.coachContextDetail">{{ row.coachContext }}</span>
                   <span role="cell" [title]="row.decisionDetail">{{ row.decision }}</span>
+                  <span role="cell" [title]="row.reviewDetail">{{ row.review }}</span>
                   <span role="cell" [title]="scenarioBatteryCardDetail(row, 'Plan actual')">
                     {{ scenarioBatteryCardSummary(row, 'Plan actual') }}
                   </span>
@@ -4056,7 +4060,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       return;
     }
     const header = [
-      'match', 'controlledTeam', 'controlledSide', 'scenarioGroup', 'coachObjective', 'coachContext', 'coachContextDetail', 'seedStart', 'seedCount', 'scenarioCount',
+      'match', 'controlledTeam', 'controlledSide', 'scenarioGroup', 'coachObjective', 'coachContext', 'coachContextDetail', 'review', 'reviewDetail', 'seedStart', 'seedCount', 'scenarioCount',
       'decision', 'decisionDetail',
       'plan', 'twoWay', 'attack', 'shape', 'protect', 'avoid', 'opponentThreat',
       'planDetail', 'twoWayDetail', 'attackDetail', 'shapeDetail', 'protectDetail', 'avoidDetail', 'opponentThreatDetail',
@@ -7516,6 +7520,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const coachObjective = this.scenarioBatteryEffectiveCoachObjective(match, controlledSide);
     const coachContext = this.scenarioBatteryCoachContext(match, controlledSide);
     const decision = this.scenarioBatteryDecision(cards, coachObjective);
+    const review = this.scenarioBatteryDecisionReview(coachObjective, decision.label, cards);
     return {
       matchId: match.matchId,
       matchLabel: `${match.homeTeamName} vs ${match.awayTeamName}`,
@@ -7530,6 +7535,8 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       scenarioCount: rows.length,
       decision: decision.label,
       decisionDetail: decision.detail,
+      review: review.label,
+      reviewDetail: review.detail,
       cards,
     };
   }
@@ -7626,6 +7633,53 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     };
   }
 
+  private scenarioBatteryDecisionReview(
+    objective: ScenarioBatteryCoachObjective,
+    decisionLabel: string,
+    cards: ScenarioDecisionCard[]
+  ): { label: string; detail: string } {
+    const has = (title: string) => cards.some((card) => card.title === title);
+    const starts = (...prefixes: string[]) => prefixes.some((prefix) => decisionLabel.startsWith(prefix));
+    if (objective === 'NEED_GOAL') {
+      if (starts('Cerrar partido', 'Cerrar amenaza', 'Proteger', 'No forzar', 'No arriesgar', 'Mantener equipo')) {
+        return {
+          label: 'Revisar: poco gol',
+          detail: `El objetivo es buscar gol, pero la decision fue "${decisionLabel}". Revisar si faltan escenarios ofensivos claros o si el motor penaliza demasiado el riesgo.`,
+        };
+      }
+      if (!has('Atacar') && !has('Riesgo ofensivo') && !has('Doble ganancia')) {
+        return {
+          label: 'Revisar: sin via',
+          detail: 'El objetivo es buscar gol, pero la bateria no encontro Atacar, Riesgo ofensivo ni Doble ganancia. Puede ser correcto si no hay buen cambio, pero conviene auditar.',
+        };
+      }
+    }
+    if (objective === 'PROTECT_RESULT') {
+      if (starts('Atacar', 'Riesgo alto', 'Riesgo asumible', 'Aprovechar')) {
+        return {
+          label: 'Revisar: mucho riesgo',
+          detail: `El objetivo es cuidar resultado, pero la decision fue "${decisionLabel}". Revisar si el escenario abre demasiado xGA o si falta una alternativa defensiva mejor.`,
+        };
+      }
+      if (!has('Cuidar') && !has('Amenaza rival') && !has('Evitar') && !has('Riesgo ofensivo')) {
+        return {
+          label: 'Revisar: sin cierre',
+          detail: 'El objetivo es cuidar resultado, pero la bateria no encontro Cuidar, Amenaza rival, Evitar ni una accion ofensiva para descartar. Puede faltar cobertura defensiva en los escenarios.',
+        };
+      }
+    }
+    if (objective === 'NEUTRAL' && starts('Riesgo alto')) {
+      return {
+        label: 'Revisar: riesgo neutral',
+        detail: `El objetivo es neutral y la decision fue "${decisionLabel}". Puede estar bien, pero conviene revisar si el beneficio ofensivo compensa el riesgo.`,
+      };
+    }
+    return {
+      label: 'OK',
+      detail: `La decision "${decisionLabel}" es consistente con el objetivo ${this.scenarioBatteryCoachObjectiveLabel(objective)} y las senales disponibles.`,
+    };
+  }
+
   scenarioBatteryCardSummary(row: ScenarioBatteryRow, title: string): string {
     const card = row.cards.find((item) => item.title === title);
     return card ? `${card.label} · ${card.metrics}` : '-';
@@ -7659,6 +7713,8 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       coachObjective: this.scenarioBatteryCoachObjectiveLabel(row.coachObjective),
       coachContext: row.coachContext,
       coachContextDetail: row.coachContextDetail,
+      review: row.review,
+      reviewDetail: row.reviewDetail,
       seedStart: row.seedStart,
       seedCount: row.seedCount,
       scenarioCount: row.scenarioCount,
