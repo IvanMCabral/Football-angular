@@ -126,6 +126,7 @@ export interface TestHarnessMatchRow {
  */
 export interface ReplayMatchRequest {
   seed: number | null;
+  controlledTeamSide?: 'USER' | 'HOME' | 'AWAY';
 }
 
 export interface TeamStrengthInfo {

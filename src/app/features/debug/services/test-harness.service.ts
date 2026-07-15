@@ -171,8 +171,12 @@ export class TestHarnessService {
     );
   }
 
-  runFormationMatrix(matchId: string, seed: number | null): Observable<FormationMatrixRow[]> {
-    const body: ReplayMatchRequest = { seed };
+  runFormationMatrix(
+    matchId: string,
+    seed: number | null,
+    controlledTeamSide: ScenarioMatrixSummaryRequest['controlledTeamSide'] = 'USER'
+  ): Observable<FormationMatrixRow[]> {
+    const body: ReplayMatchRequest = { seed, controlledTeamSide };
     return this.http.post<FormationMatrixRow[]>(
       `${this.apiUrl}/match/${matchId}/formation-matrix`,
       body
@@ -182,9 +186,10 @@ export class TestHarnessService {
   runFormationMatrixSummary(
     matchId: string,
     seedStart: number,
-    seedCount: number
+    seedCount: number,
+    controlledTeamSide: ScenarioMatrixSummaryRequest['controlledTeamSide'] = 'USER'
   ): Observable<FormationMatrixSummaryRow[]> {
-    const body: ScenarioMatrixSummaryRequest = { seedStart, seedCount };
+    const body: ScenarioMatrixSummaryRequest = { seedStart, seedCount, controlledTeamSide };
     return this.http.post<FormationMatrixSummaryRow[]>(
       `${this.apiUrl}/match/${matchId}/formation-matrix/summary`,
       body

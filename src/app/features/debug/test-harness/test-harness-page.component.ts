@@ -885,7 +885,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
               <button
                 mat-stroked-button
                 (click)="onRunFormationMatrix()"
-                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                [disabled]="mutationInFlight() || !selectedMatchId()"
                 [title]="formationMatrixDisabledReason()"
                 aria-label="Replay selected match with every formation and the same seed"
               >
@@ -895,7 +895,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 mat-stroked-button
                 data-testid="formation-avg-button"
                 (click)="onRunFormationMatrixSummary()"
-                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                [disabled]="mutationInFlight() || !selectedMatchId()"
                 [title]="formationMatrixDisabledReason()"
                 aria-label="Average every formation across multiple seeds"
               >
@@ -1138,8 +1138,8 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
               class="harness-warning"
               role="status"
             >
-              Formation/player matrices still affect only {{ userTeamName() || 'your team' }}.
-              Scenario smokes can test this match by choosing Local or Visitante in Controlar.
+              Formation matrix/avg now affect the side selected in Controlar.
+              Player/pixel matrices still use {{ userTeamName() || 'your team' }} until we generalize that block too.
             </p>
 
             <p
@@ -8937,10 +8937,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     if (!this.selectedMatchId()) {
       return 'Selecciona un partido completado del Panel C.';
     }
-    if (!this.selectedMatchIncludesUserTeam()) {
-      return `La matriz de formaciones modifica el XI de ${this.userTeamName() || 'tu equipo'}; elegi un partido donde juegue ese equipo.`;
-    }
-    return 'Ejecutar matriz de formaciones para el equipo usuario.';
+    return `Ejecutar matriz de formaciones para ${this.controlledTeamDisplayName()}.`;
   }
 
   /**
@@ -8959,14 +8956,6 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       this.snackBar.open('Select a match in Panel C first.', 'OK', {
         duration: 3000,
       });
-      return;
-    }
-    if (!this.selectedMatchIncludesUserTeam()) {
-      this.snackBar.open(
-        `Pick a match involving ${this.userTeamName() || 'your team'} before running the formation matrix.`,
-        'OK',
-        { duration: 5000 }
-      );
       return;
     }
     const careerId = this.careerId();
@@ -8996,7 +8985,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         }
 
         return this.harness.setStyle(this.selectedStyleModel).pipe(
-          switchMap(() => this.harness.runFormationMatrix(matchId, seed)),
+          switchMap(() => this.harness.runFormationMatrix(matchId, seed, this.controlledTeamSideModel)),
           switchMap((rows) => {
             const mappedRows = rows.map((row) => this.buildFormationReplayResultFromMatrix(row));
             this.formationReplayResults.set(mappedRows);
@@ -9045,14 +9034,6 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       this.snackBar.open('Select a match in Panel C first.', 'OK', { duration: 3000 });
       return;
     }
-    if (!this.selectedMatchIncludesUserTeam()) {
-      this.snackBar.open(
-        `Pick a match involving ${this.userTeamName() || 'your team'} before running formation averages.`,
-        'OK',
-        { duration: 5000 }
-      );
-      return;
-    }
 
     const seedStart = this.summarySeedStart();
     const seedCount = this.scenarioMatrixSummaryEffectiveSeedCount();
@@ -9062,7 +9043,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     this.mutationInFlight.set(true);
 
     this.harness.setStyle(this.selectedStyleModel).pipe(
-      switchMap(() => this.harness.runFormationMatrixSummary(matchId, seedStart, seedCount))
+      switchMap(() => this.harness.runFormationMatrixSummary(matchId, seedStart, seedCount, this.controlledTeamSideModel))
     ).subscribe({
       next: (rows) => {
         this.formationMatrixSummaryResults.set(rows ?? []);
