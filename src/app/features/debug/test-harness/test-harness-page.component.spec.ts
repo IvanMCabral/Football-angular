@@ -1195,12 +1195,30 @@ describe('TestHarnessPageComponent', () => {
       avgOpponentShotsDelta: 2.0,
       avgOpponentLeftWideXgDelta: 0.14,
     }));
+    const shapeRead = component.scenarioSummaryCoachRead(makeScenarioSummaryRow({
+      scenario: 'm45-shape-right-overload',
+      actionType: 'POSITION',
+      actionDetail: 'right-overload',
+      avgOpponentXgDelta: 0.14,
+      avgOpponentShotsDelta: 2.0,
+    }));
+    const wideShapeRead = component.scenarioSummaryCoachRead(makeScenarioSummaryRow({
+      scenario: 'm45-shape-wide-overload',
+      actionType: 'POSITION',
+      actionDetail: 'wide-overload -> x50/y50',
+      avgOpponentXgDelta: 0.14,
+      avgOpponentShotsDelta: 2.0,
+    }));
 
     expect(formationRead).toContain('formacion:');
     expect(formationRead).toContain('gana ataque');
     expect(subRead).toContain('cambio:');
     expect(subRead).toContain('pierde ataque');
     expect(opponentRead).toContain('rival: rival amenaza');
+    expect(shapeRead).toContain('forma:');
+    expect(shapeRead).not.toContain('posicion:');
+    expect(wideShapeRead).toContain('forma:');
+    expect(wideShapeRead).not.toContain('posicion:');
   });
 
   it('turns scenario reads into DT recommendations', () => {

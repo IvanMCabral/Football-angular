@@ -6892,6 +6892,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const normalized = actionDetail.trim().toLowerCase();
     if (normalized.startsWith('right-overload')) return 'Sobrecarga derecha';
     if (normalized.startsWith('left-overload')) return 'Sobrecarga izquierda';
+    if (normalized.startsWith('wide-overload')) return 'Amplitud ofensiva';
     if (normalized.startsWith('compact-center')) return 'Cerrar el centro';
     if (normalized.startsWith('attacking-high')) return 'Ataque alto';
     if (normalized.startsWith('attacking-step')) return 'Paso ofensivo';
@@ -7070,10 +7071,16 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     if (row.actionType === 'FORMATION') return 'formacion';
     if (row.actionType === 'STYLE') return 'estilo';
     if (row.actionType === 'SUBSTITUTION') return 'cambio';
-    if (row.actionType === 'POSITION') return 'posicion';
+    if (row.actionType === 'POSITION') {
+      return this.isScenarioShapeAction(row.actionDetail) ? 'forma' : 'posicion';
+    }
     if (this.isOpponentScenarioRow(row)) return 'rival';
     if (row.actionType === 'NOOP_REPLAY' || row.actionType === 'NONE') return 'base';
     return 'escenario';
+  }
+
+  private isScenarioShapeAction(actionDetail: string | null | undefined): boolean {
+    return !!actionDetail && !!this.scenarioShapeActionLabel(actionDetail);
   }
 
   scenarioSummaryCoachReadDetail(row: ScenarioMatrixSummaryRow): string {
