@@ -2938,11 +2938,11 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
 
   selectedSwapBenchIdModel: string | null = null;
 
-  playerSwapSeedCountModel = 3;
+  playerSwapSeedCountModel = 10;
 
   playerSwapBatteryModeModel: 'natural' | 'mixed' | 'stress' = 'natural';
 
-  playerSwapBatteryPrecisionModel: 'quick' | 'balanced' | 'reliable' = 'quick';
+  playerSwapBatteryPrecisionModel: 'quick' | 'balanced' | 'reliable' = 'balanced';
 
   controlledTeamSideModel: ControlledTeamSide = 'USER';
 
@@ -5707,7 +5707,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const allowed: Array<typeof this.playerSwapBatteryPrecisionModel> = ['quick', 'balanced', 'reliable'];
     this.playerSwapBatteryPrecisionModel = allowed.includes(value as typeof this.playerSwapBatteryPrecisionModel)
       ? (value as typeof this.playerSwapBatteryPrecisionModel)
-      : 'quick';
+      : 'balanced';
     this.playerSwapSeedCountModel = this.playerSwapBatteryPrecisionSeedCount(this.playerSwapBatteryPrecisionModel);
   }
 
@@ -6816,9 +6816,9 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     if (this.playerSwapBatteryModeModel === 'stress' && this.playerSwapBatteryPrecisionModel === 'quick') {
       return `${seeds} seeds - Stress test usa minimo 10 para evitar ruido.`;
     }
-    if (this.playerSwapBatteryPrecisionModel === 'reliable') return `${seeds} seeds - High confidence.`;
-    if (this.playerSwapBatteryPrecisionModel === 'balanced') return `${seeds} seeds - Medium confidence.`;
-    return `${seeds} seeds - Low confidence, smoke rapido.`;
+    if (this.playerSwapBatteryPrecisionModel === 'reliable') return `${seeds} seeds - High confidence para calibracion fina.`;
+    if (this.playerSwapBatteryPrecisionModel === 'balanced') return `${seeds} seeds - Medium confidence, recomendado para decidir tuning.`;
+    return `${seeds} seeds - Low confidence, solo smoke exploratorio.`;
   }
 
   playerSwapBatteryConfidenceLabel(seedCount = this.playerSwapSeedCountModel): string {

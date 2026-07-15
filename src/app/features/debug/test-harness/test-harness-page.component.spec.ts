@@ -144,6 +144,19 @@ describe('TestHarnessPageComponent', () => {
     expect(component.selectedMatchId()).toBeNull();
   });
 
+  it('defaults player swap battery precision to balanced for tuning reads', () => {
+    expect(component.playerSwapBatteryPrecisionModel).toBe('balanced');
+    expect(component.playerSwapSeedCountModel).toBe(10);
+    expect(component.playerSwapBatteryPrecisionHint()).toContain('recomendado para decidir tuning');
+  });
+
+  it('falls back to balanced when player swap battery precision is invalid', () => {
+    component.onPlayerSwapBatteryPrecisionChange('unknown');
+
+    expect(component.playerSwapBatteryPrecisionModel).toBe('balanced');
+    expect(component.playerSwapSeedCountModel).toBe(10);
+  });
+
   it('wires the Position presets matrix button to the position pixel handler', () => {
     const runSpy = spyOn(component, 'onRunPositionPixelMatrix');
     component.selectMatch({
