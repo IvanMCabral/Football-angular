@@ -1367,6 +1367,16 @@ describe('TestHarnessPageComponent', () => {
       homeGoals: 1,
       awayGoals: 1,
     };
+    const realStrengthFavoriteHomeDraw = {
+      ...makeMatchRow('match-real-strength-home-draw'),
+      homeTeamName: 'Unknown Home',
+      awayTeamName: 'Unknown Away',
+      homeStrength: { startingOvr: 84, squadOvr: 82 },
+      awayStrength: { startingOvr: 74, squadOvr: 73 },
+      status: 'COMPLETED' as const,
+      homeGoals: 1,
+      awayGoals: 1,
+    };
 
     component.selectedMinute.set(70);
 
@@ -1377,6 +1387,8 @@ describe('TestHarnessPageComponent', () => {
     expect((component as any).inferScenarioBatteryCoachObjective(favoriteHomeDraw, 'HOME', 75)).toBe('NEED_GOAL');
     expect((component as any).inferScenarioBatteryCoachObjective(underdogAwayDraw, 'AWAY', 75)).toBe('PROTECT_RESULT');
     expect((component as any).inferScenarioBatteryCoachObjective(awayWinning, 'AWAY', 60)).toBe('PROTECT_RESULT');
+    expect((component as any).inferScenarioBatteryCoachObjective(realStrengthFavoriteHomeDraw, 'HOME', 75)).toBe('NEED_GOAL');
+    expect((component as any).scenarioBatteryContextPressure(realStrengthFavoriteHomeDraw, 'HOME').label).toContain('/ovr');
   });
 
   it('renders scenario summary headers with stable separators', () => {

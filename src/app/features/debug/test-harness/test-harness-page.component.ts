@@ -6957,15 +6957,31 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   ): { label: string; reputationDelta: number; away: boolean } {
     const ownName = controlledSide === 'HOME' ? match.homeTeamName : match.awayTeamName;
     const rivalName = controlledSide === 'HOME' ? match.awayTeamName : match.homeTeamName;
-    const reputationDelta = this.scenarioBatteryTeamReputation(ownName) - this.scenarioBatteryTeamReputation(rivalName);
+    const ownStrength = controlledSide === 'HOME' ? match.homeStrength : match.awayStrength;
+    const rivalStrength = controlledSide === 'HOME' ? match.awayStrength : match.homeStrength;
+    const ownRating = this.scenarioBatteryTeamRating(ownName, ownStrength ?? null);
+    const rivalRating = this.scenarioBatteryTeamRating(rivalName, rivalStrength ?? null);
+    const reputationDelta = ownRating.value - rivalRating.value;
     const away = controlledSide === 'AWAY';
     const venue = away ? 'visitante' : 'local';
-    const level = reputationDelta >= 2
+    const strongThreshold = ownRating.source === 'strength' && rivalRating.source === 'strength' ? 4 : 2;
+    const level = reputationDelta >= strongThreshold
       ? 'favorito'
-      : reputationDelta <= -2
+      : reputationDelta <= -strongThreshold
         ? 'underdog'
         : 'parejo';
-    return { label: `${venue}/${level}`, reputationDelta, away };
+    const source = ownRating.source === 'strength' && rivalRating.source === 'strength' ? 'ovr' : 'nombre';
+    return { label: `${venue}/${level}/${source}`, reputationDelta, away };
+  }
+
+  private scenarioBatteryTeamRating(
+    teamName: string,
+    strength: TestHarnessMatchRow['homeStrength'] | null
+  ): { value: number; source: 'strength' | 'name' } {
+    const realRating = strength?.startingOvr ?? strength?.squadOvr;
+    return realRating !== null && realRating !== undefined
+      ? { value: realRating, source: 'strength' }
+      : { value: this.scenarioBatteryTeamReputation(teamName), source: 'name' };
   }
 
   private scenarioBatteryTeamReputation(teamName: string): number {
@@ -9495,6 +9511,8 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       status: f.status,
       homeGoals: f.homeGoals ?? null,
       awayGoals: f.awayGoals ?? null,
+      homeStrength: f.homeStrength ?? null,
+      awayStrength: f.awayStrength ?? null,
       homeFormation: null,
       awayFormation: null,
       roundId: f.roundId ?? null,

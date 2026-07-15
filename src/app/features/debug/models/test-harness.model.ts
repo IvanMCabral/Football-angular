@@ -101,6 +101,8 @@ export interface TestHarnessMatchRow {
   status: 'PENDING' | 'SIMULATING' | 'COMPLETED' | string;
   homeGoals: number | null;
   awayGoals: number | null;
+  homeStrength?: TeamStrengthInfo | null;
+  awayStrength?: TeamStrengthInfo | null;
   homeFormation: string | null;
   awayFormation: string | null;
   /**
@@ -124,6 +126,16 @@ export interface TestHarnessMatchRow {
  */
 export interface ReplayMatchRequest {
   seed: number | null;
+}
+
+export interface TeamStrengthInfo {
+  squadOvr?: number | null;
+  startingOvr?: number | null;
+  avgEnergy?: number | null;
+  avgForm?: number | null;
+  avgStamina?: number | null;
+  squadSize?: number | null;
+  starterCount?: number | null;
 }
 
 export interface FormationMatrixRow {

@@ -92,6 +92,8 @@ export interface Fixture {
   status: 'PENDING' | 'SIMULATING' | 'COMPLETED' | 'CANCELLED';
   homeGoals?: number | null;
   awayGoals?: number | null;
+  homeStrength?: TeamStrengthInfo | null;
+  awayStrength?: TeamStrengthInfo | null;
   /**
    * V24D24.2-F2.5 — team display names hydrated by the backend on
    * GET /api/v1/career/fixtures/round-with-bye (the
@@ -111,6 +113,16 @@ export interface Fixture {
    * or for fixtures served by endpoints that don't hydrate it.
    */
   roundId?: string | null;
+}
+
+export interface TeamStrengthInfo {
+  squadOvr?: number | null;
+  startingOvr?: number | null;
+  avgEnergy?: number | null;
+  avgForm?: number | null;
+  avgStamina?: number | null;
+  squadSize?: number | null;
+  starterCount?: number | null;
 }
 
 /**
