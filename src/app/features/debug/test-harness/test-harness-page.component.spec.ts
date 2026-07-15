@@ -1423,9 +1423,11 @@ describe('TestHarnessPageComponent', () => {
     expect((component as any).scenarioBatteryContextPressure(tiredUnderdogAwayDraw, 'AWAY').label).toContain('/cansado');
     expect((component as any).inferScenarioBatteryCoachObjective(tiredHomeWinning, 'HOME', 60)).toBe('PROTECT_RESULT');
     const context = (component as any).scenarioBatteryCoachContext(freshSmallFavoriteHomeDraw, 'HOME');
+    expect(context.summary).toContain('1-1 min 70');
     expect(context.summary).toContain('OVR 78-76');
     expect(context.summary).toContain('EN 95');
     expect(context.summary).toContain('/fresco');
+    expect(context.detail).toContain('empatado');
     expect(context.detail).toContain('startingOvr 78');
   });
 

@@ -7006,10 +7006,12 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const ownEnergy = this.scenarioBatteryMetricText(ownStrength?.avgEnergy, 'EN');
     const ownForm = this.scenarioBatteryMetricText(ownStrength?.avgForm, 'FOR');
     const ownStamina = this.scenarioBatteryMetricText(ownStrength?.avgStamina, 'STA');
+    const matchState = this.scenarioBatteryMatchStateText(match, controlledSide);
     const source = ownRating.source === 'strength' && rivalRating.source === 'strength' ? 'OVR real' : 'fallback nombre';
-    const summary = `${pressure.label} · OVR ${ownRating.value}-${rivalRating.value} · ${ownEnergy}`;
+    const summary = `${matchState.summary} · ${pressure.label} · OVR ${ownRating.value}-${rivalRating.value} · ${ownEnergy}`;
     const detail = [
       `${ownName} vs ${rivalName}`,
+      `Partido: ${matchState.detail}`,
       `Contexto: ${pressure.label}`,
       `Fuente: ${source}`,
       `OVR propio/rival: ${ownRating.value}/${rivalRating.value}`,
@@ -7022,6 +7024,30 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
 
   private scenarioBatteryMetricText(value: number | null | undefined, label: string): string {
     return value === null || value === undefined ? `${label} ?` : `${label} ${Math.round(value)}`;
+  }
+
+  private scenarioBatteryMatchStateText(
+    match: TestHarnessMatchRow,
+    controlledSide: Exclude<ControlledTeamSide, 'USER'>
+  ): { summary: string; detail: string } {
+    const minute = this.scenarioBatteryDecisionMinute(match);
+    const homeGoals = match.homeGoals;
+    const awayGoals = match.awayGoals;
+    const score = homeGoals === null || homeGoals === undefined || awayGoals === null || awayGoals === undefined
+      ? 'marcador ?'
+      : `${homeGoals}-${awayGoals}`;
+    const goalDiff = this.scenarioBatteryGoalDiff(match, controlledSide);
+    const state = goalDiff === null
+      ? 'estado ?'
+      : goalDiff > 0
+        ? `ganando +${goalDiff}`
+        : goalDiff < 0
+          ? `perdiendo ${goalDiff}`
+          : 'empatado';
+    return {
+      summary: `${score} min ${minute}`,
+      detail: `${score}, min ${minute}, ${state}`,
+    };
   }
 
   private scenarioBatterySquadText(strength: TestHarnessMatchRow['homeStrength'] | null): string {
