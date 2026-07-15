@@ -1377,6 +1377,34 @@ describe('TestHarnessPageComponent', () => {
       homeGoals: 1,
       awayGoals: 1,
     };
+    const freshSmallFavoriteHomeDraw = {
+      ...makeMatchRow('match-fresh-small-favorite-home-draw'),
+      homeTeamName: 'Fresh Home',
+      awayTeamName: 'Normal Away',
+      homeStrength: { startingOvr: 78, squadOvr: 77, avgEnergy: 95, avgStamina: 82, avgForm: 70 },
+      awayStrength: { startingOvr: 76, squadOvr: 76, avgEnergy: 82, avgStamina: 76, avgForm: 55 },
+      status: 'COMPLETED' as const,
+      homeGoals: 1,
+      awayGoals: 1,
+    };
+    const tiredUnderdogAwayDraw = {
+      ...makeMatchRow('match-tired-underdog-away-draw'),
+      homeTeamName: 'Strong Home',
+      awayTeamName: 'Tired Away',
+      homeStrength: { startingOvr: 82, squadOvr: 82, avgEnergy: 86, avgStamina: 80, avgForm: 60 },
+      awayStrength: { startingOvr: 76, squadOvr: 75, avgEnergy: 68, avgStamina: 70, avgForm: 48 },
+      status: 'COMPLETED' as const,
+      homeGoals: 1,
+      awayGoals: 1,
+    };
+    const tiredHomeWinning = {
+      ...makeMatchRow('match-tired-home-winning'),
+      homeStrength: { startingOvr: 78, squadOvr: 77, avgEnergy: 69, avgStamina: 74, avgForm: 55 },
+      awayStrength: { startingOvr: 78, squadOvr: 77, avgEnergy: 86, avgStamina: 78, avgForm: 60 },
+      status: 'COMPLETED' as const,
+      homeGoals: 2,
+      awayGoals: 1,
+    };
 
     component.selectedMinute.set(70);
 
@@ -1389,6 +1417,11 @@ describe('TestHarnessPageComponent', () => {
     expect((component as any).inferScenarioBatteryCoachObjective(awayWinning, 'AWAY', 60)).toBe('PROTECT_RESULT');
     expect((component as any).inferScenarioBatteryCoachObjective(realStrengthFavoriteHomeDraw, 'HOME', 75)).toBe('NEED_GOAL');
     expect((component as any).scenarioBatteryContextPressure(realStrengthFavoriteHomeDraw, 'HOME').label).toContain('/ovr');
+    expect((component as any).inferScenarioBatteryCoachObjective(freshSmallFavoriteHomeDraw, 'HOME', 65)).toBe('NEED_GOAL');
+    expect((component as any).scenarioBatteryContextPressure(freshSmallFavoriteHomeDraw, 'HOME').label).toContain('/fresco');
+    expect((component as any).inferScenarioBatteryCoachObjective(tiredUnderdogAwayDraw, 'AWAY', 70)).toBe('PROTECT_RESULT');
+    expect((component as any).scenarioBatteryContextPressure(tiredUnderdogAwayDraw, 'AWAY').label).toContain('/cansado');
+    expect((component as any).inferScenarioBatteryCoachObjective(tiredHomeWinning, 'HOME', 60)).toBe('PROTECT_RESULT');
   });
 
   it('renders scenario summary headers with stable separators', () => {

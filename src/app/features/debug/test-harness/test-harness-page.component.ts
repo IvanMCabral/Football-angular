@@ -6931,20 +6931,26 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       return 'NEUTRAL';
     }
     const pressure = this.scenarioBatteryContextPressure(match, controlledSide);
-    if (goalDiff < 0 && (minute >= 50 || goalDiff <= -2)) {
+    if (goalDiff < 0 && (minute >= (pressure.tired ? 45 : 50) || goalDiff <= -2)) {
       return 'NEED_GOAL';
     }
     if (goalDiff > 0 && (
-      minute >= 70
-      || (minute >= 60 && (pressure.away || pressure.reputationDelta <= 0))
+      minute >= (pressure.tired ? 60 : 70)
+      || (minute >= (pressure.tired ? 55 : 60) && (pressure.away || pressure.reputationDelta <= 0))
     )) {
       return 'PROTECT_RESULT';
     }
-    if (goalDiff === 0 && minute >= 70) {
-      if (!pressure.away && pressure.reputationDelta >= 2) {
+    if (goalDiff === 0 && (minute >= 70 || (pressure.fresh && !pressure.away && pressure.reputationDelta > 0 && minute >= 65))) {
+      if (pressure.tired && (pressure.away || pressure.reputationDelta <= 0) && minute >= 70) {
+        return 'PROTECT_RESULT';
+      }
+      if (!pressure.tired && !pressure.away && pressure.reputationDelta >= pressure.strongThreshold) {
         return 'NEED_GOAL';
       }
-      if (pressure.away && pressure.reputationDelta <= -2 && minute >= 75) {
+      if (pressure.fresh && !pressure.away && pressure.reputationDelta > 0 && minute >= 65) {
+        return 'NEED_GOAL';
+      }
+      if (pressure.away && pressure.reputationDelta <= -pressure.strongThreshold && minute >= (pressure.tired ? 70 : 75)) {
         return 'PROTECT_RESULT';
       }
     }
@@ -6954,7 +6960,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   private scenarioBatteryContextPressure(
     match: TestHarnessMatchRow,
     controlledSide: Exclude<ControlledTeamSide, 'USER'>
-  ): { label: string; reputationDelta: number; away: boolean } {
+  ): { label: string; reputationDelta: number; away: boolean; strongThreshold: number; tired: boolean; fresh: boolean } {
     const ownName = controlledSide === 'HOME' ? match.homeTeamName : match.awayTeamName;
     const rivalName = controlledSide === 'HOME' ? match.awayTeamName : match.homeTeamName;
     const ownStrength = controlledSide === 'HOME' ? match.homeStrength : match.awayStrength;
@@ -6971,7 +6977,38 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         ? 'underdog'
         : 'parejo';
     const source = ownRating.source === 'strength' && rivalRating.source === 'strength' ? 'ovr' : 'nombre';
-    return { label: `${venue}/${level}/${source}`, reputationDelta, away };
+    const condition = this.scenarioBatteryTeamCondition(ownStrength ?? null);
+    return {
+      label: `${venue}/${level}/${source}/${condition.label}`,
+      reputationDelta,
+      away,
+      strongThreshold,
+      tired: condition.tired,
+      fresh: condition.fresh,
+    };
+  }
+
+  private scenarioBatteryTeamCondition(
+    strength: TestHarnessMatchRow['homeStrength'] | null
+  ): { label: string; tired: boolean; fresh: boolean } {
+    const energy = strength?.avgEnergy;
+    const stamina = strength?.avgStamina;
+    const form = strength?.avgForm;
+    const hasRealCondition = energy !== null && energy !== undefined
+      || stamina !== null && stamina !== undefined
+      || form !== null && form !== undefined;
+    if (!hasRealCondition) {
+      return { label: 'condicion?', tired: false, fresh: false };
+    }
+    const tired = (energy !== null && energy !== undefined && energy < 72)
+      || (stamina !== null && stamina !== undefined && stamina < 72)
+      || (form !== null && form !== undefined && form < 45);
+    const fresh = (energy === null || energy === undefined || energy >= 88)
+      && (stamina === null || stamina === undefined || stamina >= 78)
+      && (form === null || form === undefined || form >= 60);
+    if (tired) return { label: 'cansado', tired: true, fresh: false };
+    if (fresh) return { label: 'fresco', tired: false, fresh: true };
+    return { label: 'normal', tired: false, fresh: false };
   }
 
   private scenarioBatteryTeamRating(
