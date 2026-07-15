@@ -3842,6 +3842,10 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     this.formationLineSmokeRows.set([]);
   }
 
+  private clearFormationAverageResults(): void {
+    this.formationMatrixSummaryResults.set([]);
+  }
+
   downloadFormationMatrixCsv(): void {
     const rows = this.formationReplayResults();
     const header = [
@@ -8482,7 +8486,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const seedStart = this.summarySeedStart();
     const seedCount = this.scenarioMatrixSummaryEffectiveSeedCount();
     this.scenarioMatrixSummarySeedCount.set(seedCount);
-    this.clearReplayAnalysisResults();
+    this.clearFormationAverageResults();
     this.analysisReadyMessage.set(`Formation averages corriendo: ${seedCount} seeds por formacion...`);
     this.mutationInFlight.set(true);
 

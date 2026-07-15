@@ -126,3 +126,14 @@ Ejecutar en `/debug/test-harness` para calibracion fina:
 - Fix SquadManagementComponent: confirmacion usa slots/subdivisiones persistidas como verdad del lineup, no players stale.
 - Tests especificos career+squad: 61/61 OK.
 - Suite frontend completa: 526 SUCCESS, 2 skipped.
+
+## V25D99.124 - Smoke visual Celta Vigo
+
+- Carrera smoke con Celta Vigo, partido Celta Vigo vs Mallorca, seed 12345.
+- All formations audit: 36/36 rows, 29 OK, 4 fallback, 3 review.
+- Reviews: 4-4-2 MID, 4-1-4-1 MID y 5-4-1 MID por hard off-role en roles de banda/medio, especialmente Iago Aspas usado como RM.
+- Pixel smoke: 15 rows, 7 visible/non-stable, 0 strong 1px cliff, 3 big tactical move -> OK.
+- Player swap precision: 6 precision swaps, 6 stable, 0 changed, 0 need more seeds -> OK.
+- Formation avg confirma tradeoffs; 4-3-3/4-1-2-3 producen mas tiros/xG, 5-4-1 baja produccion ofensiva.
+- Fix harness: Formation avg ya no borra el checklist ni evidencia previa de Panel E; test harness 55/55 OK.
+- Proximo ajuste sugerido: auto-select debe preferir WINGER natural para LM/RM antes que convertir ATT a medio de banda cuando el plantel lo permite.
