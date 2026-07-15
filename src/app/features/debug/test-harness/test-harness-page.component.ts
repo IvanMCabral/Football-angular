@@ -358,6 +358,12 @@ interface ScenarioBatteryRow {
   cards: ScenarioDecisionCard[];
 }
 
+interface ScenarioBatteryReviewItem {
+  key: string;
+  summary: string;
+  detail: string;
+}
+
 type PositionPixelExportRow = PositionPixelMatrixSummary & {
   read: string;
   tacticalRead: string;
@@ -2204,6 +2210,15 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
               </span>
               <span class="read-pill tactical-read-pill" [class.read-visible]="scenarioBatteryReviewCount() === 0" [class.read-noise]="scenarioBatteryReviewCount() > 0">
                 {{ scenarioBatteryReviewHint() }}
+              </span>
+            </div>
+            <div *ngIf="scenarioBatteryReviewItems().length > 0" class="position-read-summary tactical-read-summary" aria-label="Scenario battery review items">
+              <span
+                *ngFor="let item of scenarioBatteryReviewItems(); trackBy: trackByScenarioBatteryReviewItem"
+                class="read-pill tactical-read-pill read-noise"
+                [title]="item.detail"
+              >
+                {{ item.summary }}
               </span>
             </div>
             <div class="matrix-scroll">
@@ -7189,6 +7204,21 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const sample = labels.slice(0, 2).join(' + ');
     const suffix = labels.length > 2 ? ` +${labels.length - 2}` : '';
     return `Revision: ${reviewCount}/${rows.length} para mirar (${sample}${suffix}).`;
+  }
+
+  scenarioBatteryReviewItems(): ScenarioBatteryReviewItem[] {
+    return this.scenarioBatteryRows()
+      .filter((row) => row.review.startsWith('Revisar'))
+      .slice(0, 5)
+      .map((row) => ({
+        key: `${row.matchId}-${row.controlledSide}-${row.review}`,
+        summary: `${row.review}: ${row.controlledTeam} vs ${row.matchLabel}`,
+        detail: `${row.coachContext} · ${row.decision} · ${row.reviewDetail}`,
+      }));
+  }
+
+  trackByScenarioBatteryReviewItem(_: number, item: ScenarioBatteryReviewItem): string {
+    return item.key;
   }
 
   scenarioBatteryGroupLabel(group: 'ALL' | 'OFFENSE' | 'DEFENSE' | 'OPPONENT'): string {

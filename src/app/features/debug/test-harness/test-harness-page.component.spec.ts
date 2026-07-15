@@ -1452,6 +1452,20 @@ describe('TestHarnessPageComponent', () => {
     ] as any);
     expect(component.scenarioBatteryReviewCount()).toBe(1);
     expect(component.scenarioBatteryReviewHint()).toContain('1/2 para mirar');
+    component.scenarioBatteryRows.set([
+      {
+        matchId: 'm1',
+        controlledSide: 'HOME',
+        controlledTeam: 'Atletico Madrid',
+        matchLabel: 'Atletico Madrid vs Sevilla',
+        coachContext: '1-1 min 75',
+        decision: 'No forzar',
+        review: 'Revisar: poco gol',
+        reviewDetail: 'test detail',
+      },
+    ] as any);
+    expect(component.scenarioBatteryReviewItems()[0].summary).toContain('Atletico Madrid');
+    expect(component.scenarioBatteryReviewItems()[0].detail).toContain('No forzar');
   });
 
   it('renders scenario summary headers with stable separators', () => {
