@@ -3409,6 +3409,9 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   /** Active debounce timer for the timeline fetch. */
   private timelineFetchTimer: ReturnType<typeof setTimeout> | null = null;
 
+  /** Timers used to refresh Panel C after async round simulation starts. */
+  private roundRefreshTimers: Array<ReturnType<typeof setTimeout>> = [];
+
   /** Monotonic counter for stale-response rejection. */
   private timelineFetchSeq = 0;
 
@@ -3475,6 +3478,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       clearTimeout(this.timelineFetchTimer);
       this.timelineFetchTimer = null;
     }
+    this.clearRoundRefreshTimers();
   }
 
   private loadFormationCoordinateCache(): void {
@@ -6583,10 +6587,10 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           'OK',
           { duration: 3000 }
         );
-        // The simulation is async ? reload the match list once so the UI
-        // catches up on whatever completed by the time the response lands.
-        // Iv?n can re-click Simulate or Replay later for further updates.
-        this.loadMatches();
+        // The simulation is async: refresh Panel C several times so the UI
+        // catches the completed fixtures instead of freezing on the initial
+        // PENDING snapshot returned by /rounds/start.
+        this.scheduleRoundCompletionRefresh(roundNumber, matchesPayload.length);
       },
       error: (err) => {
         this.mutationInFlight.set(false);
@@ -9143,7 +9147,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
 
   // ============== Internal helpers ==============
 
-  private loadMatches(): void {
+  private loadMatches(onLoaded?: (rounds: RoundGroup[]) => void): void {
     this.careerService.getAllFixturesWithBye().subscribe({
       next: (resp) => {
         const rounds: RoundGroup[] = (resp?.rounds ?? []).map((rd) => ({
@@ -9155,6 +9159,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         }));
         this.rounds.set(rounds);
         this.loading.set(false);
+        onLoaded?.(rounds);
       },
       error: (err) => {
         this.loadError.set(
@@ -9163,6 +9168,39 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         this.loading.set(false);
       },
     });
+  }
+
+  private scheduleRoundCompletionRefresh(roundNumber: number, expectedMatchCount: number): void {
+    this.clearRoundRefreshTimers();
+
+    const refresh = () => {
+      this.loadMatches((rounds) => {
+        const roundGroup = rounds.find((r) => r.round === roundNumber);
+        const completed = (roundGroup?.matches ?? [])
+          .filter((match) => String(match.status).toUpperCase() === 'COMPLETED')
+          .length;
+        if (expectedMatchCount > 0 && completed >= expectedMatchCount) {
+          this.clearRoundRefreshTimers();
+          this.snackBar.open(
+            `Round ${roundNumber} completed (${completed}/${expectedMatchCount}). Battery tablero ya tiene mas muestra.`,
+            'OK',
+            { duration: 3500 }
+          );
+        }
+      });
+    };
+
+    refresh();
+    for (const delayMs of [1500, 4000, 8000, 12000]) {
+      this.roundRefreshTimers.push(setTimeout(refresh, delayMs));
+    }
+  }
+
+  private clearRoundRefreshTimers(): void {
+    for (const timer of this.roundRefreshTimers) {
+      clearTimeout(timer);
+    }
+    this.roundRefreshTimers = [];
   }
 
   /**
