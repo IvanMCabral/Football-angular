@@ -3697,7 +3697,8 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return this.harness.getCurrentLineup().pipe(
       switchMap((lineup) => {
         const playerCount = lineup.players?.length ?? 0;
-        if (playerCount > 0) {
+        const slotCount = this.effectivePositionPixelSlots(lineup).length;
+        if (playerCount === 11 && slotCount >= 11) {
           return of(lineup);
         }
         this.analysisReadyMessage.set(
@@ -5104,9 +5105,10 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   }
 
   private pickPositionPixelCandidates(lineup: LineupDTO): PositionPixelCandidate[] {
-    const slots = this.buildLineupSlots(lineup);
+    const slots = this.effectivePositionPixelSlots(lineup);
     const slotByPlayer = new Map(slots.map((slot) => [slot.playerId, slot.subdivisionId]));
-    const movablePlayers = (lineup.players ?? []).filter((player) => player.position !== 'GK');
+    const movablePlayers = (lineup.players ?? [])
+      .filter((player) => !!player.playerId && player.position !== 'GK');
     const selected = this.selectedSwapStarterIdModel
       ? movablePlayers.find((player) => player.playerId === this.selectedSwapStarterIdModel)
       : null;
@@ -5130,12 +5132,14 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       unique.set(player.playerId, player);
     }
 
-    return Array.from(unique.values()).map((player) => ({
-      starterId: player.playerId,
-      starterName: player.name,
-      starterPosition: player.position,
-      slotId: slotByPlayer.get(player.playerId) ?? '',
-    }));
+    return Array.from(unique.values())
+      .map((player) => ({
+        starterId: player.playerId,
+        starterName: player.name,
+        starterPosition: player.position,
+        slotId: slotByPlayer.get(player.playerId) ?? '',
+      }))
+      .filter((candidate) => !!candidate.starterId);
   }
 
   private pickPositionPixelLineCandidates(lineup: LineupDTO, line: 'DEF' | 'MID' | 'ATT', maxCount: number): PositionPixelCandidate[] {
@@ -5146,10 +5150,10 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       this.positionPixelLineFromSlot(lineup.formation, slotMetaByPlayer.get(player.playerId))
         ?? this.strictPositionPixelLine(player.position);
     const selected = this.selectedSwapStarterIdModel
-      ? (lineup.players ?? []).find((player) => player.playerId === this.selectedSwapStarterIdModel && player.position !== 'GK')
+      ? (lineup.players ?? []).find((player) => !!player.playerId && player.playerId === this.selectedSwapStarterIdModel && player.position !== 'GK')
       : null;
     const players = (lineup.players ?? [])
-      .filter((player) => player.position !== 'GK' && playerLine(player) === line)
+      .filter((player) => !!player.playerId && player.position !== 'GK' && playerLine(player) === line)
       .sort((a, b) => {
         const aHasSlot = slotByPlayer.has(a.playerId) ? 0 : 1;
         const bHasSlot = slotByPlayer.has(b.playerId) ? 0 : 1;
@@ -5159,12 +5163,14 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       ? [selected, ...players.filter((player) => player.playerId !== selected.playerId)]
       : players;
 
-    return ordered.slice(0, maxCount).map((player) => ({
-      starterId: player.playerId,
-      starterName: player.name,
-      starterPosition: player.position,
-      slotId: slotByPlayer.get(player.playerId) ?? '',
-    }));
+    return ordered.slice(0, maxCount)
+      .map((player) => ({
+        starterId: player.playerId,
+        starterName: player.name,
+        starterPosition: player.position,
+        slotId: slotByPlayer.get(player.playerId) ?? '',
+      }))
+      .filter((candidate) => !!candidate.starterId);
   }
 
   private effectivePositionPixelSlots(lineup: LineupDTO): LineupSlotDTO[] {
