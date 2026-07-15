@@ -1048,7 +1048,8 @@ describe('TestHarnessPageComponent', () => {
     expect(report).toContain('Reads: 1 Clear upgrade · 1 Clear downgrade');
     expect(report).toContain('Fit: 2 Same profile');
     expect(report).toContain('Coach read: Lectura balanceada');
-    expect(report).toContain('| Swap | OVR | Fit | Read | Señal | Ataque | Control | Proteccion | Canales | Shots | Shots Ag. | xG For | xG Ag. | xG Diff | Pre xG Diff |');
+    expect(report).toContain('| Swap | OVR | Fit | Read |');
+    expect(report).toContain('| Ataque | Control | Proteccion | Canales | Shots | Shots Ag. | xG For | xG Ag. | xG Diff | Pre xG Diff |');
     expect(report).toContain('| Jude Bellingham -> Endrick | — | Same profile | Clear upgrade | Alta 0.150 | Ataque + | Control = | Proteccion = | Canales = | +2.25 | +0.50 | +0.18 | +0.03 | +0.15 | +0.11 |');
     expect(report).toContain('## Tactical breakdown detail');
     expect(snackBarSpy.open).toHaveBeenCalledWith('Player swap battery report copied.', 'OK', { duration: 2500 });
@@ -1117,6 +1118,54 @@ describe('TestHarnessPageComponent', () => {
     expect(pixel?.observed).toContain('1 rows');
     expect(swap?.observed).toContain('1 swaps');
     expect(swap?.verdict).toBe('OK');
+  });
+
+  it('uses precision comparison rows as player swap checklist evidence', () => {
+    component.playerSwapPrecisionComparisonRows.set([
+      {
+        candidateKey: 'stable',
+        starter: 'Starter A',
+        bench: 'Bench A',
+        slotId: 'S05-1',
+        fit: 'Same profile',
+        quick: makePlayerSwapSummary({ swapRead: 'Noise / neutral' }),
+        balanced: makePlayerSwapSummary({ swapRead: 'Noise / neutral' }),
+        stability: 'Stable read',
+        stabilityClass: 'read-neutral',
+      },
+      {
+        candidateKey: 'changed',
+        starter: 'Starter B',
+        bench: 'Bench B',
+        slotId: 'S06-1',
+        fit: 'Same line',
+        quick: makePlayerSwapSummary({ swapRead: 'Clear upgrade' }),
+        balanced: makePlayerSwapSummary({ swapRead: 'Noise / neutral' }),
+        stability: 'Changed read',
+        stabilityClass: 'read-warning',
+      },
+      {
+        candidateKey: 'needs-seeds',
+        starter: 'Starter C',
+        bench: 'Bench C',
+        slotId: 'S07-1',
+        fit: 'Same line',
+        quick: makePlayerSwapSummary({ swapRead: 'Clear upgrade' }),
+        balanced: makePlayerSwapSummary({ swapRead: 'Clear upgrade' }),
+        stability: 'Needs more seeds',
+        stabilityClass: 'read-warning',
+      },
+    ] as any);
+
+    const swap = component.professionalQaChecklistRows()
+      .find((row) => row.check === 'Player swap signal');
+
+    expect(swap?.observed).toContain('3 precision swaps');
+    expect(swap?.observed).toContain('1 stable');
+    expect(swap?.observed).toContain('1 changed');
+    expect(swap?.observed).toContain('1 need more seeds');
+    expect(swap?.verdict).toBe('Review');
+    expect(swap?.next).toContain('Trust balanced reads');
   });
 });
 

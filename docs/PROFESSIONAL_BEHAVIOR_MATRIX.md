@@ -33,7 +33,7 @@ razonable.
 | Abrir bandas | ancho, centros, aislamiento | sube wide; baja compactacion; mas riesgo central/espalda | `Scenario matrix`, `Position presets matrix` | OK parcial |
 | Sobrecargar izquierda | canal izquierdo propio/rival | sube izquierda mas que derecha, especialmente vs debilidad | `Smoke rival`, `Battery tablero` | Debil |
 | Sobrecargar derecha | canal derecho propio/rival | sube derecha mas que izquierda, especialmente vs debilidad | `Smoke rival`, `Battery tablero` | Debil |
-| Cambiar jugador por mejor mismo rol | calidad especifica de rol | mejora promedio en xG/defensa/zona ligada al rol | `Professional QA checklist`, `Player swap matrix`, `Player swap battery` | OK en quick; falta mas confianza |
+| Cambiar jugador por mejor mismo rol | calidad especifica de rol | mejora promedio en xG/defensa/zona ligada al rol | `Professional QA checklist`, `Player swap matrix`, `Player swap battery`, `Compare precision` | OK; usar Balanced para decidir |
 | Cambiar jugador fuera de rol | penalizacion + posible beneficio parcial | baja eficiencia del rol; puede subir una virtud individual | `Player swap matrix`, `Formation line audit` | En progreso |
 | Cambiar tactica/style | ritmo, foco, riesgo | modifica distribucion de eventos sin ignorar posiciones | `Scenario matrix`, `Multi-seed matrix` | En progreso |
 
@@ -73,6 +73,12 @@ Orden recomendado para tablero combinado: seleccionar primero un partido del usu
    - 6 swaps.
    - 6 actionable reads.
    - Low confidence en modo quick.
+4. `Player swap precision compare` en partido `Vigo City vs Vigo City 1`:
+   - 6 swaps.
+   - 4 stable reads.
+   - 1 changed read.
+   - 1 needs more seeds.
+   - Lectura: quick sirve como smoke, pero Balanced 10 seeds es la lectura para decidir calibracion.
 
 ## Proxima bateria recomendada
 
@@ -96,3 +102,20 @@ Ejecutar en `/debug/test-harness` para calibracion fina:
   y queda visible con formaciones, pixels o swaps.
 - Probar varios equipos, no solo Real Madrid/Vigo City, para validar planteles
   con perfiles naturales distintos.
+
+## V25D99.122 - Player swap precision compare
+
+- Smoke visual en `/debug/test-harness`, partido `Vigo City vs Vigo City 1`.
+- Resultado:
+  - 6 swaps comparados.
+  - 4 `Stable read`.
+  - 1 `Changed read`.
+  - 1 `Needs more seeds`.
+- Lectura:
+  - `Quick 3 seeds` sirve como detector rapido.
+  - `Balanced 10 seeds` es la lectura para decidir calibracion.
+  - Quick sobreactuo algunos upgrades defensivos; Balanced los llevo a neutral/noise.
+- Ajuste del harness:
+  - Si se corre solo `Compare precision`, el `Professional QA checklist` ya toma esas filas como evidencia de `Player swap signal`.
+  - Checklist visual confirmado: `6 precision swaps · 4 stable · 1 changed · 1 need more seeds` -> `Review`, accion `Trust balanced reads; quick is smoke only.`
+- Test frontend harness especifico: 55/55 OK.

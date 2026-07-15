@@ -2975,9 +2975,11 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       const pixelMatchSummaries = this.positionPixelMatchSmokeSummary();
       const pixelPlayerSummaries = this.positionPixelPlayerSmokeSummary();
       const swapBattery = this.playerSwapBatterySummary();
+      const swapPrecisionRows = this.playerSwapPrecisionComparisonRows();
     const hasAudit = rows.length > 0;
     const hasPixelRows = pixelRows.length > 0;
     const hasSwapBattery = swapBattery.total > 0;
+    const hasSwapPrecision = swapPrecisionRows.length > 0;
     const rowsByLine = (line: 'DEF' | 'MID' | 'ATT') => rows.filter((row) => row.line === line);
     const countByVerdict = (verdict: string) => rows.filter((row) => row.verdict === verdict).length;
     const hardReviews = rows.filter((row) => row.verdict === 'Review');
@@ -3007,6 +3009,24 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const swapActionableReads = Object.entries(swapBattery.reads)
       .filter(([read]) => !['No clear effect', 'Neutral', 'Sin lectura clara'].includes(read))
       .reduce((sum, [, count]) => sum + count, 0);
+    const stableSwapReads = swapPrecisionRows.filter((row) => row.stability === 'Stable read').length;
+    const changedSwapReads = swapPrecisionRows.filter((row) => row.stability === 'Changed read').length;
+    const needsMoreSwapSeeds = swapPrecisionRows.filter((row) => row.stability === 'Needs more seeds').length;
+    const swapObserved = hasSwapBattery
+      ? `${swapBattery.total} swaps · ${swapActionableReads} actionable read(s) · ${swapBattery.confidence}`
+      : hasSwapPrecision
+        ? `${swapPrecisionRows.length} precision swaps · ${stableSwapReads} stable · ${changedSwapReads} changed · ${needsMoreSwapSeeds} need more seeds`
+        : 'Not run yet';
+    const swapVerdict: ProfessionalQaChecklistRow['verdict'] = hasSwapBattery
+      ? swapActionableReads > 0 ? 'OK' : 'Review'
+      : hasSwapPrecision
+        ? changedSwapReads > 0 ? 'Review' : needsMoreSwapSeeds > 0 ? 'Fallback' : 'OK'
+        : 'Pending';
+    const swapNext = hasSwapBattery
+      ? swapActionableReads > 0 ? 'Use best/worst to tune role quality.' : 'Check whether substitutions influence engine enough.'
+      : hasSwapPrecision
+        ? changedSwapReads > 0 ? 'Trust balanced reads; quick is smoke only.' : needsMoreSwapSeeds > 0 ? 'Run balanced or more seeds for borderline swaps.' : 'Precision stable enough.'
+        : 'Run Player swap battery or Compare precision.';
     return [
       {
         check: 'All formations audit',
@@ -3053,9 +3073,9 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       {
         check: 'Player swap signal',
         expected: 'Changing players should affect role quality and match averages.',
-        observed: hasSwapBattery ? `${swapBattery.total} swaps · ${swapActionableReads} actionable read(s) · ${swapBattery.confidence}` : 'Not run yet',
-        verdict: !hasSwapBattery ? 'Pending' : swapActionableReads > 0 ? 'OK' : 'Review',
-        next: !hasSwapBattery ? 'Run Player swap battery.' : swapActionableReads > 0 ? 'Use best/worst to tune role quality.' : 'Check whether substitutions influence engine enough.',
+        observed: swapObserved,
+        verdict: swapVerdict,
+        next: swapNext,
       },
     ];
   });
