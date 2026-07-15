@@ -323,6 +323,7 @@ type ScenarioSummaryReadLevel = 'noise' | 'small' | 'visible' | 'strong' | 'revi
 type ScenarioSummaryReadFilter = 'all' | ScenarioSummaryReadLevel | 'actionable';
 type ScenarioSummarySortMode = 'default' | 'read-desc' | 'impact-desc' | 'xg-desc';
 type ControlledTeamSide = 'USER' | 'HOME' | 'AWAY';
+type ScenarioBatteryCoachObjective = 'NEUTRAL' | 'NEED_GOAL' | 'PROTECT_RESULT';
 interface ScenarioScoutingNote {
   title: string;
   body: string;
@@ -719,6 +720,19 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                   <mat-option value="balanced">Media</mat-option>
                 </mat-select>
                 <mat-hint>{{ scenarioBatteryScopeHint() }}</mat-hint>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="swap-field">
+                <mat-label>Objetivo DT</mat-label>
+                <mat-select
+                  [(ngModel)]="scenarioBatteryCoachObjectiveModel"
+                  aria-label="Select tactical battery coach objective"
+                >
+                  <mat-option value="NEUTRAL">Neutral</mat-option>
+                  <mat-option value="NEED_GOAL">Necesito gol</mat-option>
+                  <mat-option value="PROTECT_RESULT">Cuidar resultado</mat-option>
+                </mat-select>
+                <mat-hint>{{ scenarioBatteryCoachObjectiveHint() }}</mat-hint>
               </mat-form-field>
             </div>
 
@@ -2904,6 +2918,8 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   scenarioBatteryGroupModel: 'ALL' | 'OFFENSE' | 'DEFENSE' | 'OPPONENT' = 'OFFENSE';
 
   scenarioBatteryScopeModel: 'quick' | 'balanced' = 'quick';
+
+  scenarioBatteryCoachObjectiveModel: ScenarioBatteryCoachObjective = 'NEUTRAL';
 
   /** V24D24.2: seed for the "Replay with seed" button (null = non-reproducible). */
   seedInputModel: number | null = DEFAULT_REPLAY_SEED;
@@ -6849,6 +6865,17 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       : `Rapida: hasta 2 partidos x Local/Visitante.${suffix}`;
   }
 
+  scenarioBatteryCoachObjectiveHint(): string {
+    switch (this.scenarioBatteryCoachObjectiveModel) {
+      case 'NEED_GOAL':
+        return 'Prioriza upside ofensivo aunque abra espacios.';
+      case 'PROTECT_RESULT':
+        return 'Prioriza bajar riesgo y evitar intercambios.';
+      default:
+        return 'Lectura equilibrada para partido abierto.';
+    }
+  }
+
   scenarioBatteryGroupHint(): string {
     switch (this.scenarioBatteryGroupModel) {
       case 'ALL':
@@ -7227,7 +7254,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     rows: ScenarioMatrixSummaryRow[]
   ): ScenarioBatteryRow {
     const cards = this.buildScenarioDecisionCards(rows);
-    const decision = this.scenarioBatteryDecision(cards);
+    const decision = this.scenarioBatteryDecision(cards, this.scenarioBatteryCoachObjectiveModel);
     return {
       matchId: match.matchId,
       matchLabel: `${match.homeTeamName} vs ${match.awayTeamName}`,
@@ -7243,7 +7270,10 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     };
   }
 
-  private scenarioBatteryDecision(cards: ScenarioDecisionCard[]): { label: string; detail: string } {
+  private scenarioBatteryDecision(
+    cards: ScenarioDecisionCard[],
+    objective: ScenarioBatteryCoachObjective = this.scenarioBatteryCoachObjectiveModel
+  ): { label: string; detail: string } {
     const card = (title: string) => cards.find((item) => item.title === title);
     const twoWay = card('Doble ganancia');
     if (twoWay) {
@@ -7252,7 +7282,43 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         detail: `${twoWay.label} da doble ganancia. ${twoWay.metrics}. ${twoWay.detail}`,
       };
     }
+    const protect = card('Cuidar');
+    const threat = card('Amenaza rival');
+    const offensiveRisk = card('Riesgo ofensivo');
+    const avoid = card('Evitar');
+    if (objective === 'PROTECT_RESULT') {
+      if (protect) {
+        return {
+          label: `Cerrar partido: ${protect.label}`,
+          detail: `${protect.label} es la mejor proteccion para cuidar resultado. ${protect.metrics}. ${protect.detail}`,
+        };
+      }
+      if (threat) {
+        return {
+          label: `Cerrar amenaza: ${threat.label}`,
+          detail: `${threat.label} es la amenaza principal si estas cuidando el partido. ${threat.metrics}. ${threat.detail}`,
+        };
+      }
+      if (offensiveRisk) {
+        return {
+          label: `No arriesgar: ${offensiveRisk.label}`,
+          detail: `${offensiveRisk.label} puede mejorar ataque, pero no encaja con cuidar resultado porque abre espacios. ${offensiveRisk.metrics}. ${offensiveRisk.detail}`,
+        };
+      }
+      if (avoid) {
+        return {
+          label: `No forzar: ${avoid.label}`,
+          detail: `${avoid.label} abre riesgo y no conviene si estas protegiendo resultado. ${avoid.metrics}. ${avoid.detail}`,
+        };
+      }
+    }
     const attack = card('Atacar');
+    if (objective === 'NEED_GOAL' && offensiveRisk) {
+      return {
+        label: `Riesgo asumible: ${offensiveRisk.label}`,
+        detail: `${offensiveRisk.label} mejora el ataque y puede valer la pena si necesitas gol. Ojo: abre espacios. ${offensiveRisk.metrics}. ${offensiveRisk.detail}`,
+      };
+    }
     if (attack) {
       return {
         label: `Atacar: ${attack.label}`,
@@ -7266,28 +7332,24 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         detail: `${shape.label} cambia la forma con impacto visible. ${shape.metrics}. ${shape.detail}`,
       };
     }
-    const protect = card('Cuidar');
     if (protect) {
       return {
         label: `Proteger: ${protect.label}`,
         detail: `${protect.label} es la mejor proteccion detectada. ${protect.metrics}. ${protect.detail}`,
       };
     }
-    const threat = card('Amenaza rival');
     if (threat) {
       return {
         label: `Vigilar: ${threat.label}`,
         detail: `${threat.label} es la amenaza principal del rival. ${threat.metrics}. ${threat.detail}`,
       };
     }
-    const offensiveRisk = card('Riesgo ofensivo');
     if (offensiveRisk) {
       return {
         label: `Riesgo alto: ${offensiveRisk.label}`,
         detail: `${offensiveRisk.label} mejora el ataque pero abre espacios. Usarlo si necesitas gol o aceptas intercambio. ${offensiveRisk.metrics}. ${offensiveRisk.detail}`,
       };
     }
-    const avoid = card('Evitar');
     if (avoid) {
       return {
         label: `No forzar: ${avoid.label}`,

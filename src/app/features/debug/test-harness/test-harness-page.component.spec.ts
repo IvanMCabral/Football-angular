@@ -1297,6 +1297,35 @@ describe('TestHarnessPageComponent', () => {
     expect(decision.detail).toContain('mejora el ataque pero abre espacios');
   });
 
+  it('adapts tactical battery decision to coach objective', () => {
+    const rows = [
+      makeScenarioSummaryRow({
+        scenario: 'base-balanced',
+        actionType: 'NONE',
+        actionDetail: 'Baseline',
+      }),
+      makeScenarioSummaryRow({
+        scenario: 'm45-position-mid-up',
+        actionType: 'POSITION',
+        actionDetail: 'CM -> x50/y40',
+        avgUserXgDelta: 0.03,
+        avgOpponentXgDelta: 0.18,
+        avgOpponentShotsDelta: 1.8,
+      }),
+    ];
+
+    const cards = (component as any).buildScenarioDecisionCards(rows);
+    const neutral = (component as any).scenarioBatteryDecision(cards, 'NEUTRAL');
+    const chasing = (component as any).scenarioBatteryDecision(cards, 'NEED_GOAL');
+    const protecting = (component as any).scenarioBatteryDecision(cards, 'PROTECT_RESULT');
+
+    expect(neutral.label).toContain('Riesgo alto: CM -> x50/y40');
+    expect(chasing.label).toContain('Riesgo asumible: CM -> x50/y40');
+    expect(chasing.detail).toContain('si necesitas gol');
+    expect(protecting.label).toContain('No arriesgar: CM -> x50/y40');
+    expect(protecting.detail).toContain('cuidar resultado');
+  });
+
   it('renders scenario summary headers with stable separators', () => {
     component.scenarioMatrixSummaryResults.set([
       makeScenarioSummaryRow({
