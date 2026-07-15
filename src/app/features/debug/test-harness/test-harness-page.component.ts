@@ -2159,6 +2159,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
               <span>
                 {{ scenarioBatteryRows().length }} lecturas - seeds {{ summarySeedStart() }}..{{ summarySeedStart() + scenarioMatrixSmokeSeedCount() - 1 }}
                 - {{ scenarioBatteryGroupLabel(scenarioBatteryRows()[0]?.scenarioGroup || scenarioBatteryGroupModel) }}
+                - {{ scenarioBatteryCandidateMatches().length }}/{{ scenarioBatteryMatchLimit() }} partidos disponibles
               </span>
               <button type="button" class="matrix-export" (click)="copyScenarioBatteryJson()">
                 Copy JSON
@@ -6825,9 +6826,14 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   }
 
   scenarioBatteryScopeHint(): string {
+    const available = this.scenarioBatteryCandidateMatches().length;
+    const limit = this.scenarioBatteryMatchLimit();
+    const suffix = available < limit
+      ? ` Hoy hay ${available}/${limit} partidos completados disponibles.`
+      : ` ${available}/${limit} partidos disponibles.`;
     return this.scenarioBatteryScopeModel === 'balanced'
-      ? 'Media: hasta 4 partidos x Local/Visitante.'
-      : 'Rapida: hasta 2 partidos x Local/Visitante.';
+      ? `Media: hasta 4 partidos x Local/Visitante.${suffix}`
+      : `Rapida: hasta 2 partidos x Local/Visitante.${suffix}`;
   }
 
   scenarioBatteryGroupHint(): string {
@@ -6847,6 +6853,11 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const readings = this.scenarioBatteryRows().length;
     const seeds = this.scenarioMatrixSmokeSeedCount();
     const coverage = readings > 0 ? `${readings} lecturas x ${seeds} seeds` : `${seeds} seeds`;
+    const availableMatches = this.scenarioBatteryCandidateMatches().length;
+    const targetMatches = this.scenarioBatteryMatchLimit();
+    if (this.scenarioBatteryScopeModel === 'balanced' && availableMatches < targetMatches) {
+      return `Cobertura limitada: ${coverage}; faltan partidos completados para decidir tendencias.`;
+    }
     return this.scenarioBatteryScopeModel === 'balanced'
       ? `Cobertura media: ${coverage}; usar para decidir tendencias.`
       : `Cobertura smoke: ${coverage}; usar para detectar senales, no para cerrar balance.`;
@@ -6865,7 +6876,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     }
   }
 
-  private scenarioBatteryMatchLimit(): number {
+  scenarioBatteryMatchLimit(): number {
     return this.scenarioBatteryScopeModel === 'balanced' ? 4 : 2;
   }
 
@@ -8678,7 +8689,9 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
 
     this.scenarioBatteryRows.set([]);
     this.scenarioMatrixSummarySeedCount.set(seedCount);
-    this.scenarioBatteryProgress.set(`Battery tablero: 0/${jobs.length} lecturas...`);
+    this.scenarioBatteryProgress.set(
+      `Battery tablero: 0/${jobs.length} lecturas (${matches.length}/${this.scenarioBatteryMatchLimit()} partidos)...`
+    );
     this.mutationInFlight.set(true);
 
     from(jobs).pipe(
@@ -8703,7 +8716,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
             const completedRows = partialRows.filter((item): item is ScenarioBatteryRow => !!item);
             this.scenarioBatteryRows.set(completedRows);
             this.scenarioBatteryProgress.set(
-              `Battery tablero: ${completedRows.length}/${jobs.length} lecturas...`
+              `Battery tablero: ${completedRows.length}/${jobs.length} lecturas (${matches.length}/${this.scenarioBatteryMatchLimit()} partidos)...`
             );
             return row;
           })
