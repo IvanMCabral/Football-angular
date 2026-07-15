@@ -34,10 +34,12 @@ describe('TestHarnessPageComponent', () => {
       'getCareerStatus',
       'getAllFixturesWithBye',
     ]);
-    harness = jasmine.createSpyObj('TestHarnessService', [
-      'setFormation',
-      'setStyle',
-      'getCurrentLineup',
+      harness = jasmine.createSpyObj('TestHarnessService', [
+        'setFormation',
+        'setStyle',
+        'getCurrentLineup',
+        'autoSelectLineup',
+        'manualSelectLineup',
       'resetInjuries',
       'replaceFixtures',
       'replayMatch',
@@ -100,6 +102,9 @@ describe('TestHarnessPageComponent', () => {
     harness.setStyle.and.returnValue(
       of({ success: true, message: 'style ok', style: 'BALANCED' } as any)
     );
+    harness.getCurrentLineup.and.returnValue(of(sampleLineup('4-4-2')) as any);
+    harness.autoSelectLineup.and.returnValue(of(sampleLineup('4-4-2')) as any);
+    harness.manualSelectLineup.and.returnValue(of(sampleLineup('4-4-2')) as any);
 
     await TestBed.configureTestingModule({
       imports: [TestHarnessPageComponent, NoopAnimationsModule],
@@ -225,13 +230,33 @@ describe('TestHarnessPageComponent', () => {
     expect(component.selectedFormationModel).toBeNull();
   });
 
-  it('applyFormation calls the service with the selected formation', () => {
+  it('applyFormation applies the selected formation and rebuilds canonical slots', () => {
     harness.setFormation.and.returnValue(
       of({ success: true, message: 'ok' } as any)
     );
+    harness.getCurrentLineup.and.returnValue(of(sampleLineup('4-4-2')) as any);
+    harness.manualSelectLineup.and.returnValue(of(sampleLineup('4-3-3')) as any);
     component.selectedFormationModel = '4-3-3';
     component.applyFormation();
+    expect(harness.getCurrentLineup).toHaveBeenCalled();
     expect(harness.setFormation).toHaveBeenCalledWith('4-3-3');
+    expect(harness.manualSelectLineup).toHaveBeenCalledWith(
+      '4-3-3',
+      Array.from({ length: 11 }, (_, i) => `p${i + 1}`),
+      [
+        { playerId: 'p1', subdivisionId: 'GK-1' },
+        { playerId: 'p2', subdivisionId: 'S22-2' },
+        { playerId: 'p3', subdivisionId: 'S23-1' },
+        { playerId: 'p4', subdivisionId: 'S23-3' },
+        { playerId: 'p5', subdivisionId: 'S24-2' },
+        { playerId: 'p6', subdivisionId: 'S17-1' },
+        { playerId: 'p7', subdivisionId: 'S17-2' },
+        { playerId: 'p8', subdivisionId: 'S17-3' },
+        { playerId: 'p9', subdivisionId: 'S04-1' },
+        { playerId: 'p10', subdivisionId: 'S05-2' },
+        { playerId: 'p11', subdivisionId: 'S06-3' },
+      ]
+    );
     expect(snackBarSpy.open).toHaveBeenCalled();
     expect(component.mutationInFlight()).toBeFalse();
   });
@@ -244,6 +269,7 @@ describe('TestHarnessPageComponent', () => {
   });
 
   it('applyFormation surfaces errors via the snackbar', () => {
+    harness.getCurrentLineup.and.returnValue(of(sampleLineup('4-4-2')) as any);
     harness.setFormation.and.returnValue(throwError(() => new Error('boom')));
     component.selectedFormationModel = '4-4-2';
     component.applyFormation();
@@ -1091,6 +1117,24 @@ function sampleSnapshot(minute: number): TimelineSnapshot {
     homeShots: 4,
     awayShots: 1,
     events: [],
+  };
+}
+
+function sampleLineup(formation: string) {
+  return {
+    formation,
+    confirmed: true,
+    warnings: [],
+    players: Array.from({ length: 11 }, (_, i) => ({
+      playerId: `p${i + 1}`,
+      name: `Player ${i + 1}`,
+      position: i === 0 ? 'GK' : i < 5 ? 'DEF' : i < 9 ? 'MID' : 'ATT',
+      overall: 70,
+    })),
+    slots: Array.from({ length: 11 }, (_, i) => ({
+      playerId: `p${i + 1}`,
+      subdivisionId: i === 0 ? 'GK-1' : `S${String(i + 1).padStart(2, '0')}-1`,
+    })),
   };
 }
 

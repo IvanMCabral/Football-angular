@@ -292,6 +292,7 @@ interface PositionPixelMatchSmokeSummary {
   worstTacticalRead: string;
   dominantCause: string;
   fivePxRiskRows: number;
+  fivePxCostRows: number;
   bigMoveRows: number;
   bigMoveStrongRows: number;
   verdict: string;
@@ -304,6 +305,7 @@ interface PositionPixelPlayerSmokeSummary {
   playerPosition: string;
   rows: number;
   fivePxRiskRows: number;
+  fivePxCostRows: number;
   bigMoveStrongRows: number;
   bigMoveRows: number;
   avgSignal: number;
@@ -371,6 +373,43 @@ interface PositionPixelCandidate {
   starterName: string;
   starterPosition: string;
   slotId: string;
+}
+
+interface LineupDebugRow {
+  index: number;
+  playerId: string;
+  name: string;
+  position: string;
+  slotId: string;
+  x: number | null;
+  y: number | null;
+  visualLine: 'GK' | 'DEF' | 'MID' | 'ATT' | 'UNKNOWN';
+  source: 'persisted' | 'canonical' | 'missing';
+}
+
+interface LineupDebugSnapshot {
+  label: string;
+  formation: string;
+  selectedFormation: string;
+  playerCount: number;
+  nonGkCount: number;
+  persistedSlotCount: number;
+  effectiveSlotCount: number;
+  candidatesCount: number;
+  visualLineFilter: string;
+  rows: LineupDebugRow[];
+  warnings: string[];
+}
+
+interface FormationLineSmokeRow {
+  formation: string;
+  line: 'DEF' | 'MID' | 'ATT';
+  candidates: number;
+  expectedRows: number;
+  players: string;
+  slotRoles: string;
+  verdict: string;
+  warnings: string;
 }
 
 interface TeamStyleOption {
@@ -770,8 +809,49 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
               </button>
               <button
                 mat-stroked-button
+                (click)="onRunMidfielderPositionSweep()"
+                [disabled]="mutationInFlight() || !userTeamName()"
+                aria-label="Run midfield-only position movement smoke across multiple completed user-team matches"
+              >
+                MID position smoke
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRunLinePositionSweep('DEF')"
+                [disabled]="mutationInFlight() || !userTeamName()"
+                aria-label="Run defensive-line position movement smoke across multiple completed user-team matches"
+              >
+                DEF position smoke
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRunLinePositionSweep('ATT')"
+                [disabled]="mutationInFlight() || !userTeamName()"
+                aria-label="Run attacking-line position movement smoke across multiple completed user-team matches"
+              >
+                ATT position smoke
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRunCurrentFormationLineAudit()"
+                [disabled]="mutationInFlight() || !userTeamName()"
+                aria-label="Audit current formation DEF MID ATT candidates before running line smokes"
+              >
+                Formation line audit
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRunAllFormationsLineAudit()"
+                [disabled]="mutationInFlight() || !userTeamName()"
+                aria-label="Audit every formation DEF MID ATT candidates before running expensive line smokes"
+              >
+                All formations line audit
+              </button>
+              <button
+                mat-stroked-button
                 (click)="onRunFormationMatrix()"
                 [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                [title]="formationMatrixDisabledReason()"
                 aria-label="Replay selected match with every formation and the same seed"
               >
                 Formation matrix
@@ -781,6 +861,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 data-testid="formation-avg-button"
                 (click)="onRunFormationMatrixSummary()"
                 [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                [title]="formationMatrixDisabledReason()"
                 aria-label="Average every formation across multiple seeds"
               >
                 Formation avg ({{ scenarioMatrixSummaryEffectiveSeedCount() }} seeds)
@@ -1038,7 +1119,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
 
         <!-- Panel E: replay analysis matrices (full width) -->
         <section
-          *ngIf="currentLineupReplayResult() || currentLineupMultiSeedSummary() || playerSwapMatrixSummary() || playerSwapBatterySummaries().length > 0 || playerSwapPrecisionComparisonRows().length > 0 || positionPixelMatrixSummary() || positionPixelMatrixRows().length > 0 || formationReplayResults().length > 0 || formationMatrixSummaryResults().length > 0 || scenarioMatrixResults().length > 0 || scenarioMatrixSummaryResults().length > 0 || scenarioBatteryRows().length > 0"
+          *ngIf="currentLineupReplayResult() || currentLineupMultiSeedSummary() || playerSwapMatrixSummary() || playerSwapBatterySummaries().length > 0 || playerSwapPrecisionComparisonRows().length > 0 || positionPixelMatrixSummary() || positionPixelMatrixRows().length > 0 || formationLineSmokeRows().length > 0 || lineupDebugSnapshot() || formationReplayResults().length > 0 || formationMatrixSummaryResults().length > 0 || scenarioMatrixResults().length > 0 || scenarioMatrixSummaryResults().length > 0 || scenarioBatteryRows().length > 0"
           id="test-harness-replay-analysis"
           class="panel panel-e"
           aria-labelledby="panel-e-heading"
@@ -1047,6 +1128,41 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
           <p class="panel-hint">
             Compare the same match and seed across formations, live tactical changes and substitutions.
           </p>
+
+          <div *ngIf="formationLineSmokeRows().length > 0" class="formation-matrix analysis-matrix current-lineup-replay">
+            <div class="matrix-header">
+              <strong>Formation line audit</strong>
+              <span>DEF/MID/ATT candidates for the current visual formation</span>
+            </div>
+            <div class="table-scroll compact-position-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Formation</th>
+                    <th>Line</th>
+                    <th>Candidates</th>
+                    <th>Expected rows</th>
+                    <th>Players</th>
+                    <th>Slot roles</th>
+                    <th>Verdict</th>
+                    <th>Warnings</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let row of formationLineSmokeRows(); trackBy: trackByFormationLineSmokeRow">
+                    <td>{{ row.formation }}</td>
+                    <td>{{ row.line }}</td>
+                    <td>{{ row.candidates }}</td>
+                    <td>{{ row.expectedRows }}</td>
+                    <td>{{ row.players }}</td>
+                    <td>{{ row.slotRoles }}</td>
+                    <td>{{ row.verdict }}</td>
+                    <td>{{ row.warnings || '-' }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
 
           <div *ngIf="currentLineupReplayResult() as replay" class="formation-matrix analysis-matrix current-lineup-replay">
             <div class="matrix-header">
@@ -1413,10 +1529,52 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
             </p>
           </div>
 
+          <div *ngIf="lineupDebugSnapshot() as debug" class="formation-matrix analysis-matrix current-lineup-replay">
+            <div class="matrix-header">
+              <strong>Current lineup debug</strong>
+              <span>
+                {{ debug.label }} · formation {{ debug.formation || '?' }}
+                · selected {{ debug.selectedFormation || '?' }}
+                · players {{ debug.playerCount }}/11
+                · slots {{ debug.persistedSlotCount }}/{{ debug.effectiveSlotCount }}
+                · candidates {{ debug.candidatesCount }}
+              </span>
+            </div>
+            <p class="panel-hint current-replay-starters" *ngIf="debug.warnings.length > 0">
+              {{ debug.warnings.join(' · ') }}
+            </p>
+            <div class="table-scroll compact-position-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Player</th>
+                    <th>Role</th>
+                    <th>Slot</th>
+                    <th>X/Y</th>
+                    <th>Visual line</th>
+                    <th>Source</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let row of debug.rows; trackBy: trackByLineupDebugRow">
+                    <td>{{ row.index }}</td>
+                    <td>{{ row.name }}</td>
+                    <td>{{ row.position }}</td>
+                    <td>{{ row.slotId || '-' }}</td>
+                    <td>{{ row.x ?? '?' }}/{{ row.y ?? '?' }}</td>
+                    <td>{{ row.visualLine }}</td>
+                    <td>{{ row.source }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
           <div *ngIf="positionPixelMatrixRows().length > 0" class="formation-matrix analysis-matrix">
             <div class="matrix-header">
               <strong>Position movement presets</strong>
-              <span>DEF/MID/ATT representatives + same seeds, multiple pixel moves</span>
+              <span>Selected tactical candidates + same seeds, multiple pixel moves</span>
               <button type="button" class="matrix-export" (click)="copyPositionPixelMatrixJson()">
                 Copy filtered JSON
               </button>
@@ -1460,6 +1618,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                   <span role="columnheader">Att loss</span>
                   <span role="columnheader">Big bad</span>
                   <span role="columnheader">5px risk</span>
+                  <span role="columnheader">5px cost</span>
                   <span role="columnheader">Big strong</span>
                   <span role="columnheader">Avg señal</span>
                   <span role="columnheader">Worst</span>
@@ -1479,6 +1638,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                   <span role="cell">{{ item.visibleAttackLoss }}</span>
                   <span role="cell">{{ item.bigBadTradeoff }}</span>
                   <span role="cell">{{ item.fivePxRiskRows }}</span>
+                  <span role="cell">{{ item.fivePxCostRows }}</span>
                   <span role="cell">{{ item.bigMoveStrongRows }}/{{ item.bigMoveRows }}</span>
                   <span role="cell">{{ item.avgSignal.toFixed(3) }}</span>
                   <span role="cell" [title]="item.worstMove">{{ item.worstSignal.toFixed(3) }}</span>
@@ -1488,13 +1648,14 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 </div>
               </div>
             </div>
-            <div *ngIf="positionPixelPlayerSmokeSummary().length > 1" class="matrix-scroll position-smoke-summary">
+            <div *ngIf="positionPixelPlayerSmokeSummary().length > 0" class="matrix-scroll position-smoke-summary">
               <div class="matrix-table position-smoke-table" role="table" aria-label="Position smoke summary by player">
                 <div class="matrix-row formation-matrix-row matrix-row-head" role="row">
                   <span role="columnheader">Player</span>
                   <span role="columnheader">Pos</span>
                   <span role="columnheader">Rows</span>
                   <span role="columnheader">5px risk</span>
+                  <span role="columnheader">5px cost</span>
                   <span role="columnheader">Big strong</span>
                   <span role="columnheader">Avg señal</span>
                   <span role="columnheader">Worst</span>
@@ -1507,6 +1668,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                   <span role="cell">{{ item.playerPosition }}</span>
                   <span role="cell">{{ item.rows }}</span>
                   <span role="cell">{{ item.fivePxRiskRows }}</span>
+                  <span role="cell">{{ item.fivePxCostRows }}</span>
                   <span role="cell">{{ item.bigMoveStrongRows }}/{{ item.bigMoveRows }}</span>
                   <span role="cell">{{ item.avgSignal.toFixed(3) }}</span>
                   <span role="cell">{{ item.worstSignal.toFixed(3) }}</span>
@@ -2768,6 +2930,8 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   /** One-pixel starter movement comparison. */
   readonly positionPixelMatrixSummary = signal<PositionPixelMatrixSummary | null>(null);
   readonly positionPixelMatrixRows = signal<PositionPixelMatrixSummary[]>([]);
+  readonly lineupDebugSnapshot = signal<LineupDebugSnapshot | null>(null);
+  readonly formationLineSmokeRows = signal<FormationLineSmokeRow[]>([]);
   readonly positionPixelReadFilter = signal<PositionPixelReadFilter>('all');
   readonly positionPixelSortMode = signal<PositionPixelSortMode>('default');
 
@@ -3247,14 +3411,32 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       return;
     }
     this.mutationInFlight.set(true);
-    this.harness.setFormation(formation).subscribe({
+    this.currentOrAutoSelectedLineup(this.selectedFormationModel ?? '4-4-2').pipe(
+      switchMap((lineup) => {
+        const playerIds = (lineup.players ?? [])
+          .map((player) => player.playerId)
+          .filter(Boolean);
+        if (playerIds.length !== 11) {
+          throw new Error(`Set Formation needs exactly 11 current lineup players, got ${playerIds.length}.`);
+        }
+        const canonicalSlots = this.buildCanonicalSlotsForFormation(formation, playerIds);
+        return this.harness.setFormation(formation).pipe(
+          switchMap((resp) =>
+            this.harness.manualSelectLineup(formation, playerIds, canonicalSlots).pipe(
+              map(() => resp)
+            )
+          )
+        );
+      })
+    ).subscribe({
       next: (resp) => {
         this.mutationInFlight.set(false);
         this.snackBar.open(
-          resp?.message ?? `Formation ${formation} applied.`,
+          resp?.message ?? `Formation ${formation} applied with canonical slots.`,
           'OK',
           { duration: 3000 }
         );
+        this.refreshLineupContext();
         this.refreshDetailAfterMutation();
       },
       error: (err) => {
@@ -3266,6 +3448,50 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         );
       },
     });
+  }
+
+  private buildCanonicalSlotsForFormation(formation: string, playerIds: string[]): LineupSlotDTO[] {
+    const positions = [...(this.formationPositionsByName()[formation] ?? [])]
+      .filter((position) => !!position?.subdivisionId && position.subdivisionId !== 'GK-1')
+      .sort((a, b) => a.index - b.index);
+    const fallbackSubdivisionIds = this.fallbackCanonicalSubdivisionIds(formation);
+    const subdivisionIds = positions.length >= 10
+      ? positions.slice(0, 10).map((position) => position.subdivisionId)
+      : fallbackSubdivisionIds;
+    if (playerIds.length !== 11 || subdivisionIds.length < 10) {
+      return [];
+    }
+    return [
+      { playerId: playerIds[0], subdivisionId: 'GK-1' },
+      ...playerIds.slice(1, 11).map((playerId, index) => ({
+        playerId,
+        subdivisionId: subdivisionIds[index] ?? `S${String(index + 1).padStart(2, '0')}-1`,
+      })),
+    ];
+  }
+
+  private fallbackCanonicalSubdivisionIds(formation: string): string[] {
+    const fallback: Record<string, string[]> = {
+      '4-4-2': ['S22-2', 'S23-1', 'S23-3', 'S24-2', 'S16-2', 'S17-1', 'S17-3', 'S18-2', 'S05-1', 'S05-3'],
+      '4-3-3': ['S22-2', 'S23-1', 'S23-3', 'S24-2', 'S17-1', 'S17-2', 'S17-3', 'S04-1', 'S05-2', 'S06-3'],
+      '3-5-2': ['S22-2', 'S23-2', 'S24-2', 'S15-1', 'S17-1', 'S17-2', 'S17-3', 'S18-3', 'S05-1', 'S05-3'],
+      };
+      return fallback[formation] ?? [];
+    }
+
+  private currentOrAutoSelectedLineup(formation: string): Observable<LineupDTO> {
+    return this.harness.getCurrentLineup().pipe(
+      switchMap((lineup) => {
+        const playerCount = lineup.players?.length ?? 0;
+        if (playerCount > 0) {
+          return of(lineup);
+        }
+        this.analysisReadyMessage.set(
+          `Current lineup vacío; auto-select ${formation} antes de correr el harness.`
+        );
+        return this.harness.autoSelectLineup(formation);
+      })
+    );
   }
 
   onResetInjuries(): void {
@@ -3445,6 +3671,8 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     this.playerSwapPrecisionComparisonRows.set([]);
     this.positionPixelMatrixSummary.set(null);
     this.positionPixelMatrixRows.set([]);
+    this.lineupDebugSnapshot.set(null);
+    this.formationLineSmokeRows.set([]);
     this.formationReplayResults.set([]);
     this.formationMatrixSummaryResults.set([]);
     this.scenarioMatrixResults.set([]);
@@ -3773,6 +4001,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       totalRows: number;
       readSummary: Array<{ label: string; level: PositionPixelReadLevel; count: number }>;
       tacticalReadSummary: Array<{ label: string; count: number; className: string; hint: string }>;
+      lineupDebug: LineupDebugSnapshot | null;
     };
     rows: PositionPixelExportRow[];
   } {
@@ -3787,6 +4016,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         totalRows: this.positionPixelMatrixRows().length,
         readSummary: this.positionPixelReadSummary(),
         tacticalReadSummary: this.positionPixelTacticalReadSummary(),
+        lineupDebug: this.lineupDebugSnapshot(),
       },
       rows: this.displayedPositionPixelMatrixRows().map((row) => this.positionPixelExportRow(row)),
     };
@@ -4618,6 +4848,27 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return 'MID';
   }
 
+  private strictPositionPixelLine(position: string | null | undefined): 'DEF' | 'MID' | 'ATT' | null {
+    const p = String(position ?? '').trim().toUpperCase();
+    if (!p || p === 'UNKNOWN' || p === 'NONE') return null;
+    if (p === 'GK') return null;
+    if (['DEF', 'CB', 'LB', 'RB', 'LWB', 'RWB'].includes(p)) return 'DEF';
+    if (['MID', 'CM', 'CDM', 'DM', 'CAM', 'AM', 'LM', 'RM'].includes(p)) return 'MID';
+    if (this.isAttackingPosition(p)) return 'ATT';
+    return null;
+  }
+
+  private positionPixelLineFromSlot(
+    formation: string | null | undefined,
+    slot: LineupSlotDTO | null | undefined
+  ): 'DEF' | 'MID' | 'ATT' | null {
+    const y = this.matchContextYPercent(slot) ?? this.canonicalYPercent(formation, slot);
+    if (y === null || !Number.isFinite(y)) return null;
+    if (y < 34) return 'ATT';
+    if (y < 67) return 'MID';
+    return 'DEF';
+  }
+
   private pickPositionPixelCandidates(lineup: LineupDTO): PositionPixelCandidate[] {
     const slots = this.buildLineupSlots(lineup);
     const slotByPlayer = new Map(slots.map((slot) => [slot.playerId, slot.subdivisionId]));
@@ -4651,6 +4902,120 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       starterPosition: player.position,
       slotId: slotByPlayer.get(player.playerId) ?? '',
     }));
+  }
+
+  private pickPositionPixelLineCandidates(lineup: LineupDTO, line: 'DEF' | 'MID' | 'ATT', maxCount: number): PositionPixelCandidate[] {
+    const slots = this.effectivePositionPixelSlots(lineup);
+    const slotByPlayer = new Map(slots.map((slot) => [slot.playerId, slot.subdivisionId]));
+    const slotMetaByPlayer = new Map(slots.map((slot) => [slot.playerId, slot]));
+    const playerLine = (player: LineupDTO['players'][number]): 'DEF' | 'MID' | 'ATT' | null =>
+      this.positionPixelLineFromSlot(lineup.formation, slotMetaByPlayer.get(player.playerId))
+        ?? this.strictPositionPixelLine(player.position);
+    const selected = this.selectedSwapStarterIdModel
+      ? (lineup.players ?? []).find((player) => player.playerId === this.selectedSwapStarterIdModel && player.position !== 'GK')
+      : null;
+    const players = (lineup.players ?? [])
+      .filter((player) => player.position !== 'GK' && playerLine(player) === line)
+      .sort((a, b) => {
+        const aHasSlot = slotByPlayer.has(a.playerId) ? 0 : 1;
+        const bHasSlot = slotByPlayer.has(b.playerId) ? 0 : 1;
+        return aHasSlot - bHasSlot || a.name.localeCompare(b.name);
+      });
+    const ordered = selected && playerLine(selected) === line
+      ? [selected, ...players.filter((player) => player.playerId !== selected.playerId)]
+      : players;
+
+    return ordered.slice(0, maxCount).map((player) => ({
+      starterId: player.playerId,
+      starterName: player.name,
+      starterPosition: player.position,
+      slotId: slotByPlayer.get(player.playerId) ?? '',
+    }));
+  }
+
+  private effectivePositionPixelSlots(lineup: LineupDTO): LineupSlotDTO[] {
+    const existingSlots = this.buildLineupSlots(lineup);
+    const playerIds = (lineup.players ?? [])
+      .map((player) => player.playerId)
+      .filter(Boolean);
+    const expectedSlotCount = Math.min(playerIds.length, 11);
+    const canonicalSlots = existingSlots.length >= expectedSlotCount
+      ? []
+      : this.buildCanonicalSlotsForFormation(lineup.formation ?? this.selectedFormationModel ?? '4-4-2', playerIds);
+    const existingByPlayer = new Map(existingSlots.map((slot) => [slot.playerId, slot]));
+    return existingSlots.length >= expectedSlotCount
+      ? existingSlots
+      : canonicalSlots.map((slot) => existingByPlayer.get(slot.playerId) ?? slot);
+  }
+
+  private buildLineupDebugSnapshot(
+    lineup: LineupDTO,
+    label: string,
+    visualLineFilter: 'DEF' | 'MID' | 'ATT' | null,
+    candidates: PositionPixelCandidate[]
+  ): LineupDebugSnapshot {
+    const formation = lineup.formation ?? this.selectedFormationModel ?? '';
+    const persistedSlots = this.buildLineupSlots(lineup);
+    const effectiveSlots = this.effectivePositionPixelSlots(lineup);
+    const persistedByPlayer = new Map(persistedSlots.map((slot) => [slot.playerId, slot]));
+    const effectiveByPlayer = new Map(effectiveSlots.map((slot) => [slot.playerId, slot]));
+    const candidateIds = new Set(candidates.map((candidate) => candidate.starterId));
+    const warnings: string[] = [];
+    const players = lineup.players ?? [];
+
+    if (players.length !== 11) {
+      warnings.push(`Expected 11 players, got ${players.length}.`);
+    }
+    if (persistedSlots.length < Math.min(players.length, 11)) {
+      warnings.push(`Persisted slots incomplete: ${persistedSlots.length}/${Math.min(players.length, 11)}. Canonical fallback may be used.`);
+    }
+    if (visualLineFilter && candidates.length <= 1) {
+      warnings.push(`${visualLineFilter} smoke has only ${candidates.length} candidate(s); verify lineup slots or tactical roles.`);
+    }
+
+    const rows = players.map((player, index): LineupDebugRow => {
+      const persisted = persistedByPlayer.get(player.playerId);
+      const effective = effectiveByPlayer.get(player.playerId);
+      const slot = effective ?? persisted ?? null;
+      const x = this.matchContextXPercent(slot) ?? this.canonicalXPercent(formation, slot);
+      const y = this.matchContextYPercent(slot) ?? this.canonicalYPercent(formation, slot);
+      const source: LineupDebugRow['source'] = persisted
+        ? 'persisted'
+        : effective
+          ? 'canonical'
+          : 'missing';
+      const visualLine: LineupDebugRow['visualLine'] = player.position === 'GK'
+        ? 'GK'
+        : y === null
+          ? 'UNKNOWN'
+          : this.positionPixelVisualLine(y);
+
+      return {
+        index: index + 1,
+        playerId: player.playerId,
+        name: candidateIds.has(player.playerId) ? `${player.name} *` : player.name,
+        position: player.position,
+        slotId: slot?.subdivisionId ?? '',
+        x,
+        y,
+        visualLine,
+        source,
+      };
+    });
+
+    return {
+      label,
+      formation,
+      selectedFormation: this.selectedFormationModel ?? '',
+      playerCount: players.length,
+      nonGkCount: players.filter((player) => player.position !== 'GK').length,
+      persistedSlotCount: persistedSlots.length,
+      effectiveSlotCount: effectiveSlots.length,
+      candidatesCount: candidates.length,
+      visualLineFilter: visualLineFilter ?? 'any',
+      rows,
+      warnings,
+    };
   }
 
   private autoPositionPixelCandidates(): PositionPixelCandidate[] {
@@ -5632,11 +5997,232 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     );
   }
 
+  onRunMidfielderPositionSweep(): void {
+    this.onRunLinePositionSweep('MID');
+  }
+
+  onRunLinePositionSweep(line: 'DEF' | 'MID' | 'ATT'): void {
+    const seedCount = Math.max(10, Math.min(30, Math.round(this.playerSwapSeedCountModel || 10)));
+    const matches = this.userTeamMatches()
+      .filter((match) => match.status === 'COMPLETED')
+      .slice(0, 3);
+    if (matches.length === 0) {
+      this.snackBar.open(`No completed ${this.userTeamName() || 'user team'} matches available for ${line} position smoke.`, 'OK', { duration: 4000 });
+      return;
+    }
+    this.runPositionPixelMatrixWithPresets(
+      seedCount,
+      (fromX, fromY) => this.positionMovementPresets(fromX, fromY)
+        .filter((preset) => ['5px forward', '5px deeper', '5px wide', '5px center'].includes(preset.label)),
+      `${line} calibration sweep`,
+      matches,
+      (lineup) => this.pickPositionPixelLineCandidates(lineup, line, 6),
+      line
+    );
+  }
+
+  onRunCurrentFormationLineAudit(): void {
+    const matches = this.userTeamMatches()
+      .filter((match) => match.status === 'COMPLETED')
+      .slice(0, 3);
+    if (matches.length === 0) {
+      this.snackBar.open(`No completed ${this.userTeamName() || 'user team'} matches available for formation line audit.`, 'OK', { duration: 4000 });
+      return;
+    }
+    const formation = this.selectedFormationModel ?? '4-4-2';
+    this.clearReplayAnalysisResults();
+    this.mutationInFlight.set(true);
+    this.analysisReadyMessage.set(`Formation line audit corriendo para ${formation}...`);
+    this.currentOrAutoSelectedLineup(formation).subscribe({
+      next: (lineup) => {
+        const rows = (['DEF', 'MID', 'ATT'] as const).map((line) =>
+          this.toFormationLineSmokeRow(lineup, line, matches.length)
+        );
+        this.formationLineSmokeRows.set(rows);
+        const allOk = rows.every((row) => row.candidates > 0);
+        this.lineupDebugSnapshot.set(this.buildLineupDebugSnapshot(
+          lineup,
+          'Formation line audit',
+          null,
+          rows.flatMap((row) => this.pickPositionPixelLineCandidates(lineup, row.line, 6))
+        ));
+        this.mutationInFlight.set(false);
+        this.snackBar.open(
+          allOk ? `Formation line audit OK (${formation}).` : `Formation line audit has warnings (${formation}).`,
+          'OK',
+          { duration: 4000 }
+        );
+        this.markReplayAnalysisReady(`Formation line audit listo para ${formation}.`);
+      },
+      error: (err) => {
+        this.mutationInFlight.set(false);
+        this.analysisReadyMessage.set(this.fmtError(err, 'Formation line audit falló'));
+        this.snackBar.open(this.fmtError(err, 'Failed to run formation line audit'), 'OK', { duration: 5000 });
+      },
+    });
+  }
+
+  onRunAllFormationsLineAudit(): void {
+    const matches = this.userTeamMatches()
+      .filter((match) => match.status === 'COMPLETED')
+      .slice(0, 3);
+    if (matches.length === 0) {
+      this.snackBar.open(`No completed ${this.userTeamName() || 'user team'} matches available for all-formations line audit.`, 'OK', { duration: 4000 });
+      return;
+    }
+    const formations = [...this.formationCodes];
+    this.clearReplayAnalysisResults();
+    this.mutationInFlight.set(true);
+    this.analysisReadyMessage.set(`All formations line audit corriendo: ${formations.length} formaciones...`);
+    from(formations).pipe(
+      concatMap((formation) =>
+        this.harness.autoSelectLineup(formation).pipe(
+          map((lineup) => ({ formation, lineup }))
+        )
+      ),
+      toArray()
+    ).subscribe({
+      next: (items) => {
+        const rows = items.flatMap(({ formation, lineup }) =>
+          (['DEF', 'MID', 'ATT'] as const).map((line) =>
+            this.toFormationLineSmokeRow(
+              { ...lineup, formation: lineup.formation ?? formation },
+              line,
+              matches.length
+            )
+          )
+        );
+        this.formationLineSmokeRows.set(rows);
+        const last = items[items.length - 1]?.lineup ?? null;
+        if (last) {
+          this.lineupDebugSnapshot.set(this.buildLineupDebugSnapshot(
+            last,
+            'All formations line audit (last formation)',
+            null,
+            (['DEF', 'MID', 'ATT'] as const).flatMap((line) => this.pickPositionPixelLineCandidates(last, line, 6))
+          ));
+        }
+        const reviewCount = rows.filter((row) => row.verdict !== 'OK').length;
+        this.mutationInFlight.set(false);
+        this.snackBar.open(
+          reviewCount === 0
+            ? `All formations line audit OK (${rows.length} line checks).`
+            : `All formations line audit: ${reviewCount} line checks need review.`,
+          'OK',
+          { duration: 5000 }
+        );
+        this.markReplayAnalysisReady(`All formations line audit listo: ${rows.length} line checks.`);
+      },
+      error: (err) => {
+        this.mutationInFlight.set(false);
+        this.analysisReadyMessage.set(this.fmtError(err, 'All formations line audit falló'));
+        this.snackBar.open(this.fmtError(err, 'Failed to run all formations line audit'), 'OK', { duration: 5000 });
+      },
+    });
+  }
+
+  private toFormationLineSmokeRow(
+    lineup: LineupDTO,
+    line: 'DEF' | 'MID' | 'ATT',
+    matchCount: number
+  ): FormationLineSmokeRow {
+    const candidates = this.pickPositionPixelLineCandidates(lineup, line, 6);
+    const expectedRows = candidates.length * 4 * matchCount;
+    const minExpected = line === 'ATT' ? 1 : 2;
+    const warnings: string[] = [];
+    const effectiveSlots = this.effectivePositionPixelSlots(lineup);
+    const slotByPlayer = new Map(effectiveSlots.map((slot) => [slot.playerId, slot]));
+    const slotRolesByPlayer = new Map(candidates.map((candidate) => {
+      const slot = slotByPlayer.get(candidate.starterId);
+      const role = this.canonicalFormationPosition(lineup.formation, slot)?.role
+        ?? this.tacticalRoleFromVisualLine(line);
+      return [candidate.starterId, role] as const;
+    }));
+    if ((lineup.players?.length ?? 0) !== 11) warnings.push(`players ${lineup.players?.length ?? 0}/11`);
+    if ((lineup.slots?.length ?? 0) !== 11) warnings.push(`slots ${lineup.slots?.length ?? 0}/11`);
+    if (candidates.length < minExpected) warnings.push(`few ${line} candidates`);
+    const offRoleCandidates = candidates.filter((candidate) =>
+      !this.naturalFitsTacticalRole(candidate.starterPosition, slotRolesByPlayer.get(candidate.starterId) ?? line)
+    );
+    const hardOffRoleCount = offRoleCandidates.filter((candidate) =>
+      this.isHardFormationLineOffRole(candidate.starterPosition, slotRolesByPlayer.get(candidate.starterId) ?? line)
+    ).length;
+    const fallbackOffRoleCount = offRoleCandidates.length - hardOffRoleCount;
+    if (hardOffRoleCount > 0) warnings.push(`hard off-role ${hardOffRoleCount}/${candidates.length}`);
+    if (fallbackOffRoleCount > 0) warnings.push(`fallback profile ${fallbackOffRoleCount}/${candidates.length}`);
+    const verdict = warnings.some((warning) =>
+      warning.startsWith('players ')
+      || warning.startsWith('slots ')
+      || warning.startsWith('few ')
+      || warning.startsWith('hard off-role ')
+    )
+      ? 'Review'
+      : warnings.length > 0 ? 'Fallback' : 'OK';
+    return {
+      formation: lineup.formation ?? this.selectedFormationModel ?? '?',
+      line,
+      candidates: candidates.length,
+      expectedRows,
+      players: candidates.map((candidate) => `${candidate.starterName} (${candidate.starterPosition})`).join(' · '),
+      slotRoles: candidates.map((candidate) => slotRolesByPlayer.get(candidate.starterId) ?? '?').join(' · '),
+      verdict,
+      warnings: warnings.join(' · '),
+    };
+  }
+
+  private tacticalRoleFromVisualLine(line: 'DEF' | 'MID' | 'ATT'): string {
+    if (line === 'DEF') return 'DEF';
+    if (line === 'ATT') return 'ATT';
+    return 'MID';
+  }
+
+  private naturalFitsTacticalRole(naturalPosition: string | null | undefined, tacticalRole: string | null | undefined): boolean {
+    const natural = String(naturalPosition ?? '').trim().toUpperCase();
+    const role = String(tacticalRole ?? '').trim().toUpperCase();
+    if (!natural || !role) return true;
+    if (natural === role) return true;
+    const fitGroups: Record<string, string[]> = {
+      LWB: ['LB', 'LW', 'LM', 'WINGER', 'DEF', 'MID'],
+      RWB: ['RB', 'RW', 'RM', 'WINGER', 'DEF', 'MID'],
+      LM: ['LW', 'LWB', 'LB', 'WINGER', 'MID'],
+      RM: ['RW', 'RWB', 'RB', 'WINGER', 'MID'],
+      CAM: ['CM', 'AM', 'CAM', 'CF', 'WINGER', 'MID', 'ATT'],
+      AM: ['CM', 'CAM', 'CF', 'WINGER', 'MID', 'ATT'],
+      CDM: ['CM', 'CDM', 'DM', 'CB', 'MID', 'DEF'],
+      DM: ['CM', 'CDM', 'DM', 'CB', 'MID', 'DEF'],
+      CF: ['ST', 'CF', 'CAM', 'ATT'],
+      ST: ['ST', 'CF', 'ATT'],
+      LW: ['LW', 'LM', 'WINGER'],
+      RW: ['RW', 'RM', 'WINGER'],
+      CB: ['CB', 'DEF'],
+      LB: ['LB', 'LWB', 'DEF'],
+      RB: ['RB', 'RWB', 'DEF'],
+    };
+    if (fitGroups[role]) {
+      return fitGroups[role].includes(natural);
+    }
+    const naturalLine = this.strictPositionPixelLine(natural);
+    const roleLine = this.strictPositionPixelLine(role);
+    return !!naturalLine && !!roleLine && naturalLine === roleLine;
+  }
+
+  private isHardFormationLineOffRole(naturalPosition: string | null | undefined, tacticalRole: string | null | undefined): boolean {
+    const natural = String(naturalPosition ?? '').trim().toUpperCase();
+    const role = String(tacticalRole ?? '').trim().toUpperCase();
+    if (!natural || !role) return false;
+    const naturalLine = this.strictPositionPixelLine(natural);
+    const roleLine = this.strictPositionPixelLine(role);
+    if (!naturalLine || !roleLine) return false;
+    return naturalLine !== roleLine;
+  }
+
   private runPositionPixelMatrixWithPresets(
     seedCount: number,
     presetsFor: (fromX: number, fromY: number) => Array<{ label: string; x: number; y: number; dx: number; dy: number }>,
     label: string,
-    targetMatches: TestHarnessMatchRow[] | null = null
+    targetMatches: TestHarnessMatchRow[] | null = null,
+    candidatesFor: ((lineup: LineupDTO) => PositionPixelCandidate[]) | null = null,
+    visualLineFilter: 'DEF' | 'MID' | 'ATT' | null = null
   ): void {
     const selectedMatchId = this.selectedMatchId();
     const matches = targetMatches ?? (this.selectedMatch() ? [this.selectedMatch()!] : []);
@@ -5659,9 +6245,9 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     this.mutationInFlight.set(true);
     this.analysisReadyMessage.set(`${label} corriendo: preparando titulares, movimientos y ${seedCount} seeds...`);
     window.setTimeout(() => this.scrollToReplayAnalysis(), 0);
-    this.harness.getCurrentLineup().pipe(
+    this.currentOrAutoSelectedLineup(this.selectedFormationModel ?? '4-4-2').pipe(
       switchMap((lineup) => {
-        let candidates = this.pickPositionPixelCandidates(lineup);
+        let candidates = candidatesFor ? candidatesFor(lineup) : this.pickPositionPixelCandidates(lineup);
         const playerCount = lineup.players?.length ?? 0;
         const slotCount = lineup.slots?.length ?? 0;
         const nonGkCount = (lineup.players ?? []).filter((player) => player.position !== 'GK').length;
@@ -5677,11 +6263,28 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
             + `lineup players=${playerCount}, nonGK=${nonGkCount}, slots=${slotCount}, formation=${lineup.formation ?? 'unknown'}.`
           );
         }
-        const slots = this.buildLineupSlots(lineup);
-        const requests = candidates.flatMap((candidate) => {
+        const slots = this.effectivePositionPixelSlots(lineup);
+        const candidateContexts = candidates.map((candidate) => {
           const slot = slots.find((s) => s.playerId === candidate.starterId);
           const fromX = this.matchContextXPercent(slot) ?? this.canonicalXPercent(lineup.formation, slot) ?? 50;
           const fromY = this.matchContextYPercent(slot) ?? this.canonicalYPercent(lineup.formation, slot) ?? this.fallbackYForPosition(candidate.starterPosition);
+          return { candidate, fromX, fromY };
+        }).filter((context) => !visualLineFilter || this.positionPixelVisualLine(context.fromY) === visualLineFilter);
+        this.lineupDebugSnapshot.set(this.buildLineupDebugSnapshot(
+          lineup,
+          label,
+          visualLineFilter,
+          candidateContexts.map((context) => context.candidate)
+        ));
+
+        if (candidateContexts.length === 0) {
+          throw new Error(
+            `${label} found no candidates in visual line ${visualLineFilter ?? 'any'}. `
+            + `lineup players=${playerCount}, nonGK=${nonGkCount}, slots=${slotCount}, formation=${lineup.formation ?? 'unknown'}.`
+          );
+        }
+
+        const requests = candidateContexts.flatMap(({ candidate, fromX, fromY }) => {
           const presets = presetsFor(fromX, fromY);
           return matches.flatMap((match) =>
             presets.map((preset) =>
@@ -5940,6 +6543,14 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
 
   trackByPositionPixelRow(_index: number, row: PositionPixelMatrixSummary): string {
     return `${row.playerName}-${row.label}-${row.targetXPercent}-${row.targetYPercent}`;
+  }
+
+  trackByLineupDebugRow(_index: number, row: LineupDebugRow): string {
+    return row.playerId || `${row.index}-${row.slotId}`;
+  }
+
+  trackByFormationLineSmokeRow(_index: number, row: FormationLineSmokeRow): string {
+    return `${row.formation}-${row.line}`;
   }
 
   selectedStyleLabel(): string {
@@ -7184,7 +7795,13 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         label: 'Risk/Bad',
         className: 'read-check',
         hint: 'Movimientos que abren riesgo defensivo o empeoran ataque y defensa.',
-        matches: (read: string) => read === 'Risk' || read === 'Bad tradeoff' || read === 'Visible risk' || read === 'Visible attack loss',
+        matches: (read: string) => read === 'Risk' || read === 'Bad tradeoff' || read === 'Visible risk',
+      },
+      {
+        label: 'Cost',
+        className: 'read-visible',
+        hint: 'Movimientos que tienen costo ofensivo visible, pero no necesariamente abren riesgo defensivo.',
+        matches: (read: string) => read === 'Attack loss' || read === 'Visible attack loss',
       },
       {
         label: 'Micro review',
@@ -7235,6 +7852,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     let visibleAttackLoss = 0;
     let bigBadTradeoff = 0;
     let fivePxRiskRows = 0;
+    let fivePxCostRows = 0;
     let bigMoveRows = 0;
     let bigMoveStrongRows = 0;
     let signalSum = 0;
@@ -7249,7 +7867,8 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       if (tacticalRead === 'Visible risk') visibleRisk += 1;
       if (tacticalRead === 'Visible attack loss') visibleAttackLoss += 1;
       if (tacticalRead === 'Bad tradeoff') bigBadTradeoff += 1;
-      if (!isBigMove && (tacticalRead === 'Visible risk' || tacticalRead === 'Visible attack loss')) fivePxRiskRows += 1;
+      if (!isBigMove && tacticalRead === 'Visible risk') fivePxRiskRows += 1;
+      if (!isBigMove && tacticalRead === 'Visible attack loss') fivePxCostRows += 1;
       if (isBigMove) {
         bigMoveRows += 1;
         if (this.positionPixelReadLevel(row) === 'strong' || tacticalRead === 'Bad tradeoff' || tacticalRead === 'Risk') {
@@ -7271,6 +7890,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       visibleAttackLoss,
       bigBadTradeoff,
       fivePxRiskRows,
+      fivePxCostRows,
       bigMoveRows,
       bigMoveStrongRows,
       avgSignal,
@@ -7289,6 +7909,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       visibleAttackLoss,
       bigBadTradeoff,
       fivePxRiskRows,
+      fivePxCostRows,
       bigMoveRows,
       bigMoveStrongRows,
       avgSignal,
@@ -7308,6 +7929,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     visibleAttackLoss: number,
     bigBadTradeoff: number,
     fivePxRiskRows: number,
+    fivePxCostRows: number,
     bigMoveRows: number,
     bigMoveStrongRows: number,
     avgSignal: number,
@@ -7318,7 +7940,8 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     if (bigMoveRows > 0 && bigMoveStrongRows === bigMoveRows && readCounts.strong <= bigMoveStrongRows) return 'Big-move outlier';
     if (bigBadTradeoff > 0 || readCounts.strong > 0) return 'Strong review';
     if (readCounts.check > 1 || microReview > 1) return 'Needs seeds';
-    if (visibleRisk + visibleAttackLoss >= 4) return 'Visible bias';
+    if (visibleRisk >= 4) return 'Visible risk pattern';
+    if (fivePxCostRows >= 4 || visibleRisk + visibleAttackLoss >= 4) return 'Visible cost pattern';
     if (readCounts.visible > 0) return 'Playable variation';
     return 'Stable';
   }
@@ -7328,7 +7951,8 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     if (verdict === '5px visible pattern') return 'read-check';
     if (verdict === 'Big-move outlier') return 'read-visible';
     if (verdict === 'Strong review') return 'read-strong';
-    if (verdict === 'Needs seeds' || verdict === 'Visible bias') return 'read-check';
+    if (verdict === 'Needs seeds' || verdict === 'Visible risk pattern') return 'read-check';
+    if (verdict === 'Visible cost pattern') return 'read-visible';
     if (verdict === 'Playable variation') return 'read-visible';
     return 'read-stable';
   }
@@ -7338,6 +7962,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     rows: PositionPixelMatrixSummary[]
   ): PositionPixelPlayerSmokeSummary {
     let fivePxRiskRows = 0;
+    let fivePxCostRows = 0;
     let bigMoveRows = 0;
     let bigMoveStrongRows = 0;
     let signalSum = 0;
@@ -7347,8 +7972,11 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       const tacticalRead = this.positionPixelTacticalRead(row);
       const moveLabel = this.positionPixelMoveLabel(row);
       const isBigMove = moveLabel === 'big zone cross' || this.positionPixelDistance(row) > 6.0;
-      if (!isBigMove && (tacticalRead === 'Visible risk' || tacticalRead === 'Visible attack loss')) {
+      if (!isBigMove && tacticalRead === 'Visible risk') {
         fivePxRiskRows += 1;
+      }
+      if (!isBigMove && tacticalRead === 'Visible attack loss') {
+        fivePxCostRows += 1;
       }
       if (isBigMove) {
         bigMoveRows += 1;
@@ -7372,6 +8000,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       playerPosition: first?.playerPosition ?? '-',
       rows: rows.length,
       fivePxRiskRows,
+      fivePxCostRows,
       bigMoveRows,
       bigMoveStrongRows,
       avgSignal,
@@ -7559,6 +8188,19 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       return '?';
     }
     return `${Math.round(value)}%`;
+  }
+
+  formationMatrixDisabledReason(): string {
+    if (this.mutationInFlight()) {
+      return 'Hay una prueba corriendo; espera a que termine.';
+    }
+    if (!this.selectedMatchId()) {
+      return 'Selecciona un partido completado del Panel C.';
+    }
+    if (!this.selectedMatchIncludesUserTeam()) {
+      return `La matriz de formaciones modifica el XI de ${this.userTeamName() || 'tu equipo'}; elegi un partido donde juegue ese equipo.`;
+    }
+    return 'Ejecutar matriz de formaciones para el equipo usuario.';
   }
 
   /**

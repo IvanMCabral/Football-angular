@@ -80,6 +80,12 @@ export class TestHarnessService {
     return this.http.get<LineupDTO>(`${this.lineupUrl}/current`);
   }
 
+  autoSelectLineup(formation: string): Observable<LineupDTO> {
+    return this.http.post<LineupDTO>(`${this.lineupUrl}/auto-select`, {
+      formation,
+    });
+  }
+
   /**
    * Persist a lineup through the real lineup endpoint.
    *
