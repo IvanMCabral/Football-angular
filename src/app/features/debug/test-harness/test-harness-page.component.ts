@@ -324,6 +324,7 @@ type ScenarioSummaryReadFilter = 'all' | ScenarioSummaryReadLevel | 'actionable'
 type ScenarioSummarySortMode = 'default' | 'read-desc' | 'impact-desc' | 'xg-desc';
 type ControlledTeamSide = 'USER' | 'HOME' | 'AWAY';
 type ScenarioBatteryCoachObjective = 'NEUTRAL' | 'NEED_GOAL' | 'PROTECT_RESULT';
+type ScenarioBatteryCoachObjectiveModel = ScenarioBatteryCoachObjective | 'AUTO';
 interface ScenarioScoutingNote {
   title: string;
   body: string;
@@ -344,6 +345,7 @@ interface ScenarioBatteryRow {
   controlledSide: Exclude<ControlledTeamSide, 'USER'>;
   controlledTeam: string;
   scenarioGroup: 'ALL' | 'OFFENSE' | 'DEFENSE' | 'OPPONENT';
+  coachObjective: ScenarioBatteryCoachObjective;
   seedStart: number;
   seedCount: number;
   scenarioCount: number;
@@ -728,6 +730,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                   [(ngModel)]="scenarioBatteryCoachObjectiveModel"
                   aria-label="Select tactical battery coach objective"
                 >
+                  <mat-option value="AUTO">Auto</mat-option>
                   <mat-option value="NEUTRAL">Neutral</mat-option>
                   <mat-option value="NEED_GOAL">Necesito gol</mat-option>
                   <mat-option value="PROTECT_RESULT">Cuidar resultado</mat-option>
@@ -2202,6 +2205,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                   <span role="columnheader">Partido</span>
                   <span role="columnheader">Controlando</span>
                   <span role="columnheader">Grupo</span>
+                  <span role="columnheader">Objetivo</span>
                   <span role="columnheader">Decision</span>
                   <span role="columnheader">Plan</span>
                   <span role="columnheader">Doble</span>
@@ -2220,6 +2224,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                   <span role="cell">{{ row.matchLabel }}</span>
                   <span role="cell">{{ row.controlledTeam }} ({{ row.controlledSide === 'HOME' ? 'local' : 'visitante' }})</span>
                   <span role="cell">{{ scenarioBatteryGroupLabel(row.scenarioGroup) }}</span>
+                  <span role="cell">{{ scenarioBatteryCoachObjectiveLabel(row.coachObjective) }}</span>
                   <span role="cell" [title]="row.decisionDetail">{{ row.decision }}</span>
                   <span role="cell" [title]="scenarioBatteryCardDetail(row, 'Plan actual')">
                     {{ scenarioBatteryCardSummary(row, 'Plan actual') }}
@@ -2919,7 +2924,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
 
   scenarioBatteryScopeModel: 'quick' | 'balanced' = 'quick';
 
-  scenarioBatteryCoachObjectiveModel: ScenarioBatteryCoachObjective = 'NEUTRAL';
+  scenarioBatteryCoachObjectiveModel: ScenarioBatteryCoachObjectiveModel = 'AUTO';
 
   /** V24D24.2: seed for the "Replay with seed" button (null = non-reproducible). */
   seedInputModel: number | null = DEFAULT_REPLAY_SEED;
@@ -4047,7 +4052,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       return;
     }
     const header = [
-      'match', 'controlledTeam', 'controlledSide', 'scenarioGroup', 'seedStart', 'seedCount', 'scenarioCount',
+      'match', 'controlledTeam', 'controlledSide', 'scenarioGroup', 'coachObjective', 'seedStart', 'seedCount', 'scenarioCount',
       'decision', 'decisionDetail',
       'plan', 'twoWay', 'attack', 'shape', 'protect', 'avoid', 'opponentThreat',
       'planDetail', 'twoWayDetail', 'attackDetail', 'shapeDetail', 'protectDetail', 'avoidDetail', 'opponentThreatDetail',
@@ -6848,6 +6853,14 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return `${this.userTeamName() || 'Mi equipo'} (mi equipo)`;
   }
 
+  private resolveControlledSideForMatch(match: TestHarnessMatchRow): Exclude<ControlledTeamSide, 'USER'> {
+    if (this.controlledTeamSideModel === 'HOME' || this.controlledTeamSideModel === 'AWAY') {
+      return this.controlledTeamSideModel;
+    }
+    const userTeam = this.userTeamName();
+    return userTeam && match.awayTeamName === userTeam ? 'AWAY' : 'HOME';
+  }
+
   canRunScenarioSummaryForControlledSide(): boolean {
     return this.controlledTeamSideModel === 'USER'
       ? this.selectedMatchIncludesUserTeam()
@@ -6867,12 +6880,92 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
 
   scenarioBatteryCoachObjectiveHint(): string {
     switch (this.scenarioBatteryCoachObjectiveModel) {
+      case 'AUTO':
+        return this.scenarioBatteryAutoObjectiveHint();
       case 'NEED_GOAL':
         return 'Prioriza upside ofensivo aunque abra espacios.';
       case 'PROTECT_RESULT':
         return 'Prioriza bajar riesgo y evitar intercambios.';
       default:
         return 'Lectura equilibrada para partido abierto.';
+    }
+  }
+
+  private scenarioBatteryAutoObjectiveHint(): string {
+    const match = this.selectedMatch();
+    if (!match) {
+      return 'Auto: usa resultado y minuto; sin partido seleccionado, lectura equilibrada.';
+    }
+    const side = this.resolveControlledSideForMatch(match);
+    const objective = this.inferScenarioBatteryCoachObjective(match, side);
+    const label = this.scenarioBatteryCoachObjectiveLabel(objective);
+    const minute = this.scenarioBatteryDecisionMinute(match);
+    const goalDiff = this.scenarioBatteryGoalDiff(match, side);
+    const diffText = goalDiff === null
+      ? 'marcador desconocido'
+      : goalDiff > 0
+        ? `ganando por ${goalDiff}`
+        : goalDiff < 0
+          ? `perdiendo por ${Math.abs(goalDiff)}`
+          : 'empatado';
+    return `Auto: ${label} (${diffText}, min ${minute}).`;
+  }
+
+  private scenarioBatteryEffectiveCoachObjective(
+    match: TestHarnessMatchRow,
+    controlledSide: Exclude<ControlledTeamSide, 'USER'>
+  ): ScenarioBatteryCoachObjective {
+    return this.scenarioBatteryCoachObjectiveModel === 'AUTO'
+      ? this.inferScenarioBatteryCoachObjective(match, controlledSide)
+      : this.scenarioBatteryCoachObjectiveModel;
+  }
+
+  private inferScenarioBatteryCoachObjective(
+    match: TestHarnessMatchRow,
+    controlledSide: Exclude<ControlledTeamSide, 'USER'>,
+    minute = this.scenarioBatteryDecisionMinute(match)
+  ): ScenarioBatteryCoachObjective {
+    const goalDiff = this.scenarioBatteryGoalDiff(match, controlledSide);
+    if (goalDiff === null) {
+      return 'NEUTRAL';
+    }
+    if (goalDiff < 0 && (minute >= 55 || goalDiff <= -2)) {
+      return 'NEED_GOAL';
+    }
+    if (goalDiff > 0 && minute >= 65) {
+      return 'PROTECT_RESULT';
+    }
+    return 'NEUTRAL';
+  }
+
+  private scenarioBatteryGoalDiff(
+    match: TestHarnessMatchRow,
+    controlledSide: Exclude<ControlledTeamSide, 'USER'>
+  ): number | null {
+    if (match.homeGoals === null || match.awayGoals === null) {
+      return null;
+    }
+    return controlledSide === 'HOME'
+      ? match.homeGoals - match.awayGoals
+      : match.awayGoals - match.homeGoals;
+  }
+
+  private scenarioBatteryDecisionMinute(match: TestHarnessMatchRow): number {
+    const selected = this.selectedMinute();
+    if (selected > 0) {
+      return selected;
+    }
+    return String(match.status).toUpperCase() === 'COMPLETED' ? 75 : 45;
+  }
+
+  scenarioBatteryCoachObjectiveLabel(objective: ScenarioBatteryCoachObjective): string {
+    switch (objective) {
+      case 'NEED_GOAL':
+        return 'Necesito gol';
+      case 'PROTECT_RESULT':
+        return 'Cuidar resultado';
+      default:
+        return 'Neutral';
     }
   }
 
@@ -7254,13 +7347,15 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     rows: ScenarioMatrixSummaryRow[]
   ): ScenarioBatteryRow {
     const cards = this.buildScenarioDecisionCards(rows);
-    const decision = this.scenarioBatteryDecision(cards, this.scenarioBatteryCoachObjectiveModel);
+    const coachObjective = this.scenarioBatteryEffectiveCoachObjective(match, controlledSide);
+    const decision = this.scenarioBatteryDecision(cards, coachObjective);
     return {
       matchId: match.matchId,
       matchLabel: `${match.homeTeamName} vs ${match.awayTeamName}`,
       controlledSide,
       controlledTeam: controlledSide === 'HOME' ? match.homeTeamName : match.awayTeamName,
       scenarioGroup,
+      coachObjective,
       seedStart,
       seedCount,
       scenarioCount: rows.length,
@@ -7272,7 +7367,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
 
   private scenarioBatteryDecision(
     cards: ScenarioDecisionCard[],
-    objective: ScenarioBatteryCoachObjective = this.scenarioBatteryCoachObjectiveModel
+    objective: ScenarioBatteryCoachObjective = 'NEUTRAL'
   ): { label: string; detail: string } {
     const card = (title: string) => cards.find((item) => item.title === title);
     const twoWay = card('Doble ganancia');
@@ -7392,6 +7487,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       controlledTeam: row.controlledTeam,
       controlledSide: row.controlledSide,
       scenarioGroup: this.scenarioBatteryGroupLabel(row.scenarioGroup),
+      coachObjective: this.scenarioBatteryCoachObjectiveLabel(row.coachObjective),
       seedStart: row.seedStart,
       seedCount: row.seedCount,
       scenarioCount: row.scenarioCount,

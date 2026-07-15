@@ -1326,6 +1326,34 @@ describe('TestHarnessPageComponent', () => {
     expect(protecting.detail).toContain('cuidar resultado');
   });
 
+  it('infers tactical battery coach objective from score and minute in auto mode', () => {
+    const losingLate = {
+      ...makeMatchRow('match-losing-late'),
+      status: 'COMPLETED' as const,
+      homeGoals: 0,
+      awayGoals: 1,
+    };
+    const winningLate = {
+      ...makeMatchRow('match-winning-late'),
+      status: 'COMPLETED' as const,
+      homeGoals: 2,
+      awayGoals: 1,
+    };
+    const draw = {
+      ...makeMatchRow('match-draw'),
+      status: 'COMPLETED' as const,
+      homeGoals: 1,
+      awayGoals: 1,
+    };
+
+    component.selectedMinute.set(70);
+
+    expect((component as any).inferScenarioBatteryCoachObjective(losingLate, 'HOME')).toBe('NEED_GOAL');
+    expect((component as any).inferScenarioBatteryCoachObjective(winningLate, 'HOME')).toBe('PROTECT_RESULT');
+    expect((component as any).inferScenarioBatteryCoachObjective(draw, 'HOME')).toBe('NEUTRAL');
+    expect((component as any).inferScenarioBatteryCoachObjective(winningLate, 'HOME', 30)).toBe('NEUTRAL');
+  });
+
   it('renders scenario summary headers with stable separators', () => {
     component.scenarioMatrixSummaryResults.set([
       makeScenarioSummaryRow({
