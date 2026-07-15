@@ -175,3 +175,16 @@ Ejecutar en `/debug/test-harness` para calibracion fina:
     - `5-4-1 MID`: 2 defensores como linea media.
 - Lectura:
   - Los 2 reviews restantes son coherentes con una plantilla corta para jugar con 5 atras; deben mostrarse/penalizarse, no ocultarse.
+
+## V25D99.127 - Feedback profesional para penalizaciones reales
+
+- Modal `/squad`:
+  - Las penalizaciones reales por jugador fuera de rol ahora tienen resumen de impacto acumulado.
+  - Cada fila muestra consejo tactico: por ejemplo, un DEF usado como MID se lee como recurso defensivo/partido cerrado, no como bug silencioso.
+  - El resumen usa la misma fuente que el motor/preview (`formationEffectiveness.perPlayerEffectiveness`), no una metrica paralela.
+- Test:
+  - `squad-editor-modal.component.spec.ts`: nuevo pin para DEF parado en MID con penalizacion visible, resumen y consejo.
+  - Resultado: `123 SUCCESS`.
+- Lectura:
+  - Los casos Celta `5-3-2 MID` y `5-4-1 MID` siguen siendo `Review` reales: el sistema debe avisar y penalizar, no esconderlos.
+  - Proximo paso recomendado: llevar este mismo lenguaje de "impacto tactico" al harness/motor para comparar formacion, cambio de jugador y movimiento pixelado con una lectura unica.

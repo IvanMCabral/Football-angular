@@ -792,6 +792,45 @@ describe('SquadEditorModalComponent — V25D47 (C11b) drag-drop + effectiveness'
     }, 30);
   });
 
+  it('should explain real off-role tactical penalties with summary and advice', (done) => {
+    // V25D99.127: a deliberate off-role move must be visible as tactical
+    // feedback, not just a raw percent hidden in the left panel.
+    setTimeout(() => {
+      (component as any).homePlayers$.next([
+        {
+          playerId: 'p-def',
+          name: 'DEF',
+          position: 'DEF',
+          role: 'DEF',
+          overall: 80,
+          energy: 100,
+          injured: false,
+          slotId: 'S13-2',
+          xPercent: 50,
+          yPercent: 50,
+          active: true,
+          isEmpty: false
+        } as any
+      ]);
+      (component as any).formationEffectiveness$.next({
+        inferredFormation: '4-4-2',
+        perPlayerEffectiveness: { 'S13-2': 0.82 },
+        teamAverage: 0.82
+      });
+
+      fixture.detectChanges();
+
+      const summary = fixture.nativeElement.querySelector('.tsp-penalty-summary');
+      const advice = fixture.nativeElement.querySelector('.tsp-offrole-advice');
+      const rows = fixture.nativeElement.querySelectorAll('.tsp-offrole-row');
+
+      expect(rows.length).toBeGreaterThan(0, 'at least one tactical penalty row should render');
+      expect(summary?.textContent).toContain('Impacto');
+      expect(advice?.textContent).toContain('Rueda de auxilio defensiva');
+      done();
+    }, 30);
+  });
+
   // ---- drag-drop handlers (direct method calls) ----
 
   it('handleSlotDrop — moves a slot player to another empty slot', (done) => {

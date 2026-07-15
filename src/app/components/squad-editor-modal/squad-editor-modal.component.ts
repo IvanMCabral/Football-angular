@@ -372,6 +372,11 @@ import { SessionPlayer } from '../../shared/models/player.model';
                they're placed in. Hidden when everyone is on-role. -->
           <section class="tsp-section" *ngIf="offRolePlayers?.length">
             <h3 class="tsp-title">⚠  Penalizaciones ({{ offRolePlayers.length }})</h3>
+            <div class="tsp-penalty-summary"
+                 [class.severe]="tacticalPenaltySummary.level === 'severe'"
+                 [class.warning]="tacticalPenaltySummary.level === 'warning'">
+              {{ tacticalPenaltySummary.message }}
+            </div>
             <div class="tsp-offrole-list">
               <div *ngFor="let o of offRolePlayers"
                    class="tsp-offrole-row"
@@ -388,6 +393,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
                      [class.warning]="o.penaltyPct >= 10 && o.penaltyPct < 25">
                   -{{ o.penaltyPct }}%
                 </div>
+                <div class="tsp-offrole-advice">{{ o.advice }}</div>
               </div>
             </div>
           </section>
@@ -1658,6 +1664,21 @@ import { SessionPlayer } from '../../shared/models/player.model';
       flex-direction: column;
       gap: 4px;
     }
+    .tsp-penalty-summary {
+      margin-bottom: 6px;
+      padding: 5px 7px;
+      border-radius: 4px;
+      font-size: 0.66rem;
+      line-height: 1.25;
+      color: #f8f2cf;
+      background: rgba(234, 179, 8, 0.10);
+      border: 1px solid rgba(234, 179, 8, 0.25);
+    }
+    .tsp-penalty-summary.severe {
+      color: #fed7d7;
+      background: rgba(197, 48, 48, 0.13);
+      border-color: rgba(197, 48, 48, 0.35);
+    }
     .tsp-offrole-row {
       display: grid;
       grid-template-columns: 1fr auto auto;
@@ -1715,6 +1736,12 @@ import { SessionPlayer } from '../../shared/models/player.model';
     .tsp-offrole-penalty.warning {
       color: #eab308;
       background: rgba(234, 179, 8, 0.18);
+    }
+    .tsp-offrole-advice {
+      grid-column: 1 / -1;
+      font-size: 0.62rem;
+      line-height: 1.2;
+      color: rgba(255, 255, 255, 0.68);
     }
 
     .field-container {
@@ -3305,6 +3332,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     naturalRole: string;
     actualZone: 'GK' | 'DEF' | 'MID' | 'ATT';
     penaltyPct: number;
+    advice: string;
   }> {
     const fe = this.formationEffectiveness$.value;
     const effMap = (fe && fe.perPlayerEffectiveness) || {};
@@ -3313,6 +3341,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
       naturalRole: string;
       actualZone: 'GK' | 'DEF' | 'MID' | 'ATT';
       penaltyPct: number;
+      advice: string;
     }> = [];
     for (const p of this.homePlayers) {
       const natural = this.getRoleFamily(p.role);
@@ -3321,10 +3350,51 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
       if (natural === actual) { continue; }
       const eff = (p.slotId && typeof effMap[p.slotId] === 'number') ? effMap[p.slotId] : 1.0;
       const penaltyPct = Math.max(0, Math.round((1 - eff) * 100));
-      result.push({ player: p, naturalRole: p.role, actualZone: actual, penaltyPct });
+      result.push({
+        player: p,
+        naturalRole: p.role,
+        actualZone: actual,
+        penaltyPct,
+        advice: this.getOffRoleAdvice(p.role, actual, penaltyPct),
+      });
     }
     result.sort((a, b) => b.penaltyPct - a.penaltyPct);
     return result;
+  }
+
+  get tacticalPenaltySummary(): { level: 'warning' | 'severe'; message: string } {
+    const rows = this.offRolePlayers;
+    const totalPenalty = rows.reduce((acc, row) => acc + row.penaltyPct, 0);
+    const severeRows = rows.filter(row => row.penaltyPct >= 25).length;
+    if (severeRows > 0 || totalPenalty >= 45) {
+      return {
+        level: 'severe',
+        message: `Impacto fuerte: ${rows.length} jugador(es) fuera de rol, ${totalPenalty}% acumulado. Cambia jugador o formacion si queres competir fino.`,
+      };
+    }
+    return {
+      level: 'warning',
+      message: `Impacto moderado: ${rows.length} ajuste(s), ${totalPenalty}% acumulado. Es jugable, pero el motor lo penaliza.`,
+    };
+  }
+
+  private getOffRoleAdvice(naturalRole: string, actualZone: 'GK' | 'DEF' | 'MID' | 'ATT', penaltyPct: number): string {
+    const naturalFamily = this.getRoleFamily(naturalRole);
+    if (naturalFamily === 'DEF' && actualZone === 'MID') {
+      return penaltyPct >= 20
+        ? 'Sirve para cerrar el partido; para construir juego, busca un MID o winger natural.'
+        : 'Rueda de auxilio defensiva: protege, pero baja fluidez en medio.';
+    }
+    if (naturalFamily === 'ATT' && actualZone === 'MID') {
+      return 'Aporta gol, pero pierde retorno y orden. Mejor como ST/CAM o con cobertura detras.';
+    }
+    if (naturalFamily === 'MID' && actualZone === 'DEF') {
+      return 'Ayuda a salir jugando, pero no reemplaza un defensor natural.';
+    }
+    if (actualZone === 'ATT') {
+      return 'Movimiento ofensivo agresivo: puede romper balance si no hay cobertura.';
+    }
+    return 'Revisa si la formacion pide otro perfil natural para ese sector.';
   }
 
   /**
