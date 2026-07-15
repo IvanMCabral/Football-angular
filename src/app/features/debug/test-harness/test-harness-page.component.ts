@@ -2194,7 +2194,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                   <span role="columnheader">Atacar</span>
                   <span role="columnheader">Forma</span>
                   <span role="columnheader">Cuidar</span>
-                  <span role="columnheader">Evitar</span>
+                  <span role="columnheader">Riesgo</span>
                   <span role="columnheader">Amenaza rival</span>
                   <span role="columnheader">Escenarios</span>
                 </div>
@@ -2222,8 +2222,8 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                   <span role="cell" [title]="scenarioBatteryCardDetail(row, 'Cuidar')">
                     {{ scenarioBatteryCardSummary(row, 'Cuidar') }}
                   </span>
-                  <span role="cell" [title]="scenarioBatteryCardDetail(row, 'Evitar')">
-                    {{ scenarioBatteryCardSummary(row, 'Evitar') }}
+                  <span role="cell" [title]="scenarioBatteryRiskCardDetail(row)">
+                    {{ scenarioBatteryRiskCardSummary(row) }}
                   </span>
                   <span role="cell" [title]="scenarioBatteryCardDetail(row, 'Amenaza rival')">
                     {{ scenarioBatteryCardSummary(row, 'Amenaza rival') }}
@@ -3358,7 +3358,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       .sort((a, b) => Math.max(b.avgOpponentXgDelta, this.scenarioOpponentMaxChannelXgDelta(b))
         - Math.max(a.avgOpponentXgDelta, this.scenarioOpponentMaxChannelXgDelta(a)))[0];
     if (biggestRisk) {
-      const offensiveRisk = biggestRisk.avgUserXgDelta >= 0.04;
+      const offensiveRisk = biggestRisk.avgUserXgDelta >= 0.02;
       cards.push(this.scenarioDecisionCardFromRow(
         offensiveRisk ? 'Riesgo ofensivo' : 'Evitar',
         biggestRisk,
@@ -7310,6 +7310,18 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return card ? card.detail : 'Sin senal clara en esta bateria.';
   }
 
+  scenarioBatteryRiskCardSummary(row: ScenarioBatteryRow): string {
+    const card = row.cards.find((item) => item.title === 'Riesgo ofensivo')
+      ?? row.cards.find((item) => item.title === 'Evitar');
+    return card ? `${card.label} Â· ${card.metrics}` : '-';
+  }
+
+  scenarioBatteryRiskCardDetail(row: ScenarioBatteryRow): string {
+    const card = row.cards.find((item) => item.title === 'Riesgo ofensivo')
+      ?? row.cards.find((item) => item.title === 'Evitar');
+    return card ? card.detail : 'Sin riesgo claro en esta bateria.';
+  }
+
   private scenarioBatteryExportRow(row: ScenarioBatteryRow): Record<string, unknown> {
     const summary = (title: string) => this.scenarioBatteryCardSummary(row, title);
     const detail = (title: string) => this.scenarioBatteryCardDetail(row, title);
@@ -7328,14 +7340,14 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       attack: summary('Atacar'),
       shape: summary('Forma'),
       protect: summary('Cuidar'),
-      avoid: summary('Evitar'),
+      avoid: this.scenarioBatteryRiskCardSummary(row),
       opponentThreat: summary('Amenaza rival'),
       planDetail: detail('Plan actual'),
       twoWayDetail: detail('Doble ganancia'),
       attackDetail: detail('Atacar'),
       shapeDetail: detail('Forma'),
       protectDetail: detail('Cuidar'),
-      avoidDetail: detail('Evitar'),
+      avoidDetail: this.scenarioBatteryRiskCardDetail(row),
       opponentThreatDetail: detail('Amenaza rival'),
     };
   }
