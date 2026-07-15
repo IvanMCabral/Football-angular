@@ -1167,6 +1167,39 @@ describe('TestHarnessPageComponent', () => {
     expect(swap?.verdict).toBe('Review');
     expect(swap?.next).toContain('Trust balanced reads');
   });
+
+  it('adds action context to scenario coach reads', () => {
+    const formationRead = component.scenarioSummaryCoachRead(makeScenarioSummaryRow({
+      actionType: 'FORMATION',
+      actionDetail: '4-3-3',
+      avgUserXgDelta: 0.18,
+      avgUserShotsDelta: 2.2,
+      avgUserWideDelta: 2.0,
+      avgUserWideXgDelta: 0.12,
+    }));
+    const subRead = component.scenarioSummaryCoachRead(makeScenarioSummaryRow({
+      actionType: 'SUBSTITUTION',
+      actionDetail: 'ST -> MID',
+      avgUserXgDelta: -0.12,
+      avgUserShotsDelta: -2.0,
+      avgUserWideDelta: -1.5,
+      avgUserWideXgDelta: -0.08,
+    }));
+    const opponentRead = component.scenarioSummaryCoachRead(makeScenarioSummaryRow({
+      scenario: 'm45-opponent-wide-left',
+      actionType: 'OPPONENT_STYLE',
+      actionDetail: 'Opponent wide left',
+      avgOpponentXgDelta: 0.12,
+      avgOpponentShotsDelta: 2.0,
+      avgOpponentLeftWideXgDelta: 0.14,
+    }));
+
+    expect(formationRead).toContain('formacion:');
+    expect(formationRead).toContain('gana ataque');
+    expect(subRead).toContain('cambio:');
+    expect(subRead).toContain('pierde ataque');
+    expect(opponentRead).toContain('rival: rival amenaza');
+  });
 });
 
 function makeMatchRow(matchId: string) {
@@ -1183,6 +1216,40 @@ function makeMatchRow(matchId: string) {
     homeFormation: null,
     awayFormation: null,
     roundId: 'round-uuid-1',
+  };
+}
+
+function makeScenarioSummaryRow(overrides: Partial<any> = {}): any {
+  return {
+    scenario: 'm45-formation-433',
+    actionType: 'FORMATION',
+    actionDetail: '4-3-3',
+    seedCount: 10,
+    avgUserXgDelta: 0,
+    minUserXgDelta: 0,
+    maxUserXgDelta: 0,
+    avgOpponentXgDelta: 0,
+    avgUserShotsDelta: 0,
+    avgOpponentShotsDelta: 0,
+    avgUserPossessionDelta: 0,
+    avgUserCentralDelta: 0,
+    avgUserWideDelta: 0,
+    avgOpponentCentralDelta: 0,
+    avgOpponentWideDelta: 0,
+    avgUserCentralXgDelta: 0,
+    avgUserWideXgDelta: 0,
+    avgOpponentCentralXgDelta: 0,
+    avgOpponentWideXgDelta: 0,
+    avgUserLeftWideDelta: 0,
+    avgUserRightWideDelta: 0,
+    avgOpponentLeftWideDelta: 0,
+    avgOpponentRightWideDelta: 0,
+    avgUserLeftWideXgDelta: 0,
+    avgUserRightWideXgDelta: 0,
+    avgOpponentLeftWideXgDelta: 0,
+    avgOpponentRightWideXgDelta: 0,
+    baselineScenario: 'baseline',
+    ...overrides,
   };
 }
 

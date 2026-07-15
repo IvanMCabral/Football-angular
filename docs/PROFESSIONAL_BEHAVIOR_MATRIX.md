@@ -188,3 +188,16 @@ Ejecutar en `/debug/test-harness` para calibracion fina:
 - Lectura:
   - Los casos Celta `5-3-2 MID` y `5-4-1 MID` siguen siendo `Review` reales: el sistema debe avisar y penalizar, no esconderlos.
   - Proximo paso recomendado: llevar este mismo lenguaje de "impacto tactico" al harness/motor para comparar formacion, cambio de jugador y movimiento pixelado con una lectura unica.
+
+## V25D99.128 - Coach read contextual en harness
+
+- Harness `/debug/test-harness`:
+  - La columna `Coach read` del Scenario summary ahora arranca con el tipo de decision: `formacion`, `estilo`, `cambio`, `posicion`, `rival`, `base` o `escenario`.
+  - La lectura deja de ser generica: diferencia "formacion: gana ataque", "cambio: pierde ataque", "rival: rival amenaza", etc.
+  - Mantiene los mismos scores tacticos existentes: ataque, perdida de ataque, proteccion, riesgo y canales.
+- Test:
+  - `test-harness-page.component.spec.ts`: nuevo pin para formacion ofensiva, cambio negativo y amenaza rival.
+  - Resultado: `56 SUCCESS`.
+- Lectura:
+  - Primer puente entre modal y harness: ambos explican el impacto como decision de DT, no como numero aislado.
+  - Siguiente paso recomendado: agregar una mini tarjeta de "decision recomendada" por fila o grupo, usando esta lectura contextual.
