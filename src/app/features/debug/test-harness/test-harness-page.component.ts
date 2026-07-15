@@ -412,6 +412,14 @@ interface FormationLineSmokeRow {
   warnings: string;
 }
 
+interface ProfessionalQaChecklistRow {
+  check: string;
+  expected: string;
+  observed: string;
+  verdict: 'OK' | 'Fallback' | 'Review' | 'Pending';
+  next: string;
+}
+
 interface TeamStyleOption {
   value: TeamStyle;
   label: string;
@@ -1128,6 +1136,35 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
           <p class="panel-hint">
             Compare the same match and seed across formations, live tactical changes and substitutions.
           </p>
+
+          <div class="formation-matrix analysis-matrix current-lineup-replay">
+            <div class="matrix-header">
+              <strong>Professional QA checklist</strong>
+              <span>Expected vs observed read for modal → lineup → engine contracts</span>
+            </div>
+            <div class="table-scroll compact-position-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Check</th>
+                    <th>Expected</th>
+                    <th>Observed</th>
+                    <th>Verdict</th>
+                    <th>Next</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let row of professionalQaChecklistRows(); trackBy: trackByProfessionalQaChecklistRow">
+                    <td>{{ row.check }}</td>
+                    <td>{{ row.expected }}</td>
+                    <td>{{ row.observed }}</td>
+                    <td>{{ row.verdict }}</td>
+                    <td>{{ row.next }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
 
           <div *ngIf="formationLineSmokeRows().length > 0" class="formation-matrix analysis-matrix current-lineup-replay">
             <div class="matrix-header">
@@ -2932,6 +2969,96 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   readonly positionPixelMatrixRows = signal<PositionPixelMatrixSummary[]>([]);
   readonly lineupDebugSnapshot = signal<LineupDebugSnapshot | null>(null);
   readonly formationLineSmokeRows = signal<FormationLineSmokeRow[]>([]);
+  readonly professionalQaChecklistRows = computed<ProfessionalQaChecklistRow[]>(() => {
+      const rows = this.formationLineSmokeRows();
+      const pixelRows = this.positionPixelMatrixRows();
+      const pixelMatchSummaries = this.positionPixelMatchSmokeSummary();
+      const pixelPlayerSummaries = this.positionPixelPlayerSmokeSummary();
+      const swapBattery = this.playerSwapBatterySummary();
+    const hasAudit = rows.length > 0;
+    const hasPixelRows = pixelRows.length > 0;
+    const hasSwapBattery = swapBattery.total > 0;
+    const rowsByLine = (line: 'DEF' | 'MID' | 'ATT') => rows.filter((row) => row.line === line);
+    const countByVerdict = (verdict: string) => rows.filter((row) => row.verdict === verdict).length;
+    const hardReviews = rows.filter((row) => row.verdict === 'Review');
+    const fallbackRows = rows.filter((row) => row.verdict === 'Fallback');
+    const defenseRows = rowsByLine('DEF');
+    const cleanDefenseRows = defenseRows.filter((row) => row.verdict === 'OK').length;
+    const camOk = rows.some((row) =>
+      row.formation === '3-4-1-2'
+      && row.line === 'MID'
+      && row.verdict === 'OK'
+      && row.slotRoles.includes('CAM')
+    );
+    const strikerOk = rows.some((row) =>
+      row.formation === '3-4-1-2'
+      && row.line === 'ATT'
+      && row.verdict === 'OK'
+      && row.slotRoles === 'ST · ST'
+    );
+      const pixelVisibleRows = pixelRows.filter((row) => this.positionPixelReadLevel(row) !== 'stable').length;
+      const pixelCliffRows = pixelRows.filter((row) => this.positionPixelDistance(row) <= 1.5 && this.positionPixelReadLevel(row) === 'strong').length;
+      const pixelRepeatedFivePxRows = pixelMatchSummaries.filter((row) => row.verdict === 'Repeated 5px bias').length;
+      const pixelPlayerRepeatedFivePxRows = pixelPlayerSummaries.filter((row) => row.verdict === 'Repeated 5px bias').length;
+      const pixelVisibleFivePxRows = pixelMatchSummaries.filter((row) => row.verdict === '5px visible pattern').length
+        + pixelPlayerSummaries.filter((row) => row.verdict === '5px visible pattern').length;
+      const pixelBigTacticalMoveRows = pixelMatchSummaries.filter((row) => row.verdict === 'Strong review' || row.verdict === 'Big tactical move').length
+        + pixelPlayerSummaries.filter((row) => row.verdict === 'Strong review' || row.verdict === 'Big tactical move').length;
+    const swapActionableReads = Object.entries(swapBattery.reads)
+      .filter(([read]) => !['No clear effect', 'Neutral', 'Sin lectura clara'].includes(read))
+      .reduce((sum, [, count]) => sum + count, 0);
+    return [
+      {
+        check: 'All formations audit',
+        expected: '36 line checks after running all 12 formations.',
+        observed: hasAudit ? `${rows.length}/36 rows · ${countByVerdict('OK')} OK · ${countByVerdict('Fallback')} fallback · ${countByVerdict('Review')} review` : 'Not run yet',
+        verdict: !hasAudit ? 'Pending' : hardReviews.length > 0 ? 'Review' : fallbackRows.length > 0 ? 'Fallback' : 'OK',
+        next: !hasAudit ? 'Run All formations line audit.' : hardReviews.length > 0 ? 'Inspect Review rows first.' : fallbackRows.length > 0 ? 'Fallbacks are allowed; calibrate penalties.' : 'Keep as contract.',
+      },
+      {
+        check: 'Defensive side mapping',
+        expected: 'LB/RB and LWB/RWB stay on their tactical side; no crossing.',
+        observed: hasAudit ? `${cleanDefenseRows}/${defenseRows.length} defensive lines clean` : 'Not run yet',
+        verdict: !hasAudit ? 'Pending' : defenseRows.length > 0 && cleanDefenseRows === defenseRows.length ? 'OK' : 'Review',
+        next: !hasAudit ? 'Run formation audit.' : cleanDefenseRows === defenseRows.length ? 'Keep as contract.' : 'Check side mapping / persisted slots.',
+      },
+      {
+        check: '3-4-1-2 spine',
+        expected: 'CAM natural in CAM and two CF/ST preserved for both ST slots.',
+        observed: hasAudit ? `CAM ${camOk ? 'OK' : 'missing'} · ST pair ${strikerOk ? 'OK' : 'missing'}` : 'Not run yet',
+        verdict: !hasAudit ? 'Pending' : camOk && strikerOk ? 'OK' : 'Review',
+        next: !hasAudit ? 'Run formation audit.' : camOk && strikerOk ? 'Pinned by backend test.' : 'Recheck auto-select reservation.',
+      },
+      {
+        check: 'Wide-role scarcity',
+        expected: 'Missing natural wingers/LM/RM becomes Fallback, not silent OK.',
+        observed: hasAudit ? `${fallbackRows.length} fallback line(s)` : 'Not run yet',
+        verdict: !hasAudit ? 'Pending' : fallbackRows.length > 0 ? 'Fallback' : 'OK',
+        next: fallbackRows.length > 0 ? 'Expose/penalize fallback in preview and engine.' : 'No fallback detected for this squad.',
+      },
+      {
+        check: 'Pixel movement signal',
+        expected: 'Manual x/y movement creates a measurable multi-seed signal.',
+        observed: hasPixelRows ? `${pixelRows.length} rows · ${pixelVisibleRows} visible/non-stable` : 'Not run yet',
+        verdict: !hasPixelRows ? 'Pending' : pixelVisibleRows > 0 ? 'OK' : 'Review',
+        next: !hasPixelRows ? 'Run Position presets matrix or line smokes.' : pixelVisibleRows > 0 ? 'Use rows to calibrate direction.' : 'Increase seeds or inspect engine sensitivity.',
+      },
+        {
+          check: 'Pixel no-cliff rule',
+          expected: '1px moves should be smooth, not strong cliff jumps.',
+          observed: hasPixelRows ? `${pixelCliffRows} strong 1px cliff row(s) · ${pixelRepeatedFivePxRows} match repeated 5px bias · ${pixelPlayerRepeatedFivePxRows} player repeated 5px bias · ${pixelVisibleFivePxRows} visible 5px pattern(s) · ${pixelBigTacticalMoveRows} big tactical move(s)` : 'Not run yet',
+          verdict: !hasPixelRows ? 'Pending' : pixelCliffRows > 0 || pixelRepeatedFivePxRows > 0 || pixelPlayerRepeatedFivePxRows > 0 ? 'Review' : 'OK',
+          next: !hasPixelRows ? 'Run Sensitivity check.' : pixelCliffRows > 0 || pixelRepeatedFivePxRows > 0 || pixelPlayerRepeatedFivePxRows > 0 ? 'Inspect micro thresholds / zone boundaries.' : pixelVisibleFivePxRows > 0 || pixelBigTacticalMoveRows > 0 ? 'Micro is smooth; calibrate 5px/big tactical sensitivity separately.' : 'Keep as contract.',
+        },
+      {
+        check: 'Player swap signal',
+        expected: 'Changing players should affect role quality and match averages.',
+        observed: hasSwapBattery ? `${swapBattery.total} swaps · ${swapActionableReads} actionable read(s) · ${swapBattery.confidence}` : 'Not run yet',
+        verdict: !hasSwapBattery ? 'Pending' : swapActionableReads > 0 ? 'OK' : 'Review',
+        next: !hasSwapBattery ? 'Run Player swap battery.' : swapActionableReads > 0 ? 'Use best/worst to tune role quality.' : 'Check whether substitutions influence engine enough.',
+      },
+    ];
+  });
   readonly positionPixelReadFilter = signal<PositionPixelReadFilter>('all');
   readonly positionPixelSortMode = signal<PositionPixelSortMode>('default');
 
@@ -3678,6 +3805,21 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     this.scenarioMatrixResults.set([]);
     this.scenarioMatrixSummaryResults.set([]);
     this.scenarioBatteryRows.set([]);
+  }
+
+  private clearPlayerSwapAnalysisResults(): void {
+    this.playerSwapMatrixSummary.set(null);
+    this.playerSwapBatterySummaries.set([]);
+    this.playerSwapPrecisionComparisonRows.set([]);
+  }
+
+  private clearPositionPixelAnalysisResults(): void {
+    this.positionPixelMatrixSummary.set(null);
+    this.positionPixelMatrixRows.set([]);
+  }
+
+  private clearFormationLineAuditResults(): void {
+    this.formationLineSmokeRows.set([]);
   }
 
   downloadFormationMatrixCsv(): void {
@@ -5679,7 +5821,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     this.playerSwapSeedCountModel = seedCount;
     let candidate: PlayerSwapCandidate | null = null;
 
-    this.clearReplayAnalysisResults();
+    this.clearPlayerSwapAnalysisResults();
     this.analysisReadyMessage.set(`Player swap matrix corriendo: ${seedCount} seeds...`);
     this.mutationInFlight.set(true);
     forkJoin({
@@ -5762,7 +5904,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const seedCount = this.playerSwapBatteryEffectiveSeedCount();
     this.playerSwapSeedCountModel = seedCount;
 
-    this.clearReplayAnalysisResults();
+    this.clearPlayerSwapAnalysisResults();
     this.analysisReadyMessage.set(`Player swap battery corriendo: ${seedCount} seeds por cambio...`);
     this.mutationInFlight.set(true);
     forkJoin({
@@ -5842,7 +5984,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     }
 
     const seedStart = this.seedInputModel ?? DEFAULT_REPLAY_SEED;
-    this.clearReplayAnalysisResults();
+    this.clearPlayerSwapAnalysisResults();
     this.analysisReadyMessage.set('Precision compare corriendo...');
     this.mutationInFlight.set(true);
     forkJoin({
@@ -6030,7 +6172,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       return;
     }
     const formation = this.selectedFormationModel ?? '4-4-2';
-    this.clearReplayAnalysisResults();
+    this.clearFormationLineAuditResults();
     this.mutationInFlight.set(true);
     this.analysisReadyMessage.set(`Formation line audit corriendo para ${formation}...`);
     this.currentOrAutoSelectedLineup(formation).subscribe({
@@ -6071,7 +6213,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       return;
     }
     const formations = [...this.formationCodes];
-    this.clearReplayAnalysisResults();
+    this.clearFormationLineAuditResults();
     this.mutationInFlight.set(true);
     this.analysisReadyMessage.set(`All formations line audit corriendo: ${formations.length} formaciones...`);
     from(formations).pipe(
@@ -6241,7 +6383,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const seedStart = this.seedInputModel ?? DEFAULT_REPLAY_SEED;
     this.playerSwapSeedCountModel = seedCount;
 
-    this.clearReplayAnalysisResults();
+    this.clearPositionPixelAnalysisResults();
     this.mutationInFlight.set(true);
     this.analysisReadyMessage.set(`${label} corriendo: preparando titulares, movimientos y ${seedCount} seeds...`);
     window.setTimeout(() => this.scrollToReplayAnalysis(), 0);
@@ -6551,6 +6693,10 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
 
   trackByFormationLineSmokeRow(_index: number, row: FormationLineSmokeRow): string {
     return `${row.formation}-${row.line}`;
+  }
+
+  trackByProfessionalQaChecklistRow(_index: number, row: ProfessionalQaChecklistRow): string {
+    return row.check;
   }
 
   selectedStyleLabel(): string {
@@ -7936,8 +8082,8 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     worstSignal: number
   ): string {
     if (fivePxRiskRows >= 6 && (avgSignal >= 0.075 || worstSignal >= 0.160)) return 'Repeated 5px bias';
-    if (fivePxRiskRows >= 3) return '5px visible pattern';
-    if (bigMoveRows > 0 && bigMoveStrongRows === bigMoveRows && readCounts.strong <= bigMoveStrongRows) return 'Big-move outlier';
+    if (fivePxRiskRows >= 3 && (avgSignal >= 0.065 || worstSignal >= 0.160)) return '5px visible pattern';
+    if (bigMoveRows > 0 && bigMoveStrongRows === bigMoveRows && readCounts.strong <= bigMoveStrongRows) return 'Big tactical move';
     if (bigBadTradeoff > 0 || readCounts.strong > 0) return 'Strong review';
     if (readCounts.check > 1 || microReview > 1) return 'Needs seeds';
     if (visibleRisk >= 4) return 'Visible risk pattern';
@@ -7949,7 +8095,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   private positionPixelMatchSmokeVerdictClass(verdict: string): string {
     if (verdict === 'Repeated 5px bias') return 'read-strong';
     if (verdict === '5px visible pattern') return 'read-check';
-    if (verdict === 'Big-move outlier') return 'read-visible';
+    if (verdict === 'Big tactical move') return 'read-visible';
     if (verdict === 'Strong review') return 'read-strong';
     if (verdict === 'Needs seeds' || verdict === 'Visible risk pattern') return 'read-check';
     if (verdict === 'Visible cost pattern') return 'read-visible';
@@ -8020,9 +8166,8 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     worstSignal: number
   ): string {
     if (fivePxRiskRows >= 6 && (avgSignal >= 0.075 || worstSignal >= 0.160)) return 'Repeated 5px bias';
-    if (fivePxRiskRows >= 3) return '5px visible pattern';
-    if (bigMoveRows > 0 && bigMoveStrongRows === bigMoveRows) return 'Big-move outlier';
-    if (bigMoveStrongRows > 0) return 'Strong review';
+    if (fivePxRiskRows >= 3 && (avgSignal >= 0.065 || worstSignal >= 0.160)) return '5px visible pattern';
+    if (bigMoveStrongRows > 0) return 'Big tactical move';
     return 'Stable';
   }
 
@@ -8030,7 +8175,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     if (item.verdict === 'Repeated 5px bias') return 5;
     if (item.verdict === '5px visible pattern') return 4;
     if (item.verdict === 'Strong review') return 3;
-    if (item.verdict === 'Big-move outlier') return 2;
+    if (item.verdict === 'Big tactical move') return 2;
     return 1;
   }
 

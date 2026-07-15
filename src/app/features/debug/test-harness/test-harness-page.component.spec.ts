@@ -1053,6 +1053,71 @@ describe('TestHarnessPageComponent', () => {
     expect(report).toContain('## Tactical breakdown detail');
     expect(snackBarSpy.open).toHaveBeenCalledWith('Player swap battery report copied.', 'OK', { duration: 2500 });
   });
+
+  it('keeps soft repeated 5px risks as playable variation instead of a review pattern', () => {
+    component.positionPixelMatrixRows.set([
+      makePositionPixelRow({ label: 'R1 ? 5px forward', signalScore: 0.04 }),
+      makePositionPixelRow({ label: 'R1 ? 5px deeper', signalScore: 0.04 }),
+      makePositionPixelRow({ label: 'R1 ? 5px wide', signalScore: 0.04 }),
+    ] as any);
+
+    const [summary] = component.positionPixelMatchSmokeSummary();
+    const noCliffRow = component.professionalQaChecklistRows()
+      .find((row) => row.check === 'Pixel no-cliff rule');
+
+    expect(summary.verdict).toBe('Playable variation');
+    expect(noCliffRow?.verdict).toBe('OK');
+    expect(noCliffRow?.observed).toContain('0 match repeated 5px bias');
+    expect(noCliffRow?.observed).toContain('0 visible 5px pattern(s)');
+  });
+
+  it('flags repeated 5px risks only when the signal is strong enough', () => {
+    component.positionPixelMatrixRows.set([
+      makePositionPixelRow({ label: 'R1 ? 5px forward', signalScore: 0.17 }),
+      makePositionPixelRow({ label: 'R1 ? 5px deeper', signalScore: 0.17 }),
+      makePositionPixelRow({ label: 'R1 ? 5px wide', signalScore: 0.17 }),
+    ] as any);
+
+    const [summary] = component.positionPixelMatchSmokeSummary();
+    const noCliffRow = component.professionalQaChecklistRows()
+      .find((row) => row.check === 'Pixel no-cliff rule');
+
+    expect(summary.verdict).toBe('5px visible pattern');
+    expect(noCliffRow?.verdict).toBe('OK');
+    expect(noCliffRow?.observed).toContain('2 visible 5px pattern(s)');
+  });
+
+  it('keeps professional QA checklist combined across formation, pixel and swap batteries', () => {
+    component.formationLineSmokeRows.set([
+      {
+        formation: '4-4-2',
+        line: 'DEF',
+        candidates: 4,
+        expectedPlayers: 4,
+        rows: 8,
+        candidateNames: 'A · B · C · D',
+        slotRoles: 'LB · CB · CB · RB',
+        verdict: 'OK',
+        warnings: '-',
+      },
+    ] as any);
+    component.positionPixelMatrixRows.set([
+      makePositionPixelRow({ label: 'R1 ? 5px forward', signalScore: 0.04 }),
+    ] as any);
+    component.playerSwapBatterySummaries.set([
+      makePlayerSwapSummary({ swapRead: 'Clear upgrade' }),
+    ] as any);
+
+    const rows = component.professionalQaChecklistRows();
+    const formation = rows.find((row) => row.check === 'All formations audit');
+    const pixel = rows.find((row) => row.check === 'Pixel movement signal');
+    const swap = rows.find((row) => row.check === 'Player swap signal');
+
+    expect(formation?.observed).toContain('1/36 rows');
+    expect(pixel?.observed).toContain('1 rows');
+    expect(swap?.observed).toContain('1 swaps');
+    expect(swap?.verdict).toBe('OK');
+  });
 });
 
 function makeMatchRow(matchId: string) {
@@ -1216,6 +1281,73 @@ function makePlayerSwapSummary(overrides: Record<string, unknown>) {
     tacticalChannelsClass: 'delta-neutral',
     tacticalBreakdownDetail: 'test',
     timestamp: '2026-07-13T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+function makePositionPixelRow(overrides: Record<string, unknown> = {}) {
+  return {
+    label: 'R1 ? 5px forward',
+    matchId: 'match-1',
+    formation: '4-4-2',
+    playerId: 'p2',
+    playerName: 'Starter RB',
+    playerPosition: 'RB',
+    slotId: 'S24-2',
+    fromXPercent: 80,
+    fromYPercent: 80,
+    targetXPercent: 80,
+    targetYPercent: 75,
+    seedStart: 12345,
+    seedEnd: 12347,
+    seedCount: 3,
+    baselineAvgShotsFor: 10,
+    baselineAvgPossessionFor: 50,
+    baselineAvgXgFor: 1,
+    baselineAvgXgAgainst: 1,
+    movedAvgShotsFor: 10,
+    movedAvgPossessionFor: 50,
+    movedAvgXgFor: 1,
+    movedAvgXgAgainst: 1.03,
+    deltaGoalsFor: 0,
+    deltaGoalsAgainst: 0,
+    deltaGoalDiff: 0,
+    deltaShotsFor: 0,
+    deltaShotsAgainst: 0.3,
+    deltaPossessionFor: 0,
+    deltaXgFor: 0,
+    deltaXgAgainst: 0.03,
+    deltaXgDiff: -0.03,
+    deltaCentralShotsFor: 0,
+    deltaWideShotsFor: 0,
+    deltaLongShotsFor: 0,
+    deltaCentralShotsAgainst: 0.2,
+    deltaWideShotsAgainst: 0.2,
+    deltaLongShotsAgainst: 0,
+    deltaCentralXgFor: 0,
+    deltaWideXgFor: 0,
+    deltaLongXgFor: 0,
+    deltaLeftWideShotsFor: 0,
+    deltaRightWideShotsFor: 0,
+    deltaLeftWideXgFor: 0,
+    deltaRightWideXgFor: 0,
+    deltaCentralXgAgainst: 0.015,
+    deltaWideXgAgainst: 0.015,
+    deltaLongXgAgainst: 0,
+    deltaLeftWideShotsAgainst: 0,
+    deltaRightWideShotsAgainst: 0,
+    deltaLeftWideXgAgainst: 0.01,
+    deltaRightWideXgAgainst: 0.01,
+    baselineAvgCentralShotsAgainst: 3,
+    baselineAvgWideShotsAgainst: 3,
+    baselineAvgLongShotsAgainst: 2,
+    movedAvgCentralShotsAgainst: 3.2,
+    movedAvgWideShotsAgainst: 3.2,
+    movedAvgLongShotsAgainst: 2,
+    signalScore: 0.04,
+    signalRead: 'Baja 0.040',
+    signalClass: 'read-stable',
+    signalDetail: 'test',
     ...overrides,
   };
 }
