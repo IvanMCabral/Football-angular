@@ -457,7 +457,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
  * +-----------------------------------+
  * </pre>
  *
- * <p>Backend gating: this UI is a debug surface ? the backend is
+ * <p>Backend gating: this UI is a debug surface - the backend is
  * profile-gated ({@code dev | local | test}). The /detail and /timeline
  * endpoints return 404 in prod. REVISOR runs the smoke against the
  * dev profile.
@@ -482,7 +482,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
       <header class="page-header">
         <h1 class="page-title">Test Harness</h1>
         <p class="page-subtitle">
-          Debug surface ? change formation, replay, and inspect match detail.
+          Debug surface - change formation, replay, and inspect match detail.
         </p>
         <a routerLink="/dashboard" class="link link-back" aria-label="Back to dashboard">
           &larr; Back to dashboard
@@ -514,7 +514,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
       <div *ngIf="!loading() && !loadError() && hasCareer()" class="test-harness-grid">
         <!-- Panel A: Reused V24 match detail (F2) -->
         <section class="panel panel-a" aria-labelledby="panel-a-heading">
-          <h2 id="panel-a-heading" class="panel-title">Panel A ? Match Detail</h2>
+          <h2 id="panel-a-heading" class="panel-title">Panel A - Match Detail</h2>
           <p class="panel-hint" *ngIf="!selectedMatchId()">
             Select a match in Panel C to view its V24 detail.
           </p>
@@ -528,7 +528,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
 
         <!-- Panel B: Mutation controls -->
         <section class="panel panel-b" aria-labelledby="panel-b-heading">
-          <h2 id="panel-b-heading" class="panel-title">Panel B ? Mutations</h2>
+          <h2 id="panel-b-heading" class="panel-title">Panel B - Mutations</h2>
 
           <div class="control-group">
             <mat-form-field appearance="outline" class="formation-field">
@@ -650,7 +650,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                   (ngModelChange)="onPlayerSwapSeedCountChange($event)"
                   aria-label="Number of seeds for player swap matrix"
                 />
-                <mat-hint>1-50 ? Multi-seed usa min 20</mat-hint>
+                <mat-hint>1-50 - Multi-seed usa min 20</mat-hint>
               </mat-form-field>
 
               <mat-form-field appearance="outline" class="swap-field">
@@ -1132,7 +1132,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
           class="panel panel-e"
           aria-labelledby="panel-e-heading"
         >
-          <h2 id="panel-e-heading" class="panel-title">Panel E ? Replay Analysis</h2>
+          <h2 id="panel-e-heading" class="panel-title">Panel E - Replay Analysis</h2>
           <p class="panel-hint">
             Compare the same match and seed across formations, live tactical changes and substitutions.
           </p>
@@ -2174,6 +2174,9 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
               <span class="read-pill tactical-read-pill read-stable">
                 {{ scenarioBatteryGroupHint() }}
               </span>
+              <span class="read-pill tactical-read-pill read-noise">
+                {{ scenarioBatteryCoverageHint() }}
+              </span>
             </div>
             <div class="matrix-scroll">
               <div class="matrix-table scenario-battery-table" role="table" aria-label="Tactical battery board">
@@ -2230,7 +2233,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
 
         <!-- Panel C: Match list (full width) -->
         <section class="panel panel-c" aria-labelledby="panel-c-heading">
-          <h2 id="panel-c-heading" class="panel-title">Panel C ? Matches</h2>
+          <h2 id="panel-c-heading" class="panel-title">Panel C - Matches</h2>
           <p class="panel-hint">Click a match to load its detail in Panel A and the scrubber in Panel D.</p>
 
           <div *ngIf="rounds().length === 0" class="empty-rounds">
@@ -2274,7 +2277,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
 
         <!-- Panel D: Timeline scrubber (F3) -->
         <section class="panel panel-d" aria-labelledby="panel-d-heading">
-          <h2 id="panel-d-heading" class="panel-title">Panel D ? Timeline Scrubber</h2>
+          <h2 id="panel-d-heading" class="panel-title">Panel D - Timeline Scrubber</h2>
           <p class="panel-hint" *ngIf="!selectedMatchId()">
             Select a match in Panel C to use the timeline scrubber.
           </p>
@@ -3516,7 +3519,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     });
   }
 
-  /** Set the selected match (Panel C ? Panel A re-render via @Input). */
+  /** Set the selected match (Panel C -> Panel A re-render via @Input). */
   selectMatch(m: TestHarnessMatchRow): void {
     const previousMatchId = this.selectedMatchId();
     this.selectedMatchId.set(m.matchId);
@@ -6744,11 +6747,11 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   playerSwapBatteryPrecisionHint(): string {
     const seeds = this.playerSwapBatteryEffectiveSeedCount();
     if (this.playerSwapBatteryModeModel === 'stress' && this.playerSwapBatteryPrecisionModel === 'quick') {
-      return `${seeds} seeds ? Stress test usa minimo 10 para evitar ruido.`;
+      return `${seeds} seeds - Stress test usa minimo 10 para evitar ruido.`;
     }
-    if (this.playerSwapBatteryPrecisionModel === 'reliable') return `${seeds} seeds ? High confidence.`;
-    if (this.playerSwapBatteryPrecisionModel === 'balanced') return `${seeds} seeds ? Medium confidence.`;
-    return `${seeds} seeds ? Low confidence, smoke rapido.`;
+    if (this.playerSwapBatteryPrecisionModel === 'reliable') return `${seeds} seeds - High confidence.`;
+    if (this.playerSwapBatteryPrecisionModel === 'balanced') return `${seeds} seeds - Medium confidence.`;
+    return `${seeds} seeds - Low confidence, smoke rapido.`;
   }
 
   playerSwapBatteryConfidenceLabel(seedCount = this.playerSwapSeedCountModel): string {
@@ -6838,6 +6841,15 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       default:
         return 'Ataque: mide canales, forma y riesgo ofensivo.';
     }
+  }
+
+  scenarioBatteryCoverageHint(): string {
+    const readings = this.scenarioBatteryRows().length;
+    const seeds = this.scenarioMatrixSmokeSeedCount();
+    const coverage = readings > 0 ? `${readings} lecturas x ${seeds} seeds` : `${seeds} seeds`;
+    return this.scenarioBatteryScopeModel === 'balanced'
+      ? `Cobertura media: ${coverage}; usar para decidir tendencias.`
+      : `Cobertura smoke: ${coverage}; usar para detectar senales, no para cerrar balance.`;
   }
 
   scenarioBatteryGroupLabel(group: 'ALL' | 'OFFENSE' | 'DEFENSE' | 'OPPONENT'): string {
