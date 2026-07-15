@@ -137,3 +137,23 @@ Ejecutar en `/debug/test-harness` para calibracion fina:
 - Formation avg confirma tradeoffs; 4-3-3/4-1-2-3 producen mas tiros/xG, 5-4-1 baja produccion ofensiva.
 - Fix harness: Formation avg ya no borra el checklist ni evidencia previa de Panel E; test harness 55/55 OK.
 - Proximo ajuste sugerido: auto-select debe preferir WINGER natural para LM/RM antes que convertir ATT a medio de banda cuando el plantel lo permite.
+
+## V25D99.125 - Auto-select profesional para bandas y extremos
+
+- Backend:
+  - `WINGER` cuenta como mediocampo solo en formaciones con `LM/RM/LWB/RWB`.
+  - `WINGER` cuenta como atacante solo en formaciones con `LW/RW`.
+  - Ataques con extremos reservan primero los cupos `LW/RW` y despues completan `ST/CF`.
+  - El score de asignacion prefiere roles especificos de banda antes que `MID/ATT` genericos.
+- Tests:
+  - `LineupCommandUseCaseImplAutoSelectTest`: 20/20 OK.
+  - Cubierto `4-4-2`: winger natural en `LM/RM`, no ATT central reconvertido a medio externo.
+  - Cubierto `4-3-3`: wingers naturales en `LW/RW`, no gastados en `CM`.
+- Smoke visual Celta en `/debug/test-harness`:
+  - `All formations line audit`: `36/36 rows · 29 OK · 0 fallback · 7 review`.
+  - `4-4-2`: `Bamba LM`, `Damian/F. Beltran CM`, `Hugo Alvarez RM`, `Iago/Jorgen ST` -> OK.
+  - `4-3-3`: `Damian/F. Beltran/Hugo Sotelo CM`, `Bamba LW`, `Hugo Alvarez RW`, `Iago ST` -> OK.
+  - `4-1-2-3`: extremos arriba y mediocampo limpio -> OK.
+- Lectura:
+  - Cerrado el bug de autoselect que usaba delanteros centrales como banda cuando habia wingers naturales.
+  - Quedan reviews reales en lineas de 3/5 por escasez de carrileros/defensores adecuados; siguiente calibracion tactica, no inconsistencia del modal.
