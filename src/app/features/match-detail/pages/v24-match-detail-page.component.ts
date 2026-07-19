@@ -1176,22 +1176,17 @@ export class V24MatchDetailPageComponent implements OnInit, OnChanges {
     if (!this.detail) {
       return null;
     }
-    const homeRatings = (this.detail.playerRatings ?? [])
-      .filter(p => p.teamId === this.detail!.homeTeamId)
-      .filter(p => p.playerId && p.playerName && !this.isPlaceholderPlayerName(p.playerName));
-    const substitutedIds = new Set(
-      (this.detail.timeline ?? [])
-        .filter(e => e.type === 'SUBSTITUTION' && e.teamId === this.detail!.homeTeamId)
-        .map(e => e.playerId)
-        .filter(Boolean)
-    );
-    const realPlayers = homeRatings.map(p => ({
-      sessionPlayerId: p.playerId,
-      name: p.playerName,
+    const toDialogPlayer = (p: { sessionPlayerId: string; name: string; position: string }) => ({
+      sessionPlayerId: p.sessionPlayerId,
+      name: p.name,
       position: p.position || 'MID'
-    }));
-    const startingPlayers = realPlayers.filter(p => !substitutedIds.has(p.sessionPlayerId)).slice(0, 11);
-    const benchPlayers = realPlayers.filter(p => substitutedIds.has(p.sessionPlayerId)).slice(0, 12);
+    });
+    const startingPlayers = (this.detail.homeStartingPlayers ?? [])
+      .filter(p => p.sessionPlayerId && p.name && !this.isPlaceholderPlayerName(p.name))
+      .map(toDialogPlayer);
+    const benchPlayers = (this.detail.homeBenchPlayers ?? [])
+      .filter(p => p.sessionPlayerId && p.name && !this.isPlaceholderPlayerName(p.name))
+      .map(toDialogPlayer);
 
     if (startingPlayers.length < 7 || benchPlayers.length === 0) {
       return null;
@@ -1201,7 +1196,7 @@ export class V24MatchDetailPageComponent implements OnInit, OnChanges {
       matchId: this.detail.matchId,
       startingPlayers,
       benchPlayers,
-      substitutionsRemaining: Math.max(0, 5 - substitutedIds.size),
+      substitutionsRemaining: 5,
       currentMinute: 45,
     };
   }

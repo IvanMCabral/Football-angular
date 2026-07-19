@@ -218,6 +218,38 @@ describe('V24MatchDetailPageComponent — V24D24 @Input path', () => {
       jasmine.objectContaining({ panelClass: 'snack-warning' })
     );
   });
+
+  it('builds substitution modal data with real lineup players from match detail', () => {
+    const detail = makeDetail('match-1', 'career-1', 0, 0);
+    detail.homeStartingPlayers = Array.from({ length: 11 }, (_, i) => ({
+      sessionPlayerId: `starter-${i}`,
+      name: `Starter ${i}`,
+      position: i === 0 ? 'GK' : i < 5 ? 'DEF' : i < 9 ? 'MID' : 'ATT',
+      overall: 75,
+      attack: 75,
+      defense: 75,
+      energy: 100,
+      form: 50,
+      injured: false,
+    }));
+    detail.homeBenchPlayers = [{
+      sessionPlayerId: 'bench-1',
+      name: 'Real Bench Player',
+      position: 'ATT',
+      overall: 74,
+      attack: 74,
+      defense: 60,
+      energy: 100,
+      form: 50,
+      injured: false,
+    }];
+    component.detail = detail;
+
+    const data = (component as any).buildRealSubstitutionDialogData();
+
+    expect(data.startingPlayers.length).toBe(11);
+    expect(data.benchPlayers[0].name).toBe('Real Bench Player');
+  });
 });
 
 function makeDetail(matchId: string, careerId: string, homeGoals: number, awayGoals: number): MatchDetail {
@@ -240,6 +272,10 @@ function makeDetail(matchId: string, careerId: string, homeGoals: number, awayGo
     awayPossession: 45,
     timeline: [],
     playerRatings: [],
+    homeStartingPlayers: [],
+    homeBenchPlayers: [],
+    awayStartingPlayers: [],
+    awayBenchPlayers: [],
     schemaVersion: '1',
     engineVersion: 'V24',
     createdAt: new Date().toISOString(),

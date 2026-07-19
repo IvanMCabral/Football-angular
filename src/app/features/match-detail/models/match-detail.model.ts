@@ -85,6 +85,18 @@ export interface PlayerMatchRating {
   substitutions: number;
 }
 
+export interface MatchLineupPlayer {
+  sessionPlayerId: string;
+  name: string;
+  position: string;
+  overall: number;
+  attack: number;
+  defense: number;
+  energy: number;
+  form: number;
+  injured: boolean;
+}
+
 /**
  * V24 Detailed Match Data DTO.
  * Consumed from: GET /api/careers/{careerId}/matches/{matchId}/detail
@@ -115,6 +127,10 @@ export interface MatchDetail {
   awayPossession: number;
   timeline: MatchEvent[];
   playerRatings: PlayerMatchRating[];
+  homeStartingPlayers?: MatchLineupPlayer[];
+  homeBenchPlayers?: MatchLineupPlayer[];
+  awayStartingPlayers?: MatchLineupPlayer[];
+  awayBenchPlayers?: MatchLineupPlayer[];
   schemaVersion: string;
   engineVersion: string;
   createdAt: string;
