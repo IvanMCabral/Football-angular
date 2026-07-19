@@ -13751,35 +13751,45 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const seed = this.seedInputModel;
     this.formationReplayResults.set([]);
     this.mutationInFlight.set(true);
-    this.harness.getCurrentLineup().pipe(
-      switchMap((originalLineup) => {
-        const originalFormation =
-          originalLineup?.formation || this.selectedFormationModel || null;
-        const originalPlayerIds =
-          originalLineup?.players?.map((p) => p.playerId).filter(Boolean) ?? [];
-        const originalSlots = originalLineup?.slots ?? [];
-        if (originalPlayerIds.length !== 11) {
-          throw new Error(
-            `Formation matrix needs exactly 11 current lineup players, got ${originalPlayerIds.length}.`
+    const runMatrix$ = this.controlledTeamSideModel === 'USER'
+      ? this.harness.getCurrentLineup().pipe(
+        switchMap((originalLineup) => {
+          const originalFormation =
+            originalLineup?.formation || this.selectedFormationModel || null;
+          const originalPlayerIds =
+            originalLineup?.players?.map((p) => p.playerId).filter(Boolean) ?? [];
+          const originalSlots = originalLineup?.slots ?? [];
+          if (originalPlayerIds.length !== 11) {
+            throw new Error(
+              `Formation matrix needs exactly 11 current lineup players, got ${originalPlayerIds.length}.`
+            );
+          }
+          return this.harness.setStyle(this.selectedStyleModel).pipe(
+            switchMap(() => this.harness.runFormationMatrix(matchId, seed, this.controlledTeamSideModel)),
+            switchMap((rows) => {
+              const mappedRows = rows.map((row) => this.buildFormationReplayResultFromMatrix(row));
+              this.formationReplayResults.set(mappedRows);
+              if (!originalFormation) {
+                return of(mappedRows);
+              }
+              return this.harness.manualSelectLineup(
+                originalFormation,
+                originalPlayerIds,
+                originalSlots
+              ).pipe(map(() => mappedRows));
+            })
           );
-        }
-        return this.harness.setStyle(this.selectedStyleModel).pipe(
-          switchMap(() => this.harness.runFormationMatrix(matchId, seed, this.controlledTeamSideModel)),
-          switchMap((rows) => {
-            const mappedRows = rows.map((row) => this.buildFormationReplayResultFromMatrix(row));
-            this.formationReplayResults.set(mappedRows);
-            if (!originalFormation) {
-              return of(mappedRows);
-            }
-            return this.harness.manualSelectLineup(
-              originalFormation,
-              originalPlayerIds,
-              originalSlots
-            ).pipe(map(() => mappedRows));
-          })
-        );
-      })
-    ).subscribe({
+        })
+      )
+      : this.harness.setStyle(this.selectedStyleModel).pipe(
+        switchMap(() => this.harness.runFormationMatrix(matchId, seed, this.controlledTeamSideModel)),
+        map((rows) => {
+          const mappedRows = rows.map((row) => this.buildFormationReplayResultFromMatrix(row));
+          this.formationReplayResults.set(mappedRows);
+          return mappedRows;
+        })
+      );
+    runMatrix$.subscribe({
       next: () => {
         // The backend returns the complete matrix in one response.
       },
@@ -13793,7 +13803,9 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       },
       complete: () => {
         this.mutationInFlight.set(false);
-        this.refreshLineupContext();
+        if (this.controlledTeamSideModel === 'USER') {
+          this.refreshLineupContext();
+        }
         this.snackBar.open(
           `Formation matrix completed (${this.formationReplayResults().length} formations).`,
           'OK',

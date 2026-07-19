@@ -46,6 +46,7 @@ describe('TestHarnessPageComponent', () => {
       'replaceFixtures',
       'replayMatch',
       'simulateRound',
+      'runFormationMatrix',
       'runPositionPixelMatrixSummary',
       'runScenarioMatrixSummary',
     ]);
@@ -109,6 +110,7 @@ describe('TestHarnessPageComponent', () => {
     harness.autoSelectLineup.and.returnValue(of(sampleLineup('4-4-2')) as any);
     harness.manualSelectLineup.and.returnValue(of(sampleLineup('4-4-2')) as any);
     harness.resetInjuries.and.returnValue(of({ success: true, message: 'reset' } as any));
+    harness.runFormationMatrix.and.returnValue(of([]) as any);
     harness.runScenarioMatrixSummary.and.returnValue(of([]) as any);
 
     await TestBed.configureTestingModule({
@@ -453,6 +455,33 @@ describe('TestHarnessPageComponent', () => {
       'OK',
       { duration: 5000 }
     );
+  });
+
+  it('runs formation matrix for local or visitor without touching editable user lineup', () => {
+    component.selectMatch({
+      matchId: 'match-1',
+      round: 1,
+      homeTeamId: 'team-2',
+      homeTeamName: 'Local Team',
+      awayTeamId: 'team-3',
+      awayTeamName: 'Away Team',
+      status: 'COMPLETED',
+      homeGoals: 1,
+      awayGoals: 0,
+      homeFormation: null,
+      awayFormation: null,
+      roundId: 'round-uuid-1',
+    });
+    component.controlledTeamSideModel = 'HOME';
+    harness.runFormationMatrix.calls.reset();
+    const getCurrentLineupCallsBefore = harness.getCurrentLineup.calls.count();
+    const manualSelectLineupCallsBefore = harness.manualSelectLineup.calls.count();
+
+    component.onRunFormationMatrix();
+
+    expect(harness.getCurrentLineup.calls.count()).toBe(getCurrentLineupCallsBefore);
+    expect(harness.manualSelectLineup.calls.count()).toBe(manualSelectLineupCallsBefore);
+    expect(harness.runFormationMatrix).toHaveBeenCalledWith('match-1', component.seedInputModel, 'HOME');
   });
 
   it('onFormationChange updates the model', () => {
