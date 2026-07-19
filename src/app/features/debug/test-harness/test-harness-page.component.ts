@@ -5452,6 +5452,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       fits[row.swapFit] = (fits[row.swapFit] ?? 0) + 1;
     }
     const sorted = [...rows].sort((a, b) => this.playerSwapDecisionScore(b) - this.playerSwapDecisionScore(a));
+    const recommended = sorted.filter((row) => this.playerSwapIsActionableRecommendation(row));
     const seedCount = rows[0]?.seedCount ?? this.playerSwapSeedCountModel;
     const hasStressRows = rows.some((row) => (row.testCase || '').toLowerCase().includes('stress'));
     const hasNaturalRows = rows.some((row) => (row.testCase || '').toLowerCase().includes('battery: natural'));
@@ -5461,7 +5462,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       mode,
       precision: this.playerSwapBatteryPrecisionModel,
       confidence: this.playerSwapBatteryConfidenceLabel(seedCount),
-      best: sorted[0] ?? null,
+      best: recommended[0] ?? sorted[0] ?? null,
       worst: sorted[sorted.length - 1] ?? null,
       reads,
       fits,
@@ -7635,6 +7636,14 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       Math.abs(row.deltaShotsAgainst) * 0.025,
       roleSignal,
     );
+    if (this.playerSwapHasLargeQualityDrop(row)) {
+      const preNet = row.preAutoSubDeltaXgDiff || 0;
+      const stableStrongGain = net >= 0.18 && row.deltaXgDiff >= 0.12 && preNet >= 0.06 && risk <= 0.10;
+      if (!stableStrongGain) {
+        if (net <= -0.03 || preNet <= -0.03 || row.deltaXgFor <= -0.03) return 'downgrade';
+        return 'review';
+      }
+    }
     if (signal < 0.035) return 'neutral';
     if (roleSignal >= 0.050 && risk < 0.08 && Math.abs(net) < 0.05) return 'review';
     if (this.playerSwapRoleTradeoff(row, candidate)) return 'tradeoff';
@@ -7646,19 +7655,19 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     if (signal >= 0.18 || Math.abs(net) >= 0.06) return 'review';
     return 'neutral';
   }
-  private playerSwapHasLargeQualityDrop(row: PlayerSwapMatrixSummaryRow): boolean {
+  private playerSwapHasLargeQualityDrop(row: Pick<PlayerSwapMatrixSummaryRow, 'baselinePlayerOverall' | 'swapPlayerOverall'>): boolean {
     const delta = this.playerSwapOverallDelta(row);
     return delta != null && delta <= -6;
   }
-  private playerSwapQualityWarning(row: PlayerSwapMatrixSummaryRow): string {
+  private playerSwapQualityWarning(row: Pick<PlayerSwapMatrixSummaryRow, 'baselinePlayerOverall' | 'swapPlayerOverall'>): string {
     if (!this.playerSwapHasLargeQualityDrop(row)) return '';
     return ` y baja mucho la calidad individual (${this.playerSwapOverallDeltaText(row)})`;
   }
-  private playerSwapOverallDelta(row: PlayerSwapMatrixSummaryRow): number | null {
+  private playerSwapOverallDelta(row: Pick<PlayerSwapMatrixSummaryRow, 'baselinePlayerOverall' | 'swapPlayerOverall'>): number | null {
     if (row.baselinePlayerOverall == null || row.swapPlayerOverall == null) return null;
     return row.swapPlayerOverall - row.baselinePlayerOverall;
   }
-  private playerSwapOverallDeltaText(row: PlayerSwapMatrixSummaryRow): string {
+  private playerSwapOverallDeltaText(row: Pick<PlayerSwapMatrixSummaryRow, 'baselinePlayerOverall' | 'swapPlayerOverall'>): string {
     const delta = this.playerSwapOverallDelta(row);
     if (row.baselinePlayerOverall == null || row.swapPlayerOverall == null || delta == null) return 'OVR desconocido';
     return `${row.baselinePlayerOverall}${String.fromCharCode(8594)}${row.swapPlayerOverall} (${this.fmtDeltaNumber(delta)})`;
@@ -7830,7 +7839,19 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   }
   private playerSwapDecisionScore(row: PlayerSwapMatrixSummary): number {
     const shotDiff = row.deltaShotsFor - row.deltaShotsAgainst;
-    return row.deltaXgDiff + (row.preAutoSubDeltaXgDiff || 0) * 0.60 + shotDiff * 0.015 + row.deltaPossessionFor * 0.0015;
+    return row.deltaXgDiff
+      + (row.preAutoSubDeltaXgDiff || 0) * 0.60
+      + shotDiff * 0.015
+      + row.deltaPossessionFor * 0.0015
+      + Math.min(0, this.playerSwapOverallDelta(row) ?? 0) * 0.025;
+  }
+  private playerSwapIsActionableRecommendation(row: PlayerSwapMatrixSummary): boolean {
+    if (row.swapRead !== 'Clear upgrade') return false;
+    if (!this.playerSwapHasLargeQualityDrop(row)) return true;
+    return row.deltaXgDiff >= 0.12
+      && (row.preAutoSubDeltaXgDiff || 0) >= 0.06
+      && row.deltaXgAgainst <= 0.08
+      && row.seedCount >= 30;
   }
   private playerSwapFit(candidate: PlayerSwapCandidate | null): string {
     const level = this.playerSwapFitLevel(candidate);
@@ -11671,6 +11692,9 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   }
   playerSwapBatteryBestWorstText(row: PlayerSwapMatrixSummary | null): string {
     if (!row) return 'sin datos';
+    if (!this.playerSwapIsActionableRecommendation(row) && row.swapRead !== 'Clear downgrade') {
+      return `sin recomendacion clara; revisar ${row.baselinePlayer} -> ${row.swapPlayer} (${this.fmtDeltaNumber(row.deltaXgDiff)} xG diff, ${row.swapRead})`;
+    }
     return `${row.baselinePlayer} -> ${row.swapPlayer} (${this.fmtDeltaNumber(row.deltaXgDiff)} xG diff, ${row.swapFit})`;
   }
   styleShort(style: TeamStyle | null): string {
