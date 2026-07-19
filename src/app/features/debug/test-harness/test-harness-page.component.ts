@@ -7352,6 +7352,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const xgAgainst = this.fmtDeltaNumber(row.deltaXgAgainst);
     const shotsFor = this.fmtDeltaNumber(row.deltaShotsFor);
     const shotsAgainst = this.fmtDeltaNumber(row.deltaShotsAgainst);
+    const qualityWarning = this.playerSwapQualityWarning(row);
     if (read === 'Clear upgrade') {
       return `mejora el diferencial xG (${xgDiff}; pre-auto-sub ${preXgDiff}) con riesgo defensivo controlado. Shots ${shotsFor}, shots ag. ${shotsAgainst}.`;
     }
@@ -7362,7 +7363,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       return `gana algo en ataque, pero tambien concede mas. xG for ${xgFor}, xG ag. ${xgAgainst}, shots ag. ${shotsAgainst}.`;
     }
     if (read === 'Needs review') {
-      return `la senal es grande pero mezclada; conviene repetir con mas seeds o mirar eventos. xG diff ${xgDiff}, shots ${shotsFor}/${shotsAgainst}.`;
+      return `la senal es grande pero mezclada${qualityWarning}; conviene repetir con mas seeds o mirar eventos. xG diff ${xgDiff}, shots ${shotsFor}/${shotsAgainst}.`;
     }
     const roleRisk = this.playerSwapRoleRisk(candidate);
     const roleDetail = roleRisk.detail ? ` ${roleRisk.detail}.` : '';
@@ -7386,11 +7387,30 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     if (signal < 0.035) return 'neutral';
     if (roleSignal >= 0.050 && risk < 0.08 && Math.abs(net) < 0.05) return 'review';
     if (this.playerSwapRoleTradeoff(row, candidate)) return 'tradeoff';
-    if (net >= 0.08 && risk <= 0.16) return 'upgrade';
+    if (net >= 0.08 && risk <= 0.16) {
+      return this.playerSwapHasLargeQualityDrop(row) ? 'review' : 'upgrade';
+    }
     if (net <= -0.08 && (risk >= 0.10 || row.deltaXgFor <= 0)) return 'downgrade';
     if (attack >= 0.12 && risk >= 0.12) return 'tradeoff';
     if (signal >= 0.18 || Math.abs(net) >= 0.06) return 'review';
     return 'neutral';
+  }
+  private playerSwapHasLargeQualityDrop(row: PlayerSwapMatrixSummaryRow): boolean {
+    const delta = this.playerSwapOverallDelta(row);
+    return delta != null && delta <= -6;
+  }
+  private playerSwapQualityWarning(row: PlayerSwapMatrixSummaryRow): string {
+    if (!this.playerSwapHasLargeQualityDrop(row)) return '';
+    return ` y baja mucho la calidad individual (${this.playerSwapOverallDeltaText(row)})`;
+  }
+  private playerSwapOverallDelta(row: PlayerSwapMatrixSummaryRow): number | null {
+    if (row.baselinePlayerOverall == null || row.swapPlayerOverall == null) return null;
+    return row.swapPlayerOverall - row.baselinePlayerOverall;
+  }
+  private playerSwapOverallDeltaText(row: PlayerSwapMatrixSummaryRow): string {
+    const delta = this.playerSwapOverallDelta(row);
+    if (row.baselinePlayerOverall == null || row.swapPlayerOverall == null || delta == null) return 'OVR desconocido';
+    return `${row.baselinePlayerOverall}${String.fromCharCode(8594)}${row.swapPlayerOverall} (${this.fmtDeltaNumber(delta)})`;
   }
   private playerSwapCoachNetScore(row: PlayerSwapMatrixSummaryRow): number {
     const shotDiff = row.deltaShotsFor - row.deltaShotsAgainst;
@@ -14108,14 +14128,13 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     this.waitForProfessionalSmokeStep('formation/scenario', () => {
       const baseSummary = this.professionalSmokeSummary();
       const baseSmokeNotes = [...(baseSummary?.skipped ?? []), ...(baseSummary?.included ?? [])];
-      if (baseSmokeNotes.some((item) => {
+      const baseHadIssue = baseSmokeNotes.some((item) => {
         const lower = item.toLowerCase();
         return lower.includes('timeout') || lower.includes('timed out') || lower.includes('error');
-      })) {
-        this.professionalSmokeFullRunId++;
-        this.analysisReadyMessage.set('Professional smoke full detenido: la etapa base terminó con observaciones. Resultados parciales abajo.');
-        this.snackBar.open('Smoke full detenido: professional smoke base tuvo observaciones.', 'OK', { duration: 6000 });
-        return;
+      });
+      if (baseHadIssue) {
+        this.analysisReadyMessage.set('Professional smoke full sigue con pixeles/swaps: la etapa base tuvo observaciones, pero no se corta la evidencia restante.');
+        this.snackBar.open('Smoke full: etapa base con observaciones; sigo con pixeles/swaps.', 'OK', { duration: 4500 });
       }
       this.runProfessionalSmokePixelStage(() => {
         if (runId !== this.professionalSmokeFullRunId) return;
