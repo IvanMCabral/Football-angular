@@ -12045,6 +12045,12 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         detail: `${offensiveRisk.label} mejora el ataque y puede valer la pena si necesitas gol. Ojo: abre espacios. ${offensiveRisk.metrics}. ${offensiveRisk.detail}`,
       };
     }
+    if (objective === 'NEED_GOAL' && !attack && !offensiveRisk && !twoWay && avoid) {
+      return {
+        label: `Sin via clara: ${avoid.label}`,
+        detail: `Necesitas gol, pero la bateria no encontro una via ofensiva clara; ${avoid.label} aparece como accion a evitar, no como solucion. ${avoid.metrics}. ${avoid.detail}`,
+      };
+    }
     if (attack) {
       return {
         label: `Atacar: ${attack.label}`,

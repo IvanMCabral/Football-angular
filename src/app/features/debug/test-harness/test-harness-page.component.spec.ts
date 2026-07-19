@@ -2802,6 +2802,30 @@ describe('TestHarnessPageComponent', () => {
     expect(protecting.detail).toContain('cuidar resultado');
   });
 
+  it('marks chasing teams without attacking route as no clear path', () => {
+    const cards = [
+      {
+        title: 'Evitar',
+        label: '4-3-3',
+        metrics: 'xG 0.00 / xGA +0.70 / fuerte',
+        detail: 'rival amenaza por centro',
+      },
+      {
+        title: 'Amenaza rival',
+        label: 'Rival: canal derecho',
+        metrics: 'xGA +0.04 / canal +0.36 / fuerte',
+        detail: 'rival amenaza por banda derecha',
+      },
+    ];
+
+    const decision = (component as any).scenarioBatteryDecision(cards, 'NEED_GOAL');
+    const review = (component as any).scenarioBatteryDecisionReview('NEED_GOAL', decision.label, cards);
+
+    expect(decision.label).toBe('Sin via clara: 4-3-3');
+    expect(decision.detail).toContain('no encontro una via ofensiva clara');
+    expect(review.label).toBe('Revisar: sin via');
+  });
+
   it('infers tactical battery coach objective from score and minute in auto mode', () => {
     const losingLate = {
       ...makeMatchRow('match-losing-late'),
