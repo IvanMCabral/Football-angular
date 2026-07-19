@@ -47,6 +47,7 @@ describe('TestHarnessPageComponent', () => {
       'replayMatch',
       'simulateRound',
       'runFormationMatrix',
+      'runFormationMatrixSummary',
       'runPositionPixelMatrixSummary',
       'runScenarioMatrixSummary',
     ]);
@@ -111,6 +112,7 @@ describe('TestHarnessPageComponent', () => {
     harness.manualSelectLineup.and.returnValue(of(sampleLineup('4-4-2')) as any);
     harness.resetInjuries.and.returnValue(of({ success: true, message: 'reset' } as any));
     harness.runFormationMatrix.and.returnValue(of([]) as any);
+    harness.runFormationMatrixSummary.and.returnValue(of([]) as any);
     harness.runScenarioMatrixSummary.and.returnValue(of([]) as any);
 
     await TestBed.configureTestingModule({
@@ -482,6 +484,46 @@ describe('TestHarnessPageComponent', () => {
     expect(harness.getCurrentLineup.calls.count()).toBe(getCurrentLineupCallsBefore);
     expect(harness.manualSelectLineup.calls.count()).toBe(manualSelectLineupCallsBefore);
     expect(harness.runFormationMatrix).toHaveBeenCalledWith('match-1', component.seedInputModel, 'HOME');
+  });
+
+  it('runs professional smoke for the controlled home side without touching editable user lineup', () => {
+    component.selectMatch({
+      matchId: 'match-1',
+      round: 1,
+      homeTeamId: 'team-2',
+      homeTeamName: 'Local Team',
+      awayTeamId: 'team-3',
+      awayTeamName: 'Away Team',
+      status: 'COMPLETED',
+      homeGoals: 1,
+      awayGoals: 0,
+      homeFormation: null,
+      awayFormation: null,
+      roundId: 'round-uuid-1',
+    });
+    component.controlledTeamSideModel = 'HOME';
+    harness.getCurrentLineup.calls.reset();
+    harness.manualSelectLineup.calls.reset();
+    harness.runFormationMatrixSummary.calls.reset();
+    harness.runScenarioMatrixSummary.calls.reset();
+
+    component.onRunProfessionalSmoke();
+
+    expect(harness.getCurrentLineup).not.toHaveBeenCalled();
+    expect(harness.manualSelectLineup).not.toHaveBeenCalled();
+    expect(harness.runFormationMatrixSummary).toHaveBeenCalledWith(
+      'match-1',
+      (component as any).summarySeedStart(),
+      component.scenarioMatrixSummaryEffectiveSeedCount(),
+      'HOME'
+    );
+    expect(harness.runScenarioMatrixSummary).toHaveBeenCalledWith(
+      'match-1',
+      (component as any).summarySeedStart(),
+      component.scenarioMatrixSmokeSeedCount(),
+      'ALL',
+      'HOME'
+    );
   });
 
   it('onFormationChange updates the model', () => {

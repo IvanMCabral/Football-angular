@@ -1363,6 +1363,16 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 Formation avg ({{ scenarioMatrixSummaryEffectiveSeedCount() }} seeds)
               </button>
               <button
+                mat-flat-button
+                color="primary"
+                data-testid="professional-smoke-button"
+                (click)="onRunProfessionalSmoke()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !canRunScenarioSummaryForControlledSide()"
+                aria-label="Run professional controlled smoke with formation averages and tactical scenario reads"
+              >
+                Run professional smoke
+              </button>
+              <button
                 mat-stroked-button
                 data-testid="low-block-lab-button"
                 (click)="onRunLowBlockLab()"
@@ -13854,6 +13864,57 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           'OK',
           { duration: 5000 }
         );
+      },
+      complete: () => {
+        this.mutationInFlight.set(false);
+      },
+    });
+  }
+  onRunProfessionalSmoke(): void {
+    const matchId = this.selectedMatchId();
+    if (!matchId) {
+      this.snackBar.open('Select a match in Panel C first.', 'OK', { duration: 3000 });
+      return;
+    }
+    if (!this.canRunScenarioSummaryForControlledSide()) {
+      this.snackBar.open('Elegí Mi equipo, Local o Visitante válido para correr el smoke profesional.', 'OK', { duration: 4000 });
+      return;
+    }
+    const seedStart = this.summarySeedStart();
+    const formationSeedCount = this.scenarioMatrixSummaryEffectiveSeedCount();
+    const scenarioSeedCount = this.scenarioMatrixSmokeSeedCount();
+    const controlledSide = this.controlledTeamSideModel;
+    const controlledName = this.controlledTeamDisplayName();
+    this.clearFormationAverageResults();
+    this.scenarioMatrixSummaryResults.set([]);
+    this.scenarioMatrixSummarySeedCount.set(formationSeedCount);
+    this.analysisReadyMessage.set(
+      `Professional smoke corriendo para ${controlledName}: formaciones ${formationSeedCount} seeds + escenarios ${scenarioSeedCount} seeds...`
+    );
+    this.mutationInFlight.set(true);
+    this.harness.setStyle(this.selectedStyleModel).pipe(
+      switchMap(() => forkJoin({
+        formationRows: this.harness.runFormationMatrixSummary(matchId, seedStart, formationSeedCount, controlledSide),
+        scenarioRows: this.harness.runScenarioMatrixSummary(matchId, seedStart, scenarioSeedCount, 'ALL', controlledSide),
+      }))
+    ).subscribe({
+      next: ({ formationRows, scenarioRows }) => {
+        const safeFormationRows = formationRows ?? [];
+        const safeScenarioRows = scenarioRows ?? [];
+        this.formationMatrixSummaryResults.set(safeFormationRows);
+        this.scenarioMatrixSummaryResults.set(safeScenarioRows);
+        this.markReplayAnalysisReady(
+          `Professional smoke listo para ${controlledName}: ${safeFormationRows.length} formaciones · ${safeScenarioRows.length} escenarios.`
+        );
+        this.snackBar.open(
+          `Professional smoke complete: ${safeFormationRows.length} formations, ${safeScenarioRows.length} scenarios.`,
+          'OK',
+          { duration: 4500 }
+        );
+      },
+      error: (err) => {
+        this.analysisReadyMessage.set(this.fmtError(err, 'Professional smoke falló'));
+        this.snackBar.open(this.fmtError(err, 'Failed to run professional smoke'), 'OK', { duration: 6000 });
       },
       complete: () => {
         this.mutationInFlight.set(false);
