@@ -1025,6 +1025,18 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 <mat-hint>1-50 - Multi-seed usa min 20</mat-hint>
               </mat-form-field>
               <mat-form-field appearance="outline" class="swap-field">
+                <mat-label>Sub minute</mat-label>
+                <mat-select
+                  [(ngModel)]="substitutionWhatIfMinuteModel"
+                  aria-label="Select minute for substitution what-if"
+                >
+                  <mat-option *ngFor="let minute of substitutionWhatIfMinuteOptions" [value]="minute">
+                    {{ minute }}'
+                  </mat-option>
+                </mat-select>
+                <mat-hint>Para comparar cambio temprano/tardío</mat-hint>
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="swap-field">
                 <mat-label>Battery precision</mat-label>
                 <mat-select
                   [(ngModel)]="playerSwapBatteryPrecisionModel"
@@ -5065,6 +5077,8 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   selectedSwapStarterIdModel: string | null = null;
   selectedSwapBenchIdModel: string | null = null;
   playerSwapSeedCountModel = 10;
+  substitutionWhatIfMinuteModel = 60;
+  readonly substitutionWhatIfMinuteOptions = [45, 60, 70, 80] as const;
   playerSwapBatteryModeModel: 'natural' | 'mixed' | 'stress' = 'natural';
   playerSwapBatteryPrecisionModel: 'quick' | 'balanced' | 'reliable' = 'balanced';
   controlledTeamSideModel: ControlledTeamSide = 'USER';
@@ -9335,10 +9349,13 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     }
     const seedStart = this.seedInputModel ?? DEFAULT_REPLAY_SEED;
     const seedCount = Math.max(1, Math.min(50, Math.round(this.playerSwapSeedCountModel || 10)));
+    const minute = this.substitutionWhatIfMinuteOptions.includes(this.substitutionWhatIfMinuteModel as 45 | 60 | 70 | 80)
+      ? this.substitutionWhatIfMinuteModel
+      : 60;
     this.playerSwapSeedCountModel = seedCount;
     let candidate: PlayerSwapCandidate | null = null;
     this.substitutionWhatIfSummary.set(null);
-    this.analysisReadyMessage.set(`Substitution what-if corriendo: min 60, ${seedCount} seeds...`);
+    this.analysisReadyMessage.set(`Substitution what-if corriendo: min ${minute}, ${seedCount} seeds...`);
     this.mutationInFlight.set(true);
     forkJoin({
       lineup: this.harness.getCurrentLineup().pipe(take(1), timeout(10_000)),
@@ -9360,7 +9377,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
             this.harness.runSubstitutionWhatIfSummary(matchId, {
               playerOffId,
               playerOnId,
-              minute: 60,
+              minute,
               seedStart,
               seedCount,
               controlledTeamSide: 'USER',
