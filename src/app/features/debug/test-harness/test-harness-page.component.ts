@@ -12002,6 +12002,12 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   ): { label: string; detail: string } {
     const card = (title: string) => cards.find((item) => item.title === title);
     const twoWay = card('Doble ganancia');
+    if (objective === 'PROTECT_RESULT' && twoWay) {
+      return {
+        label: `Controlar: ${twoWay.label}`,
+        detail: `${twoWay.label} da doble ganancia y encaja con cuidar resultado porque mejora el plan sin abrir xGA. ${twoWay.metrics}. ${twoWay.detail}`,
+      };
+    }
     if (twoWay) {
       return {
         label: `Aprovechar: ${twoWay.label}`,

@@ -2802,6 +2802,30 @@ describe('TestHarnessPageComponent', () => {
     expect(protecting.detail).toContain('cuidar resultado');
   });
 
+  it('labels double-gain protect-result plans as control instead of risk', () => {
+    const cards = [
+      {
+        title: 'Doble ganancia',
+        label: 'Centro',
+        metrics: 'xG +0.05 / xGA -0.07 / media',
+        detail: 'mejora control central y baja xGA',
+      },
+      {
+        title: 'Riesgo ofensivo',
+        label: '4-3-3',
+        metrics: 'xG +0.09 / xGA +0.61 / fuerte',
+        detail: 'abre riesgo',
+      },
+    ];
+
+    const decision = (component as any).scenarioBatteryDecision(cards, 'PROTECT_RESULT');
+    const review = (component as any).scenarioBatteryDecisionReview('PROTECT_RESULT', decision.label, cards);
+
+    expect(decision.label).toBe('Controlar: Centro');
+    expect(decision.detail).toContain('encaja con cuidar resultado');
+    expect(review.label).toBe('OK');
+  });
+
   it('marks chasing teams without attacking route as no clear path', () => {
     const cards = [
       {
