@@ -2187,7 +2187,7 @@ describe('TestHarnessPageComponent', () => {
     expect(summary?.best?.playerName).toBe('Good Mid');
     expect(summary?.worst?.playerName).toBe('Risk Def');
     expect(summary?.worstVisualMismatch?.playerName).toBe('Mismatch Att');
-    expect(summary?.worstVisualReview).toBeNull();
+    expect(summary?.worstVisualReview?.playerName).toBe('Mismatch Att');
     expect(component.positionPixelDiagonalSummaryRowText(summary?.best ?? null)).toContain('Good Mid');
   });
 

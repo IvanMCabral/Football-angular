@@ -12766,6 +12766,13 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const defensiveGain = this.positionPixelDefensiveGainScore(row);
     const tacticalRead = this.positionPixelTacticalRead(row);
     const result: Array<{ level: 'soft' | 'hard'; detail: string }> = [];
+    const visualExpectationMismatches = this.positionPixelVisualExpectationMismatches(row);
+    if (visualExpectationMismatches.length > 0 && !this.positionPixelIsMicroVisualMismatch(row)) {
+      result.push({
+        level: 'soft',
+        detail: `expectativa visual pendiente: ${visualExpectationMismatches.join(' / ')}`,
+      });
+    }
     const mixedVisualTradeoff = (breakdown.threat >= 0.20 || breakdown.connection >= 0.20 || breakdown.coverage >= 0.20)
       && (breakdown.threat <= -0.20 || breakdown.connection <= -0.20 || breakdown.coverage <= -0.20);
     if (breakdown.threat >= 0.35
@@ -14045,10 +14052,10 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       });
       this.analysisReadyMessage.set('Professional smoke full cortado por timeout defensivo. Resultados parciales abajo.');
       this.snackBar.open('Professional smoke full timeout: resultados parciales disponibles.', 'OK', { duration: 6000 });
-    }, 90_000);
+    }, 180_000);
   }
   private runProfessionalSmokePixelStage(onComplete: () => void): void {
-    const seedCount = Math.max(10, Math.min(30, Math.round(this.playerSwapSeedCountModel || 10)));
+    const seedCount = Math.max(20, Math.min(30, Math.round(this.playerSwapSeedCountModel || 20)));
     this.runPositionPixelMatrixWithPresets(
       seedCount,
       (fromX, fromY) => this.positionMovementPresets(fromX, fromY)
