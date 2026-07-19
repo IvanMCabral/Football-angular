@@ -10587,21 +10587,30 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     ].join(' · ');
   }
   private toFormationCoachPick(label: string, row: FormationMatrixSummaryRow): FormationCoachPick {
-    const read = this.formationSummaryRead(row);
+    const bestOfBad = this.formationPickIsBestOfBad(row);
+    const badCoachSlot = bestOfBad && (label.includes('balance') || label.includes('segura'));
+    const displayLabel = badCoachSlot
+      ? 'Mejor dentro de mal escenario'
+      : label;
+    const read = badCoachSlot ? 'Mal menor' : this.formationSummaryRead(row);
     const detail = [
+      ...(badCoachSlot ? ['no es plan ganador; necesita mejorar XI/tactica'] : []),
       `xG ${this.fmtXg(row.avgXgFor)} / ${this.fmtXg(row.avgXgAgainst)}`,
       `diff ${this.fmtDeltaNumber(row.avgXgDiff)}`,
       `tiros ${this.fmtXg(row.avgShotsFor)} / ${this.fmtXg(row.avgShotsAgainst)}`,
       `posesion ${this.fmtPct(row.avgPossessionFor)}`,
     ].join(' · ');
     return {
-      label,
+      label: displayLabel,
       formation: row.formation,
       read,
       detail,
       identity: this.formationSummaryIdentity(row),
-      cssClass: this.formationSummaryReadClass(row),
+      cssClass: badCoachSlot ? 'read-check' : this.formationSummaryReadClass(row),
     };
+  }
+  private formationPickIsBestOfBad(row: FormationMatrixSummaryRow): boolean {
+    return row.avgXgDiff <= -0.75 || row.avgXgAgainst >= 1.35;
   }
   formationSummaryIdentity(row: FormationMatrixSummaryRow): string {
     const ownChannel = this.formationSummaryOwnChannel(row);
