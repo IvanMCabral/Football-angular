@@ -311,6 +311,9 @@ interface PlayerSwapCandidate {
 interface SubstitutionWhatIfSummary extends SubstitutionWhatIfSummaryRow {
   readClass: string;
 }
+interface SubstitutionTimingMatrixRow extends SubstitutionWhatIfSummary {
+  timingRead: string;
+}
 interface PlayerSwapBatterySummary {
   total: number;
   mode: string;
@@ -1220,6 +1223,15 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
               </button>
               <button
                 mat-stroked-button
+                data-testid="substitution-timing-matrix-button"
+                (click)="onRunSubstitutionTimingMatrix()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                aria-label="Compare the same substitution at minutes 45, 60, 70 and 80"
+              >
+                Sub timing matrix
+              </button>
+              <button
+                mat-stroked-button
                 data-testid="player-swap-battery-button"
                 (click)="onRunPlayerSwapBattery()"
                 [disabled]="mutationInFlight() || !selectedMatchId()"
@@ -1749,7 +1761,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
         </section>
         <!-- Panel E: replay analysis matrices (full width) -->
         <section
-          *ngIf="currentLineupReplayResult() || currentLineupMultiSeedSummary() || modalVsCanonicalSummary() || lineupDiagnostic() || playerSwapMatrixSummary() || substitutionWhatIfSummary() || playerSwapBatterySummaries().length > 0 || playerSwapPrecisionComparisonRows().length > 0 || roleSlotImpactRows().length > 0 || roleSlotImpactSmokeRows().length > 0 || allFormationRoleSlotSmokeRows().length > 0 || positionPixelEvidenceNote() || positionPixelMatrixSummary() || positionPixelMatrixRows().length > 0 || formationLineSmokeRows().length > 0 || lineupDebugSnapshot() || formationReplayResults().length > 0 || formationMatrixSummaryResults().length > 0 || professionalSmokeSummary() || lowBlockLabRows().length > 0 || backFiveTransitionLabRows().length > 0 || backFiveFamilyLabRows().length > 0 || backFiveContextSmokeRows().length > 0 || sideMirrorSmokeRows().length > 0 || scenarioMatrixResults().length > 0 || scenarioMatrixSummaryResults().length > 0 || scenarioBatteryRows().length > 0"
+          *ngIf="currentLineupReplayResult() || currentLineupMultiSeedSummary() || modalVsCanonicalSummary() || lineupDiagnostic() || playerSwapMatrixSummary() || substitutionWhatIfSummary() || substitutionTimingMatrixRows().length > 0 || playerSwapBatterySummaries().length > 0 || playerSwapPrecisionComparisonRows().length > 0 || roleSlotImpactRows().length > 0 || roleSlotImpactSmokeRows().length > 0 || allFormationRoleSlotSmokeRows().length > 0 || positionPixelEvidenceNote() || positionPixelMatrixSummary() || positionPixelMatrixRows().length > 0 || formationLineSmokeRows().length > 0 || lineupDebugSnapshot() || formationReplayResults().length > 0 || formationMatrixSummaryResults().length > 0 || professionalSmokeSummary() || lowBlockLabRows().length > 0 || backFiveTransitionLabRows().length > 0 || backFiveFamilyLabRows().length > 0 || backFiveContextSmokeRows().length > 0 || sideMirrorSmokeRows().length > 0 || scenarioMatrixResults().length > 0 || scenarioMatrixSummaryResults().length > 0 || scenarioBatteryRows().length > 0"
           id="test-harness-replay-analysis"
           class="panel panel-e"
           aria-labelledby="panel-e-heading"
@@ -2254,6 +2266,46 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
               Baseline xG {{ fmtXg(sub.baselineAvgXgFor) }} / {{ fmtXg(sub.baselineAvgXgAgainst) }}
               → Con cambio {{ fmtXg(sub.substitutedAvgXgFor) }} / {{ fmtXg(sub.substitutedAvgXgAgainst) }}.
               Esto prueba una sustitución real durante el partido, no solo cambio del XI inicial.
+            </p>
+          </div>
+          <div *ngIf="substitutionTimingMatrixRows().length > 0" class="formation-matrix analysis-matrix current-lineup-replay">
+            <div class="matrix-header">
+              <strong>Substitution timing matrix</strong>
+              <span>
+                {{ substitutionTimingMatrixRows()[0].playerOffName }} → {{ substitutionTimingMatrixRows()[0].playerOnName }}
+                · seeds {{ substitutionTimingMatrixRows()[0].seedStart }}..{{ substitutionTimingMatrixRows()[0].seedEnd }}
+              </span>
+            </div>
+            <div class="matrix-table-wrapper">
+              <table class="matrix-table">
+                <thead>
+                  <tr>
+                    <th>Min</th>
+                    <th>Δ xG</th>
+                    <th>Δ xGA</th>
+                    <th>Δ Shots</th>
+                    <th>Δ Poss</th>
+                    <th>Δ C/W/L</th>
+                    <th>Read</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let row of substitutionTimingMatrixRows(); trackBy: trackBySubstitutionTimingRow">
+                    <td>{{ row.minute }}'</td>
+                    <td [class]="deltaClass(row.deltaXgFor)">{{ fmtDeltaNumber(row.deltaXgFor) }}</td>
+                    <td [class]="deltaClass(-row.deltaXgAgainst)">{{ fmtDeltaNumber(row.deltaXgAgainst) }}</td>
+                    <td [class]="deltaClass(row.deltaShotsFor)">{{ fmtDeltaNumber(row.deltaShotsFor) }}</td>
+                    <td [class]="deltaClass(row.deltaPossessionFor)">{{ fmtDeltaNumber(row.deltaPossessionFor) }}%</td>
+                    <td [class]="deltaClass(row.deltaCentralShotsFor + row.deltaWideShotsFor + row.deltaLongShotsFor)">
+                      {{ fmtDeltaNumber(row.deltaCentralShotsFor) }}/{{ fmtDeltaNumber(row.deltaWideShotsFor) }}/{{ fmtDeltaNumber(row.deltaLongShotsFor) }}
+                    </td>
+                    <td [class]="row.readClass">{{ row.timingRead }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p class="panel-hint current-replay-starters">
+              Lectura DT: si el 45' y el 60' muestran más señal que el 80', el timing está pesando. Si todos son iguales, revisar sensibilidad temporal del motor.
             </p>
           </div>
           <div *ngIf="playerSwapBatterySummaries().length > 0" class="formation-matrix analysis-matrix current-lineup-replay">
@@ -5315,6 +5367,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   readonly playerSwapMatrixSummary = signal<PlayerSwapMatrixSummary | null>(null);
   /** Live-substitution replay comparison for the selected starter/bench pair. */
   readonly substitutionWhatIfSummary = signal<SubstitutionWhatIfSummary | null>(null);
+  readonly substitutionTimingMatrixRows = signal<SubstitutionTimingMatrixRow[]>([]);
   readonly playerSwapBatterySummaries = signal<PlayerSwapMatrixSummary[]>([]);
   readonly playerSwapPrecisionComparisonRows = signal<PlayerSwapPrecisionComparisonRow[]>([]);
   readonly playerSwapBatterySummary = computed<PlayerSwapBatterySummary>(() => {
@@ -6405,6 +6458,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   private clearPlayerSwapAnalysisResults(): void {
     this.playerSwapMatrixSummary.set(null);
     this.substitutionWhatIfSummary.set(null);
+    this.substitutionTimingMatrixRows.set([]);
     this.playerSwapBatterySummaries.set([]);
     this.playerSwapPrecisionComparisonRows.set([]);
   }
@@ -6420,6 +6474,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     this.lineupDiagnostic.set(null);
     this.playerSwapMatrixSummary.set(null);
     this.substitutionWhatIfSummary.set(null);
+    this.substitutionTimingMatrixRows.set([]);
     this.playerSwapBatterySummaries.set([]);
     this.playerSwapPrecisionComparisonRows.set([]);
     this.positionPixelMatrixSummary.set(null);
@@ -7168,6 +7223,23 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       timestamp: new Date().toISOString(),
     };
   }
+
+  private toSubstitutionTimingMatrixRow(row: SubstitutionWhatIfSummaryRow): SubstitutionTimingMatrixRow {
+    const score = row.deltaXgDiff + row.deltaShotsFor * 0.04 - row.deltaXgAgainst * 0.6;
+    const timingRead = score >= 0.18
+      ? 'Fuerte mejora'
+      : score >= 0.05
+        ? 'Mejora leve'
+        : score <= -0.18
+          ? 'Empeora'
+          : 'Casi neutro';
+    return {
+      ...row,
+      readClass: this.deltaClass(score),
+      timingRead,
+    };
+  }
+
   private roleSlotImpactSmokeExportPayload(): {
     match: string;
     formation: string | null;
@@ -9355,6 +9427,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     this.playerSwapSeedCountModel = seedCount;
     let candidate: PlayerSwapCandidate | null = null;
     this.substitutionWhatIfSummary.set(null);
+    this.substitutionTimingMatrixRows.set([]);
     this.analysisReadyMessage.set(`Substitution what-if corriendo: min ${minute}, ${seedCount} seeds...`);
     this.mutationInFlight.set(true);
     forkJoin({
@@ -9409,6 +9482,83 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           { duration: 4500 }
         );
         this.markReplayAnalysisReady('Substitution what-if listo en Panel E.');
+        this.refreshLineupContext();
+      },
+    });
+  }
+
+  onRunSubstitutionTimingMatrix(): void {
+    const matchId = this.selectedMatchId();
+    const careerId = this.careerId();
+    if (!matchId || !careerId) {
+      this.snackBar.open('Select a match in Panel C first.', 'OK', { duration: 3000 });
+      return;
+    }
+    if (!this.selectedMatchIncludesUserTeam()) {
+      this.snackBar.open('Sub timing matrix usa el XI de tu equipo para replicar el modal.', 'OK', { duration: 3500 });
+      return;
+    }
+    const seedStart = this.seedInputModel ?? DEFAULT_REPLAY_SEED;
+    const seedCount = Math.max(1, Math.min(50, Math.round(this.playerSwapSeedCountModel || 10)));
+    this.playerSwapSeedCountModel = seedCount;
+    this.substitutionWhatIfSummary.set(null);
+    this.substitutionTimingMatrixRows.set([]);
+    this.analysisReadyMessage.set(`Sub timing matrix corriendo: ${seedCount} seeds x ${this.substitutionWhatIfMinuteOptions.length} minutos...`);
+    this.mutationInFlight.set(true);
+    forkJoin({
+      lineup: this.harness.getCurrentLineup().pipe(take(1), timeout(10_000)),
+      squad: this.http.get<SessionPlayer[]>(`${environment.apiUrl}/career/players/squad`).pipe(
+        take(1),
+        timeout(10_000),
+        catchError(() => of([] as SessionPlayer[]))
+      ),
+    }).pipe(
+      switchMap(({ lineup, squad }) => {
+        const candidate = this.pickAutomaticSwapCandidate(lineup, squad);
+        const playerOffId = this.selectedSwapStarterIdModel || candidate?.starterId;
+        const playerOnId = this.selectedSwapBenchIdModel || candidate?.benchId;
+        if (!playerOffId || !playerOnId) {
+          throw new Error('No pude resolver titular y suplente para la matriz de sustituciÃ³n.');
+        }
+        return this.harness.setStyle(this.selectedStyleModel).pipe(
+          switchMap(() =>
+            from(this.substitutionWhatIfMinuteOptions).pipe(
+              concatMap((minute) =>
+                this.harness.runSubstitutionWhatIfSummary(matchId, {
+                  playerOffId,
+                  playerOnId,
+                  minute,
+                  seedStart,
+                  seedCount,
+                  controlledTeamSide: 'USER',
+                }).pipe(map((row) => this.toSubstitutionTimingMatrixRow(row)))
+              ),
+              toArray()
+            )
+          )
+        );
+      })
+    ).subscribe({
+      next: (rows) => {
+        this.substitutionTimingMatrixRows.set([...rows].sort((a, b) => a.minute - b.minute));
+      },
+      error: (err) => {
+        this.mutationInFlight.set(false);
+        this.analysisReadyMessage.set(this.fmtError(err, 'Sub timing matrix fallÃ³ antes de generar Panel E'));
+        this.snackBar.open(this.fmtError(err, 'Failed to run substitution timing matrix'), 'OK', { duration: 5000 });
+        this.refreshLineupContext();
+      },
+      complete: () => {
+        this.mutationInFlight.set(false);
+        const rows = this.substitutionTimingMatrixRows();
+        this.snackBar.open(
+          rows.length > 0
+            ? `Sub timing matrix complete: ${rows[0].playerOffName} â†’ ${rows[0].playerOnName}, ${rows.length} minutos.`
+            : 'Sub timing matrix completed with insufficient samples.',
+          'OK',
+          { duration: 4500 }
+        );
+        this.markReplayAnalysisReady('Sub timing matrix listo en Panel E.');
         this.refreshLineupContext();
       },
     });
@@ -10879,6 +11029,9 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   }
   trackByPlayerSwapSummary(_index: number, summary: PlayerSwapMatrixSummary): string {
     return `${summary.slotId}:${summary.baselinePlayer}:${summary.swapPlayer}:${summary.seedStart}:${summary.seedEnd}`;
+  }
+  trackBySubstitutionTimingRow(_index: number, row: SubstitutionTimingMatrixRow): string {
+    return `${row.playerOffId}:${row.playerOnId}:${row.minute}:${row.seedStart}:${row.seedEnd}`;
   }
   trackByPlayerSwapPrecisionComparison(_index: number, row: PlayerSwapPrecisionComparisonRow): string {
     return row.candidateKey;
