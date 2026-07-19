@@ -12107,6 +12107,12 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const has = (title: string) => cards.some((card) => card.title === title);
     const starts = (...prefixes: string[]) => prefixes.some((prefix) => decisionLabel.startsWith(prefix));
     if (objective === 'NEED_GOAL') {
+      if (starts('Sin via clara')) {
+        return {
+          label: 'OK: sin via clara',
+          detail: `El objetivo es buscar gol y la bateria confirmo que no hay Atacar, Riesgo ofensivo ni Doble ganancia; "${decisionLabel}" queda como diagnostico, no como falso positivo.`,
+        };
+      }
       if (starts('Cerrar partido', 'Cerrar amenaza', 'Proteger', 'No forzar', 'No arriesgar', 'Mantener equipo')) {
         return {
           label: 'Revisar: poco gol',

@@ -2847,7 +2847,7 @@ describe('TestHarnessPageComponent', () => {
 
     expect(decision.label).toBe('Sin via clara: 4-3-3');
     expect(decision.detail).toContain('no encontro una via ofensiva clara');
-    expect(review.label).toBe('Revisar: sin via');
+    expect(review.label).toBe('OK: sin via clara');
   });
 
   it('infers tactical battery coach objective from score and minute in auto mode', () => {
