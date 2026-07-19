@@ -48,6 +48,7 @@ import {
   ScenarioMatrixRow,
   ScenarioMatrixSummaryRow,
   SideMirrorSyntheticLabRow,
+  SubstitutionWhatIfSummaryRow,
   TestHarnessMatchRow,
   TeamStyle,
 } from '../models/test-harness.model';
@@ -306,6 +307,9 @@ interface PlayerSwapCandidate {
   benchPosition: string;
   slotId: string;
   testCase?: string;
+}
+interface SubstitutionWhatIfSummary extends SubstitutionWhatIfSummaryRow {
+  readClass: string;
 }
 interface PlayerSwapBatterySummary {
   total: number;
@@ -1195,6 +1199,15 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
               </button>
               <button
                 mat-stroked-button
+                data-testid="substitution-what-if-button"
+                (click)="onRunSubstitutionWhatIf()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                aria-label="Compare the selected starter and bench player as a live substitution at minute 60"
+              >
+                Substitution what-if
+              </button>
+              <button
+                mat-stroked-button
                 data-testid="player-swap-battery-button"
                 (click)="onRunPlayerSwapBattery()"
                 [disabled]="mutationInFlight() || !selectedMatchId()"
@@ -1724,7 +1737,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
         </section>
         <!-- Panel E: replay analysis matrices (full width) -->
         <section
-          *ngIf="currentLineupReplayResult() || currentLineupMultiSeedSummary() || modalVsCanonicalSummary() || lineupDiagnostic() || playerSwapMatrixSummary() || playerSwapBatterySummaries().length > 0 || playerSwapPrecisionComparisonRows().length > 0 || roleSlotImpactRows().length > 0 || roleSlotImpactSmokeRows().length > 0 || allFormationRoleSlotSmokeRows().length > 0 || positionPixelEvidenceNote() || positionPixelMatrixSummary() || positionPixelMatrixRows().length > 0 || formationLineSmokeRows().length > 0 || lineupDebugSnapshot() || formationReplayResults().length > 0 || formationMatrixSummaryResults().length > 0 || professionalSmokeSummary() || lowBlockLabRows().length > 0 || backFiveTransitionLabRows().length > 0 || backFiveFamilyLabRows().length > 0 || backFiveContextSmokeRows().length > 0 || sideMirrorSmokeRows().length > 0 || scenarioMatrixResults().length > 0 || scenarioMatrixSummaryResults().length > 0 || scenarioBatteryRows().length > 0"
+          *ngIf="currentLineupReplayResult() || currentLineupMultiSeedSummary() || modalVsCanonicalSummary() || lineupDiagnostic() || playerSwapMatrixSummary() || substitutionWhatIfSummary() || playerSwapBatterySummaries().length > 0 || playerSwapPrecisionComparisonRows().length > 0 || roleSlotImpactRows().length > 0 || roleSlotImpactSmokeRows().length > 0 || allFormationRoleSlotSmokeRows().length > 0 || positionPixelEvidenceNote() || positionPixelMatrixSummary() || positionPixelMatrixRows().length > 0 || formationLineSmokeRows().length > 0 || lineupDebugSnapshot() || formationReplayResults().length > 0 || formationMatrixSummaryResults().length > 0 || professionalSmokeSummary() || lowBlockLabRows().length > 0 || backFiveTransitionLabRows().length > 0 || backFiveFamilyLabRows().length > 0 || backFiveContextSmokeRows().length > 0 || sideMirrorSmokeRows().length > 0 || scenarioMatrixResults().length > 0 || scenarioMatrixSummaryResults().length > 0 || scenarioBatteryRows().length > 0"
           id="test-harness-replay-analysis"
           class="panel panel-e"
           aria-labelledby="panel-e-heading"
@@ -2187,6 +2200,48 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
               {{ fmtXg(swap.baseline.avgCentralShotsAgainst) }}/{{ fmtXg(swap.baseline.avgWideShotsAgainst) }}/{{ fmtXg(swap.baseline.avgLongShotsAgainst) }}
               â†’
               {{ fmtXg(swap.swapped.avgCentralShotsAgainst) }}/{{ fmtXg(swap.swapped.avgWideShotsAgainst) }}/{{ fmtXg(swap.swapped.avgLongShotsAgainst) }}
+            </p>
+          </div>
+          <div *ngIf="substitutionWhatIfSummary() as sub" class="formation-matrix analysis-matrix current-lineup-replay">
+            <div class="matrix-header">
+              <strong>Substitution what-if</strong>
+              <span>
+                {{ sub.playerOffName }} → {{ sub.playerOnName }}
+                · min {{ sub.minute }} · seeds {{ sub.seedStart }}..{{ sub.seedEnd }}
+              </span>
+            </div>
+            <div class="current-replay-grid" role="group" aria-label="Substitution what-if summary">
+              <div class="metric-card">
+                <span class="metric-label">Coach read</span>
+                <span class="metric-value" [class]="sub.readClass">{{ sub.read }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Δ xG For</span>
+                <span class="metric-value" [class]="deltaClass(sub.deltaXgFor)">{{ fmtDeltaNumber(sub.deltaXgFor) }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Δ xG Ag.</span>
+                <span class="metric-value" [class]="deltaClass(-sub.deltaXgAgainst)">{{ fmtDeltaNumber(sub.deltaXgAgainst) }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Δ Shots</span>
+                <span class="metric-value" [class]="deltaClass(sub.deltaShotsFor)">{{ fmtDeltaNumber(sub.deltaShotsFor) }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Δ Poss</span>
+                <span class="metric-value" [class]="deltaClass(sub.deltaPossessionFor)">{{ fmtDeltaNumber(sub.deltaPossessionFor) }}%</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Δ Channels C/W/L</span>
+                <span class="metric-value" [class]="deltaClass(sub.deltaCentralShotsFor + sub.deltaWideShotsFor + sub.deltaLongShotsFor)">
+                  {{ fmtDeltaNumber(sub.deltaCentralShotsFor) }}/{{ fmtDeltaNumber(sub.deltaWideShotsFor) }}/{{ fmtDeltaNumber(sub.deltaLongShotsFor) }}
+                </span>
+              </div>
+            </div>
+            <p class="panel-hint current-replay-starters">
+              Baseline xG {{ fmtXg(sub.baselineAvgXgFor) }} / {{ fmtXg(sub.baselineAvgXgAgainst) }}
+              → Con cambio {{ fmtXg(sub.substitutedAvgXgFor) }} / {{ fmtXg(sub.substitutedAvgXgAgainst) }}.
+              Esto prueba una sustitución real durante el partido, no solo cambio del XI inicial.
             </p>
           </div>
           <div *ngIf="playerSwapBatterySummaries().length > 0" class="formation-matrix analysis-matrix current-lineup-replay">
@@ -5244,6 +5299,8 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   readonly lineupDiagnostic = signal<LineupDiagnostic | null>(null);
   /** Automatic starter-vs-bench player swap comparison. */
   readonly playerSwapMatrixSummary = signal<PlayerSwapMatrixSummary | null>(null);
+  /** Live-substitution replay comparison for the selected starter/bench pair. */
+  readonly substitutionWhatIfSummary = signal<SubstitutionWhatIfSummary | null>(null);
   readonly playerSwapBatterySummaries = signal<PlayerSwapMatrixSummary[]>([]);
   readonly playerSwapPrecisionComparisonRows = signal<PlayerSwapPrecisionComparisonRow[]>([]);
   readonly playerSwapBatterySummary = computed<PlayerSwapBatterySummary>(() => {
@@ -6333,6 +6390,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   }
   private clearPlayerSwapAnalysisResults(): void {
     this.playerSwapMatrixSummary.set(null);
+    this.substitutionWhatIfSummary.set(null);
     this.playerSwapBatterySummaries.set([]);
     this.playerSwapPrecisionComparisonRows.set([]);
   }
@@ -6347,6 +6405,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     this.modalVsCanonicalSummary.set(null);
     this.lineupDiagnostic.set(null);
     this.playerSwapMatrixSummary.set(null);
+    this.substitutionWhatIfSummary.set(null);
     this.playerSwapBatterySummaries.set([]);
     this.playerSwapPrecisionComparisonRows.set([]);
     this.positionPixelMatrixSummary.set(null);
@@ -9262,6 +9321,82 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       },
     });
   }
+
+  onRunSubstitutionWhatIf(): void {
+    const matchId = this.selectedMatchId();
+    const careerId = this.careerId();
+    if (!matchId || !careerId) {
+      this.snackBar.open('Select a match in Panel C first.', 'OK', { duration: 3000 });
+      return;
+    }
+    if (!this.selectedMatchIncludesUserTeam()) {
+      this.snackBar.open('Substitution what-if usa el XI de tu equipo para replicar el modal.', 'OK', { duration: 3500 });
+      return;
+    }
+    const seedStart = this.seedInputModel ?? DEFAULT_REPLAY_SEED;
+    const seedCount = Math.max(1, Math.min(50, Math.round(this.playerSwapSeedCountModel || 10)));
+    this.playerSwapSeedCountModel = seedCount;
+    let candidate: PlayerSwapCandidate | null = null;
+    this.substitutionWhatIfSummary.set(null);
+    this.analysisReadyMessage.set(`Substitution what-if corriendo: min 60, ${seedCount} seeds...`);
+    this.mutationInFlight.set(true);
+    forkJoin({
+      lineup: this.harness.getCurrentLineup().pipe(take(1), timeout(10_000)),
+      squad: this.http.get<SessionPlayer[]>(`${environment.apiUrl}/career/players/squad`).pipe(
+        take(1),
+        timeout(10_000),
+        catchError(() => of([] as SessionPlayer[]))
+      ),
+    }).pipe(
+      switchMap(({ lineup, squad }) => {
+        candidate = this.pickAutomaticSwapCandidate(lineup, squad);
+        const playerOffId = this.selectedSwapStarterIdModel || candidate?.starterId;
+        const playerOnId = this.selectedSwapBenchIdModel || candidate?.benchId;
+        if (!playerOffId || !playerOnId) {
+          throw new Error('No pude resolver titular y suplente para la sustitución.');
+        }
+        return this.harness.setStyle(this.selectedStyleModel).pipe(
+          switchMap(() =>
+            this.harness.runSubstitutionWhatIfSummary(matchId, {
+              playerOffId,
+              playerOnId,
+              minute: 60,
+              seedStart,
+              seedCount,
+              controlledTeamSide: 'USER',
+            })
+          )
+        );
+      })
+    ).subscribe({
+      next: (row) => {
+        this.substitutionWhatIfSummary.set({
+          ...row,
+          readClass: this.deltaClass(row.deltaXgDiff + row.deltaShotsFor * 0.04 - row.deltaXgAgainst * 0.6),
+        });
+      },
+      error: (err) => {
+        this.mutationInFlight.set(false);
+        this.analysisReadyMessage.set(this.fmtError(err, 'Substitution what-if falló antes de generar Panel E'));
+        this.snackBar.open(this.fmtError(err, 'Failed to run substitution what-if'), 'OK', { duration: 5000 });
+        this.refreshLineupContext();
+      },
+      complete: () => {
+        this.mutationInFlight.set(false);
+        const summary = this.substitutionWhatIfSummary();
+        this.snackBar.open(
+          summary
+            ? `Substitution what-if complete: ${summary.playerOffName} → ${summary.playerOnName}, ΔxG ${this.fmtDeltaNumber(summary.deltaXgFor)}.`
+            : 'Substitution what-if completed with insufficient samples.',
+          'OK',
+          { duration: 4500 }
+        );
+        this.markReplayAnalysisReady('Substitution what-if listo en Panel E.');
+        this.refreshLineupContext();
+      },
+    });
+  }
+
   onRunPlayerSwapBattery(options: { preservePositionPixels?: boolean } = {}): void {
     const matchId = this.selectedMatchId();
     const careerId = this.careerId();

@@ -415,6 +415,15 @@ export interface PlayerSwapMatrixSummaryRequest {
   controlledTeamSide?: 'USER' | 'HOME' | 'AWAY';
 }
 
+export interface SubstitutionWhatIfRequest {
+  playerOffId: string;
+  playerOnId: string;
+  minute?: number | null;
+  seedStart: number;
+  seedCount: number;
+  controlledTeamSide?: 'USER' | 'HOME' | 'AWAY';
+}
+
 export interface PlayerSwapMatrixSummaryRow {
   matchId: string;
   formation: string;
@@ -498,6 +507,57 @@ export interface PlayerSwapMatrixSummaryRow {
   preAutoSubDeltaXgFor?: number;
   preAutoSubDeltaXgAgainst?: number;
   preAutoSubDeltaXgDiff?: number;
+}
+
+export interface SubstitutionWhatIfSummaryRow {
+  matchId: string;
+  formation: string;
+  minute: number;
+  seedStart: number;
+  seedEnd: number;
+  seedCount: number;
+  playerOffId: string;
+  playerOffName: string;
+  playerOffPosition: string;
+  playerOffOverall: number | null;
+  playerOnId: string;
+  playerOnName: string;
+  playerOnPosition: string;
+  playerOnOverall: number | null;
+  baselineAvgGoalsFor: number;
+  baselineAvgGoalsAgainst: number;
+  baselineAvgGoalDiff: number;
+  baselineAvgShotsFor: number;
+  baselineAvgShotsAgainst: number;
+  baselineAvgPossessionFor: number;
+  baselineAvgXgFor: number;
+  baselineAvgXgAgainst: number;
+  baselineAvgXgDiff: number;
+  substitutedAvgGoalsFor: number;
+  substitutedAvgGoalsAgainst: number;
+  substitutedAvgGoalDiff: number;
+  substitutedAvgShotsFor: number;
+  substitutedAvgShotsAgainst: number;
+  substitutedAvgPossessionFor: number;
+  substitutedAvgXgFor: number;
+  substitutedAvgXgAgainst: number;
+  substitutedAvgXgDiff: number;
+  deltaGoalsFor: number;
+  deltaGoalsAgainst: number;
+  deltaGoalDiff: number;
+  deltaShotsFor: number;
+  deltaShotsAgainst: number;
+  deltaPossessionFor: number;
+  deltaXgFor: number;
+  deltaXgAgainst: number;
+  deltaXgDiff: number;
+  deltaCentralShotsFor: number;
+  deltaWideShotsFor: number;
+  deltaLongShotsFor: number;
+  deltaCentralXgFor: number;
+  deltaWideXgFor: number;
+  deltaLongXgFor: number;
+  read: string;
 }
 
 export interface PositionPixelMatrixSummaryRequest {

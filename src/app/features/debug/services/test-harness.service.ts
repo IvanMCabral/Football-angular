@@ -27,6 +27,8 @@ import {
   SetFormationRequest,
   SetStyleRequest,
   SimulateRoundRequest,
+  SubstitutionWhatIfRequest,
+  SubstitutionWhatIfSummaryRow,
   TestHarnessMutationResponse,
   TeamStyle,
 } from '../models/test-harness.model';
@@ -261,6 +263,16 @@ export class TestHarnessService {
   ): Observable<PlayerSwapMatrixSummaryRow> {
     return this.http.post<PlayerSwapMatrixSummaryRow>(
       `${this.apiUrl}/match/${matchId}/player-swap-matrix/summary`,
+      request
+    );
+  }
+
+  runSubstitutionWhatIfSummary(
+    matchId: string,
+    request: SubstitutionWhatIfRequest
+  ): Observable<SubstitutionWhatIfSummaryRow> {
+    return this.http.post<SubstitutionWhatIfSummaryRow>(
+      `${this.apiUrl}/match/${matchId}/substitution-what-if/summary`,
       request
     );
   }
