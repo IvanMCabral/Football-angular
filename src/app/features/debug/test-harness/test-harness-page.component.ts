@@ -5055,6 +5055,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   /** Averaged formation comparison across multiple seeds. */
   readonly formationMatrixSummaryResults = signal<FormationMatrixSummaryRow[]>([]);
   readonly professionalSmokeSummary = signal<ProfessionalSmokeSummary | null>(null);
+  private professionalSmokeRunId = 0;
   private professionalSmokeFullPixelRows = 0;
   private professionalSmokeFullRunId = 0;
   readonly lowBlockLabRows = signal<LowBlockLabRow[]>([]);
@@ -13935,6 +13936,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const scenarioSeedCount = this.scenarioMatrixSmokeSeedCount();
     const controlledSide = this.controlledTeamSideModel;
     const controlledName = this.controlledTeamDisplayName();
+    const runId = ++this.professionalSmokeRunId;
     this.clearFormationAverageResults();
     this.professionalSmokeSummary.set(null);
     this.scenarioMatrixSummaryResults.set([]);
@@ -13943,6 +13945,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       `Professional smoke corriendo para ${controlledName}: formaciones ${formationSeedCount} seeds + escenarios ${scenarioSeedCount} seeds...`
     );
     this.mutationInFlight.set(true);
+    this.guardProfessionalSmokeTimeout(runId, controlledName, controlledSide, formationSeedCount, scenarioSeedCount);
     this.harness.setStyle(this.selectedStyleModel).pipe(
       switchMap(() => forkJoin({
         formationRows: this.harness.runFormationMatrixSummary(matchId, seedStart, formationSeedCount, controlledSide),
@@ -13950,6 +13953,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       }))
     ).subscribe({
       next: ({ formationRows, scenarioRows }) => {
+        if (runId !== this.professionalSmokeRunId) return;
         const safeFormationRows = formationRows ?? [];
         const safeScenarioRows = scenarioRows ?? [];
         this.formationMatrixSummaryResults.set(safeFormationRows);
@@ -13989,13 +13993,48 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         );
       },
       error: (err) => {
+        if (runId !== this.professionalSmokeRunId) return;
         this.analysisReadyMessage.set(this.fmtError(err, 'Professional smoke falló'));
         this.snackBar.open(this.fmtError(err, 'Failed to run professional smoke'), 'OK', { duration: 6000 });
       },
       complete: () => {
+        if (runId !== this.professionalSmokeRunId) return;
         this.mutationInFlight.set(false);
       },
     });
+  }
+  private guardProfessionalSmokeTimeout(
+    runId: number,
+    controlledName: string,
+    controlledSide: ControlledTeamSide,
+    formationSeedCount: number,
+    scenarioSeedCount: number
+  ): void {
+    window.setTimeout(() => {
+      if (runId !== this.professionalSmokeRunId || !this.mutationInFlight()) return;
+      const formationRows = this.formationMatrixSummaryResults().length;
+      const scenarioRows = this.scenarioMatrixSummaryResults().length;
+      this.professionalSmokeRunId++;
+      this.mutationInFlight.set(false);
+      this.professionalSmokeSummary.set({
+        controlledTeam: controlledName,
+        scope: controlledSide,
+        formationRows,
+        scenarioRows,
+        pixelRows: 0,
+        swapRows: 0,
+        formationSeedCount,
+        scenarioSeedCount,
+        included: [
+          `Formation avg: ${formationRows} formaciones`,
+          `Scenario smoke: ${scenarioRows} escenarios`,
+        ],
+        skipped: ['Professional smoke cortado por timeout defensivo; revisar partido/endpoint lento antes de calibrar.'],
+        read: `${controlledName}: professional smoke parcial por timeout · ${formationRows} formaciones · ${scenarioRows} escenarios · scope ${controlledSide}.`,
+      });
+      this.analysisReadyMessage.set('Professional smoke cortado por timeout defensivo. Resultados parciales abajo.');
+      this.snackBar.open('Professional smoke timeout: resultados parciales disponibles.', 'OK', { duration: 6000 });
+    }, 120_000);
   }
   onRunProfessionalSmokeFull(): void {
     if (this.controlledTeamSideModel !== 'USER' || !this.selectedMatchIncludesUserTeam()) {
@@ -14011,6 +14050,13 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     this.guardProfessionalSmokeFullTimeout(runId);
     this.onRunProfessionalSmoke();
     this.waitForProfessionalSmokeStep('formation/scenario', () => {
+      const baseSummary = this.professionalSmokeSummary();
+      if (baseSummary?.skipped.some((item) => item.toLowerCase().includes('timeout'))) {
+        this.professionalSmokeFullRunId++;
+        this.analysisReadyMessage.set('Professional smoke full detenido: la etapa base terminó por timeout. Resultados parciales abajo.');
+        this.snackBar.open('Smoke full detenido: professional smoke base hizo timeout.', 'OK', { duration: 6000 });
+        return;
+      }
       this.runProfessionalSmokePixelStage(() => {
         if (runId !== this.professionalSmokeFullRunId) return;
         this.professionalSmokeFullPixelRows = this.positionPixelMatrixRows().length;
