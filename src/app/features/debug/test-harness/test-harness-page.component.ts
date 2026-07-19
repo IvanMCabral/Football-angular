@@ -72,6 +72,14 @@ interface TestHarnessSnapshotFixture {
 }
 interface TestHarnessSnapshotResponse {
   fixtures?: TestHarnessSnapshotFixture[] | null;
+  squadHealthSummary?: TestHarnessSquadHealthSummary | null;
+}
+interface TestHarnessSquadHealthSummary {
+  squadSize?: number | null;
+  injuredCount?: number | null;
+  suspendedCount?: number | null;
+  yellowCardsCount?: number | null;
+  redCardsCount?: number | null;
 }
 interface FormationReplayResult {
   formation: FormationCode;
@@ -891,6 +899,22 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
               <span class="context-label">Lectura</span>
               <strong>{{ resultPerspectiveLabel() }}</strong>
             </div>
+          </div>
+          <div
+            *ngIf="dirtyHarnessCaseMessage() as dirtyMessage"
+            class="harness-warning harness-dirty-case"
+            data-testid="dirty-harness-case-warning"
+            role="status"
+          >
+            <strong>⚠ Caso sucio</strong>
+            <span>{{ dirtyMessage }}</span>
+            <button
+              type="button"
+              (click)="onResetInjuries()"
+              [disabled]="mutationInFlight()"
+            >
+              Reset Injuries
+            </button>
           </div>
           <div class="compare-workflow-card" data-testid="compare-workflow-card">
             <div class="compare-workflow-header">
@@ -1776,6 +1800,17 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
               Partido: {{ panelMatch.homeTeamName }} vs {{ panelMatch.awayTeamName }}
             </span>
           </div>
+          <article
+            *ngIf="dirtyHarnessCaseMessage() as dirtyMessage"
+            class="position-read-summary dirty-analysis-warning"
+            data-testid="panel-e-dirty-case-warning"
+          >
+            <strong>⚠ Caso sucio antes de comparar</strong>
+            <span>{{ dirtyMessage }}</span>
+            <small>
+              Si corrés matrices con lesionados/sancionados, el motor puede meter auto-sustituciones y contaminar la lectura.
+            </small>
+          </article>
           <article *ngIf="professionalSmokeSummary() as smoke" class="position-read-summary professional-smoke-summary" data-testid="professional-smoke-summary">
             <strong>Professional smoke</strong>
             <span>{{ smoke.read }}</span>
@@ -4263,6 +4298,36 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
       font-size: 0.82rem;
       line-height: 1.35;
     }
+    .harness-dirty-case {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+      background: #fff3cd;
+      border-color: #ffcc66;
+      color: #5f3f00;
+    }
+    .harness-dirty-case strong {
+      font-weight: 900;
+    }
+    .harness-dirty-case span {
+      flex: 1 1 220px;
+    }
+    .harness-dirty-case button {
+      border: 1px solid #b7791f;
+      border-radius: 999px;
+      background: #b7791f;
+      color: #fff;
+      cursor: pointer;
+      font: inherit;
+      font-size: 0.76rem;
+      font-weight: 800;
+      padding: 0.3rem 0.65rem;
+    }
+    .harness-dirty-case button:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+    }
     .analysis-ready-banner {
       display: flex;
       align-items: center;
@@ -4850,6 +4915,13 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
       align-items: center;
       margin: 0.35rem 0 0.65rem;
     }
+    .dirty-analysis-warning {
+      border: 1px solid #ffcc66;
+      border-radius: 8px;
+      background: #fff8e1;
+      color: #5f3f00;
+      padding: 0.65rem 0.75rem;
+    }
     .tactical-read-summary {
       margin-top: -0.25rem;
     }
@@ -5156,6 +5228,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   /** The active careerId (resolved from CareerStatus; null if no career). */
   readonly careerId = signal<string | null>(null);
   readonly userTeamName = signal<string | null>(null);
+  readonly squadHealthSummary = signal<TestHarnessSquadHealthSummary | null>(null);
   /** Currently selected match (Panel C click ? Panel A renders). */
   readonly selectedMatchId = signal<string | null>(null);
   readonly detailPanelVisible = signal<boolean>(true);
@@ -5921,6 +5994,32 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   }
   /** User-facing pointer to the latest finished replay-analysis result. */
   readonly analysisReadyMessage = signal<string | null>(null);
+  readonly dirtyHarnessCase = computed(() => {
+    const health = this.squadHealthSummary();
+    if (!health) {
+      return false;
+    }
+    return (health.injuredCount ?? 0) > 0
+      || (health.suspendedCount ?? 0) > 0
+      || (health.redCardsCount ?? 0) > 0;
+  });
+  readonly dirtyHarnessCaseMessage = computed(() => {
+    const health = this.squadHealthSummary();
+    if (!health || !this.dirtyHarnessCase()) {
+      return null;
+    }
+    const parts: string[] = [];
+    if ((health.injuredCount ?? 0) > 0) {
+      parts.push(`${health.injuredCount} lesionado(s)`);
+    }
+    if ((health.suspendedCount ?? 0) > 0) {
+      parts.push(`${health.suspendedCount} suspendido(s)`);
+    }
+    if ((health.redCardsCount ?? 0) > 0) {
+      parts.push(`${health.redCardsCount} roja(s)`);
+    }
+    return `Caso sucio para comparar: ${parts.join(' · ')}. Usá Reset Injuries antes de correr matrices si querés una lectura limpia del DT.`;
+  });
   /** True if there is an active career. */
   readonly hasCareer = computed(() => this.careerId() !== null);
   readonly selectedMatchIncludesUserTeam = computed(() => {
@@ -6265,6 +6364,13 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     this.harness.resetInjuries().subscribe({
       next: (resp) => {
         this.mutationInFlight.set(false);
+        this.squadHealthSummary.set({
+          ...(this.squadHealthSummary() ?? {}),
+          injuredCount: 0,
+          suspendedCount: 0,
+          yellowCardsCount: 0,
+          redCardsCount: 0,
+        });
         this.snackBar.open(
           resp?.message ?? 'Injuries reset.',
           'OK',
@@ -15930,6 +16036,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   private loadMatchesFromSnapshot(onLoaded?: (rounds: RoundGroup[]) => void): void {
     this.http.get<TestHarnessSnapshotResponse>(`${environment.apiUrl}/test-harness/career/snapshot`).subscribe({
       next: (snapshot) => {
+        this.squadHealthSummary.set(snapshot?.squadHealthSummary ?? null);
         const rounds = this.snapshotFixturesToRoundGroups(snapshot?.fixtures ?? []);
         this.rounds.set(rounds);
         this.rehydrateSelectedMatchFromRounds(rounds);
