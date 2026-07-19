@@ -2359,7 +2359,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
             </div>
             <div *ngIf="playerSwapBatterySummary() as battery" class="current-replay-grid" role="group" aria-label="Player swap battery summary">
               <div class="metric-card">
-                <span class="metric-label">Best</span>
+                <span class="metric-label">Recommendation</span>
                 <span class="metric-value delta-positive">{{ playerSwapBatteryBestWorstText(battery.best) }}</span>
               </div>
               <div class="metric-card">
@@ -6867,7 +6867,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       `Confidence: ${summary.confidence}`,
       `Seeds: ${first ? `${first.seedStart}..${first.seedEnd}` : 'n/a'}`,
       '',
-      `Best: ${this.playerSwapBatteryBestWorstText(summary.best)}`,
+      `Recommendation: ${this.playerSwapBatteryBestWorstText(summary.best)}`,
       `Worst: ${this.playerSwapBatteryBestWorstText(summary.worst)}`,
       '',
       `Reads: ${this.playerSwapBatteryCounterText(summary.reads)}`,
