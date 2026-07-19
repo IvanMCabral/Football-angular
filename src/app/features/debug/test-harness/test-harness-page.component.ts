@@ -15003,6 +15003,9 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const seedStart = this.seedInputModel ?? 12345;
     this.scenarioMatrixSummarySeedCount.set(seedCount);
     this.scenarioMatrixSummaryResults.set([]);
+    this.analysisReadyMessage.set(
+      `${label} calculando Panel E (${seedCount} seeds). Mismo partido, mismo seed base; esperando resultados multi-seed...`
+    );
     this.mutationInFlight.set(true);
     this.harness.runScenarioMatrixSummary(
       matchId,
@@ -15558,8 +15561,8 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const matchName = `${match.homeTeamName} vs ${match.awayTeamName}`;
     this.analysisReadyMessage.set(
       match.homeTeamName === teamName || match.awayTeamName === teamName
-        ? `Panel E limpiado para ${matchName}. Corre un smoke/matriz para este partido.`
-        : `Panel E limpiado para ${matchName}. Controlar quedo en Local; podes correr smokes multi-seed para este partido.`
+        ? `Panel E preparado para ${matchName}. Corre un smoke/matriz para generar una lectura nueva.`
+        : `Panel E preparado para ${matchName}. Controlar quedo en Local; podes correr smokes multi-seed para este partido.`
     );
   }
   // ============== Internal helpers ==============
