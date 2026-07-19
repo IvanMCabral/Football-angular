@@ -524,6 +524,8 @@ describe('TestHarnessPageComponent', () => {
       'ALL',
       'HOME'
     );
+    expect(component.professionalSmokeSummary()?.scope).toBe('HOME');
+    expect(component.professionalSmokeSummary()?.skipped.join(' ')).toContain('Local/Visitante');
   });
 
   it('onFormationChange updates the model', () => {

@@ -498,6 +498,17 @@ interface BackFiveContextSmokeSummary {
   read: string;
   className: string;
 }
+interface ProfessionalSmokeSummary {
+  controlledTeam: string;
+  scope: ControlledTeamSide;
+  formationRows: number;
+  scenarioRows: number;
+  formationSeedCount: number;
+  scenarioSeedCount: number;
+  included: string[];
+  skipped: string[];
+  read: string;
+}
 interface AllFormationRoleSlotSmokeRow {
   formation: FormationCode;
   slots: number;
@@ -1702,7 +1713,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
         </section>
         <!-- Panel E: replay analysis matrices (full width) -->
         <section
-          *ngIf="currentLineupReplayResult() || currentLineupMultiSeedSummary() || modalVsCanonicalSummary() || lineupDiagnostic() || playerSwapMatrixSummary() || playerSwapBatterySummaries().length > 0 || playerSwapPrecisionComparisonRows().length > 0 || roleSlotImpactRows().length > 0 || roleSlotImpactSmokeRows().length > 0 || allFormationRoleSlotSmokeRows().length > 0 || positionPixelEvidenceNote() || positionPixelMatrixSummary() || positionPixelMatrixRows().length > 0 || formationLineSmokeRows().length > 0 || lineupDebugSnapshot() || formationReplayResults().length > 0 || formationMatrixSummaryResults().length > 0 || lowBlockLabRows().length > 0 || backFiveTransitionLabRows().length > 0 || backFiveFamilyLabRows().length > 0 || backFiveContextSmokeRows().length > 0 || sideMirrorSmokeRows().length > 0 || scenarioMatrixResults().length > 0 || scenarioMatrixSummaryResults().length > 0 || scenarioBatteryRows().length > 0"
+          *ngIf="currentLineupReplayResult() || currentLineupMultiSeedSummary() || modalVsCanonicalSummary() || lineupDiagnostic() || playerSwapMatrixSummary() || playerSwapBatterySummaries().length > 0 || playerSwapPrecisionComparisonRows().length > 0 || roleSlotImpactRows().length > 0 || roleSlotImpactSmokeRows().length > 0 || allFormationRoleSlotSmokeRows().length > 0 || positionPixelEvidenceNote() || positionPixelMatrixSummary() || positionPixelMatrixRows().length > 0 || formationLineSmokeRows().length > 0 || lineupDebugSnapshot() || formationReplayResults().length > 0 || formationMatrixSummaryResults().length > 0 || professionalSmokeSummary() || lowBlockLabRows().length > 0 || backFiveTransitionLabRows().length > 0 || backFiveFamilyLabRows().length > 0 || backFiveContextSmokeRows().length > 0 || sideMirrorSmokeRows().length > 0 || scenarioMatrixResults().length > 0 || scenarioMatrixSummaryResults().length > 0 || scenarioBatteryRows().length > 0"
           id="test-harness-replay-analysis"
           class="panel panel-e"
           aria-labelledby="panel-e-heading"
@@ -1717,6 +1728,16 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
               Partido: {{ panelMatch.homeTeamName }} vs {{ panelMatch.awayTeamName }}
             </span>
           </div>
+          <article *ngIf="professionalSmokeSummary() as smoke" class="position-read-summary professional-smoke-summary" data-testid="professional-smoke-summary">
+            <strong>Professional smoke</strong>
+            <span>{{ smoke.read }}</span>
+            <small>
+              Incluye: {{ smoke.included.join(' · ') }}
+            </small>
+            <small *ngIf="smoke.skipped.length > 0">
+              Pendiente/omitido: {{ smoke.skipped.join(' · ') }}
+            </small>
+          </article>
           <div class="formation-matrix analysis-matrix current-lineup-replay">
             <div class="matrix-header">
               <div>
@@ -5022,6 +5043,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   readonly formationReplayResults = signal<FormationReplayResult[]>([]);
   /** Averaged formation comparison across multiple seeds. */
   readonly formationMatrixSummaryResults = signal<FormationMatrixSummaryRow[]>([]);
+  readonly professionalSmokeSummary = signal<ProfessionalSmokeSummary | null>(null);
   readonly lowBlockLabRows = signal<LowBlockLabRow[]>([]);
   readonly backFiveTransitionLabRows = signal<BackFiveTransitionLabRow[]>([]);
   readonly backFiveFamilyLabRows = signal<BackFiveFamilyLabRow[]>([]);
@@ -13886,6 +13908,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const controlledSide = this.controlledTeamSideModel;
     const controlledName = this.controlledTeamDisplayName();
     this.clearFormationAverageResults();
+    this.professionalSmokeSummary.set(null);
     this.scenarioMatrixSummaryResults.set([]);
     this.scenarioMatrixSummarySeedCount.set(formationSeedCount);
     this.analysisReadyMessage.set(
@@ -13903,6 +13926,29 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         const safeScenarioRows = scenarioRows ?? [];
         this.formationMatrixSummaryResults.set(safeFormationRows);
         this.scenarioMatrixSummaryResults.set(safeScenarioRows);
+        const userScope = controlledSide === 'USER';
+        this.professionalSmokeSummary.set({
+          controlledTeam: controlledName,
+          scope: controlledSide,
+          formationRows: safeFormationRows.length,
+          scenarioRows: safeScenarioRows.length,
+          formationSeedCount,
+          scenarioSeedCount,
+          included: [
+            `Formation avg: ${safeFormationRows.length} formaciones x ${formationSeedCount} seeds`,
+            `Scenario smoke: ${safeScenarioRows.length} escenarios x ${scenarioSeedCount} seeds`,
+          ],
+          skipped: userScope
+            ? [
+                'Píxeles y swaps se corren desde sus botones dedicados para preservar evidencia detallada.',
+                'Compare baseline/live queda disponible en Open Match Compare.',
+              ]
+            : [
+                'Píxeles y swaps requieren lineup editable de Mi equipo; no se simulan para Local/Visitante.',
+                'Compare baseline/live queda disponible en Open Match Compare.',
+              ],
+          read: `${controlledName}: ${safeFormationRows.length} formaciones · ${safeScenarioRows.length} escenarios · scope ${controlledSide}.`,
+        });
         this.markReplayAnalysisReady(
           `Professional smoke listo para ${controlledName}: ${safeFormationRows.length} formaciones · ${safeScenarioRows.length} escenarios.`
         );
