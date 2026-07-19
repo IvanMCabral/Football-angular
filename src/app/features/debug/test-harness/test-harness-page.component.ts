@@ -5056,6 +5056,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   readonly formationMatrixSummaryResults = signal<FormationMatrixSummaryRow[]>([]);
   readonly professionalSmokeSummary = signal<ProfessionalSmokeSummary | null>(null);
   private professionalSmokeFullPixelRows = 0;
+  private professionalSmokeFullRunId = 0;
   readonly lowBlockLabRows = signal<LowBlockLabRow[]>([]);
   readonly backFiveTransitionLabRows = signal<BackFiveTransitionLabRow[]>([]);
   readonly backFiveFamilyLabRows = signal<BackFiveFamilyLabRow[]>([]);
@@ -9241,7 +9242,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       },
     });
   }
-  onRunPlayerSwapBattery(): void {
+  onRunPlayerSwapBattery(options: { preservePositionPixels?: boolean } = {}): void {
     const matchId = this.selectedMatchId();
     const careerId = this.careerId();
     if (!matchId || !careerId) {
@@ -9251,7 +9252,15 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const seedStart = this.seedInputModel ?? DEFAULT_REPLAY_SEED;
     const seedCount = this.playerSwapBatteryEffectiveSeedCount();
     this.playerSwapSeedCountModel = seedCount;
+    const preservedPixelSummary = options.preservePositionPixels ? this.positionPixelMatrixSummary() : null;
+    const preservedPixelRows = options.preservePositionPixels ? this.positionPixelMatrixRows() : [];
+    const preservedPixelNote = options.preservePositionPixels ? this.positionPixelEvidenceNote() : null;
     this.clearReplayAnalysisResultsForLatestRun();
+    if (options.preservePositionPixels) {
+      this.positionPixelMatrixSummary.set(preservedPixelSummary);
+      this.positionPixelMatrixRows.set(preservedPixelRows);
+      this.positionPixelEvidenceNote.set(preservedPixelNote);
+    }
     this.analysisReadyMessage.set(`Player swap battery corriendo: ${seedCount} seeds por cambio...`);
     this.mutationInFlight.set(true);
     const source$ = this.selectedMatchIncludesUserTeam()
@@ -13990,23 +13999,56 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       this.snackBar.open('Select a match in Panel C first.', 'OK', { duration: 3000 });
       return;
     }
+    const runId = ++this.professionalSmokeFullRunId;
     this.professionalSmokeFullPixelRows = 0;
+    this.guardProfessionalSmokeFullTimeout(runId);
     this.onRunProfessionalSmoke();
     this.waitForProfessionalSmokeStep('formation/scenario', () => {
       this.runProfessionalSmokePixelStage(() => {
+        if (runId !== this.professionalSmokeFullRunId) return;
         this.professionalSmokeFullPixelRows = this.positionPixelMatrixRows().length;
-        this.onRunPlayerSwapBattery();
+        this.onRunPlayerSwapBattery({ preservePositionPixels: true });
         this.waitForProfessionalSmokeStep('player swaps', () => {
+          if (runId !== this.professionalSmokeFullRunId) return;
           this.finalizeProfessionalSmokeFullSummary();
         });
       });
     });
   }
+  private guardProfessionalSmokeFullTimeout(runId: number): void {
+    window.setTimeout(() => {
+      if (runId !== this.professionalSmokeFullRunId || !this.mutationInFlight()) return;
+      const controlledName = this.controlledTeamDisplayName();
+      const pixelRows = this.professionalSmokeFullPixelRows || this.positionPixelMatrixRows().length;
+      const swapRows = this.playerSwapBatterySummaries().length;
+      const formationRows = this.formationMatrixSummaryResults().length;
+      const scenarioRows = this.scenarioMatrixSummaryResults().length;
+      this.professionalSmokeFullRunId++;
+      this.mutationInFlight.set(false);
+      this.professionalSmokeSummary.set({
+        controlledTeam: controlledName,
+        scope: 'USER',
+        formationRows,
+        scenarioRows,
+        pixelRows,
+        swapRows,
+        formationSeedCount: this.scenarioMatrixSummaryEffectiveSeedCount(),
+        scenarioSeedCount: this.scenarioMatrixSmokeSeedCount(),
+        included: [
+          `Formation avg: ${formationRows} formaciones`,
+          `Scenario smoke: ${scenarioRows} escenarios`,
+          `Pixel sensitivity: ${pixelRows} filas`,
+          `Player swap battery: ${swapRows} cambios`,
+        ],
+        skipped: ['Smoke full cortado por timeout defensivo; revisar etapa lenta antes de calibrar.'],
+        read: `${controlledName}: smoke full parcial por timeout · ${formationRows} formaciones · ${scenarioRows} escenarios · ${pixelRows} píxeles · ${swapRows} swaps.`,
+      });
+      this.analysisReadyMessage.set('Professional smoke full cortado por timeout defensivo. Resultados parciales abajo.');
+      this.snackBar.open('Professional smoke full timeout: resultados parciales disponibles.', 'OK', { duration: 6000 });
+    }, 90_000);
+  }
   private runProfessionalSmokePixelStage(onComplete: () => void): void {
     const seedCount = Math.max(10, Math.min(30, Math.round(this.playerSwapSeedCountModel || 10)));
-    const matches = this.userTeamMatches()
-      .filter((match) => match.status === 'COMPLETED')
-      .slice(0, 3);
     this.runPositionPixelMatrixWithPresets(
       seedCount,
       (fromX, fromY) => this.positionMovementPresets(fromX, fromY)
@@ -14018,7 +14060,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           'big zone cross',
         ].includes(preset.label)),
       'Professional smoke pixel sweep',
-      matches.length > 0 ? matches : null,
+      null,
       null,
       null,
       true,
