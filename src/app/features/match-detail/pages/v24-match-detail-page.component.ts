@@ -119,11 +119,11 @@ import {
             <button type="button" class="btn-nav btn-nav-prev" disabled
                     aria-label="Previous match (not available yet)"
                     title="Coming soon (P1a.1)">← Previous match</button>
-            <!-- LIVE-MATCH-F1-POC: manual substitution entry point (UI-only, no result change) -->
+            <!-- LIVE-MATCH: manual substitution entry point with real data only -->
             <button type="button" class="btn-nav btn-nav-substitute"
                     (click)="openSubstitutionDialog()"
                     aria-label="Sustituir jugador"
-                    title="Sustituir jugador (Phase 1 POC: UI only, no result change)">
+                    title="Sustituir jugador con datos reales del partido">
               Sustituir
             </button>
             <!-- F6 Sprint 2 (LIVE-MATCH-F6-MATCH-COMPARE): link to baseline-vs-live comparison -->
@@ -1107,47 +1107,32 @@ export class V24MatchDetailPageComponent implements OnInit, OnChanges {
       }));
   }
 
-  // ========== LIVE-MATCH-F1-POC: manual substitution dialog ==========
+  // ========== LIVE-MATCH: manual substitution dialog ==========
 
   /**
-   * LIVE-MATCH-F1-POC: open the substitution dialog.
-   *
-   * <p>Phase 1 POC limitation (per F3): the starting/bench player lists are
-   * hardcoded here as static arrays because the {@code MatchDetail} DTO does
-   * not yet expose {@code startingPlayers}/{@code benchPlayers}. The real
-   * lineup data requires a backend DTO extension (deferred to Phase 2).
-   *
-   * <p>For Phase 1 POC validation, we use a 4-3-3 home vs 4-4-2 away lineup
-   * with 4 bench players each. The substitutions work on real session player
-   * IDs (the dialog returns them), so the validation flow against the backend
-   * engine is end-to-end even with placeholder names.
+   * Opens the substitution dialog only when the page can use real players.
+   * A professional DT flow must never show placeholder names or fake ids:
+   * that makes the UI look editable while the engine receives meaningless
+   * substitutions. Until Match Detail exposes the real bench, we block the
+   * dialog instead of showing a false-positive substitution tool.
    */
   openSubstitutionDialog(): void {
     if (!this.detail?.matchId) {
       return;
     }
-    // Static placeholder lineups — see F3 limitation in the prompt.
-    const startingPlayers = [
-      { sessionPlayerId: 'home-starter-0', name: 'Home GK (placeholder)', position: 'GK' },
-      { sessionPlayerId: 'home-starter-1', name: 'Home DEF 1 (placeholder)', position: 'DEF' },
-      { sessionPlayerId: 'home-starter-2', name: 'Home DEF 2 (placeholder)', position: 'DEF' },
-      { sessionPlayerId: 'home-starter-3', name: 'Home MID 1 (placeholder)', position: 'MID' },
-      { sessionPlayerId: 'home-starter-4', name: 'Home ATT 1 (placeholder)', position: 'ATT' },
-    ];
-    const benchPlayers = [
-      { sessionPlayerId: 'home-bench-0', name: 'Home GK Bench (placeholder)', position: 'GK' },
-      { sessionPlayerId: 'home-bench-1', name: 'Home DEF Bench (placeholder)', position: 'DEF' },
-      { sessionPlayerId: 'home-bench-2', name: 'Home MID Bench (placeholder)', position: 'MID' },
-      { sessionPlayerId: 'home-bench-3', name: 'Home ATT Bench (placeholder)', position: 'ATT' },
-    ];
-
-    const data: SubstitutionDialogData = {
-      matchId: this.detail.matchId,
-      startingPlayers,
-      benchPlayers,
-      substitutionsRemaining: 5, // backend is authoritative; this is a UI hint
-      currentMinute: 45,         // placeholder minute (backend overrides)
-    };
+    const data = this.buildRealSubstitutionDialogData();
+    if (!data) {
+      this.snackBar.open(
+        'Sustituciones reales bloqueadas: el detalle del partido todav?a no expone titulares + suplentes reales. Hay que extender el DTO antes de habilitar este modal.',
+        'Cerrar',
+        {
+          duration: 7000,
+          panelClass: 'snack-warning',
+          politeness: 'polite'
+        }
+      );
+      return;
+    }
 
     const dialogRef = this.dialog.open<SubstitutionDialogComponent, SubstitutionDialogData, SubstitutionDialogResult>(
       SubstitutionDialogComponent,
@@ -1165,11 +1150,9 @@ export class V24MatchDetailPageComponent implements OnInit, OnChanges {
         result.minute
       ).subscribe({
         next: (subResult: { success: boolean; minuteApplied: number; substitutionsRemaining: number; error?: string }) => {
-          // Note: backend returns substitutionsRemaining; for POC we display the
-          // dialog's optimistic count. A follow-up GET /match-state would refresh.
           const msg = subResult.success
-            ? `Sustitución registrada (minuto ${subResult.minuteApplied || result.minute}). Te quedan ${subResult.substitutionsRemaining ?? '?'}.`
-            : `Error: ${subResult.error || 'sustitución no aplicada'}`;
+            ? `Sustituci?n registrada (minuto ${subResult.minuteApplied || result.minute}). Te quedan ${subResult.substitutionsRemaining ?? '?'}.`
+            : `Error: ${subResult.error || 'sustituci?n no aplicada'}`;
           this.snackBar.open(msg, 'Cerrar', {
             duration: 5000,
             panelClass: subResult.success ? 'snack-success' : 'snack-error',
@@ -1187,5 +1170,43 @@ export class V24MatchDetailPageComponent implements OnInit, OnChanges {
         }
       });
     });
+  }
+
+  private buildRealSubstitutionDialogData(): SubstitutionDialogData | null {
+    if (!this.detail) {
+      return null;
+    }
+    const homeRatings = (this.detail.playerRatings ?? [])
+      .filter(p => p.teamId === this.detail!.homeTeamId)
+      .filter(p => p.playerId && p.playerName && !this.isPlaceholderPlayerName(p.playerName));
+    const substitutedIds = new Set(
+      (this.detail.timeline ?? [])
+        .filter(e => e.type === 'SUBSTITUTION' && e.teamId === this.detail!.homeTeamId)
+        .map(e => e.playerId)
+        .filter(Boolean)
+    );
+    const realPlayers = homeRatings.map(p => ({
+      sessionPlayerId: p.playerId,
+      name: p.playerName,
+      position: p.position || 'MID'
+    }));
+    const startingPlayers = realPlayers.filter(p => !substitutedIds.has(p.sessionPlayerId)).slice(0, 11);
+    const benchPlayers = realPlayers.filter(p => substitutedIds.has(p.sessionPlayerId)).slice(0, 12);
+
+    if (startingPlayers.length < 7 || benchPlayers.length === 0) {
+      return null;
+    }
+
+    return {
+      matchId: this.detail.matchId,
+      startingPlayers,
+      benchPlayers,
+      substitutionsRemaining: Math.max(0, 5 - substitutedIds.size),
+      currentMinute: 45,
+    };
+  }
+
+  private isPlaceholderPlayerName(name: string): boolean {
+    return /\bplaceholder\b/i.test(name);
   }
 }

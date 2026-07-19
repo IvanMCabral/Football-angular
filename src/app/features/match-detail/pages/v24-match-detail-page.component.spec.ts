@@ -206,6 +206,18 @@ describe('V24MatchDetailPageComponent — V24D24 @Input path', () => {
     expect(component.error).toContain('Missing');
     expect(api.getMatchDetail).not.toHaveBeenCalled();
   });
+
+  it('blocks substitution modal when match detail has no real bench players', () => {
+    component.detail = makeDetail('match-1', 'career-1', 0, 0);
+
+    component.openSubstitutionDialog();
+
+    expect(snackBarSpy.open).toHaveBeenCalledWith(
+      jasmine.stringMatching(/Sustituciones reales bloqueadas/),
+      'Cerrar',
+      jasmine.objectContaining({ panelClass: 'snack-warning' })
+    );
+  });
 });
 
 function makeDetail(matchId: string, careerId: string, homeGoals: number, awayGoals: number): MatchDetail {
