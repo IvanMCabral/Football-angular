@@ -250,6 +250,19 @@ describe('V24MatchDetailPageComponent — V24D24 @Input path', () => {
     expect(data.startingPlayers.length).toBe(11);
     expect(data.benchPlayers[0].name).toBe('Real Bench Player');
   });
+
+  it('explains why completed harness matches cannot confirm live substitutions', () => {
+    const message = (component as any).substitutionErrorMessage({
+      status: 422,
+      message: 'Http failure response',
+      error: {
+        message: 'No active match session for userId=user matchId=match-1',
+      },
+    });
+
+    expect(message).toContain('sesión viva activa');
+    expect(message).toContain('modo live');
+  });
 });
 
 function makeDetail(matchId: string, careerId: string, homeGoals: number, awayGoals: number): MatchDetail {

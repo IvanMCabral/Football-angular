@@ -1161,7 +1161,7 @@ export class V24MatchDetailPageComponent implements OnInit, OnChanges {
           this.cdr.detectChanges();
         },
         error: (err: { message?: string } | unknown) => {
-          const errMsg = (err as { message?: string })?.message || String(err);
+          const errMsg = this.substitutionErrorMessage(err);
           this.snackBar.open(`Error de red: ${errMsg}`, 'Cerrar', {
             duration: 5000,
             panelClass: 'snack-error',
@@ -1203,5 +1203,19 @@ export class V24MatchDetailPageComponent implements OnInit, OnChanges {
 
   private isPlaceholderPlayerName(name: string): boolean {
     return /\bplaceholder\b/i.test(name);
+  }
+
+  private substitutionErrorMessage(err: unknown): string {
+    const httpErr = err as { status?: number; error?: unknown; message?: string };
+    const raw = typeof httpErr.error === 'string'
+      ? httpErr.error
+      : httpErr.error && typeof httpErr.error === 'object'
+        ? JSON.stringify(httpErr.error)
+        : '';
+    const message = `${httpErr.message ?? ''} ${raw}`.trim();
+    if (httpErr.status === 422 && /No active match session/i.test(message)) {
+      return 'Este partido no tiene una sesión viva activa. Para probar sustituciones reales hay que iniciar el partido en modo live o usar el harness de replay/what-if.';
+    }
+    return httpErr.message || raw || String(err);
   }
 }
