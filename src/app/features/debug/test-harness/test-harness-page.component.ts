@@ -503,6 +503,8 @@ interface ProfessionalSmokeSummary {
   scope: ControlledTeamSide;
   formationRows: number;
   scenarioRows: number;
+  pixelRows: number;
+  swapRows: number;
   formationSeedCount: number;
   scenarioSeedCount: number;
   included: string[];
@@ -1382,6 +1384,15 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 aria-label="Run professional controlled smoke with formation averages and tactical scenario reads"
               >
                 Run professional smoke
+              </button>
+              <button
+                mat-stroked-button
+                data-testid="professional-smoke-full-button"
+                (click)="onRunProfessionalSmokeFull()"
+                [disabled]="mutationInFlight() || controlledTeamSideModel !== 'USER' || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                aria-label="Run full professional user-team smoke with formations scenarios pixels and swaps"
+              >
+                Run professional smoke full
               </button>
               <button
                 mat-stroked-button
@@ -13932,6 +13943,8 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           scope: controlledSide,
           formationRows: safeFormationRows.length,
           scenarioRows: safeScenarioRows.length,
+          pixelRows: 0,
+          swapRows: 0,
           formationSeedCount,
           scenarioSeedCount,
           included: [
@@ -13966,6 +13979,65 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         this.mutationInFlight.set(false);
       },
     });
+  }
+  onRunProfessionalSmokeFull(): void {
+    if (this.controlledTeamSideModel !== 'USER' || !this.selectedMatchIncludesUserTeam()) {
+      this.snackBar.open('El smoke full usa píxeles y swaps del lineup editable; poné Controlar en Mi equipo.', 'OK', { duration: 4500 });
+      return;
+    }
+    if (!this.selectedMatchId()) {
+      this.snackBar.open('Select a match in Panel C first.', 'OK', { duration: 3000 });
+      return;
+    }
+    this.onRunProfessionalSmoke();
+    this.waitForProfessionalSmokeStep('formation/scenario', () => {
+      this.onRunPositionSensitivityCheck();
+      this.waitForProfessionalSmokeStep('pixel sensitivity', () => {
+        this.onRunPlayerSwapBattery();
+        this.waitForProfessionalSmokeStep('player swaps', () => {
+          this.finalizeProfessionalSmokeFullSummary();
+        });
+      });
+    });
+  }
+  private waitForProfessionalSmokeStep(label: string, next: () => void, attempts = 0): void {
+    window.setTimeout(() => {
+      if (attempts > 240) {
+        this.snackBar.open(`Professional smoke full: timeout esperando ${label}.`, 'OK', { duration: 5000 });
+        return;
+      }
+      if (this.mutationInFlight()) {
+        this.waitForProfessionalSmokeStep(label, next, attempts + 1);
+        return;
+      }
+      next();
+    }, 500);
+  }
+  private finalizeProfessionalSmokeFullSummary(): void {
+    const current = this.professionalSmokeSummary();
+    const controlledName = this.controlledTeamDisplayName();
+    const pixelRows = this.positionPixelMatrixRows().length;
+    const swapRows = this.playerSwapBatterySummaries().length;
+    const baseIncluded = current?.included ?? [];
+    this.professionalSmokeSummary.set({
+      controlledTeam: current?.controlledTeam ?? controlledName,
+      scope: 'USER',
+      formationRows: current?.formationRows ?? this.formationMatrixSummaryResults().length,
+      scenarioRows: current?.scenarioRows ?? this.scenarioMatrixSummaryResults().length,
+      pixelRows,
+      swapRows,
+      formationSeedCount: current?.formationSeedCount ?? this.scenarioMatrixSummaryEffectiveSeedCount(),
+      scenarioSeedCount: current?.scenarioSeedCount ?? this.scenarioMatrixSmokeSeedCount(),
+      included: [
+        ...baseIncluded,
+        `Pixel sensitivity: ${pixelRows} filas`,
+        `Player swap battery: ${swapRows} cambios`,
+      ],
+      skipped: ['Compare baseline/live queda disponible en Open Match Compare.'],
+      read: `${controlledName}: smoke full · ${current?.formationRows ?? this.formationMatrixSummaryResults().length} formaciones · ${current?.scenarioRows ?? this.scenarioMatrixSummaryResults().length} escenarios · ${pixelRows} píxeles · ${swapRows} swaps.`,
+    });
+    this.markReplayAnalysisReady(`Professional smoke full listo para ${controlledName}: ${pixelRows} píxeles · ${swapRows} swaps.`);
+    this.snackBar.open(`Professional smoke full complete: ${pixelRows} pixel rows, ${swapRows} swaps.`, 'OK', { duration: 4500 });
   }
   onRunLowBlockLab(): void {
     const matchId = this.selectedMatchId();

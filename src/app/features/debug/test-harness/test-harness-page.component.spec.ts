@@ -528,6 +528,54 @@ describe('TestHarnessPageComponent', () => {
     expect(component.professionalSmokeSummary()?.skipped.join(' ')).toContain('Local/Visitante');
   });
 
+  it('blocks full professional smoke outside the editable user-team scope', () => {
+    component.controlledTeamSideModel = 'HOME';
+    snackBarSpy.open.calls.reset();
+    harness.runFormationMatrixSummary.calls.reset();
+    harness.runScenarioMatrixSummary.calls.reset();
+
+    component.onRunProfessionalSmokeFull();
+
+    expect(harness.runFormationMatrixSummary).not.toHaveBeenCalled();
+    expect(harness.runScenarioMatrixSummary).not.toHaveBeenCalled();
+    expect(snackBarSpy.open).toHaveBeenCalledWith(
+      jasmine.stringMatching(/Mi equipo/),
+      'OK',
+      { duration: 4500 }
+    );
+  });
+
+  it('summarizes full professional smoke with pixel and player-swap coverage', () => {
+    component.professionalSmokeSummary.set({
+      controlledTeam: 'My Team (mi equipo)',
+      scope: 'USER',
+      formationRows: 12,
+      scenarioRows: 20,
+      pixelRows: 0,
+      swapRows: 0,
+      formationSeedCount: 20,
+      scenarioSeedCount: 5,
+      included: ['Formation avg: 12 formaciones x 20 seeds'],
+      skipped: [],
+      read: 'base',
+    });
+    component.positionPixelMatrixRows.set([{} as any, {} as any]);
+    component.playerSwapBatterySummaries.set([{} as any]);
+    snackBarSpy.open.calls.reset();
+
+    (component as any).finalizeProfessionalSmokeFullSummary();
+
+    expect(component.professionalSmokeSummary()?.pixelRows).toBe(2);
+    expect(component.professionalSmokeSummary()?.swapRows).toBe(1);
+    expect(component.professionalSmokeSummary()?.included.join(' ')).toContain('Player swap battery');
+    expect(component.analysisReadyMessage()).toContain('Professional smoke full listo');
+    expect(snackBarSpy.open).toHaveBeenCalledWith(
+      'Professional smoke full complete: 2 pixel rows, 1 swaps.',
+      'OK',
+      { duration: 4500 }
+    );
+  });
+
   it('onFormationChange updates the model', () => {
     component.onFormationChange('3-5-2');
     expect(component.selectedFormationModel).toBe('3-5-2');
