@@ -2447,6 +2447,20 @@ describe('TestHarnessPageComponent', () => {
     expect(audit?.verdict).toBe('OK');
   });
 
+  it('reports all-formations fallback as penalized OK instead of hard review', () => {
+    const toast = (component as any).allFormationsLineAuditToast(36, 0, 2);
+
+    expect(toast).toContain('OK');
+    expect(toast).toContain('2 penalized fallback');
+    expect(toast).not.toContain('need review');
+  });
+
+  it('reports all-formations hard reviews only when review rows exist', () => {
+    const toast = (component as any).allFormationsLineAuditToast(36, 1, 2);
+
+    expect(toast).toBe('All formations line audit: 1 line checks need review.');
+  });
+
   it('formats current lineup multi-seed as a readable coach summary', () => {
     const summary = {
       formation: '4-4-2',

@@ -9986,16 +9986,19 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
             (['DEF', 'MID', 'ATT'] as const).flatMap((line) => this.pickPositionPixelLineCandidates(last, line, 6))
           ));
         }
-        const reviewCount = rows.filter((row) => row.verdict !== 'OK').length;
+        const reviewCount = rows.filter((row) => row.verdict === 'Review').length;
+        const fallbackCount = rows.filter((row) => row.verdict === 'Fallback').length;
         this.mutationInFlight.set(false);
         this.snackBar.open(
-          reviewCount === 0
-            ? `All formations line audit OK (${rows.length} line checks).`
-            : `All formations line audit: ${reviewCount} line checks need review.`,
+          this.allFormationsLineAuditToast(rows.length, reviewCount, fallbackCount),
           'OK',
           { duration: 5000 }
         );
-        this.markReplayAnalysisReady(`All formations line audit listo: ${rows.length} line checks.`);
+        this.markReplayAnalysisReady(
+          reviewCount === 0
+            ? `All formations line audit listo: ${rows.length} line checks · ${fallbackCount} fallback penalizado.`
+            : `All formations line audit listo: ${rows.length} line checks · ${reviewCount} revisar · ${fallbackCount} fallback.`
+        );
       },
       error: (err) => {
         this.mutationInFlight.set(false);
@@ -10003,6 +10006,15 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         this.snackBar.open(this.fmtError(err, 'Failed to run all formations line audit'), 'OK', { duration: 5000 });
       },
     });
+  }
+  private allFormationsLineAuditToast(totalRows: number, reviewCount: number, fallbackCount: number): string {
+    if (reviewCount > 0) {
+      return `All formations line audit: ${reviewCount} line checks need review.`;
+    }
+    if (fallbackCount > 0) {
+      return `All formations line audit OK with ${fallbackCount} penalized fallback line checks (${totalRows} total).`;
+    }
+    return `All formations line audit OK (${totalRows} line checks).`;
   }
   private toFormationLineSmokeRow(
     lineup: LineupDTO,
