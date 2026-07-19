@@ -5722,26 +5722,25 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       ));
       usedActionKeys.add(this.scenarioActionKey(twoWayAction));
     }
-    const channelAttack = ownRows
-      .filter((row) => ['m45-central', 'm45-wide', 'm45-left', 'm45-right'].includes(row.scenario))
+    const attackPlan = ownRows
       .filter((row) => !usedActionKeys.has(this.scenarioActionKey(row)))
-      .filter((row) => row.avgUserXgDelta >= 0.06 && row.avgOpponentXgDelta <= 0.14)
-      .sort((a, b) => b.avgUserXgDelta - a.avgUserXgDelta)[0];
-    if (channelAttack) {
+      .filter((row) => this.scenarioAttackCandidateIsCoachWorthy(row))
+      .sort((a, b) => this.scenarioAttackPlanScore(b) - this.scenarioAttackPlanScore(a))[0];
+    if (attackPlan) {
       cards.push(this.scenarioDecisionCardFromRow(
         'Atacar',
-        channelAttack,
+        attackPlan,
         'decision-attack',
-        this.scenarioSummaryUserChannelRead(channelAttack),
+        this.scenarioSummaryUserChannelRead(attackPlan),
       ));
-      usedActionKeys.add(this.scenarioActionKey(channelAttack));
+      usedActionKeys.add(this.scenarioActionKey(attackPlan));
     }
     const shapeAttack = ownRows
       .filter((row) => row.scenario.startsWith('m45-shape-'))
       .filter((row) => !usedActionKeys.has(this.scenarioActionKey(row)))
       .filter((row) => row.avgUserXgDelta >= 0.08 && row.avgOpponentXgDelta <= 0.12)
       .sort((a, b) => b.avgUserXgDelta - a.avgUserXgDelta)[0];
-    if (shapeAttack && (!channelAttack || shapeAttack.avgUserXgDelta >= channelAttack.avgUserXgDelta + 0.04)) {
+    if (shapeAttack && (!attackPlan || shapeAttack.avgUserXgDelta >= attackPlan.avgUserXgDelta + 0.04)) {
       cards.push(this.scenarioDecisionCardFromRow(
         'Forma',
         shapeAttack,
@@ -11945,6 +11944,26 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   }
   private scenarioTwoWayScore(row: ScenarioMatrixSummaryRow): number {
     return Math.max(0, row.avgUserXgDelta) + Math.max(0, -row.avgOpponentXgDelta);
+  }
+  private scenarioAttackCandidateIsCoachWorthy(row: ScenarioMatrixSummaryRow): boolean {
+    const directAttackScenario = ['m45-central', 'm45-wide', 'm45-left', 'm45-right'].includes(row.scenario);
+    const tacticalAttackAction = row.actionType === 'FORMATION'
+      || row.actionType === 'SUBSTITUTION'
+      || (row.actionType === 'POSITION' && row.scenario.startsWith('m45-shape-'));
+    if (!directAttackScenario && !tacticalAttackAction) {
+      return false;
+    }
+    const minUpside = row.actionType === 'SUBSTITUTION' ? 0.045 : 0.06;
+    const maxRisk = row.actionType === 'SUBSTITUTION' ? 0.18 : 0.16;
+    return row.avgUserXgDelta >= minUpside
+      && row.avgOpponentXgDelta <= maxRisk
+      && row.avgUserShotsDelta >= -0.6;
+  }
+  private scenarioAttackPlanScore(row: ScenarioMatrixSummaryRow): number {
+    const risk = Math.max(0, row.avgOpponentXgDelta);
+    const shots = Math.max(0, row.avgUserShotsDelta) * 0.01;
+    const substitutionBonus = row.actionType === 'SUBSTITUTION' ? 0.015 : 0;
+    return row.avgUserXgDelta + shots + substitutionBonus - (risk * 0.45);
   }
   private scenarioDecisionConfidence(row: ScenarioMatrixSummaryRow): string {
     const level = this.scenarioSummaryReadLevel(row);

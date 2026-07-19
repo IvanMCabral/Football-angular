@@ -2802,6 +2802,45 @@ describe('TestHarnessPageComponent', () => {
     expect(protecting.detail).toContain('cuidar resultado');
   });
 
+  it('treats formation and substitution upside as attacking plans', () => {
+    const formationRows = [
+      makeScenarioSummaryRow({
+        scenario: 'base-balanced',
+        actionType: 'NONE',
+        actionDetail: 'Baseline',
+      }),
+      makeScenarioSummaryRow({
+        scenario: 'm45-formation-433',
+        actionType: 'FORMATION',
+        actionDetail: '4-3-3',
+        avgUserXgDelta: 0.18,
+        avgUserShotsDelta: 1.8,
+        avgOpponentXgDelta: 0.09,
+      }),
+    ];
+    const subRows = [
+      makeScenarioSummaryRow({
+        scenario: 'm60-noop-replay',
+        actionType: 'NOOP_REPLAY',
+        actionDetail: 'Baseline',
+      }),
+      makeScenarioSummaryRow({
+        scenario: 'm60-offensive-upgrade-sub',
+        actionType: 'SUBSTITUTION',
+        actionDetail: 'Starter OUT -> Bench IN [+8]',
+        avgUserXgDelta: 0.06,
+        avgUserShotsDelta: 0.8,
+        avgOpponentXgDelta: 0.12,
+      }),
+    ];
+
+    const formationCards = (component as any).buildScenarioDecisionCards(formationRows);
+    const subCards = (component as any).buildScenarioDecisionCards(subRows);
+
+    expect(formationCards.some((card: any) => card.title === 'Atacar' && card.label === '4-3-3')).toBeTrue();
+    expect(subCards.some((card: any) => card.title === 'Atacar' && card.label.includes('Bench IN'))).toBeTrue();
+  });
+
   it('labels double-gain protect-result plans as control instead of risk', () => {
     const cards = [
       {
