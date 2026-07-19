@@ -187,6 +187,14 @@ export interface FormationMatrixSummaryRow {
   avgCentralShotsAgainst: number;
   avgWideShotsAgainst: number;
   avgLongShotsAgainst: number;
+  avgLeftWideShotsFor?: number;
+  avgRightWideShotsFor?: number;
+  avgLeftWideShotsAgainst?: number;
+  avgRightWideShotsAgainst?: number;
+  avgLeftWideXgFor?: number;
+  avgRightWideXgFor?: number;
+  avgLeftWideXgAgainst?: number;
+  avgRightWideXgAgainst?: number;
   avgShapePossessionMultiplier: number;
   avgShapeAttackVolumeMultiplier: number;
   avgShapeDefensiveResistanceMultiplier: number;
@@ -196,6 +204,114 @@ export interface FormationMatrixSummaryRow {
   avgShapeDefenseLeft: number;
   avgShapeDefenseCenter: number;
   avgShapeDefenseRight: number;
+}
+
+export interface SideMirrorSyntheticLabRow {
+  formation: string;
+  seedStart: number;
+  seedEnd: number;
+  seedCount: number;
+  weakLeftWideXgL: number;
+  weakLeftWideXgR: number;
+  weakRightWideXgL: number;
+  weakRightWideXgR: number;
+  weakLeftWideShotsL: number;
+  weakLeftWideShotsR: number;
+  weakRightWideShotsL: number;
+  weakRightWideShotsR: number;
+  weakLeftRightEdge: number;
+  weakRightLeftEdge: number;
+  mirrorGap: number;
+  verdict: 'OK' | 'Parcial' | 'Revisar';
+  read: string;
+}
+
+export interface LineupDiagnostic {
+  matchId: string;
+  seed: number;
+  home: LineupDiagnosticTeam;
+  away: LineupDiagnosticTeam;
+}
+
+export interface LineupDiagnosticTeam {
+  teamId: string;
+  teamName: string;
+  formation: string;
+  style: TeamStyle;
+  avgOverall: number;
+  avgCollective: number;
+  avgEffectiveness: number;
+  starters: number;
+  width?: LineupWidthDiagnostic | null;
+  players: LineupDiagnosticPlayer[];
+}
+
+export interface LineupWidthDiagnostic {
+  leftCount: number;
+  centerCount: number;
+  rightCount: number;
+  wideCount: number;
+  leftAvgX: number;
+  rightAvgX: number;
+  widthScore: number;
+  sideBalance: number;
+  verdict: string;
+  read: string;
+}
+
+export interface LineupDiagnosticPlayer {
+  playerId: string;
+  name: string;
+  naturalPosition: string;
+  tacticalPosition: string;
+  slotRole?: string | null;
+  slotSide?: string | null;
+  slotId: string | null;
+  xPercent: number | null;
+  yPercent: number | null;
+  positionSource?: string | null;
+  curatedRoles?: string | null;
+  preferredSides?: string | null;
+  roleBonus?: number | null;
+  sideBonus?: number | null;
+  assignmentScore?: number | null;
+  assignmentVerdict?: string | null;
+  assignmentRead?: string | null;
+  attack: number;
+  defense: number;
+  technique: number;
+  speed: number;
+  stamina: number;
+  mentality: number;
+  overall: number;
+  effectiveness: number;
+  collective: number;
+}
+
+export interface MatchPreviewSummary {
+  matchId: string;
+  controlledTeamSide: string;
+  seedStart: number;
+  seedEnd: number;
+  seedCount: number;
+  teamName: string;
+  formation: string | null;
+  avgGoalsFor: number;
+  avgGoalsAgainst: number;
+  avgGoalDiff: number;
+  avgPossessionFor: number;
+  avgShotsFor: number;
+  avgShotsAgainst: number;
+  avgShotDiff: number;
+  avgXgFor: number;
+  avgXgAgainst: number;
+  avgXgDiff: number;
+  avgCentralShotsFor: number;
+  avgWideShotsFor: number;
+  avgLongShotsFor: number;
+  avgCentralShotsAgainst: number;
+  avgWideShotsAgainst: number;
+  avgLongShotsAgainst: number;
 }
 
 /**
@@ -395,6 +511,47 @@ export interface PositionPixelMatrixSummaryRequest {
   controlledTeamSide?: 'USER' | 'HOME' | 'AWAY';
 }
 
+export interface RoleSlotImpactRequest {
+  slotId: string;
+  naturalPositions: string[];
+  seedStart: number;
+  seedCount: number;
+  controlledTeamSide?: 'USER' | 'HOME' | 'AWAY';
+}
+
+export interface RoleSlotImpactSummaryRow {
+  matchId: string;
+  formation: string;
+  slotId: string;
+  slotXPercent: number;
+  slotYPercent: number;
+  baselinePlayerId: string;
+  baselinePlayerName: string;
+  baselineNaturalPosition: string;
+  testedNaturalPosition: string;
+  tacticalPosition: string;
+  seedStart: number;
+  seedEnd: number;
+  seedCount: number;
+  playerEffectiveness: number;
+  playerCollective: number;
+  avgGoalsFor: number;
+  avgGoalsAgainst: number;
+  avgGoalDiff: number;
+  avgShotsFor: number;
+  avgShotsAgainst: number;
+  avgPossessionFor: number;
+  avgXgFor: number;
+  avgXgAgainst: number;
+  avgXgDiff: number;
+  avgCentralShotsFor: number;
+  avgWideShotsFor: number;
+  avgLongShotsFor: number;
+  avgCentralXgFor: number;
+  avgWideXgFor: number;
+  avgLongXgFor: number;
+}
+
 export interface PositionPixelMatrixSummaryRow {
   matchId: string;
   formation: string;
@@ -446,6 +603,14 @@ export interface PositionPixelMatrixSummaryRow {
   deltaRightWideShotsAgainst: number;
   deltaLeftWideXgAgainst: number;
   deltaRightWideXgAgainst: number;
+  baselineTacticalPosition?: string;
+  movedTacticalPosition?: string;
+  baselinePlayerEffectiveness?: number;
+  movedPlayerEffectiveness?: number;
+  deltaPlayerEffectiveness?: number;
+  baselinePlayerCollective?: number;
+  movedPlayerCollective?: number;
+  deltaPlayerCollective?: number;
   baselineAvgCentralShotsAgainst: number;
   baselineAvgWideShotsAgainst: number;
   baselineAvgLongShotsAgainst: number;
@@ -483,6 +648,9 @@ export interface ScenarioMatrixSummaryRow {
   avgOpponentLeftWideXgDelta: number;
   avgOpponentRightWideXgDelta: number;
   baselineScenario: string;
+  baselineFormation?: string | null;
+  changedFormation?: string | null;
+  sameFormationAsBaseline?: boolean;
 }
 
 /**

@@ -7,11 +7,15 @@ import { LineupSlotDTO } from '../../../shared/models/lineup/lineup-slot.dto';
 import {
   CustomFixture,
   LabMutationResult,
+  LineupDiagnostic,
+  MatchPreviewSummary,
   MatchFixture,
   PlayerSwapMatrixSummaryRequest,
   PlayerSwapMatrixSummaryRow,
   PositionPixelMatrixSummaryRequest,
   PositionPixelMatrixSummaryRow,
+  RoleSlotImpactRequest,
+  RoleSlotImpactSummaryRow,
   FormationMatrixRow,
   FormationMatrixSummaryRow,
   ReplayMatchRequest,
@@ -19,6 +23,7 @@ import {
   ScenarioMatrixRow,
   ScenarioMatrixSummaryRequest,
   ScenarioMatrixSummaryRow,
+  SideMirrorSyntheticLabRow,
   SetFormationRequest,
   SetStyleRequest,
   SimulateRoundRequest,
@@ -171,6 +176,27 @@ export class TestHarnessService {
     );
   }
 
+  lineupDiagnostic(matchId: string, seed: number | null): Observable<LineupDiagnostic> {
+    const body: ReplayMatchRequest = { seed };
+    return this.http.post<LineupDiagnostic>(
+      `${this.apiUrl}/match/${matchId}/lineup-diagnostic`,
+      body
+    );
+  }
+
+  runMatchPreviewSummary(
+    matchId: string,
+    seedStart: number,
+    seedCount: number,
+    controlledTeamSide: ScenarioMatrixSummaryRequest['controlledTeamSide'] = 'USER'
+  ): Observable<MatchPreviewSummary> {
+    const body: ScenarioMatrixSummaryRequest = { seedStart, seedCount, controlledTeamSide };
+    return this.http.post<MatchPreviewSummary>(
+      `${this.apiUrl}/match/${matchId}/preview-summary`,
+      body
+    );
+  }
+
   runFormationMatrix(
     matchId: string,
     seed: number | null,
@@ -192,6 +218,17 @@ export class TestHarnessService {
     const body: ScenarioMatrixSummaryRequest = { seedStart, seedCount, controlledTeamSide };
     return this.http.post<FormationMatrixSummaryRow[]>(
       `${this.apiUrl}/match/${matchId}/formation-matrix/summary`,
+      body
+    );
+  }
+
+  runSideMirrorSyntheticLab(
+    seedStart: number,
+    seedCount: number
+  ): Observable<SideMirrorSyntheticLabRow[]> {
+    const body: ScenarioMatrixSummaryRequest = { seedStart, seedCount };
+    return this.http.post<SideMirrorSyntheticLabRow[]>(
+      `${this.apiUrl}/labs/side-mirror-synthetic`,
       body
     );
   }
@@ -234,6 +271,16 @@ export class TestHarnessService {
   ): Observable<PositionPixelMatrixSummaryRow> {
     return this.http.post<PositionPixelMatrixSummaryRow>(
       `${this.apiUrl}/match/${matchId}/position-pixel-matrix/summary`,
+      request
+    );
+  }
+
+  runRoleSlotImpactSummary(
+    matchId: string,
+    request: RoleSlotImpactRequest
+  ): Observable<RoleSlotImpactSummaryRow[]> {
+    return this.http.post<RoleSlotImpactSummaryRow[]>(
+      `${this.apiUrl}/match/${matchId}/role-slot-impact/summary`,
       request
     );
   }

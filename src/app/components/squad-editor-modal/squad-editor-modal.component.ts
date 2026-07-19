@@ -117,10 +117,10 @@ import { SessionPlayer } from '../../shared/models/player.model';
               </span>
               <span class="preview-delta"
                     *ngIf="currentChemistryScore !== null"
-                    [class.positive]="displayedScore > (currentChemistryScore ?? 0)"
-                    [class.negative]="displayedScore < (currentChemistryScore ?? 0)"
-                    [title]="'Δ vs chemistry guardado en backend (' + (currentChemistryScore ?? 0) + '/99)'">
-                ({{ displayedScore > (currentChemistryScore ?? 0) ? '+' : '' }}{{ displayedScore - (currentChemistryScore ?? 0) }})
+                    [class.positive]="displayedScore > currentChemistryScore"
+                    [class.negative]="displayedScore < currentChemistryScore"
+                    [title]="'Δ vs chemistry guardado en backend (' + currentChemistryScore + '/99)'">
+                ({{ displayedScore > currentChemistryScore ? '+' : '' }}{{ displayedScore - currentChemistryScore }})
               </span>
             </ng-container>
             <ng-template #previewEmpty>
@@ -158,6 +158,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
           <button mat-stroked-button
                   (click)="resetCustomPositions()"
                   class="reset-positions-btn"
+                  data-testid="reset-custom-positions-button"
                   *ngIf="hasCustomPositions()"
                   title="Volver a las posiciones canónicas de la formación">
             ↺ Reset posiciones
@@ -195,10 +196,10 @@ import { SessionPlayer } from '../../shared/models/player.model';
               </span>
               <span class="tsp-coverage">{{ occupiedSlots }}/11</span>
             </div>
-            <div class="tsp-style-tags" *ngIf="styleTags?.length">
+            <div class="tsp-style-tags" *ngIf="styleTags.length">
               <span *ngFor="let tag of styleTags" class="tsp-tag">{{ tag }}</span>
             </div>
-            <div class="tsp-style-tags" *ngIf="!styleTags?.length">
+            <div class="tsp-style-tags" *ngIf="!styleTags.length">
               <span class="tsp-tag-empty">Lineup incompleto</span>
             </div>
           </section>
@@ -235,14 +236,14 @@ import { SessionPlayer } from '../../shared/models/player.model';
                       [class.low]="tc.score < 60">{{ tc.score }}/99</span>
               </div>
               <div class="tsp-mini-grid">
-                <span>DEF {{ tc.lineScores?.['DEF'] ?? '—' }}</span>
-                <span>MID {{ tc.lineScores?.['MID'] ?? '—' }}</span>
-                <span>ATT {{ tc.lineScores?.['ATT'] ?? '—' }}</span>
-                <span>L {{ tc.channelScores?.['LEFT'] ?? '—' }}</span>
-                <span>C {{ tc.channelScores?.['CENTER'] ?? '—' }}</span>
-                <span>R {{ tc.channelScores?.['RIGHT'] ?? '—' }}</span>
+                <span>DEF {{ tc.lineScores['DEF'] }}</span>
+                <span>MID {{ tc.lineScores['MID'] }}</span>
+                <span>ATT {{ tc.lineScores['ATT'] }}</span>
+                <span>L {{ tc.channelScores['LEFT'] }}</span>
+                <span>C {{ tc.channelScores['CENTER'] }}</span>
+                <span>R {{ tc.channelScores['RIGHT'] }}</span>
               </div>
-              <div class="tsp-warning-line" *ngIf="tc.warnings?.length">
+              <div class="tsp-warning-line" *ngIf="tc.warnings.length">
                 {{ tc.warnings[0] }}
               </div>
             </div>
@@ -362,15 +363,57 @@ import { SessionPlayer } from '../../shared/models/player.model';
               <span class="tsp-shape-chip">Bloque {{ tacticalShapeSummary.blockHeight }}%</span>
               <span class="tsp-shape-chip">Prof. DEF {{ tacticalShapeSummary.defensiveDepth }}%</span>
             </div>
+            <div class="tsp-channel-breakdown" aria-label="Lectura de amenaza conexion y cobertura por canal">
+              <div class="tsp-channel-breakdown-row tsp-channel-breakdown-head">
+                <span>Canal</span>
+                <span>Amenaza</span>
+                <span>Conex.</span>
+                <span>Cobertura</span>
+              </div>
+              <div class="tsp-channel-breakdown-row" *ngFor="let row of tacticalChannelBreakdown">
+                <span class="tsp-shape-zone">{{ row.label }}</span>
+                <span [class.strong]="row.threat >= 66">{{ row.threat }}%</span>
+                <span [class.strong]="row.connection >= 66">{{ row.connection }}%</span>
+                <span [class.strong]="row.coverage >= 66">{{ row.coverage }}%</span>
+              </div>
+            </div>
             <div class="tsp-warning-line" *ngIf="tacticalShapeWarnings.length">
               {{ tacticalShapeWarnings[0] }}
+            </div>
+          </section>
+
+          <!-- V25D99.225-FRONT: live coach read. Compact tactical
+               explanation of the current visual shape so pixel movement is
+               understandable directly inside the DT modal, not only in the
+               debug harness. -->
+          <section class="tsp-section">
+            <h3 class="tsp-title">🧠 Lectura DT</h3>
+            <div *ngIf="lastCoachMoveRead as moveRead"
+                 class="tsp-coach-last-move"
+                 [class.good]="moveRead.level === 'good'"
+                 [class.warn]="moveRead.level === 'warn'"
+                 [class.danger]="moveRead.level === 'danger'"
+                 [class.info]="moveRead.level === 'info'">
+              <span class="tsp-coach-read-title">Último movimiento: {{ moveRead.title }}</span>
+              <span class="tsp-coach-read-body">{{ moveRead.body }}</span>
+            </div>
+            <div class="tsp-coach-read-list">
+              <div *ngFor="let note of tacticalCoachReads"
+                   class="tsp-coach-read"
+                   [class.good]="note.level === 'good'"
+                   [class.warn]="note.level === 'warn'"
+                   [class.danger]="note.level === 'danger'"
+                   [class.info]="note.level === 'info'">
+                <span class="tsp-coach-read-title">{{ note.title }}</span>
+                <span class="tsp-coach-read-body">{{ note.body }}</span>
+              </div>
             </div>
           </section>
 
           <!-- 3b. V25D99.14-FRONT: Off-role players section. Lists each
                player whose natural role family doesn't match the zone
                they're placed in. Hidden when everyone is on-role. -->
-          <section class="tsp-section" *ngIf="offRolePlayers?.length">
+          <section class="tsp-section" *ngIf="offRolePlayers.length">
             <h3 class="tsp-title">⚠  Penalizaciones ({{ offRolePlayers.length }})</h3>
             <div class="tsp-penalty-summary"
                  [class.severe]="tacticalPenaltySummary.level === 'severe'"
@@ -708,7 +751,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
            [cdkDropListData]="'bench'"
            (cdkDropListDropped)="handleBenchDrop($event)">
         <span class="bench-label">
-          Banca ({{ benchPlayers?.length || 0 }})
+          Banca ({{ benchPlayers.length }})
         </span>
         <div class="bench-list">
           <div *ngFor="let bp of benchPlayers"
@@ -1558,6 +1601,103 @@ import { SessionPlayer } from '../../shared/models/player.model';
       background: rgba(255,255,255,0.055);
       border: 1px solid rgba(255,255,255,0.08);
     }
+    .tsp-channel-breakdown {
+      display: grid;
+      gap: 3px;
+      margin-top: 7px;
+      font-size: 10px;
+    }
+    .tsp-channel-breakdown-row {
+      display: grid;
+      grid-template-columns: 0.65fr repeat(3, 1fr);
+      gap: 4px;
+      align-items: center;
+    }
+    .tsp-channel-breakdown-row span {
+      padding: 2px 4px;
+      border-radius: 4px;
+      text-align: center;
+      color: #d7f7df;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    .tsp-channel-breakdown-head span {
+      color: #9fc7aa;
+      background: transparent;
+      border-color: transparent;
+      text-transform: uppercase;
+      font-size: 9px;
+      letter-spacing: 0.03em;
+    }
+    .tsp-channel-breakdown-row span.strong {
+      color: #ffffff;
+      background: rgba(72,187,120,0.20);
+      border-color: rgba(72,187,120,0.32);
+    }
+    .tsp-coach-read-list {
+      display: grid;
+      gap: 5px;
+      margin-top: 6px;
+    }
+    .tsp-coach-read {
+      padding: 6px 7px;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.045);
+    }
+    .tsp-coach-last-move {
+      margin-top: 6px;
+      margin-bottom: 6px;
+      padding: 7px 8px;
+      border-radius: 7px;
+      border: 1px solid rgba(99, 179, 237, 0.42);
+      background: rgba(99, 179, 237, 0.12);
+      box-shadow: inset 3px 0 0 rgba(99, 179, 237, 0.72);
+    }
+    .tsp-coach-last-move.good {
+      border-color: rgba(72, 187, 120, 0.42);
+      background: rgba(72, 187, 120, 0.12);
+      box-shadow: inset 3px 0 0 rgba(72, 187, 120, 0.72);
+    }
+    .tsp-coach-last-move.warn,
+    .tsp-coach-last-move.info {
+      border-color: rgba(246, 173, 85, 0.42);
+      background: rgba(246, 173, 85, 0.11);
+      box-shadow: inset 3px 0 0 rgba(246, 173, 85, 0.72);
+    }
+    .tsp-coach-last-move.danger {
+      border-color: rgba(245, 101, 101, 0.46);
+      background: rgba(245, 101, 101, 0.13);
+      box-shadow: inset 3px 0 0 rgba(245, 101, 101, 0.78);
+    }
+    .tsp-coach-read.good {
+      border-color: rgba(72, 187, 120, 0.34);
+      background: rgba(72, 187, 120, 0.10);
+    }
+    .tsp-coach-read.warn,
+    .tsp-coach-read.info {
+      border-color: rgba(246, 173, 85, 0.32);
+      background: rgba(246, 173, 85, 0.09);
+    }
+    .tsp-coach-read.danger {
+      border-color: rgba(245, 101, 101, 0.38);
+      background: rgba(245, 101, 101, 0.11);
+    }
+    .tsp-coach-read-title {
+      display: block;
+      color: #ffffff;
+      font-size: 0.68rem;
+      font-weight: 800;
+      line-height: 1.15;
+    }
+    .tsp-coach-read-body {
+      display: block;
+      margin-top: 2px;
+      color: rgba(255, 255, 255, 0.72);
+      font-size: 0.64rem;
+      font-weight: 600;
+      line-height: 1.25;
+    }
     .tsp-rating-row {
       display: grid;
       grid-template-columns: 1fr 1fr 1fr;
@@ -2368,11 +2508,10 @@ import { SessionPlayer } from '../../shared/models/player.model';
          (56px) and MID (44px) need different offsets to keep their
          centers on style.top.
          (The height overrides below are V25D93-FRONT F3.) */
-      /* V25D99.72-FRONT: GK sits visually deeper inside the small goal area.
-         Existing saves may still carry GK-1 at y=96%; using a softer vertical
-         offset keeps old and new careers from visually touching the centre-backs
-         while the canonical FormationService now authors GK at y=98%. */
-      .player-marker.color-gk { height: 38px; margin-top: -10px; }
+      /* V25D99.179-FRONT: GK sits deep inside the small goal area without
+         clipping through the bottom touchline. Keep the card centered on its
+         canonical yPercent, matching the same coordinate the engine receives. */
+      .player-marker.color-gk { height: 38px; margin-top: -19px; }
       .player-marker.color-def { height: 48px; margin-top: -24px; }
       .player-marker.color-mid { height: 44px; margin-top: -22px; }
       .player-marker.color-att { height: 48px; margin-top: -24px; }
@@ -2908,6 +3047,27 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   /** Jugadores en la banca (observable) */
   benchPlayers$ = new BehaviorSubject<PlayerOnFieldDto[]>([]);
 
+  lastCoachMoveRead: {
+    title: string;
+    body: string;
+    baseBody?: string;
+    level: 'good' | 'warn' | 'danger' | 'info';
+  } | null = null;
+
+  private pendingCoachMoveBaseline: {
+    attack: number;
+    midfield: number;
+    defense: number;
+    chemistry: number | null;
+    channels: { left: number | null; center: number | null; right: number | null };
+    visualChannels: Array<{
+      label: 'L' | 'C' | 'R';
+      threat: number;
+      connection: number;
+      coverage: number;
+    }>;
+  } | null = null;
+
   /** Slot seleccionado para asignar */
   selectedSlot: FieldSubdivisionDTO | null = null;
 
@@ -3175,6 +3335,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
                 defenseRating: res.defenseRating,
               });
             }
+            this.enrichLastCoachMoveReadWithLatestDelta();
             this.cdr.markForCheck();
             this.cdr.detectChanges();
           }
@@ -3330,7 +3491,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   get offRolePlayers(): Array<{
     player: PlayerOnFieldDto;
     naturalRole: string;
-    actualZone: 'GK' | 'DEF' | 'MID' | 'ATT';
+    actualZone: string;
     penaltyPct: number;
     advice: string;
   }> {
@@ -3339,23 +3500,24 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     const result: Array<{
       player: PlayerOnFieldDto;
       naturalRole: string;
-      actualZone: 'GK' | 'DEF' | 'MID' | 'ATT';
+      actualZone: string;
       penaltyPct: number;
       advice: string;
     }> = [];
     for (const p of this.homePlayers) {
       const natural = this.getRoleFamily(p.role);
       const actual = this.getPositionRoleFamily(p);
+      const tacticalRole = p.slotId ? this.getRecommendedRoleBySlotId(p.slotId) : '';
       if (!natural || !actual) { continue; }
-      if (natural === actual) { continue; }
+      if (!this.isTacticalRoleMismatch(p.role, tacticalRole, actual)) { continue; }
       const eff = (p.slotId && typeof effMap[p.slotId] === 'number') ? effMap[p.slotId] : 1.0;
       const penaltyPct = Math.max(0, Math.round((1 - eff) * 100));
       result.push({
         player: p,
         naturalRole: p.role,
-        actualZone: actual,
+        actualZone: tacticalRole || actual,
         penaltyPct,
-        advice: this.getOffRoleAdvice(p.role, actual, penaltyPct),
+        advice: this.getOffRoleAdvice(p.role, tacticalRole || actual, penaltyPct),
       });
     }
     result.sort((a, b) => b.penaltyPct - a.penaltyPct);
@@ -3378,20 +3540,26 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     };
   }
 
-  private getOffRoleAdvice(naturalRole: string, actualZone: 'GK' | 'DEF' | 'MID' | 'ATT', penaltyPct: number): string {
+  private getOffRoleAdvice(naturalRole: string, actualZone: string, penaltyPct: number): string {
     const naturalFamily = this.getRoleFamily(naturalRole);
+    const actualFamily = this.getRoleFamily(actualZone) ?? actualZone;
+    if (['LW', 'RW', 'LM', 'RM', 'LWB', 'RWB'].includes(actualZone) && naturalFamily === 'MID') {
+      return penaltyPct >= 10
+        ? 'Improvisa banda: puede ordenar, pero pierde desborde y cobertura natural del carril.'
+        : 'Banda improvisada leve: sirve de emergencia, pero no es especialista.';
+    }
     if (naturalFamily === 'DEF' && actualZone === 'MID') {
       return penaltyPct >= 20
         ? 'Sirve para cerrar el partido; para construir juego, busca un MID o winger natural.'
         : 'Rueda de auxilio defensiva: protege, pero baja fluidez en medio.';
     }
-    if (naturalFamily === 'ATT' && actualZone === 'MID') {
+    if (naturalFamily === 'ATT' && actualFamily === 'MID') {
       return 'Aporta gol, pero pierde retorno y orden. Mejor como ST/CAM o con cobertura detras.';
     }
-    if (naturalFamily === 'MID' && actualZone === 'DEF') {
+    if (naturalFamily === 'MID' && actualFamily === 'DEF') {
       return 'Ayuda a salir jugando, pero no reemplaza un defensor natural.';
     }
-    if (actualZone === 'ATT') {
+    if (actualFamily === 'ATT') {
       return 'Movimiento ofensivo agresivo: puede romper balance si no hay cobertura.';
     }
     return 'Revisa si la formacion pide otro perfil natural para ese sector.';
@@ -3449,6 +3617,39 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     };
   }
 
+  get tacticalChannelBreakdown(): Array<{
+    label: 'L' | 'C' | 'R';
+    threat: number;
+    connection: number;
+    coverage: number;
+  }> {
+    const players = this.getUniqueValidHomePlayers().filter(p => !this.isGoalkeeperPlayer(p));
+    return (['L', 'C', 'R'] as const).map((channel) => {
+      const channelPlayers = players.filter(p => this.getVisualChannel(p) === channel);
+      const att = channelPlayers.filter(p => this.getVisualLine(p) === 'ATT').length;
+      const mid = channelPlayers.filter(p => this.getVisualLine(p) === 'MID').length;
+      const def = channelPlayers.filter(p => this.getVisualLine(p) === 'DEF').length;
+      const highWide = channelPlayers.filter(p => this.getMarkerY(p) < 55).length;
+      const lowCover = channelPlayers.filter(p => this.getMarkerY(p) >= 58).length;
+      const support = channelPlayers.length;
+
+      const threat = this.clampPercent(att * 34 + highWide * 18 + Math.min(2, mid) * 10);
+      const connection = this.clampPercent(
+        Math.min(1, att) * 28
+        + Math.min(2, mid) * 22
+        + Math.min(1, def) * 18
+        + Math.min(3, support) * 4
+      );
+      const coverage = this.clampPercent(def * 30 + lowCover * 14 + Math.min(2, mid) * 10);
+
+      return { label: channel, threat, connection, coverage };
+    });
+  }
+
+  private clampPercent(value: number): number {
+    return Math.max(0, Math.min(99, Math.round(value)));
+  }
+
   get tacticalShapeWarnings(): string[] {
     const matrix = this.tacticalShapeMatrix;
     const summary = this.tacticalShapeSummary;
@@ -3463,6 +3664,561 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     if (summary.width > 75) { warnings.push('Equipo muy ancho: puede partirse por dentro'); }
     if (summary.compactness < 45) { warnings.push('Bloque largo: líneas separadas'); }
     return warnings;
+  }
+
+  get tacticalCoachReads(): Array<{ title: string; body: string; level: 'good' | 'warn' | 'danger' | 'info' }> {
+    const players = this.getUniqueValidHomePlayers().filter(p => !this.isGoalkeeperPlayer(p));
+    if (players.length < 10) {
+      return [{
+        title: 'Lineup incompleto',
+        body: 'Completa los 11 para leer ataque, cobertura y bandas con sentido.',
+        level: 'warn',
+      }];
+    }
+
+    const matrix = this.tacticalShapeMatrix;
+    const summary = this.tacticalShapeSummary;
+    const notes: Array<{ title: string; body: string; level: 'good' | 'warn' | 'danger' | 'info' }> = [];
+    const attRow = matrix.find(row => row.zone === 'ATT');
+    const defRow = matrix.find(row => row.zone === 'DEF');
+    const totalLeft = matrix.reduce((acc, row) => acc + row.left, 0);
+    const totalCenter = matrix.reduce((acc, row) => acc + row.center, 0);
+    const totalRight = matrix.reduce((acc, row) => acc + row.right, 0);
+    const attCount = (attRow?.left ?? 0) + (attRow?.center ?? 0) + (attRow?.right ?? 0);
+    const defCount = (defRow?.left ?? 0) + (defRow?.center ?? 0) + (defRow?.right ?? 0);
+    const wideHigh = players.filter(p => Math.abs(this.getMarkerX(p) - 50) >= 32 && this.getMarkerY(p) < 58).length;
+    const wideCover = players.filter(p => Math.abs(this.getMarkerX(p) - 50) >= 32 && this.getMarkerY(p) >= 58).length;
+    const offRoleCount = this.offRolePlayers.length;
+    const severeOffRoleCount = this.offRolePlayers.filter(row => row.penaltyPct >= 20).length;
+
+    if (summary.width < 45) {
+      notes.push({
+        title: 'Equipo cerrado',
+        body: 'Concentras jugadores por dentro: podes combinar, pero te pueden entrar por fuera.',
+        level: 'warn',
+      });
+    } else if (summary.width > 75) {
+      notes.push({
+        title: 'Equipo muy ancho',
+        body: 'Das amplitud, pero si no hay medio suficiente el bloque puede partirse.',
+        level: 'warn',
+      });
+    } else {
+      notes.push({
+        title: 'Ancho sano',
+        body: 'La ocupacion lateral es razonable: hay bandas sin romper demasiado el centro.',
+        level: 'good',
+      });
+    }
+
+    if (totalLeft <= 1 || totalRight <= 1) {
+      notes.push({
+        title: 'Banda descubierta',
+        body: `${totalLeft <= 1 ? 'Izquierda' : 'Derecha'} queda con poca ayuda. El rival puede atacar ese costado.`,
+        level: 'danger',
+      });
+    } else if (Math.abs(totalLeft - totalRight) >= 3) {
+      notes.push({
+        title: 'Equipo inclinado',
+        body: totalLeft > totalRight
+          ? 'Cargas mas la izquierda: generas superioridad ahi, pero ojo el lado derecho.'
+          : 'Cargas mas la derecha: generas superioridad ahi, pero ojo el lado izquierdo.',
+        level: 'info',
+      });
+    }
+
+    if (totalCenter <= 2) {
+      notes.push({
+        title: 'Centro liviano',
+        body: 'Hay poca presencia interior: cuesta sostener posesion y defender segunda jugada.',
+        level: 'warn',
+      });
+    } else if (totalCenter >= 5) {
+      notes.push({
+        title: 'Centro fuerte',
+        body: 'Tenes buena presencia interior: mejora control, pero revisa que no falte amplitud.',
+        level: 'good',
+      });
+    }
+
+    if (wideHigh >= 2 && wideCover <= 1) {
+      notes.push({
+        title: 'Carrileros altos',
+        body: 'Hay proyeccion por banda, pero poca cobertura detras. Plan ofensivo con riesgo.',
+        level: 'warn',
+      });
+    } else if (wideCover >= 2 && wideHigh <= 1) {
+      notes.push({
+        title: 'Bandas protegidas',
+        body: 'Los costados quedan cubiertos. Mejor para cuidar resultado, menos agresivo arriba.',
+        level: 'good',
+      });
+    } else if (wideHigh >= 1 && wideCover >= 1) {
+      notes.push({
+        title: 'Banda compensada',
+        body: 'Tenes salida por fuera y una ayuda cercana para no quedar tan largo.',
+        level: 'good',
+      });
+    }
+
+    if (summary.compactness < 45) {
+      notes.push({
+        title: 'Bloque largo',
+        body: 'Las lineas estan separadas: puede aparecer espacio entre defensa y medio.',
+        level: 'warn',
+      });
+    } else if (summary.compactness >= 68) {
+      notes.push({
+        title: 'Bloque compacto',
+        body: 'Las lineas estan cerca: ayuda a presionar y recuperar, aunque puede faltar profundidad.',
+        level: 'good',
+      });
+    }
+
+    if (attCount >= 4 && defCount <= 3) {
+      notes.push({
+        title: 'Plan agresivo',
+        body: 'Muchos jugadores arriba y pocos atras: puede generar ocasiones, pero concede transiciones.',
+        level: 'warn',
+      });
+    } else if (defCount >= 5 && attCount <= 2) {
+      notes.push({
+        title: 'Plan conservador',
+        body: 'Mucha cobertura defensiva. Sirve para proteger, pero puede aislar a los delanteros.',
+        level: 'info',
+      });
+    }
+
+    if (severeOffRoleCount > 0) {
+      notes.push({
+        title: 'Roles forzados',
+        body: `${severeOffRoleCount} jugador(es) estan muy fuera de rol. El motor lo va a penalizar.`,
+        level: 'danger',
+      });
+    } else if (offRoleCount > 0) {
+      notes.push({
+        title: 'Ajustes de rol',
+        body: `${offRoleCount} jugador(es) fuera de zona natural. Es jugable, pero revisa si tiene sentido.`,
+        level: 'warn',
+      });
+    }
+
+    return notes.length > 0 ? notes.slice(0, 5) : [{
+      title: 'Forma estable',
+      body: 'No hay alertas claras: el dibujo se ve coherente para probar en partido.',
+      level: 'good',
+    }];
+  }
+
+  private beginCoachMoveImpactTracking(): void {
+    this.pendingCoachMoveBaseline = {
+      attack: this.attackRating,
+      midfield: this.midfieldRating,
+      defense: this.defenseRating,
+      chemistry: this.getDisplayedChemistryScore(),
+      channels: this.getTacticalChannelScoresSnapshot(),
+      visualChannels: this.tacticalChannelBreakdown,
+    };
+  }
+
+  private enrichLastCoachMoveReadWithLatestDelta(): void {
+    if (!this.pendingCoachMoveBaseline || !this.lastCoachMoveRead) { return; }
+    const baseline = this.pendingCoachMoveBaseline;
+    const currentChemistry = this.getDisplayedChemistryScore();
+    const deltas: string[] = [];
+    const magnitudes: number[] = [];
+
+    this.pushCoachDelta(deltas, magnitudes, 'ATT', this.attackRating - baseline.attack);
+    this.pushCoachDelta(deltas, magnitudes, 'MID', this.midfieldRating - baseline.midfield);
+    this.pushCoachDelta(deltas, magnitudes, 'DEF', this.defenseRating - baseline.defense);
+    if (baseline.chemistry !== null && currentChemistry !== null) {
+      this.pushCoachDelta(deltas, magnitudes, 'Chem', currentChemistry - baseline.chemistry);
+    }
+    const baseBody = this.lastCoachMoveRead.baseBody
+      ?? this.lastCoachMoveRead.body.split(' Cambios:')[0];
+    const channelDeltas = this.buildCoachChannelDeltas(baseline.channels, magnitudes, baseBody);
+    const visualDeltas = this.buildCoachVisualChannelDeltas(baseline.visualChannels, magnitudes);
+    const visualEngineTension = this.buildVisualEngineTension(
+      baseline.visualChannels,
+      this.attackRating - baseline.attack,
+      this.defenseRating - baseline.defense
+    );
+    const severity = this.describeCoachDeltaSeverity(magnitudes);
+    const channelImpact = channelDeltas.length > 0
+      ? ` Canales: ${channelDeltas.join(' · ')}.`
+      : '';
+    const visualImpact = visualDeltas.length > 0
+      ? ` Visual: ${visualDeltas.join(' · ')}.`
+      : '';
+    const tensionImpact = visualEngineTension
+      ? ` Ojo: ${visualEngineTension}`
+      : '';
+    const mainImpact = deltas.length > 0
+      ? `Cambios: ${deltas.join(' · ')}.`
+      : '';
+    const impact = deltas.length > 0 || channelDeltas.length > 0 || visualDeltas.length > 0
+      ? ` ${mainImpact}${channelImpact}${visualImpact}${tensionImpact} ${severity}`
+      : ' Cambios: sin variacion numerica relevante.';
+
+    this.lastCoachMoveRead = {
+      ...this.lastCoachMoveRead,
+      baseBody,
+      body: `${baseBody}${impact}`,
+      level: severity.includes('Impacto extremo') || this.visualDeltaHasHardWarning(visualDeltas) || !!visualEngineTension
+        ? 'danger'
+        : this.lastCoachMoveRead.level,
+    };
+  }
+
+  private pushCoachDelta(parts: string[], magnitudes: number[], label: string, delta: number): void {
+    if (!isFinite(delta) || Math.abs(delta) < 1) { return; }
+    const rounded = Math.round(delta);
+    magnitudes.push(Math.abs(rounded));
+    parts.push(`${label} ${rounded > 0 ? '+' : ''}${rounded}`);
+  }
+
+  private getTacticalChannelScoresSnapshot(): { left: number | null; center: number | null; right: number | null } {
+    const scores = this.previewedChemistry$.value?.breakdown?.tacticalChemistry?.channelScores;
+    return {
+      left: this.readCoachChannelScore(scores, 'LEFT'),
+      center: this.readCoachChannelScore(scores, 'CENTER'),
+      right: this.readCoachChannelScore(scores, 'RIGHT'),
+    };
+  }
+
+  private readCoachChannelScore(scores: Record<string, number> | undefined, key: 'LEFT' | 'CENTER' | 'RIGHT'): number | null {
+    const value = scores?.[key];
+    return typeof value === 'number' && isFinite(value) ? value : null;
+  }
+
+  private buildCoachChannelDeltas(
+    baseline: { left: number | null; center: number | null; right: number | null },
+    magnitudes: number[],
+    baseBody = ''
+  ): string[] {
+    const current = this.getTacticalChannelScoresSnapshot();
+    const result: string[] = [];
+    this.pushCoachChannelDelta(result, magnitudes, 'L', baseline.left, current.left, baseBody);
+    this.pushCoachChannelDelta(result, magnitudes, 'C', baseline.center, current.center, baseBody);
+    this.pushCoachChannelDelta(result, magnitudes, 'R', baseline.right, current.right, baseBody);
+    return result;
+  }
+
+  private pushCoachChannelDelta(
+    parts: string[],
+    magnitudes: number[],
+    label: 'L' | 'C' | 'R',
+    before: number | null,
+    after: number | null,
+    baseBody = ''
+  ): void {
+    if (before === null || after === null) { return; }
+    const delta = Math.round(after - before);
+    if (Math.abs(delta) < 1) { return; }
+    magnitudes.push(Math.abs(delta));
+    const sign = delta > 0 ? '+' : '';
+    const isWideProjection = baseBody.includes('gana profundidad')
+      || baseBody.includes('Sube por banda')
+      || baseBody.includes('amenaza por banda');
+    const projectedWideTradeoff = delta < 0 && isWideProjection && label !== 'C';
+    const detail = projectedWideTradeoff
+      ? ' (mas profundidad, menos conexion/cobertura)'
+      : '';
+    parts.push(`${label} ${sign}${delta}${detail}`);
+  }
+
+  private buildCoachVisualChannelDeltas(
+    baseline: Array<{ label: 'L' | 'C' | 'R'; threat: number; connection: number; coverage: number }>,
+    magnitudes: number[]
+  ): string[] {
+    const current = this.tacticalChannelBreakdown;
+    const result: string[] = [];
+    for (const before of baseline) {
+      const after = current.find(row => row.label === before.label);
+      if (!after) { continue; }
+      this.pushCoachVisualMetricDelta(result, magnitudes, before.label, 'Amenaza', before.threat, after.threat);
+      this.pushCoachVisualMetricDelta(result, magnitudes, before.label, 'Conexion', before.connection, after.connection);
+      this.pushCoachVisualMetricDelta(result, magnitudes, before.label, 'Cobertura', before.coverage, after.coverage);
+    }
+    return result.slice(0, 4);
+  }
+
+  private pushCoachVisualMetricDelta(
+    parts: string[],
+    magnitudes: number[],
+    channel: 'L' | 'C' | 'R',
+    label: 'Amenaza' | 'Conexion' | 'Cobertura',
+    before: number,
+    after: number
+  ): void {
+    const delta = Math.round(after - before);
+    if (!isFinite(delta) || Math.abs(delta) < 6) { return; }
+    magnitudes.push(Math.min(18, Math.ceil(Math.abs(delta) / 2)));
+    const sign = delta > 0 ? '+' : '';
+    parts.push(`${channel} ${label} ${sign}${delta}%`);
+  }
+
+  private visualDeltaHasHardWarning(visualDeltas: string[]): boolean {
+    return visualDeltas.some(delta =>
+      delta.includes('Cobertura -')
+      || delta.includes('Amenaza -')
+      || delta.includes('Conexion -'));
+  }
+
+  private buildVisualEngineTension(
+    baseline: Array<{ label: 'L' | 'C' | 'R'; threat: number; connection: number; coverage: number }>,
+    attackDelta: number,
+    defenseDelta: number
+  ): string {
+    const current = this.tacticalChannelBreakdown;
+    let threatDelta = 0;
+    let coverageDelta = 0;
+    let connectionDelta = 0;
+    for (const before of baseline) {
+      const after = current.find(row => row.label === before.label);
+      if (!after) { continue; }
+      threatDelta += after.threat - before.threat;
+      coverageDelta += after.coverage - before.coverage;
+      connectionDelta += after.connection - before.connection;
+    }
+
+    if (threatDelta >= 12 && attackDelta <= -4) {
+      return 'sube la amenaza visual, pero baja ATT general. Probable penalizacion por rol/zona; conviene probarlo en harness.';
+    }
+    if (coverageDelta >= 12 && defenseDelta <= -4) {
+      return 'sube la cobertura visual, pero baja DEF general. Revisar si el motor penaliza el cambio de rol mas que la posicion.';
+    }
+    if (connectionDelta >= 12 && attackDelta + defenseDelta <= -10) {
+      return 'mejora la conexion visual, pero el balance general cae fuerte. Puede ser un tradeoff real o una frontera exagerada.';
+    }
+    return '';
+  }
+
+  private describeCoachDeltaSeverity(magnitudes: number[]): string {
+    if (magnitudes.length === 0) { return ''; }
+    const max = Math.max(...magnitudes);
+    if (max >= 25) {
+      return 'Impacto extremo: revisar si el movimiento representa un cambio táctico grande o si el motor está exagerando la frontera de zona.';
+    }
+    if (max >= 11) {
+      return 'Impacto fuerte: debería sentirse claramente en el partido.';
+    }
+    if (max >= 4) {
+      return 'Impacto medio: ajuste táctico perceptible, pero controlado.';
+    }
+    return 'Impacto leve: microajuste estable.';
+  }
+
+  private describeCoachMoveSpatialRead(
+    fromX: number,
+    fromY: number,
+    toX: number,
+    toY: number
+  ): string {
+    const fromChannel = this.visualChannelFromCoords(fromX);
+    const toChannel = this.visualChannelFromCoords(toX);
+    const fromLine = this.visualLineFromCoords(fromY);
+    const toLine = this.visualLineFromCoords(toY);
+    const channelLabel = this.coachChannelLabel(toChannel);
+    const notes: string[] = [channelLabel];
+
+    if (fromChannel !== toChannel) {
+      notes.push(`${this.coachChannelLabel(fromChannel)} -> ${channelLabel}`);
+    }
+    if (toLine === 'ATT' && Math.abs(toX - 50) >= 28) {
+      notes.push('amenaza por banda');
+    }
+    if (toLine === 'DEF' && Math.abs(toX - 50) >= 28) {
+      notes.push('cobertura lateral');
+    }
+    if (toLine === 'MID' && toChannel === 'C') {
+      notes.push('control central');
+    }
+    if (toLine === 'ATT' && fromLine !== 'ATT') {
+      notes.push('riesgo espalda');
+    }
+    if (toLine === 'DEF' && fromLine !== 'DEF') {
+      notes.push('baja el bloque');
+    }
+    if (Math.abs(toX - 50) > Math.abs(fromX - 50) + 2.5) {
+      notes.push('mas amplitud');
+    }
+    if (Math.abs(toX - 50) < Math.abs(fromX - 50) - 2.5) {
+      notes.push('mas interior');
+    }
+
+    return ` Zona: ${notes.join(' · ')}.`;
+  }
+
+  private coachChannelLabel(channel: 'L' | 'C' | 'R'): string {
+    if (channel === 'L') { return 'izquierda'; }
+    if (channel === 'R') { return 'derecha'; }
+    return 'centro';
+  }
+
+  private setLastCoachMoveReadForDrag(
+    player: PlayerOnFieldDto,
+    fromX: number,
+    fromY: number,
+    toX: number,
+    toY: number,
+    snappedToNative: boolean
+  ): void {
+    const dx = toX - fromX;
+    const dy = toY - fromY;
+    const distance = Math.hypot(dx, dy);
+    if (snappedToNative) {
+      this.lastCoachMoveRead = {
+        title: `${player.name} vuelve a base`,
+        body: 'Volvio cerca de su punto natural: se limpia el ajuste manual y se recupera la referencia de la formacion.',
+        level: 'info',
+      };
+      return;
+    }
+    if (distance < 1.0) {
+      this.lastCoachMoveRead = {
+        title: `${player.name} microajuste`,
+        body: 'Movimiento muy chico: deberia ser estable y no provocar saltos fuertes.',
+        level: 'info',
+      };
+      return;
+    }
+
+    const fromLine = this.visualLineFromCoords(fromY);
+    const toLine = this.visualLineFromCoords(toY);
+    const fromChannel = this.visualChannelFromCoords(fromX);
+    const toChannel = this.visualChannelFromCoords(toX);
+    const movedUp = dy <= -3.5;
+    const movedDown = dy >= 3.5;
+    const movedWide = Math.abs(toX - 50) > Math.abs(fromX - 50) + 2.5;
+    const movedInside = Math.abs(toX - 50) < Math.abs(fromX - 50) - 2.5;
+    const naturalFamily = this.getRoleFamily(player.role);
+    const forcedRole = naturalFamily && naturalFamily !== toLine;
+    const spatialRead = this.describeCoachMoveSpatialRead(fromX, fromY, toX, toY);
+    const lateralTradeoff = movedWide
+      ? ' Ademas se abre: gana amplitud, pero puede aislarse o abrir espalda en ese costado.'
+      : movedInside
+      ? ' Ademas se cierra: gana conexion interior, pero puede liberar la banda.'
+      : '';
+
+    if (fromLine !== toLine) {
+      const attackerDrop = naturalFamily === 'ATT' && toLine !== 'ATT' && toY > fromY;
+      const defenderStep = naturalFamily === 'DEF' && toLine !== 'DEF' && toY < fromY;
+      this.lastCoachMoveRead = {
+        title: `${player.name}: ${fromLine} → ${toLine}`,
+        body: attackerDrop
+          ? `Baja un delantero: cambia el dibujo y puede dar cobertura contextual, pero no asumir mejora defensiva real hasta probar riesgo en harness.${lateralTradeoff}${spatialRead}`
+          : defenderStep
+          ? `Sube un defensor: puede sumar salida, presion o amenaza, pero abre espalda y debe validarse como tradeoff de riesgo en harness.${lateralTradeoff}${spatialRead}`
+          : forcedRole
+          ? `Cambio fuerte de zona: ahora juega como ${toLine}, pero su rol natural es ${player.role}. El motor puede penalizarlo.${lateralTradeoff}${spatialRead}`
+          : `Cambio fuerte de zona: modifica la estructura real de la formacion y deberia sentirse en el motor.${lateralTradeoff}${spatialRead}`,
+        level: attackerDrop || defenderStep || forcedRole ? 'danger' : 'warn',
+      };
+      return;
+    }
+
+    if (movedWide && movedUp) {
+      this.lastCoachMoveRead = {
+        title: `${player.name} se proyecta abierto`,
+        body: `Diagonal hacia banda y adelante: gana profundidad y amplitud, pero puede quedar aislado y dejar espalda si no hay cobertura. Tradeoff de amplitud/profundidad.${spatialRead}`,
+        level: 'warn',
+      };
+      return;
+    }
+    if (movedWide && movedDown) {
+      this.lastCoachMoveRead = {
+        title: `${player.name} baja abierto`,
+        body: `Diagonal hacia banda y atras: suma cobertura exterior, pero puede alejarse del circuito interior y bajar amenaza. Tradeoff cobertura/amplitud.${spatialRead}`,
+        level: 'info',
+      };
+      return;
+    }
+    if (movedInside && movedUp) {
+      this.lastCoachMoveRead = {
+        title: `${player.name} ataca por dentro`,
+        body: `Diagonal hacia dentro y adelante: suma presencia central/ofensiva, pero puede liberar la banda y partir ayudas. Tradeoff interior/profundidad.${spatialRead}`,
+        level: 'warn',
+      };
+      return;
+    }
+    if (movedInside && movedDown) {
+      this.lastCoachMoveRead = {
+        title: `${player.name} cierra para cubrir`,
+        body: `Diagonal hacia dentro y atras: puede compactar el bloque, pero reduce amplitud y puede dejar el costado sin salida. Tradeoff compactacion/amplitud.${spatialRead}`,
+        level: 'info',
+      };
+      return;
+    }
+
+    if (movedUp && Math.abs(fromX - 50) >= 30) {
+      this.lastCoachMoveRead = {
+        title: `${player.name} se proyecta`,
+        body: `Sube por banda: gana profundidad ofensiva, pero puede dejar espalda si no hay cobertura.${spatialRead}`,
+        level: 'warn',
+      };
+      return;
+    }
+    if (movedDown && Math.abs(fromX - 50) >= 30) {
+      this.lastCoachMoveRead = {
+        title: `${player.name} baja a cubrir`,
+        body: `Baja por banda: mejora la proteccion del costado, con menor agresividad arriba.${spatialRead}`,
+        level: 'good',
+      };
+      return;
+    }
+    if (movedUp) {
+      this.lastCoachMoveRead = {
+        title: `${player.name} mas alto`,
+        body: `Gana metros para presionar o atacar, pero revisa que no se rompa la distancia con su linea.${spatialRead}`,
+        level: 'info',
+      };
+      return;
+    }
+    if (movedDown) {
+      this.lastCoachMoveRead = {
+        title: `${player.name} mas bajo`,
+        body: naturalFamily === 'ATT'
+          ? `Baja un delantero: puede sumar apoyo contextual, pero valida en harness si realmente protege o si solo pierde amenaza.${spatialRead}`
+          : `Da mas cobertura y apoyo atras; puede perder llegada si queda demasiado retrasado.${spatialRead}`,
+        level: naturalFamily === 'ATT' ? 'warn' : 'info',
+      };
+      return;
+    }
+    if (movedWide) {
+      this.lastCoachMoveRead = {
+        title: `${player.name} abre la cancha`,
+        body: `Gana amplitud y amenaza por fuera, pero puede aislarse, separar ayudas y abrir espalda si el rival explota ese costado. Tradeoff de amplitud: validalo en harness/partido.${spatialRead}`,
+        level: 'warn',
+      };
+      return;
+    }
+    if (movedInside) {
+      this.lastCoachMoveRead = {
+        title: `${player.name} se cierra`,
+        body: `Mejora conexion interior y control central, pero puede liberar la banda y dejar al equipo sin amplitud. Tradeoff interior/exterior: validalo en harness/partido.${spatialRead}`,
+        level: 'warn',
+      };
+      return;
+    }
+
+    this.lastCoachMoveRead = {
+      title: `${player.name}: ajuste ${fromChannel} → ${toChannel}`,
+      body: `Ajuste lateral leve: mira si mejora conexiones o deja una banda menos cubierta.${spatialRead}`,
+      level: 'info',
+    };
+  }
+
+  private visualChannelFromCoords(x: number): 'L' | 'C' | 'R' {
+    if (x < 33) { return 'L'; }
+    if (x > 67) { return 'R'; }
+    return 'C';
+  }
+
+  private visualLineFromCoords(y: number): 'ATT' | 'MID' | 'DEF' {
+    if (y < 34) { return 'ATT'; }
+    if (y < 67) { return 'MID'; }
+    return 'DEF';
   }
 
   private getVisualChannel(player: PlayerOnFieldDto): 'L' | 'C' | 'R' {
@@ -3674,6 +4430,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
           this.previewError = false;
         }
         this.previewedChemistry$.next(detail);
+        this.enrichLastCoachMoveReadWithLatestDelta();
         this.cdr.markForCheck();
         this.cdr.detectChanges();
       });
@@ -4528,6 +5285,9 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
       this.cdr.markForCheck();
       return;
     }
+    const previousX = this.getMarkerX(player);
+    const previousY = this.getMarkerY(player);
+    this.beginCoachMoveImpactTracking();
 
     // 1. Compute drop position as % of the field bounding rect.
     const fieldEl = this.fieldContainer?.nativeElement;
@@ -4630,6 +5390,7 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
     const yPct = Math.max(0, Math.min(100, ((dropY - pickup.y + halfHeight - rect.top) / rect.height) * 100));
 
     if (this.isInsideGoalkeeperProtectedArea(xPct, yPct)) {
+      this.pendingCoachMoveBaseline = null;
       if (player.slotId) {
         delete player.xPercent;
         delete player.yPercent;
@@ -4684,6 +5445,7 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
       if (player.slotId) {
         this.slotPlayerMap[player.slotId] = player;
       }
+      this.setLastCoachMoveReadForDrag(player, previousX, previousY, centerX ?? xPct, centerY ?? yPct, true);
     } else {
       player.xPercent = xPct;
       player.yPercent = yPct;
@@ -4691,6 +5453,8 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
       if (player.slotId) {
         delete this.slotPlayerMap[player.slotId];
       }
+      this.setLastCoachMoveReadForDrag(player, previousX, previousY, xPct, yPct, false);
+      this.persistLastModalMoveHarnessCase(player, previousX, previousY, xPct, yPct);
     }
 
     // V25D99.19-FRONT (BUG-3 fix): refresh the chip ratings BEFORE the
@@ -4800,12 +5564,17 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
     if (!this.canPlayerUseSlot(player, targetSlotId)) {
       return;
     }
+    this.beginCoachMoveImpactTracking();
     // Step 1: free the source slot (if from a slot).
     if (sourceSlotId) {
       delete this.slotPlayerMap[sourceSlotId];
     }
 
     // Step 2: place player into target.
+    const fromX = this.getMarkerX(player);
+    const fromY = this.getMarkerY(player);
+    const fromLine = this.visualLineFromCoords(fromY);
+    const fromChannel = this.visualChannelFromCoords(fromX);
     player.slotId = targetSlotId;
     this.slotPlayerMap[targetSlotId] = player;
     // V25D98.2-FRONT: clear any free-positioning override so the marker
@@ -4814,6 +5583,23 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
     // stay visually pinned at the OLD override position.
     delete player.xPercent;
     delete player.yPercent;
+    const targetX = this.getFormationPositionCoord(targetSlotId, 'x') ?? this.getMarkerX(player);
+    const targetY = this.getFormationPositionCoord(targetSlotId, 'y') ?? this.getMarkerY(player);
+    const toLine = this.visualLineFromCoords(targetY);
+    const toChannel = this.visualChannelFromCoords(targetX);
+    const spatialRead = this.describeCoachMoveSpatialRead(
+      fromX,
+      fromY,
+      targetX,
+      targetY
+    );
+    this.lastCoachMoveRead = {
+      title: `${player.name}: ${fromLine}${fromChannel} → ${toLine}${toChannel}`,
+      body: fromLine !== toLine
+        ? `Cambio de slot con impacto estructural: revisa ATT/MID/DEF y la penalizacion de rol.${spatialRead}`
+        : `Reubicado en slot tactico: vuelve a una referencia limpia de formacion.${spatialRead}`,
+      level: fromLine !== toLine ? 'warn' : 'info',
+    };
 
     // Step 3: handle the displaced occupant.
     if (occupant && occupant.playerId !== player.playerId) {
@@ -4866,6 +5652,12 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
       return;
     }
     if (!player.slotId) { return; } // already on bench
+    this.beginCoachMoveImpactTracking();
+    this.lastCoachMoveRead = {
+      title: `${player.name} sale del XI`,
+      body: 'Lo mandaste al banco: baja ocupacion del dibujo y puede dejar una zona sin cobertura hasta reemplazarlo.',
+      level: 'warn',
+    };
     delete this.slotPlayerMap[player.slotId];
     player.slotId = '';
     // V25D98.2-FRONT: clear any free-positioning override too.
@@ -4912,6 +5704,42 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
       if (dist < bestDist) { bestDist = dist; best = sub; }
     }
     return best;
+  }
+
+  private persistLastModalMoveHarnessCase(
+    player: PlayerOnFieldDto,
+    fromX: number,
+    fromY: number,
+    targetX: number,
+    targetY: number
+  ): void {
+    if (!player?.playerId || this.isGoalkeeperPlayer(player)) { return; }
+    const distance = Math.hypot(targetX - fromX, targetY - fromY);
+    if (!isFinite(distance) || distance < 1) { return; }
+    const payload = {
+      version: 1,
+      createdAt: new Date().toISOString(),
+      source: 'squad-editor-modal',
+      formation: this.dropdownFormationValue,
+      playerId: player.playerId,
+      playerName: player.name,
+      playerPosition: player.position ?? player.role ?? null,
+      playerRole: player.role ?? null,
+      slotId: player.slotId ?? null,
+      fromXPercent: Number(fromX.toFixed(3)),
+      fromYPercent: Number(fromY.toFixed(3)),
+      targetXPercent: Number(targetX.toFixed(3)),
+      targetYPercent: Number(targetY.toFixed(3)),
+      deltaXPercent: Number((targetX - fromX).toFixed(3)),
+      deltaYPercent: Number((targetY - fromY).toFixed(3)),
+      coachReadTitle: this.lastCoachMoveRead?.title ?? null,
+      coachReadBody: this.lastCoachMoveRead?.body ?? null,
+    };
+    try {
+      window.localStorage.setItem('manager:last-modal-position-move', JSON.stringify(payload));
+    } catch (err) {
+      console.warn('[SQUAD-EDITOR] Could not persist last modal move for harness:', err);
+    }
   }
 
   /**
@@ -4999,6 +5827,8 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
       }
     }
     this.homePlayers$.next([...this.homePlayers$.value]);
+    this.lastCoachMoveRead = null;
+    this.pendingCoachMoveBaseline = null;
     this.saveLineup();
     this.triggerChemistryPreview();
     this.updateFormationDetection();
@@ -5327,10 +6157,52 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
     if (!sub) { return false; }
     const recommended = this.getRecommendedRole(sub);
     if (!recommended) { return false; }
-    const playerFamily = this.getRoleFamily(player.role);
-    const recommendedFamily = this.getRoleFamily(recommended);
+    const actual = this.getPositionRoleFamily(player);
+    return this.isTacticalRoleMismatch(player.role, recommended, actual);
+  }
+
+  private isTacticalRoleMismatch(
+    playerRole: string | undefined,
+    tacticalRole: string | undefined,
+    actualZone?: 'GK' | 'DEF' | 'MID' | 'ATT' | null
+  ): boolean {
+    if (!playerRole || !tacticalRole) { return false; }
+    if (this.tacticalRoleFitsPlayerRole(playerRole, tacticalRole)) { return false; }
+    const playerFamily = this.getRoleFamily(playerRole);
+    const recommendedFamily = this.getRoleFamily(tacticalRole);
     if (playerFamily === null || recommendedFamily === null) { return false; }
+    if (actualZone && playerFamily !== actualZone) { return true; }
     return playerFamily !== recommendedFamily;
+  }
+
+  private tacticalRoleFitsPlayerRole(playerRole: string | undefined, tacticalRole: string | undefined): boolean {
+    const player = String(playerRole ?? '').trim().toUpperCase();
+    const role = String(tacticalRole ?? '').trim().toUpperCase();
+    if (!player || !role) { return false; }
+    if (player === role) { return true; }
+    const fitGroups: Record<string, string[]> = {
+      GK: ['GK'],
+      CB: ['CB', 'DEF'],
+      LB: ['LB', 'LWB', 'DEF'],
+      RB: ['RB', 'RWB', 'DEF'],
+      LWB: ['LWB', 'LB', 'LM', 'LW', 'WINGER'],
+      RWB: ['RWB', 'RB', 'RM', 'RW', 'WINGER'],
+      CDM: ['CDM', 'DM', 'CM', 'MID'],
+      CM: ['CM', 'CDM', 'DM', 'CAM', 'MID'],
+      CAM: ['CAM', 'AM', 'CM', 'CF', 'MID'],
+      LM: ['LM', 'LW', 'LWB', 'WINGER', 'MID'],
+      RM: ['RM', 'RW', 'RWB', 'WINGER', 'MID'],
+      LW: ['LW', 'LM', 'WINGER'],
+      RW: ['RW', 'RM', 'WINGER'],
+      CF: ['CF', 'ST', 'CAM', 'ATT'],
+      ST: ['ST', 'CF', 'ATT'],
+    };
+    if (fitGroups[role]) {
+      return fitGroups[role].includes(player);
+    }
+    const playerFamily = this.getRoleFamily(player);
+    const roleFamily = this.getRoleFamily(role);
+    return playerFamily !== null && playerFamily === roleFamily;
   }
 
   /**
@@ -5713,7 +6585,7 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
         // EMITIR EVENTO AL PADRE con los players directamente (sin esperar backend)
         this.formationChanged.emit({
           formation: newFormation,
-          players: response?.players || []
+          players: this.homePlayers$.value.slice(0, 11)
         });
         // Legacy: emit formationChangeComplete con el subject (no-op si nadie escucha).
         this.formationChangeComplete.emit(this.formationChangeCompleteSubject);

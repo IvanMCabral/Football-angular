@@ -8,7 +8,7 @@
 
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
-import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { provideRouter } from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -28,8 +28,10 @@ describe('TestHarnessPageComponent', () => {
   let harness: jasmine.SpyObj<TestHarnessService>;
   let matchDetailApi: jasmine.SpyObj<MatchDetailApiService>;
   let snackBarSpy: jasmine.SpyObj<MatSnackBar>;
+  let httpMock: HttpTestingController;
 
   beforeEach(async () => {
+    window.localStorage.removeItem('manager:last-modal-position-move');
     careerService = jasmine.createSpyObj('CareerService', [
       'getCareerStatus',
       'getAllFixturesWithBye',
@@ -106,6 +108,7 @@ describe('TestHarnessPageComponent', () => {
     harness.getCurrentLineup.and.returnValue(of(sampleLineup('4-4-2')) as any);
     harness.autoSelectLineup.and.returnValue(of(sampleLineup('4-4-2')) as any);
     harness.manualSelectLineup.and.returnValue(of(sampleLineup('4-4-2')) as any);
+    harness.resetInjuries.and.returnValue(of({ success: true, message: 'reset' } as any));
     harness.runScenarioMatrixSummary.and.returnValue(of([]) as any);
 
     await TestBed.configureTestingModule({
@@ -123,6 +126,7 @@ describe('TestHarnessPageComponent', () => {
 
     fixture = TestBed.createComponent(TestHarnessPageComponent);
     component = fixture.componentInstance;
+    httpMock = TestBed.inject(HttpTestingController);
     fixture.detectChanges();
     await fixture.whenStable();
     fixture.detectChanges();
@@ -136,6 +140,148 @@ describe('TestHarnessPageComponent', () => {
     expect(component.careerId()).toBe('career-1');
     expect(component.rounds().length).toBe(1);
     expect(component.rounds()[0].matches.length).toBe(1);
+    expect(component.loading()).toBeFalse();
+    expect(component.loadError()).toBeNull();
+  });
+
+  it('exposes stable match row ids and enables player swap smoke after selecting a match', () => {
+    const row: HTMLElement | null = fixture.nativeElement.querySelector(
+      '[data-testid="match-row"][data-match-id="match-1"]'
+    );
+    expect(row).withContext('Panel C match row should expose a stable selector').not.toBeNull();
+
+    const swapButtonBefore: HTMLButtonElement | null = fixture.nativeElement.querySelector(
+      '[data-testid="player-swap-full-smoke-button"]'
+    );
+    expect(swapButtonBefore).withContext('player swap full smoke button should exist').not.toBeNull();
+    expect(swapButtonBefore?.disabled).toBeTrue();
+
+    row?.click();
+    fixture.detectChanges();
+
+    expect(component.selectedMatchId()).toBe('match-1');
+
+    const swapButtonAfter: HTMLButtonElement | null = fixture.nativeElement.querySelector(
+      '[data-testid="player-swap-full-smoke-button"]'
+    );
+    expect(swapButtonAfter?.disabled).toBeFalse();
+  });
+
+  it('reselects a real user-team match before checklist steps when the selected match is stale', () => {
+    component.rounds.set([
+      {
+        round: 1,
+        byeTeam: null,
+        matches: [
+          {
+            matchId: 'match-1',
+            round: 1,
+            homeTeamId: 'team-1',
+            homeTeamName: 'My Team',
+            awayTeamId: 'team-2',
+            awayTeamName: 'Rival',
+            status: 'COMPLETED',
+            homeGoals: 1,
+            awayGoals: 0,
+            homeFormation: null,
+            awayFormation: null,
+            roundId: 'round-uuid-1',
+          },
+        ],
+      },
+    ]);
+    component.selectMatch({
+      matchId: 'stale-match-id',
+      round: 99,
+      homeTeamId: 'team-1',
+      homeTeamName: 'My Team',
+      awayTeamId: 'team-x',
+      awayTeamName: 'Old Rival',
+      status: 'COMPLETED',
+      homeGoals: 1,
+      awayGoals: 1,
+      homeFormation: null,
+      awayFormation: null,
+    });
+
+    (component as any).ensureProfessionalQaChecklistMatch();
+
+    expect(component.selectedMatchId()).toBe('match-1');
+  });
+
+  it('runs the full position smoke board for the QA pixel movement action', () => {
+    component.selectMatch(makeMatchRow('match-qa-pixel') as any);
+    const fullSmokeSpy = spyOn(component, 'onRunFullPositionSmokeBoard');
+    const presetSpy = spyOn(component, 'onRunPositionPixelMatrix');
+    spyOn(component as any, 'watchProfessionalQaActionCompletion');
+
+    component.onRunProfessionalQaAction('Pixel movement signal');
+
+    expect(fullSmokeSpy).toHaveBeenCalled();
+    expect(presetSpy).not.toHaveBeenCalled();
+    expect(component.professionalQaActionLabel('Pixel movement signal')).toContain('full position smoke');
+  });
+
+  it('builds the Match Compare route for the selected match', () => {
+    expect(component.selectedMatchCompareRoute()).toBeNull();
+
+    component.selectMatch(makeMatchRow('match-compare-1') as any);
+
+    expect(component.selectedMatchCompareRoute()).toEqual([
+      '/careers',
+      'career-1',
+      'matches',
+      'match-compare-1',
+      'compare',
+    ]);
+  });
+
+  it('shows a guided professional compare workflow', () => {
+    let steps = component.compareWorkflowSteps();
+    expect(steps.length).toBe(4);
+    expect(steps[0].state).toBe('active');
+    expect(steps[0].title).toContain('Elegir partido');
+    expect(steps[1].state).toBe('pending');
+
+    component.selectMatch(makeMatchRow('match-flow-1') as any);
+
+    steps = component.compareWorkflowSteps();
+    expect(steps[0].state).toBe('done');
+    expect(steps[0].status).toBe('OK');
+    expect(steps[1].state).toBe('active');
+    expect(steps[3].body).toContain('Open Match Compare');
+  });
+
+  it('falls back to the test-harness snapshot when Panel C fixture endpoint is empty', async () => {
+    careerService.getAllFixturesWithBye.and.returnValue(of({ rounds: [] }));
+
+    component.reload();
+    const snapshotReq = httpMock.expectOne((req) =>
+      req.url.endsWith('/api/v1/test-harness/career/snapshot')
+    );
+    snapshotReq.flush({
+      fixtures: [
+        {
+          matchId: 'snapshot-match-1',
+          homeTeamId: 'team-3',
+          homeTeamName: 'Snapshot Home',
+          awayTeamId: 'team-1',
+          awayTeamName: 'My Team',
+          round: 2,
+          status: 'COMPLETED',
+          homeGoals: 1,
+          awayGoals: 2,
+        },
+      ],
+    });
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(component.rounds().length).toBe(1);
+    expect(component.rounds()[0].round).toBe(2);
+    expect(component.rounds()[0].matches[0].matchId).toBe('snapshot-match-1');
+    expect(component.rounds()[0].matches[0].homeTeamName).toBe('Snapshot Home');
+    expect(component.rounds()[0].matches[0].awayGoals).toBe(2);
     expect(component.loading()).toBeFalse();
     expect(component.loadError()).toBeNull();
   });
@@ -235,6 +381,56 @@ describe('TestHarnessPageComponent', () => {
     expect(component.selectedMatchId()).toBe('match-1');
   });
 
+  it('shows selected match context and For/Ag perspective', () => {
+    component.selectMatch({
+      matchId: 'match-1',
+      round: 1,
+      homeTeamId: 'team-1',
+      homeTeamName: 'My Team',
+      awayTeamId: 'team-2',
+      awayTeamName: 'Rival',
+      status: 'PENDING',
+      homeGoals: null,
+      awayGoals: null,
+      homeFormation: null,
+      awayFormation: null,
+      roundId: 'round-uuid-1',
+    });
+    fixture.detectChanges();
+
+    const context: HTMLElement | null = fixture.nativeElement.querySelector(
+      '[data-testid="selected-match-context"]'
+    );
+
+    expect(context).withContext('context card should be present').not.toBeNull();
+    expect(context?.textContent).toContain('My Team vs Rival');
+    expect(context?.textContent).toContain('Mi equipo: My Team');
+    expect(context?.textContent).toContain('For = My Team; Ag = Rival');
+  });
+
+  it('warns when selected match does not include the user team', () => {
+    component.selectMatch({
+      matchId: 'match-other',
+      round: 1,
+      homeTeamId: 'team-2',
+      homeTeamName: 'Other Team',
+      awayTeamId: 'team-3',
+      awayTeamName: 'Similar Generated Team',
+      status: 'COMPLETED',
+      homeGoals: 0,
+      awayGoals: 0,
+      homeFormation: null,
+      awayFormation: null,
+      roundId: 'round-uuid-1',
+    });
+    fixture.detectChanges();
+
+    expect(component.selectedMatchIncludesUserTeam()).toBeFalse();
+    expect(component.selectedMatchScopeWarning()).toContain('Other Team vs Similar Generated Team');
+    expect(component.selectedMatchScopeWarning()).toContain('Set Formation / modal DT afectan a My Team');
+    expect(component.selectedMatchScopeWarning()).toContain('Controlar: Local/Visitante');
+  });
+
   it('onFormationChange updates the model', () => {
     component.onFormationChange('3-5-2');
     expect(component.selectedFormationModel).toBe('3-5-2');
@@ -245,33 +441,16 @@ describe('TestHarnessPageComponent', () => {
     expect(component.selectedFormationModel).toBeNull();
   });
 
-  it('applyFormation applies the selected formation and rebuilds canonical slots', () => {
+  it('applyFormation applies the selected formation and auto-selects tactical slots', () => {
     harness.setFormation.and.returnValue(
       of({ success: true, message: 'ok' } as any)
     );
-    harness.getCurrentLineup.and.returnValue(of(sampleLineup('4-4-2')) as any);
-    harness.manualSelectLineup.and.returnValue(of(sampleLineup('4-3-3')) as any);
+    harness.autoSelectLineup.and.returnValue(of(sampleLineup('4-3-3')) as any);
     component.selectedFormationModel = '4-3-3';
     component.applyFormation();
-    expect(harness.getCurrentLineup).toHaveBeenCalled();
     expect(harness.setFormation).toHaveBeenCalledWith('4-3-3');
-    expect(harness.manualSelectLineup).toHaveBeenCalledWith(
-      '4-3-3',
-      Array.from({ length: 11 }, (_, i) => `p${i + 1}`),
-      [
-        { playerId: 'p1', subdivisionId: 'GK-1' },
-        { playerId: 'p2', subdivisionId: 'S22-2' },
-        { playerId: 'p3', subdivisionId: 'S23-1' },
-        { playerId: 'p4', subdivisionId: 'S23-3' },
-        { playerId: 'p5', subdivisionId: 'S24-2' },
-        { playerId: 'p6', subdivisionId: 'S17-1' },
-        { playerId: 'p7', subdivisionId: 'S17-2' },
-        { playerId: 'p8', subdivisionId: 'S17-3' },
-        { playerId: 'p9', subdivisionId: 'S04-1' },
-        { playerId: 'p10', subdivisionId: 'S05-2' },
-        { playerId: 'p11', subdivisionId: 'S06-3' },
-      ]
-    );
+    expect(harness.autoSelectLineup).toHaveBeenCalledWith('4-3-3');
+    expect(harness.manualSelectLineup).not.toHaveBeenCalled();
     expect(snackBarSpy.open).toHaveBeenCalled();
     expect(component.mutationInFlight()).toBeFalse();
   });
@@ -284,12 +463,73 @@ describe('TestHarnessPageComponent', () => {
   });
 
   it('applyFormation surfaces errors via the snackbar', () => {
-    harness.getCurrentLineup.and.returnValue(of(sampleLineup('4-4-2')) as any);
     harness.setFormation.and.returnValue(throwError(() => new Error('boom')));
     component.selectedFormationModel = '4-4-2';
     component.applyFormation();
     expect(component.mutationInFlight()).toBeFalse();
     expect(snackBarSpy.open).toHaveBeenCalled();
+  });
+
+  it('prepare DEF fallback lab swaps a non-defensive starter into a defensive slot and stores restore point', () => {
+    const lineup = {
+      ...sampleLineup('4-3-3'),
+      players: [
+        { playerId: 'p1', name: 'GK', position: 'GK', overall: 70 },
+        { playerId: 'p2', name: 'CB', position: 'CB', overall: 70 },
+        { playerId: 'p3', name: 'CB 2', position: 'CB', overall: 70 },
+        { playerId: 'p4', name: 'LB', position: 'LB', overall: 70 },
+        { playerId: 'p5', name: 'RB', position: 'RB', overall: 70 },
+        { playerId: 'p6', name: 'CM fallback', position: 'CM', overall: 70 },
+        { playerId: 'p7', name: 'CAM fallback', position: 'CAM', overall: 70 },
+        { playerId: 'p8', name: 'CM 2', position: 'CM', overall: 70 },
+        { playerId: 'p9', name: 'ST', position: 'ST', overall: 70 },
+        { playerId: 'p10', name: 'ST 2', position: 'ST', overall: 70 },
+        { playerId: 'p11', name: 'ST 3', position: 'ST', overall: 70 },
+      ],
+      slots: [
+        { playerId: 'p1', subdivisionId: 'GK-1' },
+        { playerId: 'p2', subdivisionId: 'S23-1' },
+        { playerId: 'p3', subdivisionId: 'S23-3' },
+        { playerId: 'p4', subdivisionId: 'S22-2' },
+        { playerId: 'p5', subdivisionId: 'S24-2' },
+        { playerId: 'p6', subdivisionId: 'S17-1' },
+        { playerId: 'p7', subdivisionId: 'S17-2' },
+        { playerId: 'p8', subdivisionId: 'S17-3' },
+        { playerId: 'p9', subdivisionId: 'S04-1' },
+        { playerId: 'p10', subdivisionId: 'S05-2' },
+        { playerId: 'p11', subdivisionId: 'S06-3' },
+      ],
+    };
+    (component as any).formationPositionsByName.set({
+      '4-3-3': [
+        { role: 'GK', subdivisionId: 'GK-1' },
+        { role: 'CB', subdivisionId: 'S23-1' },
+        { role: 'CB', subdivisionId: 'S23-3' },
+        { role: 'LB', subdivisionId: 'S22-2' },
+        { role: 'RB', subdivisionId: 'S24-2' },
+        { role: 'CM', subdivisionId: 'S17-1' },
+        { role: 'CM', subdivisionId: 'S17-2' },
+        { role: 'CM', subdivisionId: 'S17-3' },
+        { role: 'LW', subdivisionId: 'S04-1' },
+        { role: 'ST', subdivisionId: 'S05-2' },
+        { role: 'RW', subdivisionId: 'S06-3' },
+      ],
+    });
+    harness.setFormation.and.returnValue(of({ success: true, message: 'formation ok' } as any));
+    harness.autoSelectLineup.and.returnValue(of(lineup as any));
+    harness.getCurrentLineup.and.returnValue(of(lineup as any));
+    harness.manualSelectLineup.and.returnValue(of(lineup as any));
+
+    component.onPrepareDefensiveFallbackLineupLab();
+
+    expect(harness.manualSelectLineup).toHaveBeenCalled();
+    const [, playerIds, slots] = harness.manualSelectLineup.calls.mostRecent().args;
+    const savedSlots = slots ?? [];
+    expect(playerIds).toContain('p9');
+    expect(savedSlots.find((slot: any) => slot.subdivisionId === 'S23-1')?.playerId).toBe('p9');
+    expect(savedSlots.find((slot: any) => slot.subdivisionId === 'S04-1')?.playerId).toBe('p2');
+    expect(component.defensiveFallbackRestore?.slots.find((slot) => slot.subdivisionId === 'S23-1')?.playerId).toBe('p2');
+    expect(component.defensiveFallbackLabRead).toContain('ST (ST) -> CB S23-1');
   });
 
   it('does not call a relative-best but objectively bad formation solid', () => {
@@ -342,6 +582,187 @@ describe('TestHarnessPageComponent', () => {
     expect(component.formationSummaryRead(bad)).toBe('Revisar');
   });
 
+  it('flags sterile low-block formations for review even when xGA is acceptable', () => {
+    const sterile = makeFormationSummary({
+      formation: '5-4-1',
+      avgXgFor: 0.34,
+      avgXgAgainst: 0.94,
+      avgXgDiff: -0.60,
+      avgShotsFor: 9.8,
+      avgShotsAgainst: 15.5,
+      avgShotDiff: -5.7,
+    });
+    const balanced = makeFormationSummary({
+      formation: '4-2-3-1',
+      avgXgFor: 0.95,
+      avgXgAgainst: 0.58,
+      avgXgDiff: 0.37,
+      avgShotsFor: 16.85,
+      avgShotsAgainst: 14.7,
+      avgShotDiff: 2.15,
+    });
+
+    component.formationMatrixSummaryResults.set([balanced, sterile]);
+
+    expect(component.formationSummaryRead(sterile)).toBe('Revisar');
+  });
+
+  it('explains formation identity with profile, own channel and opponent risk', () => {
+    const row = makeFormationSummary({
+      formation: '4-2-3-1',
+      avgXgFor: 1.02,
+      avgXgAgainst: 0.72,
+      avgXgDiff: 0.30,
+      avgShotsFor: 16,
+      avgShotsAgainst: 12,
+      avgCentralShotsFor: 9,
+      avgWideShotsFor: 4,
+      avgLongShotsFor: 3,
+      avgCentralShotsAgainst: 3,
+      avgWideShotsAgainst: 7,
+      avgLongShotsAgainst: 2,
+      avgShapeAttackLeft: 0.45,
+      avgShapeAttackCenter: 0.68,
+      avgShapeAttackRight: 0.44,
+      avgShapeDefenseLeft: 0.58,
+      avgShapeDefenseCenter: 0.82,
+      avgShapeDefenseRight: 0.76,
+    });
+
+    expect(component.formationSummaryIdentity(row)).toBe('plan completo · ataca por centro · riesgo por banda izquierda');
+  });
+
+  it('marks sterile low-block identity as a reviewable tactical profile', () => {
+    const row = makeFormationSummary({
+      formation: '5-4-1',
+      avgXgFor: 0.34,
+      avgXgAgainst: 0.94,
+      avgXgDiff: -0.60,
+      avgShotsFor: 9.8,
+      avgShotsAgainst: 15.5,
+      avgShotDiff: -5.7,
+      avgCentralShotsFor: 3,
+      avgWideShotsFor: 4,
+      avgLongShotsFor: 3,
+    });
+
+    component.formationMatrixSummaryResults.set([
+      makeFormationSummary({
+        formation: '4-2-3-1',
+        avgXgFor: 0.95,
+        avgXgAgainst: 0.58,
+        avgXgDiff: 0.37,
+      }),
+      row,
+    ]);
+
+    expect(component.formationSummaryIdentity(row)).toContain('bloque esteril');
+  });
+
+  it('reads hybrid front-three formations as mixed with bands instead of pure center', () => {
+    const row = makeFormationSummary({
+      formation: '3-4-3',
+      avgXgFor: 0.98,
+      avgXgAgainst: 0.71,
+      avgXgDiff: 0.27,
+      avgShotsFor: 18.35,
+      avgShotsAgainst: 16.8,
+      avgCentralShotsFor: 8.55,
+      avgWideShotsFor: 5.0,
+      avgLongShotsFor: 4.8,
+      avgShapeAttackLeft: 0.64,
+      avgShapeAttackCenter: 0.79,
+      avgShapeAttackRight: 0.67,
+    });
+
+    expect(component.formationSummaryIdentity(row)).toContain('ataque mixto con banda derecha');
+  });
+
+  it('prioritizes own wide xG side when attack is flank-specific', () => {
+    const row = makeFormationSummary({
+      formation: '4-3-3',
+      avgXgFor: 1.05,
+      avgCentralShotsFor: 8,
+      avgWideShotsFor: 6,
+      avgLongShotsFor: 3,
+      avgLeftWideXgFor: 0.23,
+      avgRightWideXgFor: 0.08,
+      avgShapeAttackLeft: 0.55,
+      avgShapeAttackCenter: 0.72,
+      avgShapeAttackRight: 0.75,
+    });
+
+    expect(component.formationSummaryIdentity(row)).toContain('ataca por banda izquierda');
+  });
+
+  it('reports shared wide attack when attacking xG is high but balanced', () => {
+    const row = makeFormationSummary({
+      formation: '4-4-2',
+      avgXgFor: 1.1,
+      avgCentralShotsFor: 6,
+      avgWideShotsFor: 8,
+      avgLongShotsFor: 3,
+      avgLeftWideXgFor: 0.16,
+      avgRightWideXgFor: 0.15,
+      avgShapeAttackLeft: 0.62,
+      avgShapeAttackCenter: 0.72,
+      avgShapeAttackRight: 0.64,
+    });
+
+    expect(component.formationSummaryIdentity(row)).toContain('ataca por bandas');
+  });
+
+  it('prioritizes opponent wide xG side when formation risk is flank-specific', () => {
+    const row = makeFormationSummary({
+      formation: '4-3-3',
+      avgXgAgainst: 0.84,
+      avgCentralShotsAgainst: 7.5,
+      avgWideShotsAgainst: 5.5,
+      avgLongShotsAgainst: 2,
+      avgLeftWideXgAgainst: 0.18,
+      avgRightWideXgAgainst: 0.05,
+      avgShapeDefenseLeft: 0.74,
+      avgShapeDefenseCenter: 0.86,
+      avgShapeDefenseRight: 0.72,
+    });
+
+    expect(component.formationSummaryIdentity(row)).toContain('riesgo por banda izquierda');
+  });
+
+  it('keeps central risk when wide xG side signal is too small', () => {
+    const row = makeFormationSummary({
+      formation: '4-2-3-1',
+      avgXgAgainst: 0.95,
+      avgCentralShotsAgainst: 8,
+      avgWideShotsAgainst: 4,
+      avgLongShotsAgainst: 2,
+      avgLeftWideXgAgainst: 0.06,
+      avgRightWideXgAgainst: 0.05,
+      avgShapeDefenseLeft: 0.72,
+      avgShapeDefenseCenter: 0.82,
+      avgShapeDefenseRight: 0.70,
+    });
+
+    expect(component.formationSummaryIdentity(row)).toContain('riesgo por centro');
+  });
+
+  it('reports shared flank risk when conceded wide xG is high but balanced', () => {
+    const row = makeFormationSummary({
+      formation: '4-4-2',
+      avgXgAgainst: 1.2,
+      avgCentralShotsAgainst: 4.4,
+      avgWideShotsAgainst: 13.25,
+      avgLongShotsAgainst: 3.35,
+      avgLeftWideXgAgainst: 0.15,
+      avgRightWideXgAgainst: 0.14,
+      avgShapeDefenseLeft: 0.94,
+      avgShapeDefenseCenter: 0.90,
+      avgShapeDefenseRight: 0.89,
+    });
+
+    expect(component.formationSummaryIdentity(row)).toContain('riesgo por bandas');
+  });
+
   it('onResetInjuries calls the service', () => {
     harness.resetInjuries.and.returnValue(
       of({ success: true, message: 'reset' } as any)
@@ -368,6 +789,38 @@ describe('TestHarnessPageComponent', () => {
     expect(snackBarSpy.open).toHaveBeenCalled();
     // The match list is reloaded via getAllFixturesWithBye
     expect(careerService.getAllFixturesWithBye).toHaveBeenCalled();
+  });
+
+  it('onReplaceFixtures clears stale selected match and replay analysis', () => {
+    const userMatch = {
+      ...makeMatchRow('old-match'),
+      homeTeamId: 'betis',
+      homeTeamName: 'Real Betis',
+      awayTeamId: 'sevilla',
+      awayTeamName: 'Sevilla',
+      status: 'COMPLETED' as const,
+    };
+    component.userTeamName.set('Real Betis');
+    component.rounds.set([{ round: 1, byeTeam: null, matches: [userMatch] }] as any);
+    component.selectMatch(userMatch as any);
+    component.positionPixelMatrixRows.set([makePositionPixelRow({})] as any);
+    harness.replaceFixtures.and.returnValue(
+      of({ success: true, message: 'ok' } as any)
+    );
+
+    component.onReplaceFixtures();
+
+    expect(harness.replaceFixtures).toHaveBeenCalledWith([
+      jasmine.objectContaining({
+        round: 1,
+        homeTeamId: 'betis',
+        awayTeamId: 'sevilla',
+      }),
+    ]);
+    expect(component.selectedMatchId()).toBeNull();
+    expect(component.selectedMatch()).toBeNull();
+    expect(component.positionPixelMatrixRows().length).toBe(0);
+    expect(component.analysisReadyMessage()).toContain('Elegí un partido nuevo');
   });
 
   it('handles missing career (CareerStatus with null careerId)', async () => {
@@ -701,6 +1154,14 @@ describe('TestHarnessPageComponent', () => {
 
   it('starts with no round selected in the simulate-round dropdown', () => {
     expect(component.selectedRoundModel).toBeNull();
+  });
+
+  it('selectMatch auto-selects the match round for simulate-round', () => {
+    component.selectedRoundModel = null;
+
+    component.selectMatch(makeMatchRow('match-1'));
+
+    expect(component.selectedRoundModel as number | null).toBe(1);
   });
 
   it('onSeedChange coerces numeric input and rejects non-finite', () => {
@@ -1111,6 +1572,755 @@ describe('TestHarnessPageComponent', () => {
     expect(noCliffRow?.observed).toContain('0 visible 5px pattern(s)');
   });
 
+  it('separates position pixel threat, connection and coverage reads', () => {
+    const attackingWideMove = makePositionPixelRow({
+      deltaXgFor: 0.08,
+      deltaShotsFor: 1.2,
+      deltaWideXgFor: 0.06,
+      deltaWideShotsFor: 1.1,
+      deltaRightWideXgFor: 0.05,
+      deltaPossessionFor: -1.0,
+      deltaCentralXgFor: -0.03,
+      deltaCentralShotsFor: -0.8,
+      deltaXgAgainst: 0.09,
+      deltaShotsAgainst: 1.4,
+      deltaWideXgAgainst: 0.06,
+      deltaWideShotsAgainst: 1.2,
+    });
+    const controlMove = makePositionPixelRow({
+      deltaPossessionFor: 3.2,
+      deltaCentralXgFor: 0.05,
+      deltaCentralShotsFor: 1.0,
+      deltaXgAgainst: -0.06,
+      deltaShotsAgainst: -1.1,
+      deltaWideXgAgainst: -0.04,
+      deltaWideShotsAgainst: -0.8,
+    });
+
+    expect(component.positionPixelChannelBreakdownRead(attackingWideMove as any)).toBe('Amenaza + · Conex. - · Cobertura -');
+    expect(component.positionPixelChannelBreakdownClass(attackingWideMove as any)).toBe('read-strong');
+    expect(component.positionPixelChannelBreakdownDetail(attackingWideMove as any)).toContain('amenaza');
+    expect(component.positionPixelChannelBreakdownRead(controlMove as any)).toBe('Amenaza = · Conex. + · Cobertura +');
+    expect(component.positionPixelChannelBreakdownClass(controlMove as any)).toBe('read-visible');
+  });
+
+  it('marks attacker drops as contextual coverage tradeoffs when defensive risk rises', () => {
+    const attackerDropWithRisk = makePositionPixelRow({
+      playerPosition: 'ATT',
+      fromYPercent: 12,
+      targetYPercent: 38,
+      deltaXgFor: -0.03,
+      deltaShotsFor: -0.4,
+      deltaPossessionFor: 2.0,
+      deltaCentralXgFor: 0.04,
+      deltaCentralShotsFor: 0.8,
+      deltaXgAgainst: 0.10,
+      deltaShotsAgainst: -2.0,
+      deltaWideXgAgainst: -0.08,
+      deltaWideShotsAgainst: -1.5,
+      deltaCentralXgAgainst: -0.04,
+      deltaCentralShotsAgainst: -1.0,
+    });
+
+    expect(component.positionPixelChannelBreakdownRead(attackerDropWithRisk as any)).toContain('Cobertura ctx +');
+    expect(component.positionPixelChannelBreakdownDetail(attackerDropWithRisk as any)).toContain('cobertura contextual');
+    expect(component.positionPixelVisualExpectationRead(attackerDropWithRisk as any)).toBe('Visual OK');
+    expect(component.positionPixelVisualExpectationDetail(attackerDropWithRisk as any)).toContain('Cobertura ctx +');
+    expect(component.positionPixelVisualEngineTensionRead(attackerDropWithRisk as any)).toBe('Tradeoff');
+    expect(component.positionPixelVisualEngineTensionDetail(attackerDropWithRisk as any)).toContain('no asumir cobertura real');
+    expect(component.positionPixelCoachRead(attackerDropWithRisk as any)).toContain('Baja un delantero');
+  });
+
+  it('flags visual expectation mismatches for position pixels', () => {
+    const attackerUpWithoutThreat = makePositionPixelRow({
+      playerPosition: 'ATT',
+      fromYPercent: 22,
+      targetYPercent: 17,
+      deltaXgFor: 0,
+      deltaShotsFor: 0,
+      deltaWideXgFor: 0,
+      deltaWideShotsFor: 0,
+      deltaXgAgainst: -0.04,
+      deltaShotsAgainst: -0.7,
+    });
+    const defenderDownWithCoverage = makePositionPixelRow({
+      playerPosition: 'DEF',
+      fromYPercent: 78,
+      targetYPercent: 83,
+      deltaXgAgainst: -0.06,
+      deltaShotsAgainst: -1.1,
+      deltaWideXgAgainst: -0.03,
+      deltaWideShotsAgainst: -0.7,
+    });
+    const attackerUpWithCentralDanger = makePositionPixelRow({
+      playerPosition: 'ATT',
+      fromYPercent: 22,
+      targetYPercent: 17,
+      deltaXgFor: 0,
+      deltaShotsFor: -0.3,
+      deltaCentralXgFor: 0.015,
+    });
+    const attackerDropWithConnection = makePositionPixelRow({
+      playerPosition: 'ATT',
+      fromYPercent: 18,
+      targetYPercent: 23,
+      deltaXgFor: 0.059,
+      deltaShotsFor: -0.3,
+      deltaCentralXgFor: 0.044,
+      deltaWideXgFor: 0.004,
+      deltaPossessionFor: -0.1,
+      deltaXgAgainst: -0.042,
+      deltaShotsAgainst: 0.2,
+      signalScore: 0.101,
+    });
+    const microWideWithSmallBandSignal = makePositionPixelRow({
+      playerPosition: 'ATT',
+      fromXPercent: 39,
+      targetXPercent: 34,
+      fromYPercent: 17,
+      targetYPercent: 17,
+      deltaWideXgFor: -0.006,
+      deltaWideShotsFor: -0.1,
+    });
+    const wideWithoutBandSignal = makePositionPixelRow({
+      playerPosition: 'ATT',
+      fromXPercent: 39,
+      targetXPercent: 30,
+      fromYPercent: 17,
+      targetYPercent: 17,
+      deltaWideXgFor: 0,
+      deltaWideShotsFor: 0,
+      deltaWideXgAgainst: 0,
+      deltaWideShotsAgainst: 0,
+    });
+
+    expect(component.positionPixelVisualExpectationRead(attackerUpWithoutThreat as any)).toBe('Visual mismatch');
+    expect(component.positionPixelVisualExpectationClass(attackerUpWithoutThreat as any)).toBe('read-check');
+    expect(component.positionPixelVisualExpectationDetail(attackerUpWithoutThreat as any)).toContain('ATT sube');
+    expect(component.positionPixelVisualExpectationRead(defenderDownWithCoverage as any)).toBe('Visual OK');
+    expect(component.positionPixelVisualExpectationClass(defenderDownWithCoverage as any)).toBe('read-stable');
+    expect(component.positionPixelVisualExpectationRead(attackerUpWithCentralDanger as any)).toBe('Visual OK');
+    expect(component.positionPixelVisualExpectationRead(attackerDropWithConnection as any)).toBe('Visual OK');
+    expect(component.positionPixelVisualExpectationRead(microWideWithSmallBandSignal as any)).toBe('Visual OK');
+    expect(component.positionPixelVisualExpectationRead(wideWithoutBandSignal as any)).toBe('Visual micro');
+  });
+
+  it('flags visual engine tension when threat rises but attack output drops', () => {
+    const threatUpAttackLoss = makePositionPixelRow({
+      deltaXgFor: -0.05,
+      deltaShotsFor: -1.0,
+      deltaWideXgFor: 0.12,
+      deltaWideShotsFor: 2.4,
+      deltaRightWideXgFor: 0.10,
+    });
+    const coherentAttackGain = makePositionPixelRow({
+      deltaXgFor: 0.08,
+      deltaShotsFor: 1.4,
+      deltaWideXgFor: 0.04,
+      deltaWideShotsFor: 0.9,
+    });
+
+    expect(component.positionPixelVisualEngineTensionRead(threatUpAttackLoss as any)).toBe('Contradicción');
+    expect(component.positionPixelVisualEngineTensionClass(threatUpAttackLoss as any)).toBe('read-check');
+    expect(component.positionPixelVisualEngineTensionDetail(threatUpAttackLoss as any)).toContain('amenaza visual sube');
+    expect(component.positionPixelVisualEngineTensionRead(coherentAttackGain as any)).toBe('Coherente');
+  });
+
+  it('labels soft visual engine tension as a tactical tradeoff', () => {
+    const connectionUpButRisky = makePositionPixelRow({
+      playerPosition: 'WINGER',
+      fromXPercent: 18,
+      fromYPercent: 18,
+      targetXPercent: 23,
+      targetYPercent: 23,
+      deltaXgFor: 0.02,
+      deltaShotsFor: -0.8,
+      deltaCentralXgFor: 0.044,
+      deltaCentralShotsFor: 0.1,
+      deltaPossessionFor: -0.6,
+      deltaXgAgainst: 0.017,
+      deltaShotsAgainst: 0.9,
+      deltaWideXgAgainst: 0.032,
+      deltaWideShotsAgainst: 0.6,
+    });
+
+    expect(component.positionPixelVisualExpectationRead(connectionUpButRisky as any)).toBe('Visual OK');
+    expect(component.positionPixelVisualEngineTensionRead(connectionUpButRisky as any)).toBe('Tradeoff');
+    expect(component.positionPixelVisualEngineTensionDetail(connectionUpButRisky as any)).toContain('balance del motor cae');
+  });
+
+  it('reads defender steps as attacking tradeoffs when defensive risk rises', () => {
+    const defenderStepWithRisk = makePositionPixelRow({
+      playerPosition: 'DEF',
+      fromYPercent: 83,
+      targetYPercent: 57,
+      deltaXgFor: 0.08,
+      deltaShotsFor: 1.2,
+      deltaWideXgFor: 0.03,
+      deltaWideShotsFor: 0.8,
+      deltaPossessionFor: 1.2,
+      deltaXgAgainst: 0.08,
+      deltaShotsAgainst: 1.1,
+      deltaWideXgAgainst: 0.04,
+      deltaWideShotsAgainst: 0.7,
+    });
+
+    expect(component.positionPixelVisualEngineTensionRead(defenderStepWithRisk as any)).toBe('Coherente');
+    expect(component.positionPixelVisualExpectationRead(defenderStepWithRisk as any)).toBe('Visual OK');
+    expect(component.positionPixelTacticalRead(defenderStepWithRisk as any)).toContain('Tradeoff');
+    expect(component.positionPixelCoachRead(defenderStepWithRisk as any)).toContain('Sube un defensor');
+    expect(component.positionPixelCoachRead(defenderStepWithRisk as any)).toContain('tradeoff de riesgo');
+  });
+
+  it('explains large DEF to MID moves as strong defensive-line breaks', () => {
+    const defenderBigStepWithoutGain = makePositionPixelRow({
+      playerPosition: 'DEF',
+      fromYPercent: 83,
+      targetYPercent: 65,
+      deltaXgFor: -0.12,
+      deltaShotsFor: -1.6,
+      deltaXgAgainst: 0.18,
+      deltaShotsAgainst: 2.5,
+      deltaPossessionFor: -1.7,
+    });
+
+    expect(component.positionPixelTacticalRead(defenderBigStepWithoutGain as any)).toContain('Bad tradeoff');
+    expect(component.positionPixelCoachRead(defenderBigStepWithoutGain as any)).toContain('DEF->MID grande');
+    expect(component.positionPixelCoachRead(defenderBigStepWithoutGain as any)).toContain('rompe la línea defensiva');
+  });
+
+  it('does not over-flag diagonal defender moves that are tactical tradeoffs', () => {
+    const defenderWideUpWithCoverage = makePositionPixelRow({
+      playerPosition: 'DEF',
+      fromXPercent: 16.65,
+      fromYPercent: 83,
+      targetXPercent: 11.65,
+      targetYPercent: 78,
+      deltaXgAgainst: -0.056,
+      deltaShotsAgainst: -0.4,
+      deltaWideXgAgainst: -0.010,
+      deltaWideShotsAgainst: -0.2,
+      deltaCentralXgFor: -0.013,
+    });
+    const defenderWideDownBadTradeoff = makePositionPixelRow({
+      playerPosition: 'DEF',
+      fromXPercent: 16.65,
+      fromYPercent: 83,
+      targetXPercent: 11.65,
+      targetYPercent: 88,
+      deltaXgFor: -0.034,
+      deltaXgAgainst: 0.059,
+      deltaShotsFor: -0.7,
+      deltaShotsAgainst: 0.9,
+      deltaCentralXgFor: -0.038,
+      deltaCentralShotsFor: -0.6,
+      deltaWideXgAgainst: 0.012,
+    });
+
+    expect(component.positionPixelVisualExpectationRead(defenderWideUpWithCoverage as any)).toBe('Visual OK');
+    expect(component.positionPixelCoachRead(defenderWideUpWithCoverage as any)).toContain('Mejora protección');
+    expect(component.positionPixelVisualExpectationRead(defenderWideDownBadTradeoff as any)).toBe('Visual OK');
+    expect(component.positionPixelTacticalRead(defenderWideDownBadTradeoff as any)).toContain('Bad tradeoff');
+  });
+
+  it('prioritizes wide and inside movement tradeoffs when flank risk also rises', () => {
+    const wideTradeoff = makePositionPixelRow({
+      playerPosition: 'MID',
+      fromXPercent: 50,
+      targetXPercent: 82,
+      fromYPercent: 50,
+      targetYPercent: 50,
+      deltaXgFor: 0.08,
+      deltaShotsFor: 1.1,
+      deltaWideXgFor: 0.06,
+      deltaWideShotsFor: 1.0,
+      deltaRightWideXgFor: 0.05,
+      deltaXgAgainst: 0.08,
+      deltaShotsAgainst: 1.0,
+      deltaWideXgAgainst: 0.06,
+      deltaWideShotsAgainst: 1.0,
+      deltaRightWideXgAgainst: 0.05,
+    });
+    const insideTradeoff = makePositionPixelRow({
+      playerPosition: 'MID',
+      fromXPercent: 82,
+      targetXPercent: 50,
+      fromYPercent: 50,
+      targetYPercent: 50,
+      deltaXgFor: 0.07,
+      deltaShotsFor: 0.9,
+      deltaPossessionFor: 2.0,
+      deltaCentralXgFor: 0.04,
+      deltaCentralShotsFor: 0.8,
+      deltaXgAgainst: 0.08,
+      deltaShotsAgainst: 1.0,
+      deltaWideXgAgainst: 0.06,
+      deltaWideShotsAgainst: 1.0,
+      deltaRightWideXgAgainst: 0.05,
+    });
+
+    expect(component.positionPixelCoachRead(wideTradeoff as any)).toContain('tradeoff de amplitud');
+    expect(component.positionPixelCoachRead(wideTradeoff as any)).toContain('rival tambien encuentra ese costado');
+    expect(component.positionPixelCoachRead(insideTradeoff as any)).toContain('tradeoff interior/exterior');
+    expect(component.positionPixelCoachRead(insideTradeoff as any)).toContain('libera la banda');
+  });
+
+  it('reads diagonal lateral plus vertical moves as explicit tactical tradeoffs', () => {
+    const wideUp = makePositionPixelRow({
+      playerPosition: 'MID',
+      fromXPercent: 50,
+      targetXPercent: 82,
+      fromYPercent: 58,
+      targetYPercent: 44,
+      deltaXgFor: 0.08,
+      deltaShotsFor: 1.1,
+      deltaWideXgFor: 0.05,
+      deltaWideShotsFor: 1.0,
+      deltaXgAgainst: 0.07,
+      deltaShotsAgainst: 1.0,
+      deltaWideXgAgainst: 0.05,
+      deltaWideShotsAgainst: 0.7,
+    });
+    const insideDown = makePositionPixelRow({
+      playerPosition: 'MID',
+      fromXPercent: 82,
+      targetXPercent: 50,
+      fromYPercent: 48,
+      targetYPercent: 62,
+      deltaXgFor: -0.05,
+      deltaShotsFor: -0.9,
+      deltaWideXgFor: -0.04,
+      deltaWideShotsFor: -0.8,
+      deltaXgAgainst: -0.08,
+      deltaShotsAgainst: -1.0,
+      deltaWideXgAgainst: -0.05,
+      deltaWideShotsAgainst: -0.8,
+    });
+
+    expect(component.positionPixelCoachRead(wideUp as any)).toContain('Diagonal abierta alta');
+    expect(component.positionPixelCoachRead(wideUp as any)).toContain('tradeoff banda-altura');
+    expect(component.positionPixelCoachRead(insideDown as any)).toContain('Diagonal interior baja');
+    expect(component.positionPixelCoachRead(insideDown as any)).toContain('reduce amplitud');
+  });
+
+  it('summarizes visual engine tension rows for position pixels', () => {
+    component.positionPixelMatrixRows.set([
+      makePositionPixelRow({
+        deltaXgFor: -0.05,
+        deltaShotsFor: -1.0,
+        deltaWideXgFor: 0.12,
+        deltaWideShotsFor: 2.4,
+        deltaRightWideXgFor: 0.10,
+      }),
+      makePositionPixelRow({
+        deltaXgFor: 0.08,
+        deltaShotsFor: 1.4,
+        deltaWideXgFor: 0.04,
+        deltaWideShotsFor: 0.9,
+      }),
+    ] as any);
+
+    const summary = component.positionPixelVisualEngineTensionSummary();
+    expect(summary.find((item) => item.label === 'Contradicción')?.count).toBe(1);
+    expect(summary.find((item) => item.label === 'Coherente')?.count).toBe(1);
+    expect(summary.find((item) => item.label === 'Tradeoff')?.count).toBe(0);
+  });
+
+  it('builds manual extreme position hunt candidates and meaningful presets', () => {
+    const lineup = { ...sampleLineup('4-4-2'), slots: [] };
+    const candidates = (component as any).pickManualExtremeCandidates(lineup);
+    const lines = candidates.map((candidate: any) => candidate.starterPosition);
+
+    expect(candidates.length).toBeGreaterThanOrEqual(3);
+    expect(lines).toContain('DEF');
+    expect(lines).toContain('MID');
+    expect(lines).toContain('ATT');
+
+    const attackerPresets = (component as any).manualExtremeMovementPresets(55, 18, {
+      starterId: 'p10',
+      starterName: 'Attacker',
+      starterPosition: 'ATT',
+      slotId: 'S03-2',
+    });
+
+    expect(attackerPresets.map((preset: any) => preset.label)).toContain('ATT drop link');
+    expect(attackerPresets.every((preset: any) => Math.abs(preset.dx) + Math.abs(preset.dy) >= 6)).toBeTrue();
+  });
+
+  it('includes diagonal 5px presets in the same-seed position movement smoke', () => {
+    const presets = (component as any).positionMovementPresets(50, 52);
+    const labels = presets.map((preset: any) => preset.label);
+
+    expect(labels).toContain('5px wide forward');
+    expect(labels).toContain('5px wide deeper');
+    expect(labels).toContain('5px center forward');
+    expect(labels).toContain('5px center deeper');
+
+    const diagonal = presets.find((preset: any) => preset.label === '5px wide forward');
+    expect(Math.abs(diagonal.dx)).toBe(5);
+    expect(Math.abs(diagonal.dy)).toBe(5);
+  });
+
+  it('labels same-zone diagonal position pixels as diagonals in shape read', () => {
+    const wideForward = makePositionPixelRow({
+      playerPosition: 'MID',
+      fromXPercent: 45,
+      fromYPercent: 50,
+      targetXPercent: 40,
+      targetYPercent: 45,
+    });
+    const insideDeeper = makePositionPixelRow({
+      playerPosition: 'MID',
+      fromXPercent: 38,
+      fromYPercent: 50,
+      targetXPercent: 43,
+      targetYPercent: 55,
+    });
+
+    expect(component.positionPixelShapeMove(wideForward as any)).toContain('diagonal abierto alto');
+    expect(component.positionPixelShapeMoveDetail(wideForward as any)).toContain('diagonal');
+    expect(component.positionPixelShapeMove(insideDeeper as any)).toContain('diagonal interior bajo');
+  });
+
+  it('summarizes diagonal position pixels with best worst and review counters', () => {
+    const goodDiagonal = makePositionPixelRow({
+      label: 'R1 ? 5px center deeper',
+      playerName: 'Good Mid',
+      fromXPercent: 38,
+      fromYPercent: 50,
+      targetXPercent: 43,
+      targetYPercent: 55,
+      deltaXgFor: 0.01,
+      deltaXgAgainst: -0.08,
+      deltaShotsFor: -0.1,
+      deltaShotsAgainst: -1.0,
+      deltaPossessionFor: 0.4,
+    });
+    const riskyDiagonal = makePositionPixelRow({
+      label: 'R1 ? 5px center forward',
+      playerName: 'Risk Def',
+      playerPosition: 'DEF',
+      fromXPercent: 18,
+      fromYPercent: 83,
+      targetXPercent: 23,
+      targetYPercent: 78,
+      deltaXgFor: 0,
+      deltaXgAgainst: 0.09,
+      deltaShotsFor: -0.2,
+      deltaShotsAgainst: 1.1,
+      deltaWideXgAgainst: 0.04,
+      deltaWideShotsAgainst: 0.8,
+    });
+    const mismatchDiagonal = makePositionPixelRow({
+      label: 'R1 ? 5px wide forward',
+      playerName: 'Mismatch Att',
+      playerPosition: 'ATT',
+      fromXPercent: 50,
+      fromYPercent: 12,
+      targetXPercent: 55,
+      targetYPercent: 7,
+      deltaXgFor: 0,
+      deltaShotsFor: 0,
+      deltaCentralShotsFor: 0,
+      deltaWideShotsFor: 0,
+      signalScore: 0.16,
+    });
+    const straightMove = makePositionPixelRow({
+      label: 'R1 ? 5px forward',
+      fromXPercent: 50,
+      fromYPercent: 50,
+      targetXPercent: 50,
+      targetYPercent: 45,
+    });
+
+    component.positionPixelMatrixRows.set([goodDiagonal, riskyDiagonal, mismatchDiagonal, straightMove] as any);
+
+    const summary = component.positionPixelDiagonalSummary();
+    expect(summary?.total).toBe(3);
+    expect(summary?.risk).toBe(2);
+    expect(summary?.defenseGain).toBe(1);
+    expect(summary?.best?.playerName).toBe('Good Mid');
+    expect(summary?.worst?.playerName).toBe('Risk Def');
+    expect(summary?.worstVisualMismatch?.playerName).toBe('Mismatch Att');
+    expect(summary?.worstVisualReview).toBeNull();
+    expect(component.positionPixelDiagonalSummaryRowText(summary?.best ?? null)).toContain('Good Mid');
+  });
+
+  it('filters displayed position rows to diagonals only', () => {
+    const diagonal = makePositionPixelRow({
+      label: 'R1 ? 5px wide forward',
+      fromXPercent: 50,
+      fromYPercent: 50,
+      targetXPercent: 55,
+      targetYPercent: 45,
+    });
+    const straight = makePositionPixelRow({
+      label: 'R1 ? 5px forward',
+      fromXPercent: 50,
+      fromYPercent: 50,
+      targetXPercent: 50,
+      targetYPercent: 45,
+    });
+
+    component.positionPixelMatrixRows.set([diagonal, straight] as any);
+    component.setPositionPixelReadFilter('diagonal');
+
+    expect(component.displayedPositionPixelMatrixRows().length).toBe(1);
+    expect(component.displayedPositionPixelMatrixRows()[0].label).toContain('wide forward');
+
+    component.setPositionPixelReadFilter('not-real');
+    expect(component.positionPixelReadFilter()).toBe('all');
+  });
+
+  it('filters displayed position rows by visual mismatch and visual review', () => {
+    const visualMismatch = makePositionPixelRow({
+      label: 'R1 ? 5px center forward',
+      playerName: 'Mismatch Att',
+      playerPosition: 'ATT',
+      fromXPercent: 50,
+      fromYPercent: 18,
+      targetXPercent: 50,
+      targetYPercent: 14,
+      deltaXgFor: 0,
+      deltaShotsFor: 0,
+      deltaCentralShotsFor: 0,
+      deltaWideShotsFor: 0,
+      signalScore: 0.08,
+    });
+    const visualReview = makePositionPixelRow({
+      label: 'R1 ? big zone cross',
+      playerName: 'Review Mid',
+      fromXPercent: 80,
+      fromYPercent: 80,
+      targetXPercent: 75,
+      targetYPercent: 75,
+      deltaXgFor: -0.08,
+      deltaShotsFor: -1.2,
+      deltaWideXgFor: 0.12,
+      deltaWideShotsFor: 2.4,
+      deltaRightWideXgFor: 0.10,
+    });
+    const coherent = makePositionPixelRow({
+      label: 'R1 ? 5px forward',
+      playerName: 'Coherent',
+      fromXPercent: 50,
+      fromYPercent: 50,
+      targetXPercent: 50,
+      targetYPercent: 50,
+    });
+    const lineBreak = makePositionPixelRow({
+      label: 'R2 ? big zone cross',
+      playerName: 'Line Break Def',
+      playerPosition: 'DEF',
+      fromXPercent: 16.65,
+      fromYPercent: 83,
+      targetXPercent: 16.65,
+      targetYPercent: 65,
+    });
+
+    component.positionPixelMatrixRows.set([visualMismatch, visualReview, coherent, lineBreak] as any);
+
+    component.setPositionPixelReadFilter('visual-mismatch');
+    expect(component.displayedPositionPixelMatrixRows().map((row) => row.playerName)).toContain('Mismatch Att');
+    expect(component.displayedPositionPixelMatrixRows().every((row) => component.positionPixelVisualExpectationRead(row as any) === 'Visual mismatch')).toBeTrue();
+
+    component.setPositionPixelReadFilter('visual-review');
+    expect(component.displayedPositionPixelMatrixRows().map((row) => row.playerName)).toContain('Review Mid');
+    expect(component.displayedPositionPixelMatrixRows().every((row) => component.positionPixelVisualEngineTensionRead(row as any) !== 'Coherente')).toBeTrue();
+
+    component.setPositionPixelReadFilter('diagonal-mismatch');
+    expect(component.displayedPositionPixelMatrixRows().every((row) =>
+      (component as any).positionPixelIsDiagonalMove(row as any)
+        && component.positionPixelVisualExpectationRead(row as any) === 'Visual mismatch'
+    )).toBeTrue();
+
+    component.setPositionPixelReadFilter('diagonal-review');
+    expect(component.displayedPositionPixelMatrixRows().every((row) =>
+      (component as any).positionPixelIsDiagonalMove(row as any)
+        && component.positionPixelVisualEngineTensionRead(row as any) !== 'Coherente'
+    )).toBeTrue();
+
+    component.setPositionPixelReadFilter('big-move');
+    expect(component.displayedPositionPixelMatrixRows().map((row) => row.playerName)).toEqual(['Review Mid', 'Line Break Def']);
+
+    component.setPositionPixelReadFilter('line-break');
+    expect(component.displayedPositionPixelMatrixRows().map((row) => row.playerName)).toEqual(['Line Break Def']);
+  });
+
+  it('jumps from diagonal summary to the selected position row', (done) => {
+    const diagonal = makePositionPixelRow({
+      label: 'R1 ? 5px wide forward',
+      playerName: 'Jump Mid',
+      fromXPercent: 50,
+      fromYPercent: 50,
+      targetXPercent: 55,
+      targetYPercent: 45,
+    });
+    const target = document.createElement('div');
+    const scrollSpy = spyOn(target, 'scrollIntoView');
+    const querySpy = spyOn(document, 'querySelector').and.returnValue(target);
+
+    component.jumpToPositionPixelRow(diagonal as any);
+
+    expect(component.positionPixelReadFilter()).toBe('diagonal');
+    expect(component.selectedPositionPixelRowKey()).toBe(component.positionPixelRowKey(diagonal as any));
+
+    setTimeout(() => {
+      expect(querySpy).toHaveBeenCalledWith(`[data-position-row-key="${component.positionPixelRowKey(diagonal as any)}"]`);
+      expect(scrollSpy).toHaveBeenCalled();
+      done();
+    }, 0);
+  });
+
+  it('jumps to position rows with a visual filter when requested', () => {
+    const mismatch = makePositionPixelRow({
+      label: 'R1 ? 5px center forward',
+      playerName: 'Jump Mismatch',
+      fromXPercent: 50,
+      fromYPercent: 50,
+      targetXPercent: 55,
+      targetYPercent: 45,
+    });
+
+    component.jumpToPositionPixelRow(mismatch as any, 'diagonal-mismatch');
+
+    expect(component.positionPixelReadFilter()).toBe('diagonal-mismatch');
+    expect(component.selectedPositionPixelRowKey()).toBe(component.positionPixelRowKey(mismatch as any));
+  });
+
+  it('summarizes visual expectation mismatches for position pixels', () => {
+    component.positionPixelMatrixRows.set([
+      makePositionPixelRow({
+        playerPosition: 'ATT',
+        fromYPercent: 22,
+        targetYPercent: 17,
+        deltaXgFor: 0,
+        deltaShotsFor: 0,
+      }),
+      makePositionPixelRow({
+        playerPosition: 'DEF',
+        fromYPercent: 78,
+        targetYPercent: 83,
+        deltaXgAgainst: -0.06,
+        deltaShotsAgainst: -1.1,
+      }),
+    ] as any);
+
+    const summary = component.positionPixelVisualExpectationSummary();
+    const mismatch = summary.find((item) => item.label === 'Visual mismatch');
+    const ok = summary.find((item) => item.label === 'Visual OK');
+
+    expect(mismatch?.count).toBe(1);
+    expect(mismatch?.className).toBe('read-check');
+    expect(ok?.count).toBe(1);
+  });
+
+  it('summarizes position line breaks by borderline, big, strong and tactical read', () => {
+    component.positionPixelMatrixRows.set([
+      makePositionPixelRow({
+        playerName: 'Border Forward',
+        playerPosition: 'ATT',
+        label: 'R1 ? 5px deeper',
+        fromXPercent: 18,
+        fromYPercent: 31,
+        targetXPercent: 18,
+        targetYPercent: 35,
+        deltaXgFor: 0.05,
+        deltaXgAgainst: -0.02,
+        deltaShotsFor: 0.4,
+      }),
+      makePositionPixelRow({
+        playerName: 'Risk Defender',
+        playerPosition: 'DEF',
+        label: 'R1 ? big zone cross',
+        fromXPercent: 16.65,
+        fromYPercent: 83,
+        targetXPercent: 16.65,
+        targetYPercent: 65,
+        signalScore: 0.31,
+        deltaXgFor: -0.12,
+        deltaXgAgainst: 0.18,
+        deltaXgDiff: -0.30,
+        deltaShotsFor: -1.6,
+        deltaShotsAgainst: 2.5,
+      }),
+      makePositionPixelRow({
+        playerName: 'Same Line Mid',
+        playerPosition: 'MID',
+        label: 'R1 ? 5px wide',
+        fromXPercent: 50,
+        fromYPercent: 50,
+        targetXPercent: 55,
+        targetYPercent: 50,
+      }),
+    ] as any);
+
+    const summary = component.positionPixelLineBreakSummary();
+
+    expect(summary?.total).toBe(2);
+    expect(summary?.borderline).toBe(1);
+    expect(summary?.big).toBe(1);
+    expect(summary?.strong).toBe(1);
+    expect(summary?.badTradeoff).toBe(1);
+    expect(summary?.attackGain).toBe(1);
+    expect(summary?.worst?.playerName).toBe('Risk Defender');
+    expect(summary?.best?.playerName).toBe('Border Forward');
+  });
+
+  it('keeps visual MID line through the softened MID/DEF border at 67px', () => {
+    expect((component as any).positionPixelVisualLine(66)).toBe('MID');
+    expect((component as any).positionPixelVisualLine(67)).toBe('MID');
+    expect((component as any).positionPixelVisualLine(68.9)).toBe('MID');
+    expect((component as any).positionPixelVisualLine(69)).toBe('DEF');
+  });
+
+  it('labels softened visual transition bands for coach readability', () => {
+    expect(component.positionPixelVisualLineLabel(31.9)).toBe('ATT');
+    expect(component.positionPixelVisualLineLabel(32)).toBe('ATT/MID');
+    expect(component.positionPixelVisualLineLabel(34)).toBe('ATT/MID');
+    expect(component.positionPixelVisualLineLabel(36)).toBe('ATT/MID');
+    expect(component.positionPixelVisualLineLabel(37)).toBe('MID');
+    expect(component.positionPixelVisualLineLabel(65)).toBe('MID/DEF');
+    expect(component.positionPixelVisualLineLabel(67)).toBe('MID/DEF');
+    expect(component.positionPixelVisualLineLabel(69)).toBe('MID/DEF');
+    expect(component.positionPixelVisualLineLabel(70)).toBe('DEF');
+  });
+
+  it('records position smoke run summaries by scope for comparison', () => {
+    (component as any).recordPositionPixelSmokeRun('MID', 'MID calibration sweep', [
+      makePositionPixelRow({
+        label: 'R1 vs Sevilla ? 5px wide',
+        playerName: 'Mid One',
+        playerPosition: 'MID',
+        slotId: 'm1',
+        deltaXgAgainst: 0.04,
+        deltaShotsAgainst: 0.5,
+      }),
+    ]);
+    (component as any).recordPositionPixelSmokeRun('DEF', 'DEF calibration sweep', [
+      makePositionPixelRow({
+        label: 'R2 vs Valencia ? 5px deeper',
+        playerName: 'Def One',
+        playerPosition: 'DEF',
+        slotId: 'd1',
+      }),
+    ]);
+    (component as any).recordPositionPixelSmokeRun('MID', 'MID calibration sweep rerun', [
+      makePositionPixelRow({
+        label: 'R2 vs Valencia ? 5px center',
+        playerName: 'Mid Two',
+        playerPosition: 'MID',
+        slotId: 'm2',
+      }),
+    ]);
+
+    const summaries = component.positionPixelSmokeRunSummaries();
+    expect(summaries.map((item) => item.scope)).toEqual(['DEF', 'MID']);
+    expect(summaries.find((item) => item.scope === 'MID')?.label).toBe('MID calibration sweep rerun');
+    expect(summaries.find((item) => item.scope === 'MID')?.matchCount).toBe(1);
+    expect(summaries.find((item) => item.scope === 'DEF')?.playerCount).toBe(1);
+  });
+
   it('flags repeated 5px risks only when the signal is strong enough', () => {
     component.positionPixelMatrixRows.set([
       makePositionPixelRow({ label: 'R1 ? 5px forward', signalScore: 0.17 }),
@@ -1125,6 +2335,59 @@ describe('TestHarnessPageComponent', () => {
     expect(summary.verdict).toBe('5px visible pattern');
     expect(noCliffRow?.verdict).toBe('OK');
     expect(noCliffRow?.observed).toContain('2 visible 5px pattern(s)');
+  });
+
+  it('does not let a big move trigger a repeated 5px bias verdict', () => {
+    const softFivePxRisk = (label: string) => makePositionPixelRow({
+      label,
+      signalScore: 0.045,
+      deltaXgAgainst: 0.02,
+      deltaShotsAgainst: 0.35,
+    });
+    component.positionPixelMatrixRows.set([
+      softFivePxRisk('R1 ? 5px forward'),
+      softFivePxRisk('R1 ? 5px deeper'),
+      softFivePxRisk('R1 ? 5px wide'),
+      softFivePxRisk('R1 ? 5px center'),
+      softFivePxRisk('R1 ? 5px wide forward'),
+      softFivePxRisk('R1 ? 5px center deeper'),
+      makePositionPixelRow({
+        label: 'R1 ? big zone cross',
+        signalScore: 0.30,
+        deltaXgAgainst: 0.20,
+        deltaShotsAgainst: 2.0,
+      }),
+    ] as any);
+
+    const [summary] = component.positionPixelMatchSmokeSummary();
+
+    expect(summary.fivePxRiskRows).toBe(6);
+    expect(summary.worstSignal).toBe(0.30);
+    expect(summary.verdict).not.toBe('Repeated 5px bias');
+    expect(summary.verdict).not.toBe('5px visible pattern');
+  });
+
+  it('labels low-impact big moves separately from stable micro moves', () => {
+    component.positionPixelMatrixRows.set([
+      makePositionPixelRow({
+        label: 'R1 ? big zone cross',
+        fromXPercent: 38,
+        fromYPercent: 50,
+        targetXPercent: 38,
+        targetYPercent: 32,
+        signalScore: 0.03,
+        deltaXgFor: 0.02,
+        deltaXgAgainst: 0.01,
+        deltaShotsFor: 0.2,
+        deltaShotsAgainst: 0.1,
+      }),
+    ] as any);
+
+    const [matchSummary] = component.positionPixelMatchSmokeSummary();
+    const [playerSummary] = component.positionPixelPlayerSmokeSummary();
+
+    expect(matchSummary.verdict).toBe('Big neutral move');
+    expect(playerSummary.verdict).toBe('Big neutral move');
   });
 
   it('keeps professional QA checklist combined across formation, pixel and swap batteries', () => {
@@ -1157,6 +2420,47 @@ describe('TestHarnessPageComponent', () => {
     expect(pixel?.observed).toContain('1 rows');
     expect(swap?.observed).toContain('1 swaps');
     expect(swap?.verdict).toBe('OK');
+  });
+
+  it('marks all-formations line audit as a complete visible contract', () => {
+    const lines = ['DEF', 'MID', 'ATT'] as const;
+    const rows = (component as any).formationCodes.flatMap((formation: string) =>
+      lines.map((line) => ({
+        formation,
+        line,
+        candidates: line === 'DEF' ? 4 : 3,
+        expectedRows: 12,
+        players: `${formation}-${line}`,
+        slotRoles: line,
+        verdict: 'OK',
+        warnings: '-',
+      }))
+    );
+
+    component.formationLineSmokeRows.set(rows as any);
+
+    const audit = component.professionalQaChecklistRows()
+      .find((row) => row.check === 'All formations audit');
+
+    expect(audit?.observed).toContain('36/36 rows');
+    expect(audit?.observed).toContain('12/12 formations');
+    expect(audit?.verdict).toBe('OK');
+  });
+
+  it('formats current lineup multi-seed as a readable coach summary', () => {
+    const summary = {
+      formation: '4-4-2',
+      seedCount: 12,
+      avgGoalsFor: 1.42,
+      avgGoalsAgainst: 0.83,
+      avgPossessionFor: 53.4,
+      avgXgDiff: 0.24,
+      avgShotDiff: 1.1,
+    } as any;
+
+    expect(component.currentLineupMultiSeedReadable(summary)).toContain('12 seeds');
+    expect(component.currentLineupMultiSeedReadable(summary)).toContain('4-4-2');
+    expect(component.currentLineupMultiSeedSignal(summary)).toBe('Señal positiva');
   });
 
   it('uses precision comparison rows as player swap checklist evidence', () => {
@@ -1515,6 +2819,76 @@ describe('TestHarnessPageComponent', () => {
     expect(component.analysisReadyMessage()).toContain('Scenario smoke no pudo generar Panel E');
     expect(component.analysisReadyMessage()).toContain('Not Found');
     expect(snackBarSpy.open).toHaveBeenCalled();
+  });
+
+  it('replays the last modal move with persisted before and after coordinates', () => {
+    const modalMove = {
+      version: 1,
+      createdAt: '2026-07-17T00:00:00.000Z',
+      source: 'squad-editor-modal',
+      formation: '4-4-2',
+      playerId: 'p6',
+      playerName: 'Player 6',
+      playerPosition: 'MID',
+      playerRole: 'MID',
+      slotId: 'S06-1',
+      fromXPercent: 38.85,
+      fromYPercent: 50,
+      targetXPercent: 38.85,
+      targetYPercent: 32,
+      deltaXPercent: 0,
+      deltaYPercent: -18,
+      coachReadTitle: 'Player 6: MIDC -> MIDC',
+      coachReadBody: 'test',
+    };
+    window.localStorage.setItem('manager:last-modal-position-move', JSON.stringify(modalMove));
+    harness.runPositionPixelMatrixSummary.and.returnValue(of(makePositionPixelRow({
+      matchId: 'match-1',
+      playerId: 'p6',
+      playerName: 'Player 6',
+      playerPosition: 'MID',
+      slotId: 'S06-1',
+      fromXPercent: 38.85,
+      fromYPercent: 50,
+      targetXPercent: 38.85,
+      targetYPercent: 32,
+      deltaXgFor: 0.04,
+      deltaXgAgainst: 0.01,
+      deltaXgDiff: 0.03,
+    })) as any);
+    component.selectMatch(makeMatchRow('match-1') as any);
+
+    component.onRunLastModalMovePositionSmoke();
+
+    expect(harness.resetInjuries).toHaveBeenCalled();
+    expect(harness.manualSelectLineup).toHaveBeenCalledWith(
+      '4-4-2',
+      jasmine.arrayContaining(['p6']),
+      jasmine.arrayContaining([
+        jasmine.objectContaining({
+          playerId: 'p6',
+          subdivisionId: 'S06-1',
+          customXPercent: 38.85,
+          customYPercent: 50,
+        }),
+      ])
+    );
+    expect(harness.runPositionPixelMatrixSummary).toHaveBeenCalledWith('match-1', jasmine.objectContaining({
+      playerId: 'p6',
+      targetXPercent: 38.85,
+      targetYPercent: 32,
+      deltaXPercent: 0,
+      deltaYPercent: -18,
+      seedStart: 12345,
+      seedCount: 10,
+    }));
+    expect(component.positionPixelMatrixRows().length).toBe(1);
+    expect(component.positionPixelMatrixRows()[0].targetYPercent).toBe(32);
+    expect(component.lineupDebugSnapshot()?.rows.map((row) => row.name)).toEqual([
+      'Player 6 (antes)',
+      'Player 6 (despues)',
+    ]);
+    expect(component.lineupDebugSnapshot()?.rows.map((row) => row.y)).toEqual([50, 32]);
   });
 });
 

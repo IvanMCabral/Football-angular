@@ -52,15 +52,18 @@
         </small>
       </div>
 
-      <!-- Equipos por División -->
+      <!-- Tamaño de cada división -->
       <div class="form-group" *ngIf="selectedLeagueId && (availableTeamsPerDivision$ | async)?.length">
-        <label>📊 Equipos por División</label>
+        <label>📊 Tamaño de cada división</label>
         <select [(ngModel)]="selectedTeamsPerDivision" (change)="onTeamsPerDivisionChange()" class="form-select">
           <option [value]="null">Una sola división (todos los equipos)</option>
           <option *ngFor="let opt of (availableTeamsPerDivision$ | async)" [value]="opt">
-            {{ opt }} equipos
+            {{ opt }} equipos por división
           </option>
         </select>
+        <small class="hint" *ngIf="selectedTeamsPerDivision && (totalTeamsInLeague$ | async) as totalTeams">
+          Se crearán {{ (totalTeams / selectedTeamsPerDivision) | number:'1.0-0' }} divisiones de hasta {{ selectedTeamsPerDivision }} equipos.
+        </small>
       </div>
 
       <!-- Preview de Divisiones -->

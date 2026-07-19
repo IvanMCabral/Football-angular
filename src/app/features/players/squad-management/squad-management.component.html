@@ -259,7 +259,7 @@
             <div *ngIf="lineup.chemistryBreakdown as bd" class="chemistry-breakdown">
               <div class="breakdown-header">
                 Chemistry Breakdown
-                <span class="breakdown-coverage">({{ bd.coveragePercentage ?? 0 }}% coverage)</span>
+                <span class="breakdown-coverage">({{ bd.coveragePercentage }}% coverage)</span>
               </div>
               <div class="breakdown-row"
                    *ngFor="let group of positionGroupOrder">

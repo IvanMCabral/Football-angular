@@ -342,8 +342,8 @@ import {
           <app-match-shot-map
             *ngIf="hasShotMap()"
             [shotsInput]="shotInputs()"
-            [homeTeamId]="detail?.homeTeamId ?? null"
-            [awayTeamId]="detail?.awayTeamId ?? null">
+            [homeTeamId]="detail.homeTeamId"
+            [awayTeamId]="detail.awayTeamId">
           </app-match-shot-map>
         </div>
 

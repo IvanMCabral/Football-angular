@@ -217,6 +217,7 @@ export class SquadManagementComponent implements OnInit {
 selectedFormation$ = new BehaviorSubject<string>('4-4-2');
 
 private applyLineup(lineup: LineupDTO | null): void {
+  lineup = this.normalizeLineupForDisplay(lineup);
   this.lineupSubject$.next(lineup);
   this.lineupWarning$.next(this.pickLineupWarning(lineup?.warnings));
 
@@ -231,6 +232,28 @@ private applyLineup(lineup: LineupDTO | null): void {
   if (lineup?.formation && ALL_FORMATIONS.includes(lineup.formation as any)) {
     this.selectedFormation$.next(lineup.formation);
   }
+}
+
+private normalizeLineupForDisplay(lineup: LineupDTO | null): LineupDTO | null {
+  if (!lineup) {
+    return null;
+  }
+  const slots = (lineup.slots ?? [])
+    .filter(slot => !!slot?.playerId && !!slot?.subdivisionId)
+    .filter((slot, index, arr) =>
+      arr.findIndex(other => other.playerId === slot.playerId || other.subdivisionId === slot.subdivisionId) === index
+    )
+    .slice(0, 11);
+  const slotPlayerIds = new Set(slots.map(slot => slot.playerId));
+  const players = (lineup.players ?? [])
+    .filter((player, index, arr) => !!player?.playerId && arr.findIndex(other => other.playerId === player.playerId) === index)
+    .filter(player => slotPlayerIds.size === 0 || slotPlayerIds.has(player.playerId))
+    .slice(0, 11);
+  return {
+    ...lineup,
+    players,
+    slots,
+  };
 }
   /**
    * V25D38-F1: extendido a las 7 formations que el engine soporta.

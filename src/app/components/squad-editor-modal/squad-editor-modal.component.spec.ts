@@ -4266,4 +4266,227 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
     }
     expect(bad).toBe(0);
   });
+  it('resetCustomPositions: clears last movement read so visual smokes start clean', (done) => {
+    setTimeout(() => {
+      const home = (component as any).homePlayers$.value.slice();
+      home.forEach((p: any) => { p.xPercent = 25; p.yPercent = 75; });
+      (component as any).homePlayers$.next([...home]);
+      (component as any).lastCoachMoveRead = {
+        title: 'Vinicius se proyecta',
+        body: 'Canales: L +1.',
+        level: 'good'
+      };
+      (component as any).pendingCoachMoveBaseline = {
+        attack: 100,
+        midfield: 100,
+        defense: 100,
+        chemistry: 90,
+        channels: { left: 80, center: 90, right: 80 },
+        visualChannels: []
+      };
+
+      (component as any).resetCustomPositions();
+
+      expect((component as any).lastCoachMoveRead).toBeNull();
+      expect((component as any).pendingCoachMoveBaseline).toBeNull();
+      done();
+    }, 30);
+  });
+
+  it('template exposes a stable reset positions test id for visual smoke automation', (done) => {
+    setTimeout(() => {
+      const home = (component as any).homePlayers$.value.slice();
+      home.forEach((p: any) => { p.xPercent = 25; p.yPercent = 75; });
+      (component as any).homePlayers$.next([...home]);
+      fixture.detectChanges();
+
+      const button = fixture.nativeElement.querySelector('[data-testid="reset-custom-positions-button"]');
+
+      expect(button).toBeTruthy();
+      done();
+    }, 30);
+  });
+
+  it('tacticalChannelBreakdown separates threat connection and coverage reads', (done) => {
+    setTimeout(() => {
+      const home = (component as any).homePlayers$.value.slice();
+      const sample = [
+        { ...home[0], playerId: 'att-l', position: 'ATT', slotId: 'ATT-L', xPercent: 15, yPercent: 28 },
+        { ...home[1], playerId: 'mid-l', position: 'MID', slotId: 'MID-L', xPercent: 18, yPercent: 52 },
+        { ...home[2], playerId: 'def-l', position: 'DEF', slotId: 'DEF-L', xPercent: 20, yPercent: 78 },
+        { ...home[3], playerId: 'mid-c', position: 'MID', slotId: 'MID-C', xPercent: 50, yPercent: 55 },
+        { ...home[4], playerId: 'att-r', position: 'ATT', slotId: 'ATT-R', xPercent: 82, yPercent: 30 },
+      ].filter(Boolean);
+      (component as any).homePlayers$.next(sample);
+
+      const left = (component as any).tacticalChannelBreakdown.find((row: any) => row.label === 'L');
+      const right = (component as any).tacticalChannelBreakdown.find((row: any) => row.label === 'R');
+
+      expect(left.threat).toBeGreaterThan(0);
+      expect(left.connection).toBeGreaterThan(0);
+      expect(left.coverage).toBeGreaterThan(0);
+      expect(right.threat).toBeGreaterThan(0);
+      expect(right.coverage).toBeLessThan(left.coverage);
+      done();
+    }, 30);
+  });
+
+  it('last coach move read includes visual threat connection and coverage deltas', (done) => {
+    setTimeout(() => {
+      const home = (component as any).homePlayers$.value.slice();
+      const sample = [
+        { ...home[0], playerId: 'att-l', position: 'ATT', role: 'ATT', slotId: 'ATT-L', xPercent: 15, yPercent: 28 },
+        { ...home[1], playerId: 'mid-c', position: 'MID', role: 'MID', slotId: 'MID-C', xPercent: 50, yPercent: 52 },
+        { ...home[2], playerId: 'def-l', position: 'DEF', role: 'DEF', slotId: 'DEF-L', xPercent: 18, yPercent: 78 },
+      ].filter(Boolean);
+      (component as any).homePlayers$.next(sample);
+
+      (component as any).pendingCoachMoveBaseline = {
+        attack: 100,
+        midfield: 100,
+        defense: 100,
+        chemistry: 90,
+        channels: { left: 70, center: 70, right: 70 },
+        visualChannels: (component as any).tacticalChannelBreakdown,
+      };
+      (component as any).lastCoachMoveRead = {
+        title: 'Test move',
+        body: 'Base read.',
+        level: 'info',
+      };
+
+      const moved = sample.map((p: any) =>
+        p.playerId === 'att-l'
+          ? { ...p, xPercent: 50, yPercent: 54 }
+          : p
+      );
+      (component as any).homePlayers$.next(moved);
+      (component as any).enrichLastCoachMoveReadWithLatestDelta();
+
+      expect((component as any).lastCoachMoveRead.body).toContain('Visual:');
+      expect((component as any).lastCoachMoveRead.body).toContain('Amenaza');
+      done();
+    }, 30);
+  });
+
+  it('last coach move read warns when visual threat rises but engine attack drops', (done) => {
+    setTimeout(() => {
+      const home = (component as any).homePlayers$.value.slice();
+      const sample = [
+        { ...home[0], playerId: 'att-l', position: 'ATT', role: 'ATT', slotId: 'ATT-L', xPercent: 15, yPercent: 28 },
+        { ...home[1], playerId: 'mid-c', position: 'MID', role: 'MID', slotId: 'MID-C', xPercent: 50, yPercent: 52 },
+        { ...home[2], playerId: 'def-l', position: 'DEF', role: 'DEF', slotId: 'DEF-L', xPercent: 18, yPercent: 78 },
+      ].filter(Boolean);
+      (component as any).homePlayers$.next(sample);
+
+      (component as any).liveRatings = { attackRating: 100, midfieldRating: 100, defenseRating: 100 };
+      (component as any).pendingCoachMoveBaseline = {
+        attack: 130,
+        midfield: 100,
+        defense: 100,
+        chemistry: 90,
+        channels: { left: 70, center: 70, right: 70 },
+        visualChannels: [
+          { label: 'L', threat: 5, connection: 5, coverage: 5 },
+          { label: 'C', threat: 5, connection: 5, coverage: 5 },
+          { label: 'R', threat: 5, connection: 5, coverage: 5 },
+        ],
+      };
+      (component as any).lastCoachMoveRead = {
+        title: 'Test tension',
+        body: 'Base read.',
+        level: 'info',
+      };
+
+      (component as any).enrichLastCoachMoveReadWithLatestDelta();
+
+      expect((component as any).lastCoachMoveRead.body).toContain('Ojo: sube la amenaza visual, pero baja ATT general');
+      expect((component as any).lastCoachMoveRead.level).toBe('danger');
+      done();
+    }, 30);
+  });
+
+  it('last coach move read treats defender steps as risk tradeoffs', (done) => {
+    setTimeout(() => {
+      const home = (component as any).homePlayers$.value.slice();
+      const defender = {
+        ...home[0],
+        playerId: 'def-step',
+        name: 'Def Step',
+        position: 'DEF',
+        role: 'DEF',
+        slotId: 'DEF-C',
+        xPercent: 50,
+        yPercent: 83,
+      };
+
+      (component as any).setLastCoachMoveReadForDrag(defender, 50, 83, 50, 57, false);
+
+      expect((component as any).lastCoachMoveRead.title).toContain('DEF');
+      expect((component as any).lastCoachMoveRead.body).toContain('Sube un defensor');
+      expect((component as any).lastCoachMoveRead.body).toContain('tradeoff de riesgo');
+      expect((component as any).lastCoachMoveRead.level).toBe('danger');
+      done();
+    }, 30);
+  });
+
+  it('last coach move read treats wide and inside drags as tactical tradeoffs', (done) => {
+    setTimeout(() => {
+      const home = (component as any).homePlayers$.value.slice();
+      const midfielder = {
+        ...home[0],
+        playerId: 'mid-tradeoff',
+        name: 'Mid Tradeoff',
+        position: 'MID',
+        role: 'MID',
+        slotId: 'MID-C',
+        xPercent: 50,
+        yPercent: 50,
+      };
+
+      (component as any).setLastCoachMoveReadForDrag(midfielder, 50, 50, 82, 50, false);
+
+      expect((component as any).lastCoachMoveRead.title).toContain('abre la cancha');
+      expect((component as any).lastCoachMoveRead.body).toContain('Tradeoff de amplitud');
+      expect((component as any).lastCoachMoveRead.body).toContain('validalo en harness/partido');
+      expect((component as any).lastCoachMoveRead.level).toBe('warn');
+
+      (component as any).setLastCoachMoveReadForDrag(midfielder, 82, 50, 50, 50, false);
+
+      expect((component as any).lastCoachMoveRead.title).toContain('se cierra');
+      expect((component as any).lastCoachMoveRead.body).toContain('Tradeoff interior/exterior');
+      expect((component as any).lastCoachMoveRead.body).toContain('liberar la banda');
+      expect((component as any).lastCoachMoveRead.level).toBe('warn');
+      done();
+    }, 30);
+  });
+
+  it('last coach move read names diagonal combined moves explicitly', (done) => {
+    setTimeout(() => {
+      const home = (component as any).homePlayers$.value.slice();
+      const midfielder = {
+        ...home[0],
+        playerId: 'mid-diagonal',
+        name: 'Mid Diagonal',
+        position: 'MID',
+        role: 'MID',
+        slotId: 'MID-C',
+        xPercent: 50,
+        yPercent: 54,
+      };
+
+      (component as any).setLastCoachMoveReadForDrag(midfielder, 50, 54, 82, 44, false);
+
+      expect((component as any).lastCoachMoveRead.title).toContain('se proyecta abierto');
+      expect((component as any).lastCoachMoveRead.body).toContain('Tradeoff de amplitud/profundidad');
+      expect((component as any).lastCoachMoveRead.level).toBe('warn');
+
+      (component as any).setLastCoachMoveReadForDrag(midfielder, 82, 44, 50, 62, false);
+
+      expect((component as any).lastCoachMoveRead.title).toContain('cierra para cubrir');
+      expect((component as any).lastCoachMoveRead.body).toContain('Tradeoff compactacion/amplitud');
+      expect((component as any).lastCoachMoveRead.level).toBe('info');
+      done();
+    }, 30);
+  });
 });

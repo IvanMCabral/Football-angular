@@ -11,7 +11,7 @@ import {
   inject,
   OnInit,
 } from '@angular/core';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -22,18 +22,18 @@ import { MatchDetail } from '../models/match-detail.model';
 @Component({
   selector: 'app-match-compare-page',
   standalone: true,
-  imports: [CommonModule, RouterLink, MatButtonModule, MatIconModule],
+  imports: [CommonModule, MatButtonModule, MatIconModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="compare-page">
       <header class="compare-header">
         <a (click)="navigateBack()" class="back-link">
-          ← Volver al detail
+          ← Volver al detalle
         </a>
-        <h1 class="compare-title">🔄 Match Compare: Baseline vs Live</h1>
+        <h1 class="compare-title">🔄 Comparación de partido: baseline vs live</h1>
         <p *ngIf="comparison" class="compare-subtitle">
           {{ comparison.baseline.homeTeamName }} vs {{ comparison.baseline.awayTeamName }}
-          · Season {{ comparison.baseline.seasonNumber }} · Round {{ comparison.baseline.round }}
+          · Temporada {{ comparison.baseline.seasonNumber }} · Fecha {{ comparison.baseline.round }}
         </p>
       </header>
 
@@ -98,7 +98,7 @@ import { MatchDetail } from '../models/match-detail.model';
                   </td>
                 </tr>
                 <tr>
-                  <td>Posesión Local</td>
+                  <td>Posesión local</td>
                   <td class="col-baseline">{{ comparison.baseline.homePossession }}%</td>
                   <td>
                     <span [class]="deltaClass(comparison.diff.possessionDeltaHome)">
@@ -113,7 +113,7 @@ import { MatchDetail } from '../models/match-detail.model';
 
           <!-- Timeline diff (bucket-based) -->
           <section class="timeline-section">
-            <h2>⏱️ Timeline (buckets de 5 min)</h2>
+            <h2>⏱️ Timeline (bloques de 5 min)</h2>
             <p class="timeline-hint">
               Cuenta de eventos por bucket. No se matchea por jugador porque el engine consume draws distintos en cada corrida.
             </p>
@@ -244,8 +244,8 @@ import { MatchDetail } from '../models/match-detail.model';
       color: #666;
       margin-top: 0.5rem;
     }
-    .legend-base::before { content: '◼ '; color: #555; }
-    .legend-live::before { content: '◼ '; color: #1976d2; }
+    .legend-base::before { content: '▼ '; color: #555; }
+    .legend-live::before { content: '▼ '; color: #1976d2; }
   `],
 })
 export class MatchComparePageComponent implements OnInit {

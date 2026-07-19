@@ -61,7 +61,7 @@ describe('MatchComparePageComponent', () => {
     const html = fixture.nativeElement.textContent;
     expect(html).toContain('Baseline');
     expect(html).toContain('Live');
-    expect(html).toContain('Match Compare');
+    expect(html).toContain('Comparaci\u00f3n de partido');
   });
 
   it('shows error when comparison is null (no baseline or no detail)', async () => {
@@ -71,7 +71,7 @@ describe('MatchComparePageComponent', () => {
     fixture.detectChanges();
 
     expect(component.comparison).toBeNull();
-    expect(component.error).toContain('Comparación no disponible');
+    expect(component.error).toContain('Comparaci\u00f3n no disponible');
     expect(snackBarSpy.open).toHaveBeenCalled();
   });
 
