@@ -431,6 +431,30 @@ describe('TestHarnessPageComponent', () => {
     expect(component.selectedMatchScopeWarning()).toContain('Controlar: Local/Visitante');
   });
 
+  it('disables user-lineup formation audit when controlling local or visitor', () => {
+    component.controlledTeamSideModel = 'HOME';
+
+    expect(component.canRunUserLineupAudit()).toBeFalse();
+    expect(component.userLineupAuditDisabledReason()).toContain('Formation matrix');
+  });
+
+  it('does not run all-formations user lineup audit for local or visitor scope', () => {
+    component.controlledTeamSideModel = 'AWAY';
+    harness.getCurrentLineup.calls.reset();
+    harness.autoSelectLineup.calls.reset();
+    snackBarSpy.open.calls.reset();
+
+    component.onRunAllFormationsLineAudit();
+
+    expect(harness.getCurrentLineup).not.toHaveBeenCalled();
+    expect(harness.autoSelectLineup).not.toHaveBeenCalled();
+    expect(snackBarSpy.open).toHaveBeenCalledWith(
+      jasmine.stringMatching(/Formation matrix|Formation avg/),
+      'OK',
+      { duration: 5000 }
+    );
+  });
+
   it('onFormationChange updates the model', () => {
     component.onFormationChange('3-5-2');
     expect(component.selectedFormationModel).toBe('3-5-2');

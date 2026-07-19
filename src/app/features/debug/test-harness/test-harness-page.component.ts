@@ -1328,7 +1328,8 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
               <button
                 mat-stroked-button
                 (click)="onRunCurrentFormationLineAudit()"
-                [disabled]="mutationInFlight() || !userTeamName()"
+                [disabled]="mutationInFlight() || !canRunUserLineupAudit()"
+                [title]="userLineupAuditDisabledReason()"
                 aria-label="Audit current formation DEF MID ATT candidates before running line smokes"
               >
                 Formation line audit
@@ -1336,7 +1337,8 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
               <button
                 mat-stroked-button
                 (click)="onRunAllFormationsLineAudit()"
-                [disabled]="mutationInFlight() || !userTeamName()"
+                [disabled]="mutationInFlight() || !canRunUserLineupAudit()"
+                [title]="userLineupAuditDisabledReason()"
                 aria-label="Audit every formation DEF MID ATT candidates before running expensive line smokes"
               >
                 All formations line audit
@@ -9895,6 +9897,12 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     runScope(0);
   }
   onRunCurrentFormationLineAudit(): void {
+    if (!this.canRunUserLineupAudit()) {
+      const reason = this.userLineupAuditDisabledReason();
+      this.analysisReadyMessage.set(reason);
+      this.snackBar.open(reason, 'OK', { duration: 5000 });
+      return;
+    }
     const matches = this.userTeamMatches()
       .filter((match) => match.status === 'COMPLETED')
       .slice(0, 3);
@@ -9935,6 +9943,12 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     });
   }
   onRunAllFormationsLineAudit(): void {
+    if (!this.canRunUserLineupAudit()) {
+      const reason = this.userLineupAuditDisabledReason();
+      this.analysisReadyMessage.set(reason);
+      this.snackBar.open(reason, 'OK', { duration: 5000 });
+      return;
+    }
     const matches = this.userTeamMatches()
       .filter((match) => match.status === 'COMPLETED')
       .slice(0, 3);
@@ -11228,6 +11242,18 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return this.controlledTeamSideModel === 'USER'
       ? this.selectedMatchIncludesUserTeam()
       : this.selectedMatchId() !== null;
+  }
+  canRunUserLineupAudit(): boolean {
+    return !!this.userTeamName() && this.controlledTeamSideModel === 'USER';
+  }
+  userLineupAuditDisabledReason(): string {
+    if (!this.userTeamName()) {
+      return 'Necesitás una carrera con equipo de usuario para auditar el lineup editable.';
+    }
+    if (this.controlledTeamSideModel !== 'USER') {
+      return 'Este audit usa el lineup editable de Mi equipo. Para Local/Visitante usá Formation matrix o Formation avg.';
+    }
+    return 'Audita el lineup editable de Mi equipo.';
   }
   scenarioBatteryScopeHint(): string {
     const available = this.scenarioBatteryCandidateMatches().length;
