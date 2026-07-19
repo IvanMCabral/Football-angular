@@ -2822,9 +2822,9 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 <small>Cobertura/defensa mejora</small>
               </div>
               <div>
-                <span>Visual mismatch</span>
+                <span>Visual review</span>
                 <strong [class]="diagonal.visualMismatch > 0 ? 'read-check' : 'read-stable'">{{ diagonal.visualMismatch }}</strong>
-                <small>Promesa visual no acompañada</small>
+                <small>Expectativa visual para revisar</small>
                 <button
                   *ngIf="diagonal.worstVisualMismatch"
                   type="button"
@@ -3055,7 +3055,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                   <option value="diagonal-mismatch">Diagonal mismatch</option>
                   <option value="diagonal-micro">Diagonal micro</option>
                   <option value="diagonal-review">Diagonal tradeoff</option>
-                  <option value="visual-mismatch">Visual mismatch</option>
+                  <option value="visual-mismatch">Visual review</option>
                   <option value="visual-micro">Visual micro</option>
                   <option value="visual-review">Visual tradeoff</option>
                   <option value="big-move">Big moves</option>
@@ -5662,7 +5662,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         if (filter === 'all') return true;
         if (filter === 'diagonal') return this.positionPixelIsDiagonalMove(row);
         if (filter === 'diagonal-mismatch') {
-          return this.positionPixelIsDiagonalMove(row) && this.positionPixelVisualExpectationRead(row) === 'Visual mismatch';
+          return this.positionPixelIsDiagonalMove(row) && this.positionPixelVisualExpectationRead(row) === 'Visual review';
         }
         if (filter === 'diagonal-micro') {
           return this.positionPixelIsDiagonalMove(row) && this.positionPixelVisualExpectationRead(row) === 'Visual micro';
@@ -5670,7 +5670,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         if (filter === 'diagonal-review') {
           return this.positionPixelIsDiagonalMove(row) && this.positionPixelVisualEngineTensionRead(row) !== 'Coherente';
         }
-        if (filter === 'visual-mismatch') return this.positionPixelVisualExpectationRead(row) === 'Visual mismatch';
+        if (filter === 'visual-mismatch') return this.positionPixelVisualExpectationRead(row) === 'Visual review';
         if (filter === 'visual-micro') return this.positionPixelVisualExpectationRead(row) === 'Visual micro';
         if (filter === 'visual-review') return this.positionPixelVisualEngineTensionRead(row) !== 'Coherente';
         if (filter === 'big-move') return this.positionPixelIsBigMove(row);
@@ -5720,7 +5720,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       this.positionPixelDecisionScore(row) < this.positionPixelDecisionScore(candidate) ? row : candidate,
       rows[0]
     );
-    const visualMismatchRows = rows.filter((row) => this.positionPixelVisualExpectationRead(row) === 'Visual mismatch');
+    const visualMismatchRows = rows.filter((row) => this.positionPixelVisualExpectationRead(row) === 'Visual review');
     const visualMicroRows = rows.filter((row) => this.positionPixelVisualExpectationRead(row) === 'Visual micro');
     const visualReviewRows = rows.filter((row) => this.positionPixelVisualEngineTensionRead(row) !== 'Coherente');
     const worstVisualMismatch = this.pickWorstPositionPixelReviewRow(visualMismatchRows);
@@ -13223,11 +13223,11 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   }
   positionPixelVisualExpectationRead(row: PositionPixelMatrixSummary): string {
     if (this.positionPixelVisualExpectationMismatches(row).length === 0) return 'Visual OK';
-    return this.positionPixelIsMicroVisualMismatch(row) ? 'Visual micro' : 'Visual mismatch';
+    return this.positionPixelIsMicroVisualMismatch(row) ? 'Visual micro' : 'Visual review';
   }
   positionPixelVisualExpectationClass(row: PositionPixelMatrixSummary): string {
     const read = this.positionPixelVisualExpectationRead(row);
-    if (read === 'Visual mismatch') return 'read-check';
+    if (read === 'Visual review') return 'read-check';
     if (read === 'Visual micro') return 'read-stable';
     return 'read-stable';
   }
@@ -13796,15 +13796,15 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   }
   positionPixelVisualExpectationSummary(): Array<{ label: string; count: number; className: string; hint: string }> {
     const rows = this.positionPixelMatrixRows();
-    const mismatch = rows.filter((row) => this.positionPixelVisualExpectationRead(row) === 'Visual mismatch').length;
+    const mismatch = rows.filter((row) => this.positionPixelVisualExpectationRead(row) === 'Visual review').length;
     const micro = rows.filter((row) => this.positionPixelVisualExpectationRead(row) === 'Visual micro').length;
     const ok = rows.filter((row) => this.positionPixelVisualExpectationRead(row) === 'Visual OK').length;
     return [
       {
-        label: 'Visual mismatch',
+        label: 'Visual review',
         count: mismatch,
         className: mismatch > 0 ? 'read-check' : 'read-stable',
-        hint: 'Filas donde la lectura visual de DT no coincide con la respuesta del motor.',
+        hint: 'Filas donde la expectativa visual básica necesita revisión contextual; no es contradicción automática.',
       },
       {
         label: 'Visual micro',
