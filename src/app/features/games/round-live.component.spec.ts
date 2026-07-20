@@ -485,6 +485,91 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
     });
   });
 
+  it('BUG #3 (6/7): RED_CARD in a non-user match does NOT interrupt the manager', (done) => {
+    const otherMatchId = 'match-other-red';
+    setVm([
+      { match: makeMatch('SCHEDULED'), isUserMatch: true, userTeamId: SAMPLE_HOME_TEAM_ID },
+      {
+        match: {
+          ...makeMatch('SCHEDULED'),
+          id: otherMatchId,
+          homeTeamId: 'other-home',
+          awayTeamId: 'other-away'
+        },
+        isUserMatch: false
+      }
+    ]);
+    (component as any).startRoundEngine(SAMPLE_GAME_ID, (component as any).vmSubject.value.matches);
+
+    roundStateSubject.next(makeRoundState([
+      makeMatchState({ matchId: SAMPLE_MATCH_ID, status: 'RUNNING', currentMinute: 40 }),
+      makeMatchState({
+        matchId: otherMatchId,
+        homeTeamId: 'other-home',
+        awayTeamId: 'other-away',
+        status: 'RUNNING',
+        currentMinute: 40,
+        events: [{
+          eventType: 'RED_CARD',
+          minute: 40,
+          playerName: 'Other Match CB',
+          playerId: 'other-red-player',
+          teamId: 'other-away',
+          description: 'Red card in another match'
+        }]
+      })
+    ]));
+
+    fixture.whenStable().then(() => {
+      expect(modalsSpy.openRivalCardInfoModal).not.toHaveBeenCalled();
+      done();
+    });
+  });
+
+  it('BUG #3 (7/7): when the manager is away, HOME red card is rival and AWAY red card is own team', (done) => {
+    setVm([{
+      match: makeMatch('SCHEDULED'),
+      isUserMatch: true,
+      userTeamId: SAMPLE_AWAY_TEAM_ID
+    }]);
+    (component as any).startRoundEngine(SAMPLE_GAME_ID, (component as any).vmSubject.value.matches);
+
+    roundStateSubject.next(makeRoundState([makeMatchState({
+      status: 'RUNNING',
+      currentMinute: 20,
+      events: [{
+        eventType: 'RED_CARD',
+        minute: 20,
+        playerName: 'Home Rival CB',
+        playerId: 'home-rival-red',
+        teamId: SAMPLE_HOME_TEAM_ID,
+        description: 'Home rival red card'
+      }]
+    })]));
+
+    fixture.whenStable().then(() => {
+      expect(modalsSpy.openRivalCardInfoModal).toHaveBeenCalledTimes(1);
+      expect(modalsSpy.openRivalCardInfoModal.calls.mostRecent().args[2].playerName).toBe('Home Rival CB');
+
+      roundStateSubject.next(makeRoundState([makeMatchState({
+        status: 'RUNNING',
+        currentMinute: 30,
+        events: [{
+          eventType: 'RED_CARD',
+          minute: 30,
+          playerName: 'Away Own CB',
+          playerId: 'away-own-red',
+          teamId: SAMPLE_AWAY_TEAM_ID,
+          description: 'Own team red card'
+        }]
+      })]));
+      return fixture.whenStable();
+    }).then(() => {
+      expect(modalsSpy.openRivalCardInfoModal).toHaveBeenCalledTimes(1);
+      done();
+    });
+  });
+
   // ========== V25D82 sprint 2 UX fix: "Iniciar Todos" button + anyStarted flag ==========
 
   /**

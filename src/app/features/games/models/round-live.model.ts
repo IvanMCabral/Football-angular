@@ -8,6 +8,8 @@ export interface RoundMatchVM {
   match: Match;
   state?: MatchState;
   isUserMatch: boolean;
+  /** Session team id for the manager's team in this match, when known. */
+  userTeamId?: string;
 }
 
 /**

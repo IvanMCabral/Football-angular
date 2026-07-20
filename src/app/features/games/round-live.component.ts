@@ -274,7 +274,10 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
 
           return {
             match,
-            isUserMatch: homeId === userSessionTeamId || awayId === userSessionTeamId
+            isUserMatch: homeId === userSessionTeamId || awayId === userSessionTeamId,
+            userTeamId: homeId === userSessionTeamId || awayId === userSessionTeamId
+              ? userSessionTeamId
+              : undefined
           };
         });
 
@@ -543,18 +546,19 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * V25D81.1 BUG #3: walk the latest per-match state, find RED_CARD
-   * events whose {@code teamId} is NOT the manager team (i.e. the rival
-   * or any team in a non-user match), and auto-open the awareness modal.
+   * V25D81.1 BUG #3: walk the latest state for the manager's own match,
+   * find RED_CARD events whose {@code teamId} is the rival team, and
+   * auto-open the awareness modal.
    *
    * <p>Trigger rules:
    * <ul>
    *   <li>Event type === 'RED_CARD' (yellow cards are intentionally
    *       skipped — not impactful enough to interrupt the manager).</li>
-   *   <li>Event has a {@code teamId} AND that teamId is NOT the user
-   *       team. A red card on the manager team is irrelevant for the
-   *       awareness flow (the manager already sees their own match's
-   *       timeline; auto-sub flow is owned by maybeOpenInjuryAutoModal).</li>
+   *   <li>Only the user match is scanned. Red cards in other matches of
+   *       the round must not interrupt the manager.</li>
+   *   <li>Event has a {@code teamId} AND that teamId is NOT the user's
+   *       team in this match. A red card on the manager team is already
+   *       visible in their own timeline.</li>
    *   <li>Match status is RUNNING or PAUSED (no awareness for finished
    *       / cancelled matches).</li>
    *   <li>Event hasn't been shown before (tracked via
@@ -568,13 +572,14 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
    * closes the queued one fires (if any).
    */
   private maybeOpenRivalCardInfoModal(matches: RoundMatchVM[]): void {
-    const userTeamId = this.vmSubject.value.matches.find(m => m.isUserMatch)?.match.homeTeamId;
+    const userMatch = matches.find(m => m.isUserMatch);
+    const userTeamId = userMatch?.userTeamId ?? userMatch?.match.homeTeamId;
     const userTeamIdStr = userTeamId ? String(userTeamId) : null;
     if (!userTeamIdStr) {
       return;
     }
 
-    for (const rm of matches) {
+    for (const rm of userMatch ? [userMatch] : []) {
       if (!rm.state || !rm.state.events) {
         continue;
       }
