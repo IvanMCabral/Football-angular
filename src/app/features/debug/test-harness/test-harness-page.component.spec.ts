@@ -570,10 +570,12 @@ describe('TestHarnessPageComponent', () => {
 
     expect(component.professionalSmokeSummary()?.pixelRows).toBe(2);
     expect(component.professionalSmokeSummary()?.swapRows).toBe(1);
+    expect(component.professionalSmokeSummary()?.substitutionRows).toBe(0);
     expect(component.professionalSmokeSummary()?.included.join(' ')).toContain('Player swap battery');
+    expect(component.professionalSmokeSummary()?.included.join(' ')).toContain('Substitution what-if: 0 caso(s)');
     expect(component.analysisReadyMessage()).toContain('Professional smoke full listo');
     expect(snackBarSpy.open).toHaveBeenCalledWith(
-      'Professional smoke full complete: 2 pixel rows, 1 swaps.',
+      'Professional smoke full complete: 2 pixel rows, 1 swaps, 0 substitutions.',
       'OK',
       { duration: 4500 }
     );

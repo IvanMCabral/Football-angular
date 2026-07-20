@@ -14518,10 +14518,11 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       }))
     );
     this.harness.setStyle(this.selectedStyleModel).pipe(
-      switchMap(() => forkJoin({
-        formation: formationRows$,
-        scenario: scenarioRows$,
-      }))
+      switchMap(() => formationRows$.pipe(
+        switchMap((formation) => scenarioRows$.pipe(
+          map((scenario) => ({ formation, scenario }))
+        ))
+      ))
     ).subscribe({
       next: ({ formation, scenario }) => {
         if (runId !== this.professionalSmokeRunId) return;
@@ -14607,7 +14608,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       });
       this.analysisReadyMessage.set('Professional smoke cortado por timeout defensivo. Resultados parciales abajo.');
       this.snackBar.open('Professional smoke timeout: resultados parciales disponibles.', 'OK', { duration: 6000 });
-    }, 120_000);
+    }, 150_000);
   }
   onRunProfessionalSmokeFull(): void {
     if (this.controlledTeamSideModel !== 'USER' || !this.selectedMatchIncludesUserTeam()) {
@@ -14688,7 +14689,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       });
       this.analysisReadyMessage.set('Professional smoke full cortado por timeout defensivo. Resultados parciales abajo.');
       this.snackBar.open('Professional smoke full timeout: resultados parciales disponibles.', 'OK', { duration: 6000 });
-    }, 180_000);
+    }, 240_000);
   }
   private runProfessionalSmokeFormationAuditStage(onComplete: () => void): void {
     const matches = this.userTeamMatches()
@@ -14921,6 +14922,8 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       })),
       'Compare baseline/live queda disponible en Open Match Compare.',
     ];
+    const filteredSkipped = skipped.filter((item) => !item.toLowerCase().includes('preservar evidencia detallada'));
+    const finalRead = `${controlledName}: smoke full · ${current?.formationRows ?? this.formationMatrixSummaryResults().length} formaciones · ${current?.scenarioRows ?? this.scenarioMatrixSummaryResults().length} escenarios · ${pixelRows} píxeles · ${swapRows} swaps · ${substitutionRows} sustituciones.`;
     this.professionalSmokeSummary.set({
       controlledTeam: current?.controlledTeam ?? controlledName,
       scope: 'USER',
@@ -14942,11 +14945,11 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         `Player swap battery: ${swapRows} cambios`,
         `Substitution what-if: ${substitutionRows} caso(s)`,
       ],
-      skipped,
-      read: `${controlledName}: smoke full · ${current?.formationRows ?? this.formationMatrixSummaryResults().length} formaciones · ${current?.scenarioRows ?? this.scenarioMatrixSummaryResults().length} escenarios · ${pixelRows} píxeles · ${swapRows} swaps.`,
+      skipped: filteredSkipped,
+      read: finalRead,
     });
-    this.markReplayAnalysisReady(`Professional smoke full listo para ${controlledName}: ${pixelRows} píxeles · ${swapRows} swaps.`);
-    this.snackBar.open(`Professional smoke full complete: ${pixelRows} pixel rows, ${swapRows} swaps.`, 'OK', { duration: 4500 });
+    this.markReplayAnalysisReady(`Professional smoke full listo para ${controlledName}: ${pixelRows} píxeles · ${swapRows} swaps · ${substitutionRows} sustituciones.`);
+    this.snackBar.open(`Professional smoke full complete: ${pixelRows} pixel rows, ${swapRows} swaps, ${substitutionRows} substitutions.`, 'OK', { duration: 4500 });
   }
   private professionalSmokeFinalVerdict(): { verdict: NonNullable<ProfessionalSmokeSummary['verdict']>; detail: string } {
     const checks = this.professionalQaChecklistRows();
