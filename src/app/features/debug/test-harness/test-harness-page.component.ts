@@ -525,6 +525,7 @@ interface ProfessionalSmokeSummary {
   formationAuditReviewRows?: number;
   pixelRows: number;
   swapRows: number;
+  substitutionRows?: number;
   formationSeedCount: number;
   scenarioSeedCount: number;
   included: string[];
@@ -5505,6 +5506,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       const pixelEvidenceNote = this.positionPixelEvidenceNote();
       const swapBattery = this.playerSwapBatterySummary();
       const swapPrecisionRows = this.playerSwapPrecisionComparisonRows();
+      const substitutionSummary = this.substitutionWhatIfSummary();
     const expectedFormationAuditRows = this.formationCodes.length * 3;
     const auditedFormationCount = new Set(rows.map((row) => row.formation)).size;
     const hasAudit = rows.length > 0;
@@ -5599,6 +5601,18 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       : hasSwapPrecision
         ? changedSwapReads > 0 ? 'Trust balanced reads; quick is smoke only.' : needsMoreSwapSeeds > 0 ? 'Run balanced or more seeds for borderline swaps.' : 'Precision stable enough.'
         : 'Run Player swap battery or Compare precision.';
+    const hasSubstitutionWhatIf = !!substitutionSummary;
+    const substitutionSignal = substitutionSummary
+      ? Math.abs(substitutionSummary.deltaXgFor) >= 0.001
+        || Math.abs(substitutionSummary.deltaXgAgainst) >= 0.001
+        || Math.abs(substitutionSummary.deltaShotsFor) >= 0.01
+        || Math.abs(substitutionSummary.deltaShotsAgainst) >= 0.01
+        || Math.abs(substitutionSummary.deltaGoalsFor) >= 0.01
+        || Math.abs(substitutionSummary.deltaGoalsAgainst) >= 0.01
+      : false;
+    const substitutionObserved = substitutionSummary
+      ? `${substitutionSummary.playerOffName} → ${substitutionSummary.playerOnName} min ${substitutionSummary.minute} · ΔxG ${this.fmtDeltaNumber(substitutionSummary.deltaXgFor)} · Δshots ${this.fmtDeltaNumber(substitutionSummary.deltaShotsFor)}`
+      : 'Not run yet';
     return [
       {
         check: 'All formations audit',
@@ -5660,6 +5674,17 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         observed: swapObserved,
         verdict: swapVerdict,
         next: swapNext,
+      },
+      {
+        check: 'Live substitution signal',
+        expected: 'Same seed baseline vs minute substitution should alter match averages after a real sessionPlayerId change.',
+        observed: substitutionObserved,
+        verdict: !hasSubstitutionWhatIf ? 'Pending' : substitutionSignal ? 'OK' : 'Review',
+        next: !hasSubstitutionWhatIf
+          ? 'Run Substitution what-if or Professional smoke full.'
+          : substitutionSignal
+            ? 'Keep as modal → harness → engine contract.'
+            : 'Inspect candidate quality, IDs, and minute impact; increase seeds if borderline.',
       },
     ];
   });
@@ -14616,7 +14641,10 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           this.onRunPlayerSwapBattery({ preservePositionPixels: true });
           this.waitForProfessionalSmokeStep('player swaps', () => {
             if (runId !== this.professionalSmokeFullRunId) return;
-            this.finalizeProfessionalSmokeFullSummary();
+            this.runProfessionalSmokeSubstitutionStage(() => {
+              if (runId !== this.professionalSmokeFullRunId) return;
+              this.finalizeProfessionalSmokeFullSummary();
+            });
           });
         });
       });
@@ -14628,6 +14656,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       const controlledName = this.controlledTeamDisplayName();
       const pixelRows = this.professionalSmokeFullPixelRows || this.positionPixelMatrixRows().length;
       const swapRows = this.playerSwapBatterySummaries().length;
+      const substitutionRows = this.substitutionWhatIfSummary() ? 1 : 0;
       const formationRows = this.formationMatrixSummaryResults().length;
       const scenarioRows = this.scenarioMatrixSummaryResults().length;
       this.professionalSmokeFullRunId++;
@@ -14644,6 +14673,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         formationAuditReviewRows: this.formationLineSmokeRows().filter((row) => row.verdict === 'Review').length,
         pixelRows,
         swapRows,
+        substitutionRows,
         formationSeedCount: this.scenarioMatrixSummaryEffectiveSeedCount(),
         scenarioSeedCount: this.scenarioMatrixSmokeSeedCount(),
         included: [
@@ -14651,6 +14681,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           `Scenario smoke: ${scenarioRows} escenarios`,
           `Pixel sensitivity: ${pixelRows} filas`,
           `Player swap battery: ${swapRows} cambios`,
+          `Substitution what-if: ${substitutionRows} caso(s)`,
         ],
         skipped: ['Smoke full cortado por timeout defensivo; revisar etapa lenta antes de calibrar.'],
         read: `${controlledName}: smoke full parcial por timeout · ${formationRows} formaciones · ${scenarioRows} escenarios · ${pixelRows} píxeles · ${swapRows} swaps.`,
@@ -14775,6 +14806,90 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       onComplete
     );
   }
+  private runProfessionalSmokeSubstitutionStage(onComplete: () => void): void {
+    const matchId = this.selectedMatchId();
+    if (!matchId) {
+      onComplete();
+      return;
+    }
+    const seedStart = this.seedInputModel ?? DEFAULT_REPLAY_SEED;
+    const seedCount = Math.max(10, Math.min(30, Math.round(this.playerSwapSeedCountModel || 10)));
+    const minute = 60;
+    this.substitutionWhatIfSummary.set(null);
+    this.analysisReadyMessage.set(`Professional smoke full: substitution what-if min ${minute}, ${seedCount} seeds...`);
+    this.mutationInFlight.set(true);
+    forkJoin({
+      lineup: this.harness.getCurrentLineup().pipe(take(1), timeout(10_000)),
+      squad: this.http.get<SessionPlayer[]>(`${environment.apiUrl}/career/players/squad`).pipe(
+        take(1),
+        timeout(10_000),
+        catchError(() => of([] as SessionPlayer[]))
+      ),
+    }).pipe(
+      switchMap(({ lineup, squad }) => {
+        const candidate = this.pickAutomaticSwapCandidate(lineup, squad);
+        const playerOffId = this.selectedSwapStarterIdModel || candidate?.starterId;
+        const playerOnId = this.selectedSwapBenchIdModel || candidate?.benchId;
+        if (!playerOffId || !playerOnId) {
+          throw new Error('No pude resolver titular y suplente para substitution smoke.');
+        }
+        return this.harness.setStyle(this.selectedStyleModel).pipe(
+          switchMap(() =>
+            this.harness.runSubstitutionWhatIfSummary(matchId, {
+              playerOffId,
+              playerOnId,
+              minute,
+              seedStart,
+              seedCount,
+              controlledTeamSide: 'USER',
+            })
+          )
+        );
+      }),
+      timeout(60_000),
+      map((row) => ({ row, issue: null as string | null })),
+      catchError((err) => of({
+        row: null as SubstitutionWhatIfSummaryRow | null,
+        issue: this.fmtError(err, 'Substitution what-if timeout/error'),
+      }))
+    ).subscribe({
+      next: ({ row, issue }) => {
+        const before = this.professionalSmokeSummary();
+        if (row) {
+          this.substitutionWhatIfSummary.set({
+            ...row,
+            readClass: this.deltaClass(row.deltaXgDiff + row.deltaShotsFor * 0.04 - row.deltaXgAgainst * 0.6),
+          });
+        }
+        this.professionalSmokeSummary.set({
+          controlledTeam: before?.controlledTeam ?? this.controlledTeamDisplayName(),
+          scope: 'USER',
+          verdict: before?.verdict,
+          verdictDetail: before?.verdictDetail,
+          formationRows: before?.formationRows ?? this.formationMatrixSummaryResults().length,
+          scenarioRows: before?.scenarioRows ?? this.scenarioMatrixSummaryResults().length,
+          formationAuditRows: before?.formationAuditRows,
+          formationAuditFallbackRows: before?.formationAuditFallbackRows,
+          formationAuditReviewRows: before?.formationAuditReviewRows,
+          pixelRows: before?.pixelRows ?? this.positionPixelMatrixRows().length,
+          swapRows: before?.swapRows ?? this.playerSwapBatterySummaries().length,
+          substitutionRows: row ? 1 : 0,
+          formationSeedCount: before?.formationSeedCount ?? this.scenarioMatrixSummaryEffectiveSeedCount(),
+          scenarioSeedCount: before?.scenarioSeedCount ?? this.scenarioMatrixSmokeSeedCount(),
+          included: [
+            ...(before?.included ?? []),
+            issue ?? `Substitution what-if: ${row?.playerOffName ?? 'starter'} → ${row?.playerOnName ?? 'bench'} min ${minute} x ${seedCount} seeds`,
+          ],
+          skipped: before?.skipped ?? [],
+          read: before?.read ?? `${this.controlledTeamDisplayName()}: smoke full en progreso.`,
+        });
+      },
+      complete: () => {
+        this.mutationInFlight.set(false);
+        onComplete();
+      },
+    });
+  }
   private waitForProfessionalSmokeStep(label: string, next: () => void, attempts = 0): void {
     window.setTimeout(() => {
       if (attempts > 240) {
@@ -14793,6 +14908,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const controlledName = this.controlledTeamDisplayName();
     const pixelRows = this.professionalSmokeFullPixelRows || this.positionPixelMatrixRows().length;
     const swapRows = this.playerSwapBatterySummaries().length;
+    const substitutionRows = this.substitutionWhatIfSummary() ? 1 : 0;
     const baseIncluded = current?.included ?? [];
     const auditRows = this.formationLineSmokeRows().length;
     const auditFallbackRows = this.formationLineSmokeRows().filter((row) => row.verdict === 'Fallback').length;
@@ -14817,12 +14933,14 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       formationAuditReviewRows: auditReviewRows,
       pixelRows,
       swapRows,
+      substitutionRows,
       formationSeedCount: current?.formationSeedCount ?? this.scenarioMatrixSummaryEffectiveSeedCount(),
       scenarioSeedCount: current?.scenarioSeedCount ?? this.scenarioMatrixSmokeSeedCount(),
       included: [
         ...baseIncluded,
         `Pixel sensitivity: ${pixelRows} filas`,
         `Player swap battery: ${swapRows} cambios`,
+        `Substitution what-if: ${substitutionRows} caso(s)`,
       ],
       skipped,
       read: `${controlledName}: smoke full · ${current?.formationRows ?? this.formationMatrixSummaryResults().length} formaciones · ${current?.scenarioRows ?? this.scenarioMatrixSummaryResults().length} escenarios · ${pixelRows} píxeles · ${swapRows} swaps.`,
