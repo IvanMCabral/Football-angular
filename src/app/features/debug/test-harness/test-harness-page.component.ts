@@ -1299,6 +1299,16 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
               <button
                 type="button"
                 mat-stroked-button
+                data-testid="manual-shape-vs-preset-button"
+                (click)="onRunManualShapeVsPresetSmoke()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                aria-label="Compare a manual 4-4-2-like shape against stronger manual shape edits"
+              >
+                Manual shape vs preset
+              </button>
+              <button
+                type="button"
+                mat-stroked-button
                 data-testid="role-slot-impact-button"
                 (click)="onRunRoleSlotImpactSummary()"
                 [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
@@ -7934,6 +7944,42 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       { label: 'big zone cross', x: clamp(50), y: clamp(fromY + crossDelta), dx: clamp(50) - clamp(fromX), dy: crossDelta },
     ];
   }
+  private manualShapeVsPresetPresets(
+    fromX: number,
+    fromY: number,
+    candidate: PositionPixelCandidate
+  ): Array<{ label: string; x: number; y: number; dx: number; dy: number }> {
+    const clamp = (value: number) => Math.max(0, Math.min(100, Math.round(value * 100) / 100));
+    const line = this.positionPixelVisualLine(fromY);
+    const toCenter = clamp(50) - clamp(fromX);
+    const smallCenterStep = Math.max(-5, Math.min(5, toCenter));
+    if (line === 'DEF') {
+      return [
+        { label: 'manual 4-4-2 same spot', x: clamp(fromX), y: clamp(fromY), dx: 0, dy: 0 },
+        { label: 'manual DEF 5px step', x: clamp(fromX), y: clamp(fromY - 5), dx: 0, dy: -5 },
+        { label: 'manual DEF 10px step', x: clamp(fromX), y: clamp(fromY - 10), dx: 0, dy: -10 },
+        { label: 'manual DEF tuck center', x: clamp(fromX + smallCenterStep), y: clamp(fromY), dx: smallCenterStep, dy: 0 },
+        { label: 'manual DEF line break', x: clamp(fromX + smallCenterStep), y: clamp(58), dx: smallCenterStep, dy: clamp(58) - clamp(fromY) },
+      ];
+    }
+    if (line === 'ATT') {
+      return [
+        { label: 'manual 4-4-2 same spot', x: clamp(fromX), y: clamp(fromY), dx: 0, dy: 0 },
+        { label: 'manual ATT 5px higher', x: clamp(fromX), y: clamp(fromY - 5), dx: 0, dy: -5 },
+        { label: 'manual ATT 10px higher', x: clamp(fromX), y: clamp(fromY - 10), dx: 0, dy: -10 },
+        { label: 'manual ATT half-space', x: clamp(fromX + smallCenterStep), y: clamp(fromY + 2), dx: smallCenterStep, dy: 2 },
+        { label: 'manual ATT drop to 4-2-3-1', x: clamp(fromX + smallCenterStep), y: clamp(38), dx: smallCenterStep, dy: clamp(38) - clamp(fromY) },
+      ];
+    }
+    const wideDelta = fromX <= 50 ? -6 : 6;
+    return [
+      { label: 'manual 4-4-2 same spot', x: clamp(fromX), y: clamp(fromY), dx: 0, dy: 0 },
+      { label: 'manual MID 5px higher', x: clamp(fromX), y: clamp(fromY - 5), dx: 0, dy: -5 },
+      { label: 'manual MID 10px higher', x: clamp(fromX), y: clamp(fromY - 10), dx: 0, dy: -10 },
+      { label: 'manual MID tuck center', x: clamp(fromX + smallCenterStep), y: clamp(fromY), dx: smallCenterStep, dy: 0 },
+      { label: 'manual MID wide to 4-3-3', x: clamp(fromX + wideDelta), y: clamp(25), dx: wideDelta, dy: clamp(25) - clamp(fromY) },
+    ];
+  }
   private wingbackMovementPresets(
     fromX: number,
     fromY: number,
@@ -8610,6 +8656,47 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       unique.set(player.playerId, player);
     }
     return Array.from(unique.values())
+      .map((player) => ({
+        starterId: player.playerId,
+        starterName: player.name,
+        starterPosition: player.position,
+        slotId: slotByPlayer.get(player.playerId) ?? '',
+      }))
+      .filter((candidate) => !!candidate.starterId);
+  }
+  private pickManualShapeVsPresetCandidates(lineup: LineupDTO): PositionPixelCandidate[] {
+    const slots = this.effectivePositionPixelSlots(lineup);
+    const slotByPlayer = new Map(slots.map((slot) => [slot.playerId, slot.subdivisionId]));
+    const slotMetaByPlayer = new Map(slots.map((slot) => [slot.playerId, slot]));
+    const playerLine = (player: LineupDTO['players'][number]): 'DEF' | 'MID' | 'ATT' | null =>
+      this.positionPixelLineFromSlot(lineup.formation, slotMetaByPlayer.get(player.playerId))
+        ?? this.strictPositionPixelLine(player.position)
+        ?? this.positionPixelLine(player.position);
+    const movablePlayers = (lineup.players ?? [])
+      .filter((player) => !!player.playerId && player.position !== 'GK');
+    const selected = this.selectedSwapStarterIdModel
+      ? movablePlayers.find((player) => player.playerId === this.selectedSwapStarterIdModel)
+      : null;
+    const byLine = new Map<'DEF' | 'MID' | 'ATT', typeof movablePlayers[number][]>();
+    for (const player of movablePlayers) {
+      const line = playerLine(player);
+      if (!line) continue;
+      const current = byLine.get(line) ?? [];
+      current.push(player);
+      byLine.set(line, current);
+    }
+    const ordered = [
+      selected ?? null,
+      ...(byLine.get('MID') ?? []).slice(0, 2),
+      ...(byLine.get('ATT') ?? []).slice(0, 1),
+      ...(byLine.get('DEF') ?? []).slice(0, 1),
+    ].filter((player): player is typeof movablePlayers[number] => !!player);
+    const unique = new Map<string, typeof movablePlayers[number]>();
+    for (const player of ordered) {
+      unique.set(player.playerId, player);
+    }
+    return Array.from(unique.values())
+      .slice(0, 3)
       .map((player) => ({
         starterId: player.playerId,
         starterName: player.name,
@@ -9956,6 +10043,19 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       seedCount,
       (fromX, fromY) => this.positionMovementPresets(fromX, fromY),
       'Position presets matrix'
+    );
+  }
+  onRunManualShapeVsPresetSmoke(): void {
+    const seedCount = Math.max(20, Math.min(50, Math.round(this.playerSwapSeedCountModel || 20)));
+    this.clearReplayAnalysisResultsForLatestRun();
+    this.runPositionPixelMatrixWithPresets(
+      seedCount,
+      (fromX, fromY, candidate) => this.manualShapeVsPresetPresets(fromX, fromY, candidate),
+      'Manual shape vs preset',
+      null,
+      (lineup) => this.pickManualShapeVsPresetCandidates(lineup),
+      null,
+      false
     );
   }
   onRunRoleSlotImpactSummary(): void {

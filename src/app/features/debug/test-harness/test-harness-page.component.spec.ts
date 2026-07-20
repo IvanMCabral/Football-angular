@@ -337,6 +337,36 @@ describe('TestHarnessPageComponent', () => {
     expect(runSpy).toHaveBeenCalled();
   });
 
+  it('wires the Manual shape vs preset button to its smoke handler', () => {
+    const runSpy = spyOn(component, 'onRunManualShapeVsPresetSmoke');
+    component.selectMatch({
+      matchId: 'match-1',
+      round: 1,
+      homeTeamId: 'team-1',
+      homeTeamName: 'My Team',
+      awayTeamId: 'team-2',
+      awayTeamName: 'Rival',
+      status: 'PENDING',
+      homeGoals: null,
+      awayGoals: null,
+      homeFormation: null,
+      awayFormation: null,
+      roundId: 'round-uuid-1',
+    });
+    fixture.detectChanges();
+
+    const button: HTMLButtonElement | null = fixture.nativeElement.querySelector(
+      '[data-testid="manual-shape-vs-preset-button"]'
+    );
+    expect(button).withContext('button should be present').not.toBeNull();
+    expect(button?.type).toBe('button');
+    expect(button?.disabled).toBeFalse();
+
+    button?.click();
+
+    expect(runSpy).toHaveBeenCalled();
+  });
+
   it('exposes stable test ids for the main matrix buttons', () => {
     component.selectMatch({
       matchId: 'match-1',
@@ -358,6 +388,7 @@ describe('TestHarnessPageComponent', () => {
       'player-swap-matrix-button',
       'player-swap-battery-button',
       'position-presets-matrix-button',
+      'manual-shape-vs-preset-button',
       'formation-avg-button',
     ]) {
       const button: HTMLButtonElement | null = fixture.nativeElement.querySelector(
