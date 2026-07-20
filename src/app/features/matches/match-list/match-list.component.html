@@ -1,6 +1,6 @@
 <div class="matches-container">
   <div class="matches-header">
-    <h1>Matches</h1>
+    <h1>Fixture de carrera</h1>
   </div>
 
   <!-- V25D77-C42 F1: single async-pipe binding drives the entire @if/@else tree. -->
@@ -13,46 +13,62 @@
         [showRetry]="true"
         (retry)="loadMatches()"
       ></app-error-message>
-    } @else if (state.matches.length === 0) {
+    } @else if (!hasFixtures(state)) {
       @if (!hasCareer(state)) {
         <div class="empty-state">
           <div class="empty-icon">🏆</div>
           <h2>No tenés carrera activa</h2>
-          <p>Iniciá una carrera para jugar tu primera temporada</p>
+          <p>Iniciá una carrera para jugar tu primera temporada.</p>
           <a routerLink="/career/setup" class="create-button">Iniciar Carrera</a>
         </div>
       } @else {
         <div class="empty-state">
           <div class="empty-icon">⚽</div>
           <h2>Los partidos se juegan desde el Dashboard</h2>
-          <p>Los partidos de tu career se gestionan desde el resumen de fechas</p>
+          <p>No hay fixture visible todavía. Volvé al dashboard para generar o continuar la fecha.</p>
           <a routerLink="/dashboard" class="create-button">Ir al Dashboard</a>
         </div>
       }
     } @else {
       <div class="matches-list">
-        @for (match of state.matches; track match.id) {
-          <a [routerLink]="['/matches', match.id]" class="match-card" [class.completed]="match.status === 'SIMULATED'">
-            <div class="match-status">
-              <span [class]="'status-badge ' + match.status.toLowerCase()">
-                {{ formatStatus(match.status) }}
-              </span>
-            </div>
-            <div class="match-content">
-              <div class="teams">
-                <span class="team home">Team</span>
-                <span class="vs">vs</span>
-                <span class="team away">Team</span>
-              </div>
-              @if (match.result) {
-                <div class="result">
-                  <span class="goals">{{ match.result.homeGoals }} - {{ match.result.awayGoals }}</span>
-                </div>
+        @for (round of state.rounds; track round.round) {
+          <section class="round-block">
+            <div class="round-title">
+              <h2>Fecha {{ round.round }}</h2>
+              @if (round.byeTeam) {
+                <span class="bye-pill">Libre: {{ round.byeTeam }}</span>
               }
-              <div class="date">{{ formatDate(match.scheduledAt) }}</div>
             </div>
-            <div class="match-arrow">→</div>
-          </a>
+
+            @for (match of round.matches; track match.matchId) {
+              <a
+                [routerLink]="matchDetailLink(match, state)"
+                class="match-card"
+                [class.completed]="isCompleted(match)"
+              >
+                <div class="match-status">
+                  <span [class]="'status-badge ' + statusCss(match.status)">
+                    {{ formatStatus(match.status) }}
+                  </span>
+                </div>
+                <div class="match-content">
+                  <div class="teams">
+                    <span class="team home">{{ match.homeTeamName }}</span>
+                    <span class="vs">vs</span>
+                    <span class="team away">{{ match.awayTeamName }}</span>
+                  </div>
+                  <div class="result" [class.pending]="!hasResult(match)">
+                    @if (hasResult(match)) {
+                      <span class="goals">{{ match.homeGoals }} - {{ match.awayGoals }}</span>
+                    } @else {
+                      <span class="goals pending-label">Sin jugar</span>
+                    }
+                  </div>
+                </div>
+                <div class="match-arrow">→</div>
+              </a>
+            }
+          </section>
         }
       </div>
     }

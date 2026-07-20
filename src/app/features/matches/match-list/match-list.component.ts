@@ -3,10 +3,8 @@ import { CommonModule, AsyncPipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { BehaviorSubject, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
-import { MatchService } from '../services/match.service';
 import { CareerService } from '../../../core/services/career.service';
-import { CareerStatus } from '../../../core/services/career.model';
-import { Match } from '../../../shared/models/match.model';
+import { CareerStatus, Fixture } from '../../../core/services/career.model';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
 import { ErrorMessageComponent } from '../../../shared/components/error-message/error-message.component';
 
@@ -28,14 +26,30 @@ import { ErrorMessageComponent } from '../../../shared/components/error-message/
 interface MatchListViewState {
   loading: boolean;
   errorMessage: string;
-  matches: Match[];
+  rounds: MatchListRound[];
   careerStatus: CareerStatus | null;
+}
+
+interface MatchListRound {
+  round: number;
+  matches: MatchListFixture[];
+  byeTeam: string | null;
+}
+
+interface MatchListFixture {
+  matchId: string;
+  round: number;
+  homeTeamName: string;
+  awayTeamName: string;
+  status: string;
+  homeGoals: number | null;
+  awayGoals: number | null;
 }
 
 const EMPTY_STATE: MatchListViewState = {
   loading: false,
   errorMessage: '',
-  matches: [],
+  rounds: [],
   careerStatus: null
 };
 
@@ -50,7 +64,6 @@ const EMPTY_STATE: MatchListViewState = {
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class MatchListComponent implements OnInit {
-  private matchService = inject(MatchService);
   private careerService = inject(CareerService);
 
   // V25D77-C42 F1: single BehaviorSubject holds the entire view state. A
@@ -72,10 +85,13 @@ export class MatchListComponent implements OnInit {
   loadMatches(): void {
     this.patchState({ loading: true, errorMessage: '' });
 
-    this.matchService.getMatches().subscribe({
-      next: (matches) => this.patchState({ matches, loading: false }),
+    this.careerService.getAllFixturesWithBye().subscribe({
+      next: (response) => this.patchState({
+        rounds: this.toMatchListRounds(response?.rounds ?? []),
+        loading: false
+      }),
       error: (error) => this.patchState({
-        errorMessage: error.message || 'Failed to load matches',
+        errorMessage: error.message || 'No se pudieron cargar los partidos de la carrera',
         loading: false
       })
     });
@@ -89,17 +105,66 @@ export class MatchListComponent implements OnInit {
     return !!(state.careerStatus && state.careerStatus.careerId);
   }
 
+  hasFixtures(state: MatchListViewState): boolean {
+    return state.rounds.some(round => round.matches.length > 0);
+  }
+
+  matchDetailLink(match: MatchListFixture, state: MatchListViewState): unknown[] {
+    const careerId = state.careerStatus?.careerId;
+    return careerId
+      ? ['/careers', careerId, 'matches', match.matchId, 'detail']
+      : ['/matches', match.matchId];
+  }
+
   formatStatus(status: string): string {
+    const normalized = status.toUpperCase();
+    if (normalized === 'COMPLETED' || normalized === 'SIMULATED') return 'Completado';
+    if (normalized === 'PENDING' || normalized === 'SCHEDULED') return 'Pendiente';
+    if (normalized === 'SIMULATING') return 'En juego';
+    if (normalized === 'CANCELLED') return 'Cancelado';
     return status.charAt(0) + status.slice(1).toLowerCase();
   }
 
-  formatDate(date: string): string {
-    return new Date(date).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+  statusCss(status: string): string {
+    const normalized = status.toLowerCase();
+    if (normalized === 'completed') return 'simulated';
+    if (normalized === 'pending') return 'scheduled';
+    return normalized;
+  }
+
+  isCompleted(match: MatchListFixture): boolean {
+    return ['COMPLETED', 'SIMULATED'].includes(match.status.toUpperCase());
+  }
+
+  hasResult(match: MatchListFixture): boolean {
+    return match.homeGoals !== null && match.awayGoals !== null;
+  }
+
+  private toMatchListRounds(rounds: Array<{ round: number; matches: Fixture[]; byeTeam: string | null }>): MatchListRound[] {
+    return rounds
+      .map(round => ({
+        round: Number(round.round),
+        byeTeam: round.byeTeam ?? null,
+        matches: (round.matches ?? [])
+          .map(match => this.toMatchListFixture(match, Number(round.round)))
+          .filter((match): match is MatchListFixture => !!match)
+      }))
+      .filter(round => Number.isFinite(round.round))
+      .sort((a, b) => a.round - b.round);
+  }
+
+  private toMatchListFixture(match: Fixture, fallbackRound: number): MatchListFixture | null {
+    if (!match?.matchId) return null;
+
+    return {
+      matchId: String(match.matchId),
+      round: Number(match.round ?? fallbackRound),
+      homeTeamName: match.homeTeamName || match.homeTeamId || 'Local',
+      awayTeamName: match.awayTeamName || match.awayTeamId || 'Visitante',
+      status: match.status || 'PENDING',
+      homeGoals: match.homeGoals ?? null,
+      awayGoals: match.awayGoals ?? null
+    };
   }
 
   private patchState(partial: Partial<MatchListViewState>): void {

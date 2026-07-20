@@ -54,7 +54,35 @@
 .matches-list {
   display: flex;
   flex-direction: column;
+  gap: 1.25rem;
+}
+
+.round-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.round-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 1rem;
+}
+
+.round-title h2 {
+  margin: 0;
+  color: #1e3c72;
+  font-size: 1.15rem;
+}
+
+.bye-pill {
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  background: #fff8e1;
+  color: #795548;
+  font-size: 0.78rem;
+  font-weight: 700;
 }
 
 .match-card {
@@ -103,6 +131,16 @@
   color: #155724;
 }
 
+.status-badge.pending {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+.status-badge.simulating {
+  background-color: #ede7f6;
+  color: #4527a0;
+}
+
 .status-badge.cancelled {
   background-color: #f8d7da;
   color: #721c24;
@@ -129,15 +167,19 @@
   margin: 0.5rem 0;
 }
 
+.result.pending {
+  margin-bottom: 0;
+}
+
 .goals {
   font-size: 1.25rem;
   font-weight: 700;
   color: #1e3c72;
 }
 
-.date {
-  font-size: 0.875rem;
-  color: #666;
+.pending-label {
+  color: #7a7a7a;
+  font-size: 0.9rem;
 }
 
 .match-arrow {
