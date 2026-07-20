@@ -412,7 +412,12 @@ export class SubstitutionModalComponent {
               'OK',
               { duration: 3000, panelClass: 'success-toast' }
             );
-            this.dialogRef.close({ success: true, result });
+            this.dialogRef.close({
+              success: true,
+              result,
+              playerOffId: this.playerOffId,
+              playerOnId: this.playerOnId
+            });
           } else {
             this.errorMsg = result.error || 'Sustitución rechazada por el servidor';
           }

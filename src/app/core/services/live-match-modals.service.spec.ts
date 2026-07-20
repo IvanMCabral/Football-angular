@@ -91,10 +91,12 @@ describe('LiveMatchModalsService — LIVE-MATCH-F5.3 BUG-015 (pause on modal ope
       'pauseRoundForMatch',
       'resumeRoundForMatch',
       'substitutePlayer',
-      'changeFormation'
+      'changeFormation',
+      'getMatchState'
     ]);
     engineServiceSpy.pauseRoundForMatch.and.returnValue(of({ success: true }));
     engineServiceSpy.resumeRoundForMatch.and.returnValue(of({ success: true }));
+    engineServiceSpy.getMatchState.and.returnValue(of(RUNNING_STATE));
 
     careerServiceSpy.getCareerStatus.and.returnValue(of({
       careerPhase: 'LIVE',
@@ -105,8 +107,8 @@ describe('LiveMatchModalsService — LIVE-MATCH-F5.3 BUG-015 (pause on modal ope
     } as any));
 
     teamServiceSpy.getMyTeamSquad.and.returnValue(of([
-      { sessionPlayerId: 'b1', name: 'Bench 1', position: 'DEF' },
-      { sessionPlayerId: 'b2', name: 'Bench 2', position: 'ATT' }
+      { sessionPlayerId: 'b1', name: 'Bench 1', position: 'DEF', attack: 60, defense: 76, technique: 62, speed: 65, stamina: 70, mentality: 68 },
+      { sessionPlayerId: 'b2', name: 'Bench 2', position: 'ATT', attack: 82, defense: 45, technique: 76, speed: 80, stamina: 72, mentality: 70 }
     ] as any));
 
     // Lineup endpoint returns the starting XI plus the 2 bench players above.
@@ -213,6 +215,36 @@ describe('LiveMatchModalsService — LIVE-MATCH-F5.3 BUG-015 (pause on modal ope
     });
   });
 
+  it('openSubstitutionModal applies previous live substitution to the next modal XI/bench', (done) => {
+    const stateAfterSub: MatchState = {
+      ...RUNNING_STATE,
+      substitutionsRemaining: 4,
+      events: [
+        {
+          eventType: 'SUBSTITUTION',
+          minute: 23,
+          playerName: 'Starter 2',
+          playerOnName: 'Bench 1',
+          teamId: 'team-h',
+          description: 'Starter 2 -> Bench 1'
+        }
+      ]
+    };
+    engineServiceSpy.getMatchState.and.returnValue(of(stateAfterSub));
+
+    service.openSubstitutionModal('match-1', stateAfterSub).subscribe(() => {
+      const dataArg = (dialogSpy.open.calls.mostRecent().args[1] as any)?.data;
+      expect(dataArg.startingXi.map((p: any) => p.displayName)).toEqual([
+        'Starter 1',
+        'Bench 1',
+        'Starter 3'
+      ]);
+      expect(dataArg.bench.map((p: any) => p.displayName)).not.toContain('Bench 1');
+      expect(dataArg.substitutionsRemaining).toBe(4);
+      done();
+    });
+  });
+
   // ========== openFormationModal ==========
 
   it('openFormationModal — calls engineService.pauseRoundForMatch BEFORE dialog.open', (done) => {
@@ -238,6 +270,34 @@ describe('LiveMatchModalsService — LIVE-MATCH-F5.3 BUG-015 (pause on modal ope
       expect(engineServiceSpy.resumeRoundForMatch).not.toHaveBeenCalled();
       afterClosedSubject.next(undefined);
       expect(engineServiceSpy.resumeRoundForMatch).toHaveBeenCalledWith('career-abc', 'match-1');
+      done();
+    });
+  });
+
+  it('openFormationModal applies previous live substitution to current slots', (done) => {
+    const stateAfterSub: MatchState = {
+      ...RUNNING_STATE,
+      events: [
+        {
+          eventType: 'SUBSTITUTION',
+          minute: 23,
+          playerName: 'Starter 2',
+          playerOnName: 'Bench 1',
+          teamId: 'team-h',
+          description: 'Starter 2 -> Bench 1'
+        }
+      ]
+    };
+    engineServiceSpy.getMatchState.and.returnValue(of(stateAfterSub));
+
+    service.openFormationModal('match-1', stateAfterSub).subscribe(() => {
+      const dataArg = (dialogSpy.open.calls.mostRecent().args[1] as any)?.data;
+      expect(dataArg.currentSlots.map((slot: any) => slot.sessionPlayerId)).toEqual([
+        's1',
+        'b1',
+        's3'
+      ]);
+      expect(Array.from(dataArg.startingIds)).toEqual(['s1', 'b1', 's3']);
       done();
     });
   });
@@ -285,6 +345,7 @@ describe('LiveMatchModalsService — LIVE-MATCH-F5.3 BUG-015 (pause on modal ope
 
   it('openPartidoModal — passes the rivalFormation from state.awayFormation to the dialog data', (done) => {
     const away433 = { ...RUNNING_STATE, awayFormation: '4-3-3' };
+    engineServiceSpy.getMatchState.and.returnValue(of(away433));
     service.openPartidoModal('match-1', away433).subscribe(() => {
       // dialog.open was called with the PartidoDialogData including rivalFormation
       expect(dialogSpy.open).toHaveBeenCalled();
@@ -296,6 +357,7 @@ describe('LiveMatchModalsService — LIVE-MATCH-F5.3 BUG-015 (pause on modal ope
 
   it('openPartidoModal — falls back to 4-4-2 when state.awayFormation is missing', (done) => {
     const noAway = { ...RUNNING_STATE, awayFormation: undefined as any };
+    engineServiceSpy.getMatchState.and.returnValue(of(noAway));
     service.openPartidoModal('match-1', noAway).subscribe(() => {
       const dataArg = (dialogSpy.open.calls.mostRecent().args[1] as any)?.data;
       expect(dataArg.rivalFormation).toBe('4-4-2');

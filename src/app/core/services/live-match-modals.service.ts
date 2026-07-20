@@ -3,8 +3,8 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { Observable, forkJoin, switchMap } from 'rxjs';
-import { map } from 'rxjs/operators';
+import { Observable, forkJoin, of, switchMap } from 'rxjs';
+import { catchError, map } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 import { MatchEngineService } from './match-engine.service';
 import { CareerService } from './career.service';
@@ -45,6 +45,11 @@ export class LiveMatchModalsService {
   // The careerId lives in the URL (`/games/{careerId}/...`), so we read it
   // from the Router rather than threading it through every modal caller.
   private router = inject(Router);
+
+  private readonly confirmedSubstitutionMemory = new Map<string, Array<{
+    playerOffId: string;
+    playerOnId: string;
+  }>>();
 
   /**
    * V25D81-BUG #3: optional overrides for {@link openSubstitutionModal}.
@@ -101,14 +106,23 @@ export class LiveMatchModalsService {
           // LIVE-MATCH-F3-UI-LIVE F5.1 BUG-001: use /teams/me/squad so the
           // server resolves the manager's own team from the JWT instead of
           // hitting the non-existent /session-teams/{id}/squad endpoint.
-          squad: this.teamService.getMyTeamSquad()
+          squad: this.teamService.getMyTeamSquad(),
+          liveState: this.engineService.getMatchState(matchId).pipe(catchError(() => of(state)))
         }).pipe(
-          map(({ lineup, squad }) => {
+          map(({ lineup, squad, liveState }) => {
             // V25D75-C40 B1: dedupe starting XI by playerId (some upstream
             // paths can return duplicates — modal would show 22 entries per
             // column). Same for bench by sessionPlayerId. Pick first occurrence.
+            const stateForModal = liveState ?? state;
+            const livePlayers = this.applyLiveSubstitutionsToLineup(
+              lineup,
+              squad,
+              stateForModal,
+              userTeamId,
+              matchId
+            );
             const seenStarters = new Set<string>();
-            const startingXi: SubModalPlayer[] = lineup.players
+            const startingXi: SubModalPlayer[] = livePlayers
               .filter(p => {
                 if (!p.playerId || seenStarters.has(p.playerId)) { return false; }
                 seenStarters.add(p.playerId);
@@ -148,7 +162,7 @@ export class LiveMatchModalsService {
 
             const data: SubstitutionDialogData = {
               matchId,
-              currentMinute: state.currentMinute ?? 0,
+              currentMinute: stateForModal.currentMinute ?? 0,
               startingXi,
               bench,
               // V25D79 (D5): substitutionsRemaining sourced from the live
@@ -157,20 +171,20 @@ export class LiveMatchModalsService {
               // back to the cap (5) when the feed hasn't arrived yet — the
               // modal's isOutOfSubs gate will refuse to register selections
               // when the counter is 0.
-              substitutionsRemaining: state.substitutionsRemaining ?? 5,
+              substitutionsRemaining: stateForModal.substitutionsRemaining ?? 5,
               // V25D63-C23 P0: position-effectiveness feedback para chips SALE/ENTRA.
               effectivenessMap,
               // V25D79: pass formation + per-player live stats + which side
               // the manager team is playing on. The modal visual pitch and
               // the per-dot chips consume these. Falls back to defaults when
               // the SSE feed hasn't arrived yet (legacy pre-V25D79 snapshots).
-              formation: (userTeamId === state.homeTeamId)
-                  ? (state.homeFormation ?? '4-4-2')
-                  : (state.awayFormation ?? '4-4-2'),
-              playerRatings: (userTeamId === state.homeTeamId)
-                  ? (state.homePlayerRatings ?? [])
-                  : (state.awayPlayerRatings ?? []),
-              managerSide: (userTeamId === state.homeTeamId) ? 'HOME' : 'AWAY',
+              formation: (userTeamId === stateForModal.homeTeamId)
+                  ? (stateForModal.homeFormation ?? '4-4-2')
+                  : (stateForModal.awayFormation ?? '4-4-2'),
+              playerRatings: (userTeamId === stateForModal.homeTeamId)
+                  ? (stateForModal.homePlayerRatings ?? [])
+                  : (stateForModal.awayPlayerRatings ?? []),
+              managerSide: (userTeamId === stateForModal.homeTeamId) ? 'HOME' : 'AWAY',
               // V25D81-BUG #3: auto-modal pre-select + reason from the
               // round-live INJURY listener. Both optional; manual opens
               // pass undefined and get the legacy UX.
@@ -208,7 +222,10 @@ export class LiveMatchModalsService {
             // LIVE-MATCH-F5.3.3 BUG-015: resume the round when the modal
             // closes (whether the manager confirmed OR cancelled).
             if (careerId) {
-              dialogRef.afterClosed().subscribe(() => {
+              dialogRef.afterClosed().subscribe((closeResult: any) => {
+                if (closeResult?.success && closeResult.playerOffId && closeResult.playerOnId) {
+                  this.rememberConfirmedSubstitution(matchId, closeResult.playerOffId, closeResult.playerOnId);
+                }
                 this.engineService.resumeRoundForMatch(careerId, matchId).subscribe({
                   error: (err) => console.warn('[LIVE-MATCH] resume round on sub modal close failed:', err)
                 });
@@ -259,18 +276,32 @@ export class LiveMatchModalsService {
       this.snackBar.open('El partido ya terminó, no se puede cambiar la formación', 'OK', { duration: 3000 });
       return new Observable(sub => sub.complete());
     }
-    const homeTeamId = state.homeTeamId;
-    const currentFormation = state.homeFormation || '4-4-2';
     const careerId = this.getCurrentCareerId();
     // V25D81-BUG #4: also fetch the squad so the drag-drop modal can
     // render player names + a bench list. Same pattern as
     // openSubstitutionModal (lineup + squad forkJoin).
-    return forkJoin({
-      lineup: this.http.get<LineupDTO>(`${environment.apiUrl}/career/lineup/current`),
-      squad: this.teamService.getMyTeamSquad()
-    }).pipe(
-      map(({ lineup, squad }) => {
-        const currentSlots = (lineup?.players ?? []).map((p, i) => ({
+    return this.careerService.getCareerStatus().pipe(
+      switchMap(status => forkJoin({
+        lineup: this.http.get<LineupDTO>(`${environment.apiUrl}/career/lineup/current`),
+        squad: this.teamService.getMyTeamSquad(),
+        status: of(status),
+        liveState: this.engineService.getMatchState(matchId).pipe(catchError(() => of(state)))
+      })),
+      map(({ lineup, squad, status, liveState }) => {
+        const userTeamId = status.userSessionTeamId;
+        const stateForModal = liveState ?? state;
+        const managerIsHome = userTeamId === stateForModal.homeTeamId;
+        const currentFormation = managerIsHome
+          ? (stateForModal.homeFormation || lineup?.formation || '4-4-2')
+          : (stateForModal.awayFormation || lineup?.formation || '4-4-2');
+        const livePlayers = this.applyLiveSubstitutionsToLineup(
+          lineup,
+          squad,
+          stateForModal,
+          userTeamId,
+          matchId
+        );
+        const currentSlots = livePlayers.map((p, i) => ({
           sessionPlayerId: p.playerId,
           position: p.position,
           slotIndex: i
@@ -285,7 +316,7 @@ export class LiveMatchModalsService {
         const data: FormationDialogData = {
           matchId,
           currentFormation,
-          homeTeamId,
+          homeTeamId: userTeamId ?? state.homeTeamId,
           currentSlots,
           squad: squad ?? [],
           startingIds
@@ -363,12 +394,25 @@ export class LiveMatchModalsService {
       return new Observable(sub => sub.complete());
     }
     const careerId = this.getCurrentCareerId();
-    return forkJoin({
-      lineup: this.http.get<LineupDTO>(`${environment.apiUrl}/career/lineup/current`),
-      squad: this.teamService.getMyTeamSquad()
-    }).pipe(
-      map(({ lineup, squad }) => {
-        const currentSlots = (lineup?.players ?? []).map((p, i) => ({
+    return this.careerService.getCareerStatus().pipe(
+      switchMap(status => forkJoin({
+        lineup: this.http.get<LineupDTO>(`${environment.apiUrl}/career/lineup/current`),
+        squad: this.teamService.getMyTeamSquad(),
+        status: of(status),
+        liveState: this.engineService.getMatchState(matchId).pipe(catchError(() => of(state)))
+      })),
+      map(({ lineup, squad, status, liveState }) => {
+        const userTeamId = status.userSessionTeamId;
+        const stateForModal = liveState ?? state;
+        const managerIsHome = userTeamId === stateForModal.homeTeamId;
+        const livePlayers = this.applyLiveSubstitutionsToLineup(
+          lineup,
+          squad,
+          stateForModal,
+          userTeamId,
+          matchId
+        );
+        const currentSlots = livePlayers.map((p, i) => ({
           sessionPlayerId: p.playerId,
           position: p.position,
           slotIndex: i
@@ -381,29 +425,31 @@ export class LiveMatchModalsService {
           // V25D89-FRONT-A: same currentFormation source as openFormationModal
           // (home formation when the manager team is home, else away).
           // The Partido modal uses this to seed the dropdown + slot re-flow.
-          currentFormation: state.homeFormation || '4-4-2',
-          homeTeamId: state.homeTeamId,
+          currentFormation: managerIsHome
+            ? (stateForModal.homeFormation || lineup?.formation || '4-4-2')
+            : (stateForModal.awayFormation || lineup?.formation || '4-4-2'),
+          homeTeamId: userTeamId ?? stateForModal.homeTeamId,
           // V25D89.2: awayTeamId drives event attribution in the stats
           // derivation (without it we cannot tell which team a SHOT
           // belongs to). Sourced from state.awayTeamId — the SSE feed
           // exposes this on every MatchState tick.
-          awayTeamId: state.awayTeamId,
+          awayTeamId: stateForModal.awayTeamId,
           currentSlots,
           squad: squad ?? [],
           startingIds,
           // V25D89-FRONT-A: rival formation comes from state.awayFormation
           // (the only rival-side data the SSE feed exposes). Falls back to
           // '4-4-2' defensively so the rival tab always renders.
-          rivalFormation: state.awayFormation || '4-4-2',
+          rivalFormation: stateForModal.awayFormation || '4-4-2',
           // ========== V25D89.2: stats live data ==========
-          currentMinute: state.currentMinute ?? 0,
-          score: state.score ?? { home: 0, away: 0 },
-          homePossession: state.homePossession ?? 50,
-          awayPossession: state.awayPossession ?? 50,
-          homeTeamName: teamNames?.home ?? String(state.homeTeamId ?? ''),
-          awayTeamName: teamNames?.away ?? String(state.awayTeamId ?? ''),
-          events: state.events ?? [],
-          substitutionsRemaining: state.substitutionsRemaining ?? 5
+          currentMinute: stateForModal.currentMinute ?? 0,
+          score: stateForModal.score ?? { home: 0, away: 0 },
+          homePossession: stateForModal.homePossession ?? 50,
+          awayPossession: stateForModal.awayPossession ?? 50,
+          homeTeamName: teamNames?.home ?? String(stateForModal.homeTeamId ?? ''),
+          awayTeamName: teamNames?.away ?? String(stateForModal.awayTeamId ?? ''),
+          events: stateForModal.events ?? [],
+          substitutionsRemaining: stateForModal.substitutionsRemaining ?? 5
         };
 
         // LIVE-MATCH-F5.3.3 BUG-015: pause the round BEFORE the dialog
@@ -466,6 +512,113 @@ export class LiveMatchModalsService {
     const url = this.router.url || '';
     const match = url.match(/\/games\/([^/]+)/);
     return match ? match[1] : null;
+  }
+
+  /**
+   * V25D99.20.3.31: live DT decisions must be cumulative.
+   *
+   * <p>The persisted career lineup is the pre-match base XI. During a live
+   * match, confirmed substitutions live in the match-state timeline first.
+   * If the next DT modal reads only `/career/lineup/current`, it reopens with
+   * the old XI (e.g. Aurelien still on the pitch after Aurelien → Luka), which
+   * makes the manager controls feel cosmetic. This helper overlays confirmed
+   * SUBSTITUTION events for the manager team onto the base lineup before the
+   * substitution / formation / partido modals build their data.</p>
+   */
+  private applyLiveSubstitutionsToLineup(
+    lineup: LineupDTO,
+    squad: SessionPlayer[] | null | undefined,
+    state: MatchState,
+    userTeamId: string | null | undefined,
+    matchId?: string
+  ): PlayerLineupDTO[] {
+    const livePlayers = [...(lineup?.players ?? [])];
+    if (!userTeamId || !livePlayers.length) {
+      return livePlayers;
+    }
+
+    const squadById = new Map((squad ?? [])
+      .filter(p => !!p.sessionPlayerId)
+      .map(p => [p.sessionPlayerId, p]));
+    const squadByName = new Map((squad ?? [])
+      .filter(p => !!p.name)
+      .map(p => [this.normalizePlayerName(p.name), p]));
+
+    (state.events ?? [])
+      .filter(e => e.eventType === 'SUBSTITUTION')
+      .filter(e => !e.teamId || e.teamId === userTeamId)
+      .sort((a, b) => (a.minute ?? 0) - (b.minute ?? 0))
+      .forEach(event => {
+        const offName = this.normalizePlayerName(event.playerName);
+        const onName = this.normalizePlayerName(event.playerOnName ?? '');
+        if (!offName || !onName) {
+          return;
+        }
+
+        const offIndex = livePlayers.findIndex(p =>
+          this.normalizePlayerName(p.name) === offName || p.playerId === event.playerId
+        );
+        const onPlayer = (event.playerOnName ? squadByName.get(onName) : undefined)
+          ?? (event.playerId ? squadById.get(event.playerId) : undefined);
+        if (offIndex < 0 || !onPlayer?.sessionPlayerId) {
+          return;
+        }
+
+        livePlayers[offIndex] = {
+          ...livePlayers[offIndex],
+          playerId: onPlayer.sessionPlayerId,
+          name: onPlayer.name ?? event.playerOnName ?? livePlayers[offIndex].name,
+          position: onPlayer.position ?? livePlayers[offIndex].position,
+          overall: this.sessionPlayerOverall(onPlayer) ?? livePlayers[offIndex].overall
+        };
+      });
+
+    for (const remembered of this.confirmedSubstitutionMemory.get(matchId ?? '') ?? []) {
+      this.applySubstitutionByIds(livePlayers, squadById, remembered.playerOffId, remembered.playerOnId);
+    }
+
+    return livePlayers;
+  }
+
+  private rememberConfirmedSubstitution(matchId: string, playerOffId: string, playerOnId: string): void {
+    const existing = this.confirmedSubstitutionMemory.get(matchId) ?? [];
+    if (!existing.some(s => s.playerOffId === playerOffId && s.playerOnId === playerOnId)) {
+      this.confirmedSubstitutionMemory.set(matchId, [...existing, { playerOffId, playerOnId }]);
+    }
+  }
+
+  private applySubstitutionByIds(
+    livePlayers: PlayerLineupDTO[],
+    squadById: Map<string, SessionPlayer>,
+    playerOffId: string,
+    playerOnId: string
+  ): void {
+    const offIndex = livePlayers.findIndex(p => p.playerId === playerOffId);
+    const onPlayer = squadById.get(playerOnId);
+    if (offIndex < 0 || !onPlayer?.sessionPlayerId) {
+      return;
+    }
+
+    livePlayers[offIndex] = {
+      ...livePlayers[offIndex],
+      playerId: onPlayer.sessionPlayerId,
+      name: onPlayer.name ?? livePlayers[offIndex].name,
+      position: onPlayer.position ?? livePlayers[offIndex].position,
+      overall: this.sessionPlayerOverall(onPlayer) ?? livePlayers[offIndex].overall
+    };
+  }
+
+  private normalizePlayerName(name: string | null | undefined): string {
+    return (name ?? '').trim().toLocaleLowerCase();
+  }
+
+  private sessionPlayerOverall(sp: SessionPlayer): number | undefined {
+    const values = [sp.attack, sp.defense, sp.technique, sp.speed, sp.stamina, sp.mentality]
+      .filter((value): value is number => typeof value === 'number');
+    if (!values.length) {
+      return undefined;
+    }
+    return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
   }
 
   private toSubModalPlayer(p: PlayerLineupDTO, isStarter: boolean): SubModalPlayer {
