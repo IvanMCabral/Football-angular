@@ -110,7 +110,9 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
 
     engineServiceSpy = jasmine.createSpyObj<MatchEngineService>('MatchEngineService', [
       'startRound',
-      'streamRoundState'
+      'streamRoundState',
+      'pauseRoundForMatch',
+      'resumeRoundForMatch'
     ]);
     // V25D86 sprint: the default mock now returns a RoundState with the
     // backend-resolved roundId (NOT equal to SAMPLE_GAME_ID). This lets
@@ -120,6 +122,8 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
     // exercise the defensive null path).
     engineServiceSpy.startRound.and.returnValue(of(makeRoundState([])));
     engineServiceSpy.streamRoundState.and.returnValue(roundStateSubject.asObservable());
+    engineServiceSpy.pauseRoundForMatch.and.returnValue(of({}));
+    engineServiceSpy.resumeRoundForMatch.and.returnValue(of({}));
 
     careerServiceSpy = jasmine.createSpyObj<CareerService>('CareerService', [
       'getCareerTeams',
@@ -169,6 +173,47 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
     };
     (component as any).vmSubject.next(vm);
   }
+
+  it('pauseAll pauses the whole round through the round helper anchored on the user match', () => {
+    setVm([{
+      match: makeMatch('SCHEDULED'),
+      state: makeMatchState({ status: 'RUNNING', currentMinute: 54 }),
+      isUserMatch: true
+    }]);
+
+    component.pauseAll();
+
+    expect(engineServiceSpy.pauseRoundForMatch).toHaveBeenCalledOnceWith(SAMPLE_GAME_ID, SAMPLE_MATCH_ID);
+    expect((component as any).vmSubject.value.isRoundPaused).toBeTrue();
+  });
+
+  it('resumeAll resumes the whole round through the round helper anchored on the user match', () => {
+    setVm([{
+      match: makeMatch('SCHEDULED'),
+      state: makeMatchState({ status: 'PAUSED', currentMinute: 54 }),
+      isUserMatch: true
+    }]);
+    (component as any).vmSubject.next({ ...(component as any).vmSubject.value, isRoundPaused: true });
+
+    component.resumeAll();
+
+    expect(engineServiceSpy.resumeRoundForMatch).toHaveBeenCalledOnceWith(SAMPLE_GAME_ID, SAMPLE_MATCH_ID);
+    expect((component as any).vmSubject.value.isRoundPaused).toBeFalse();
+  });
+
+  it('normalizes RUNNING snapshots at 90 minutes to FINISHED so the live UI can close', () => {
+    setVm([{ match: makeMatch('SCHEDULED'), isUserMatch: true }]);
+    (component as any).startRoundEngine(SAMPLE_GAME_ID, (component as any).vmSubject.value.matches);
+
+    roundStateSubject.next(makeRoundState([
+      makeMatchState({ status: 'RUNNING', currentMinute: 90 })
+    ], 'IN_PROGRESS'));
+
+    const vm = (component as any).vmSubject.value as RoundLiveViewModel;
+    expect(vm.matches[0].state?.status).toBe('FINISHED');
+    expect(vm.matches[0].match.status).toBe('SIMULATED');
+    expect(vm.allFinished).toBeTrue();
+  });
 
   it('SSE update with status=FINISHED flips match.status to SIMULATED', () => {
     // Initial state: one match with status='SCHEDULED'.

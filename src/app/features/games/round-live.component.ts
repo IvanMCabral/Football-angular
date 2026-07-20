@@ -393,18 +393,21 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
           const matchState = roundState.matches.find(ms =>
             String(ms.matchId) === String(rm.match.id)
           );
+          const normalizedMatchState = matchState
+            ? this.normalizeTerminalLiveState(matchState)
+            : undefined;
           // V24D14-LIVE-FIX-1.7 Bug #2: propagate the live state status into the
           // embedded Match.status so post-FINISHED snapshots don't show stale
           // "En Juego" — mapFixtureStatus now handles both fixture statuses
           // (PENDING/SIMULATING/COMPLETED/CANCELLED) and live state statuses
           // (NOT_STARTED/RUNNING/PAUSED/FINISHED/CANCELLED).
-          const match = matchState
-            ? { ...rm.match, status: this.mapFixtureStatus(matchState.status) }
+          const match = normalizedMatchState
+            ? { ...rm.match, status: this.mapFixtureStatus(normalizedMatchState.status) }
             : rm.match;
           return {
             ...rm,
             match,
-            state: matchState
+            state: normalizedMatchState
           };
         });
 
@@ -723,14 +726,16 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
   }
 
   pauseAll() {
-    const matches = this.vmSubject.value.matches;
-    matches.forEach(rm => {
-      const matchId = String(rm.match.id);
-      if (rm.state?.status === 'RUNNING') {
-        this.engineService.pauseEngine(matchId).subscribe();
-      }
+    const vm = this.vmSubject.value;
+    const anchorMatch = this.findRoundControlAnchorMatch(vm);
+    if (!anchorMatch) {
+      return;
+    }
+
+    this.engineService.pauseRoundForMatch(vm.gameId, String(anchorMatch.match.id)).subscribe({
+      next: () => this.updateVm({ ...this.vmSubject.value, isRoundPaused: true }),
+      error: (err) => console.error('[ROUND-LIVE] pauseAll failed', err)
     });
-    this.updateVm({ ...this.vmSubject.value, isRoundPaused: true });
   }
 
   resumeAll() {
@@ -738,14 +743,50 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
     if (!vm.isRoundPaused) {
       return;
     }
-    const matches = vm.matches;
-    matches.forEach(rm => {
-      const matchId = String(rm.match.id);
-      if (rm.state?.status !== 'FINISHED' && rm.state?.status !== 'CANCELLED') {
-        this.engineService.resumeEngine(matchId).subscribe();
-      }
+
+    const anchorMatch = this.findRoundControlAnchorMatch(vm);
+    if (!anchorMatch) {
+      return;
+    }
+
+    this.engineService.resumeRoundForMatch(vm.gameId, String(anchorMatch.match.id)).subscribe({
+      next: () => this.updateVm({ ...this.vmSubject.value, isRoundPaused: false }),
+      error: (err) => console.error('[ROUND-LIVE] resumeAll failed', err)
     });
-    this.updateVm({ ...vm, isRoundPaused: false });
+  }
+
+  /**
+   * Header pause/resume controls operate on the whole RoundEngine, not on
+   * individual MatchEngines. The backend helper only needs one matchId from
+   * the active round to resolve the real roundId, so prefer the user's match
+   * and fall back to any non-terminal match.
+   */
+  private findRoundControlAnchorMatch(vm: RoundLiveViewModel): RoundMatchVM | null {
+    return vm.matches.find(rm => rm.isUserMatch && !this.isTerminalState(rm.state?.status))
+      ?? vm.matches.find(rm => !this.isTerminalState(rm.state?.status))
+      ?? null;
+  }
+
+  private isTerminalState(status: string | undefined): boolean {
+    return status === 'FINISHED' || status === 'CANCELLED';
+  }
+
+  /**
+   * Defensive UI guard for live streams that reach 90' but keep reporting
+   * RUNNING for one or more ticks. The backend should ideally emit FINISHED;
+   * this keeps the manager flow from getting visually stuck on "En Juego".
+   */
+  private normalizeTerminalLiveState(state: MatchState): MatchState {
+    if (
+      state.currentMinute >= 90 &&
+      state.status !== 'FINISHED' &&
+      state.status !== 'CANCELLED' &&
+      state.status !== 'PAUSED'
+    ) {
+      return { ...state, status: 'FINISHED' };
+    }
+
+    return state;
   }
 
   /**
