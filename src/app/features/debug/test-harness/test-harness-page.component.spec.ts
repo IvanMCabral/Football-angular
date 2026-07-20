@@ -559,7 +559,10 @@ describe('TestHarnessPageComponent', () => {
       skipped: [],
       read: 'base',
     });
-    component.positionPixelMatrixRows.set([{} as any, {} as any]);
+    component.positionPixelMatrixRows.set([
+      makePositionPixelRow({ label: 'R1 ? 5px forward' }),
+      makePositionPixelRow({ label: 'R1 ? 5px wide' }),
+    ] as any);
     component.playerSwapBatterySummaries.set([{} as any]);
     snackBarSpy.open.calls.reset();
 
@@ -574,6 +577,34 @@ describe('TestHarnessPageComponent', () => {
       'OK',
       { duration: 4500 }
     );
+  });
+
+  it('marks full professional smoke as partial when any included stage timed out', () => {
+    component.professionalSmokeSummary.set({
+      controlledTeam: 'My Team (mi equipo)',
+      scope: 'USER',
+      formationRows: 12,
+      scenarioRows: 20,
+      pixelRows: 0,
+      swapRows: 0,
+      formationSeedCount: 20,
+      scenarioSeedCount: 5,
+      included: [
+        'Formation avg: 12 formaciones x 20 seeds',
+        'Redis command timed out',
+      ],
+      skipped: [],
+      read: 'base',
+    });
+    component.positionPixelMatrixRows.set([
+      makePositionPixelRow({ label: 'R1 ? 5px forward' }),
+    ] as any);
+    component.playerSwapBatterySummaries.set([{} as any]);
+
+    (component as any).finalizeProfessionalSmokeFullSummary();
+
+    expect(component.professionalSmokeSummary()?.verdict).toBe('Partial');
+    expect(component.professionalSmokeSummary()?.verdictDetail).toContain('etapa lenta/fallida');
   });
 
   it('onFormationChange updates the model', () => {
@@ -1688,7 +1719,7 @@ describe('TestHarnessPageComponent', () => {
     expect(report).toContain('Precision: balanced');
     expect(report).toContain('Confidence: Medium confidence');
     expect(report).toContain('Seeds: 12345..12354');
-    expect(report).toContain('Best: Jude Bellingham -> Endrick');
+    expect(report).toContain('Recommendation: Jude Bellingham -> Endrick');
     expect(report).toContain('Worst: Federico Valverde -> Luka Modric');
     expect(report).toContain('Reads: 1 Clear upgrade · 1 Clear downgrade');
     expect(report).toContain('Fit: 2 Same profile');
@@ -1839,7 +1870,7 @@ describe('TestHarnessPageComponent', () => {
       deltaWideShotsAgainst: 0,
     });
 
-    expect(component.positionPixelVisualExpectationRead(attackerUpWithoutThreat as any)).toBe('Visual mismatch');
+    expect(component.positionPixelVisualExpectationRead(attackerUpWithoutThreat as any)).toBe('Visual review');
     expect(component.positionPixelVisualExpectationClass(attackerUpWithoutThreat as any)).toBe('read-check');
     expect(component.positionPixelVisualExpectationDetail(attackerUpWithoutThreat as any)).toContain('ATT sube');
     expect(component.positionPixelVisualExpectationRead(defenderDownWithCoverage as any)).toBe('Visual OK');
@@ -2267,7 +2298,7 @@ describe('TestHarnessPageComponent', () => {
 
     component.setPositionPixelReadFilter('visual-mismatch');
     expect(component.displayedPositionPixelMatrixRows().map((row) => row.playerName)).toContain('Mismatch Att');
-    expect(component.displayedPositionPixelMatrixRows().every((row) => component.positionPixelVisualExpectationRead(row as any) === 'Visual mismatch')).toBeTrue();
+    expect(component.displayedPositionPixelMatrixRows().every((row) => component.positionPixelVisualExpectationRead(row as any) === 'Visual review')).toBeTrue();
 
     component.setPositionPixelReadFilter('visual-review');
     expect(component.displayedPositionPixelMatrixRows().map((row) => row.playerName)).toContain('Review Mid');
@@ -2276,7 +2307,7 @@ describe('TestHarnessPageComponent', () => {
     component.setPositionPixelReadFilter('diagonal-mismatch');
     expect(component.displayedPositionPixelMatrixRows().every((row) =>
       (component as any).positionPixelIsDiagonalMove(row as any)
-        && component.positionPixelVisualExpectationRead(row as any) === 'Visual mismatch'
+        && component.positionPixelVisualExpectationRead(row as any) === 'Visual review'
     )).toBeTrue();
 
     component.setPositionPixelReadFilter('diagonal-review');
@@ -2352,7 +2383,7 @@ describe('TestHarnessPageComponent', () => {
     ] as any);
 
     const summary = component.positionPixelVisualExpectationSummary();
-    const mismatch = summary.find((item) => item.label === 'Visual mismatch');
+    const mismatch = summary.find((item) => item.label === 'Visual review');
     const ok = summary.find((item) => item.label === 'Visual OK');
 
     expect(mismatch?.count).toBe(1);
