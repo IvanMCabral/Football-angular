@@ -516,8 +516,13 @@ interface BackFiveContextSmokeSummary {
 interface ProfessionalSmokeSummary {
   controlledTeam: string;
   scope: ControlledTeamSide;
+  verdict?: 'OK' | 'Review' | 'Fail' | 'Partial';
+  verdictDetail?: string;
   formationRows: number;
   scenarioRows: number;
+  formationAuditRows?: number;
+  formationAuditFallbackRows?: number;
+  formationAuditReviewRows?: number;
   pixelRows: number;
   swapRows: number;
   formationSeedCount: number;
@@ -1813,7 +1818,13 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
           </article>
           <article *ngIf="professionalSmokeSummary() as smoke" class="position-read-summary professional-smoke-summary" data-testid="professional-smoke-summary">
             <strong>Professional smoke</strong>
+            <span *ngIf="smoke.verdict" class="qa-verdict-badge" [class]="professionalSmokeVerdictClass(smoke.verdict)">
+              {{ smoke.verdict }}
+            </span>
             <span>{{ smoke.read }}</span>
+            <small *ngIf="smoke.verdictDetail">
+              Resultado: {{ smoke.verdictDetail }}
+            </small>
             <small>
               Incluye: {{ smoke.included.join(' · ') }}
             </small>
@@ -10462,46 +10473,9 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     this.clearFormationLineAuditResults();
     this.mutationInFlight.set(true);
     this.analysisReadyMessage.set(`All formations line audit corriendo: ${formations.length} formaciones...`);
-    this.harness.getCurrentLineup().pipe(
-      take(1),
-      switchMap((originalLineup) => {
-        const originalSlots = this.buildLineupSlots(originalLineup);
-        const originalPlayerIds = this.lineupPlayerIdsFromSlots(originalSlots);
-        return from(formations).pipe(
-          concatMap((formation) =>
-            this.harness.autoSelectLineup(formation).pipe(
-              map((lineup) => ({ formation, lineup }))
-            )
-          ),
-          toArray(),
-          switchMap((items) =>
-            this.harness.manualSelectLineup(originalLineup.formation, originalPlayerIds, originalSlots).pipe(
-              map(() => items)
-            )
-          )
-        );
-      })
-    ).subscribe({
-      next: (items) => {
-        const rows = items.flatMap(({ formation, lineup }) =>
-          (['DEF', 'MID', 'ATT'] as const).map((line) =>
-            this.toFormationLineSmokeRow(
-              { ...lineup, formation: lineup.formation ?? formation },
-              line,
-              matches.length
-            )
-          )
-        );
-        this.formationLineSmokeRows.set(rows);
-        const last = items[items.length - 1]?.lineup ?? null;
-        if (last) {
-          this.lineupDebugSnapshot.set(this.buildLineupDebugSnapshot(
-            last,
-            'All formations line audit (last formation)',
-            null,
-            (['DEF', 'MID', 'ATT'] as const).flatMap((line) => this.pickPositionPixelLineCandidates(last, line, 6))
-          ));
-        }
+    this.buildAllFormationsLineAuditRows$(matches.length).subscribe({
+      next: ({ rows, last }) => {
+        this.applyAllFormationsLineAuditRows(rows, last);
         const reviewCount = rows.filter((row) => row.verdict === 'Review').length;
         const fallbackCount = rows.filter((row) => row.verdict === 'Fallback').length;
         this.mutationInFlight.set(false);
@@ -10522,6 +10496,54 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         this.snackBar.open(this.fmtError(err, 'Failed to run all formations line audit'), 'OK', { duration: 5000 });
       },
     });
+  }
+  private buildAllFormationsLineAuditRows$(matchCount: number): Observable<{ rows: FormationLineSmokeRow[]; last: LineupDTO | null }> {
+    const formations = [...this.formationCodes];
+    return this.harness.getCurrentLineup().pipe(
+      take(1),
+      switchMap((originalLineup) => {
+        const originalSlots = this.buildLineupSlots(originalLineup);
+        const originalPlayerIds = this.lineupPlayerIdsFromSlots(originalSlots);
+        return from(formations).pipe(
+          concatMap((formation) =>
+            this.harness.autoSelectLineup(formation).pipe(
+              map((lineup) => ({ formation, lineup }))
+            )
+          ),
+          toArray(),
+          switchMap((items) =>
+            this.harness.manualSelectLineup(originalLineup.formation, originalPlayerIds, originalSlots).pipe(
+              map(() => {
+                const rows = items.flatMap(({ formation, lineup }) =>
+                  (['DEF', 'MID', 'ATT'] as const).map((line) =>
+                    this.toFormationLineSmokeRow(
+                      { ...lineup, formation: lineup.formation ?? formation },
+                      line,
+                      matchCount
+                    )
+                  )
+                );
+                return {
+                  rows,
+                  last: items[items.length - 1]?.lineup ?? null,
+                };
+              })
+            )
+          )
+        );
+      })
+    );
+  }
+  private applyAllFormationsLineAuditRows(rows: FormationLineSmokeRow[], last: LineupDTO | null): void {
+    this.formationLineSmokeRows.set(rows);
+    if (last) {
+      this.lineupDebugSnapshot.set(this.buildLineupDebugSnapshot(
+        last,
+        'All formations line audit (last formation)',
+        null,
+        (['DEF', 'MID', 'ATT'] as const).flatMap((line) => this.pickPositionPixelLineCandidates(last, line, 6))
+      ));
+    }
   }
   private allFormationsLineAuditToast(totalRows: number, reviewCount: number, fallbackCount: number): string {
     if (reviewCount > 0) {
@@ -11361,6 +11383,12 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       default:
         return 'qa-verdict-pending';
     }
+  }
+  professionalSmokeVerdictClass(verdict: ProfessionalSmokeSummary['verdict']): string {
+    if (verdict === 'OK') return 'qa-verdict-ok';
+    if (verdict === 'Review' || verdict === 'Fail') return 'qa-verdict-review';
+    if (verdict === 'Partial') return 'qa-verdict-fallback';
+    return 'qa-verdict-pending';
   }
   professionalQaActionLabel(check: string): string {
     switch (check) {
@@ -14580,13 +14608,16 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         this.analysisReadyMessage.set('Professional smoke full sigue con pixeles/swaps: la etapa base tuvo observaciones, pero no se corta la evidencia restante.');
         this.snackBar.open('Smoke full: etapa base con observaciones; sigo con pixeles/swaps.', 'OK', { duration: 4500 });
       }
-      this.runProfessionalSmokePixelStage(() => {
+      this.runProfessionalSmokeFormationAuditStage(() => {
         if (runId !== this.professionalSmokeFullRunId) return;
-        this.professionalSmokeFullPixelRows = this.positionPixelMatrixRows().length;
-        this.onRunPlayerSwapBattery({ preservePositionPixels: true });
-        this.waitForProfessionalSmokeStep('player swaps', () => {
+        this.runProfessionalSmokePixelStage(() => {
           if (runId !== this.professionalSmokeFullRunId) return;
-          this.finalizeProfessionalSmokeFullSummary();
+          this.professionalSmokeFullPixelRows = this.positionPixelMatrixRows().length;
+          this.onRunPlayerSwapBattery({ preservePositionPixels: true });
+          this.waitForProfessionalSmokeStep('player swaps', () => {
+            if (runId !== this.professionalSmokeFullRunId) return;
+            this.finalizeProfessionalSmokeFullSummary();
+          });
         });
       });
     });
@@ -14604,8 +14635,13 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       this.professionalSmokeSummary.set({
         controlledTeam: controlledName,
         scope: 'USER',
+        verdict: 'Partial',
+        verdictDetail: 'Smoke cortado por timeout defensivo; usar solo como evidencia parcial.',
         formationRows,
         scenarioRows,
+        formationAuditRows: this.formationLineSmokeRows().length,
+        formationAuditFallbackRows: this.formationLineSmokeRows().filter((row) => row.verdict === 'Fallback').length,
+        formationAuditReviewRows: this.formationLineSmokeRows().filter((row) => row.verdict === 'Review').length,
         pixelRows,
         swapRows,
         formationSeedCount: this.scenarioMatrixSummaryEffectiveSeedCount(),
@@ -14622,6 +14658,101 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       this.analysisReadyMessage.set('Professional smoke full cortado por timeout defensivo. Resultados parciales abajo.');
       this.snackBar.open('Professional smoke full timeout: resultados parciales disponibles.', 'OK', { duration: 6000 });
     }, 180_000);
+  }
+  private runProfessionalSmokeFormationAuditStage(onComplete: () => void): void {
+    const matches = this.userTeamMatches()
+      .filter((match) => match.status === 'COMPLETED')
+      .slice(0, 3);
+    const current = this.professionalSmokeSummary();
+    if (matches.length === 0) {
+      this.professionalSmokeSummary.set({
+        controlledTeam: current?.controlledTeam ?? this.controlledTeamDisplayName(),
+        scope: 'USER',
+        formationRows: current?.formationRows ?? this.formationMatrixSummaryResults().length,
+        scenarioRows: current?.scenarioRows ?? this.scenarioMatrixSummaryResults().length,
+        formationAuditRows: 0,
+        formationAuditFallbackRows: 0,
+        formationAuditReviewRows: 0,
+        pixelRows: current?.pixelRows ?? 0,
+        swapRows: current?.swapRows ?? 0,
+        formationSeedCount: current?.formationSeedCount ?? this.scenarioMatrixSummaryEffectiveSeedCount(),
+        scenarioSeedCount: current?.scenarioSeedCount ?? this.scenarioMatrixSmokeSeedCount(),
+        included: current?.included ?? [],
+        skipped: [
+          ...(current?.skipped ?? []),
+          'All formations line audit omitido: no hay partidos completados del usuario.',
+        ],
+        read: current?.read ?? `${this.controlledTeamDisplayName()}: smoke full en progreso.`,
+      });
+      onComplete();
+      return;
+    }
+    this.clearFormationLineAuditResults();
+    this.mutationInFlight.set(true);
+    this.analysisReadyMessage.set('Professional smoke full: auditando slots/lados de todas las formaciones...');
+    this.buildAllFormationsLineAuditRows$(matches.length).pipe(
+      timeout(60_000),
+      map((result) => ({ result, issue: null as string | null })),
+      catchError((err) => of({
+        result: { rows: [] as FormationLineSmokeRow[], last: null as LineupDTO | null },
+        issue: this.fmtError(err, 'All formations line audit timeout/error'),
+      }))
+    ).subscribe({
+      next: ({ result, issue }) => {
+        const before = this.professionalSmokeSummary();
+        if (!issue) {
+          this.applyAllFormationsLineAuditRows(result.rows, result.last);
+        }
+        const rows = this.formationLineSmokeRows();
+        const fallbackRows = rows.filter((row) => row.verdict === 'Fallback').length;
+        const reviewRows = rows.filter((row) => row.verdict === 'Review').length;
+        this.professionalSmokeSummary.set({
+          controlledTeam: before?.controlledTeam ?? this.controlledTeamDisplayName(),
+          scope: 'USER',
+          formationRows: before?.formationRows ?? this.formationMatrixSummaryResults().length,
+          scenarioRows: before?.scenarioRows ?? this.scenarioMatrixSummaryResults().length,
+          formationAuditRows: rows.length,
+          formationAuditFallbackRows: fallbackRows,
+          formationAuditReviewRows: reviewRows,
+          pixelRows: before?.pixelRows ?? 0,
+          swapRows: before?.swapRows ?? 0,
+          formationSeedCount: before?.formationSeedCount ?? this.scenarioMatrixSummaryEffectiveSeedCount(),
+          scenarioSeedCount: before?.scenarioSeedCount ?? this.scenarioMatrixSmokeSeedCount(),
+          included: [
+            ...(before?.included ?? []),
+            issue ?? `All formations line audit: ${rows.length} checks · ${fallbackRows} fallback · ${reviewRows} review`,
+          ],
+          skipped: before?.skipped ?? [],
+          read: before?.read ?? `${this.controlledTeamDisplayName()}: smoke full en progreso.`,
+        });
+      },
+      error: (err) => {
+        const before = this.professionalSmokeSummary();
+        this.professionalSmokeSummary.set({
+          controlledTeam: before?.controlledTeam ?? this.controlledTeamDisplayName(),
+          scope: 'USER',
+          formationRows: before?.formationRows ?? this.formationMatrixSummaryResults().length,
+          scenarioRows: before?.scenarioRows ?? this.scenarioMatrixSummaryResults().length,
+          formationAuditRows: this.formationLineSmokeRows().length,
+          formationAuditFallbackRows: this.formationLineSmokeRows().filter((row) => row.verdict === 'Fallback').length,
+          formationAuditReviewRows: this.formationLineSmokeRows().filter((row) => row.verdict === 'Review').length,
+          pixelRows: before?.pixelRows ?? 0,
+          swapRows: before?.swapRows ?? 0,
+          formationSeedCount: before?.formationSeedCount ?? this.scenarioMatrixSummaryEffectiveSeedCount(),
+          scenarioSeedCount: before?.scenarioSeedCount ?? this.scenarioMatrixSmokeSeedCount(),
+          included: before?.included ?? [],
+          skipped: [
+            ...(before?.skipped ?? []),
+            this.fmtError(err, 'All formations line audit falló dentro del smoke full'),
+          ],
+          read: before?.read ?? `${this.controlledTeamDisplayName()}: smoke full en progreso.`,
+        });
+      },
+      complete: () => {
+        this.mutationInFlight.set(false);
+        onComplete();
+      },
+    });
   }
   private runProfessionalSmokePixelStage(onComplete: () => void): void {
     const seedCount = Math.max(20, Math.min(30, Math.round(this.playerSwapSeedCountModel || 20)));
@@ -14663,11 +14794,27 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const pixelRows = this.professionalSmokeFullPixelRows || this.positionPixelMatrixRows().length;
     const swapRows = this.playerSwapBatterySummaries().length;
     const baseIncluded = current?.included ?? [];
+    const auditRows = this.formationLineSmokeRows().length;
+    const auditFallbackRows = this.formationLineSmokeRows().filter((row) => row.verdict === 'Fallback').length;
+    const auditReviewRows = this.formationLineSmokeRows().filter((row) => row.verdict === 'Review').length;
+    const finalVerdict = this.professionalSmokeFinalVerdict();
+    const skipped = [
+      ...((current?.skipped ?? []).filter((item) => {
+        const lower = item.toLowerCase();
+        return !lower.includes('pÃ­xeles y swaps') && !lower.includes('pixeles y swaps') && !lower.includes('compare baseline/live');
+      })),
+      'Compare baseline/live queda disponible en Open Match Compare.',
+    ];
     this.professionalSmokeSummary.set({
       controlledTeam: current?.controlledTeam ?? controlledName,
       scope: 'USER',
+      verdict: finalVerdict.verdict,
+      verdictDetail: finalVerdict.detail,
       formationRows: current?.formationRows ?? this.formationMatrixSummaryResults().length,
       scenarioRows: current?.scenarioRows ?? this.scenarioMatrixSummaryResults().length,
+      formationAuditRows: auditRows,
+      formationAuditFallbackRows: auditFallbackRows,
+      formationAuditReviewRows: auditReviewRows,
       pixelRows,
       swapRows,
       formationSeedCount: current?.formationSeedCount ?? this.scenarioMatrixSummaryEffectiveSeedCount(),
@@ -14677,11 +14824,45 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         `Pixel sensitivity: ${pixelRows} filas`,
         `Player swap battery: ${swapRows} cambios`,
       ],
-      skipped: ['Compare baseline/live queda disponible en Open Match Compare.'],
+      skipped,
       read: `${controlledName}: smoke full · ${current?.formationRows ?? this.formationMatrixSummaryResults().length} formaciones · ${current?.scenarioRows ?? this.scenarioMatrixSummaryResults().length} escenarios · ${pixelRows} píxeles · ${swapRows} swaps.`,
     });
     this.markReplayAnalysisReady(`Professional smoke full listo para ${controlledName}: ${pixelRows} píxeles · ${swapRows} swaps.`);
     this.snackBar.open(`Professional smoke full complete: ${pixelRows} pixel rows, ${swapRows} swaps.`, 'OK', { duration: 4500 });
+  }
+  private professionalSmokeFinalVerdict(): { verdict: NonNullable<ProfessionalSmokeSummary['verdict']>; detail: string } {
+    const checks = this.professionalQaChecklistRows();
+    const total = checks.length;
+    const ok = checks.filter((row) => row.verdict === 'OK').length;
+    const fallback = checks.filter((row) => row.verdict === 'Fallback').length;
+    const review = checks.filter((row) => row.verdict === 'Review').length;
+    const pending = checks.filter((row) => row.verdict === 'Pending').length;
+    const notes = [
+      ...(this.professionalSmokeSummary()?.included ?? []),
+      ...(this.professionalSmokeSummary()?.skipped ?? []),
+    ].join(' ').toLowerCase();
+    if (notes.includes('timeout') || notes.includes('timed out') || notes.includes('error') || notes.includes('fallÃ³') || notes.includes('falló') || notes.includes('fallo') || notes.includes('failed')) {
+      return {
+        verdict: 'Partial',
+        detail: `${ok}/${total} checks OK, ${fallback} fallback aceptado, ${review} review, ${pending} pending; hubo etapa lenta/fallida.`,
+      };
+    }
+    if (review > 0) {
+      return {
+        verdict: 'Fail',
+        detail: `${review} check(s) requieren correcciÃ³n antes de calibrar profesionalmente.`,
+      };
+    }
+    if (pending > 0) {
+      return {
+        verdict: 'Review',
+        detail: `${pending} check(s) quedaron pendientes; correrlos o integrarlos antes de cerrar QA.`,
+      };
+    }
+    return {
+      verdict: 'OK',
+      detail: `${ok}/${total} checks OK${fallback > 0 ? `, ${fallback} fallback visible/penalizado` : ''}.`,
+    };
   }
   onRunLowBlockLab(): void {
     const matchId = this.selectedMatchId();
