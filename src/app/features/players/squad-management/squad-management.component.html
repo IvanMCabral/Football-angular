@@ -94,7 +94,7 @@
           class="tab-btn"
           [class.active]="(activeTab$ | async) === 'stats'"
           (click)="setActiveTab('stats')">
-          📊 Estad?sticas
+          📊 Estadísticas
         </button>
       </div>
 
@@ -110,7 +110,7 @@
              [class.lineup-incomplete]="lineupSlotsCount < 11"
              [class.lineup-complete]="lineupSlotsCount === 11"
              class="lineup-mini-cta">
-          ⚽ Alineaci?n armada: <strong>{{ lineupSlotsCount }} / 11</strong> — <a href="#">Ir a confirmar</a>
+          ⚽ Alineación armada: <strong>{{ lineupSlotsCount }} / 11</strong> — <a href="#">Ir a confirmar</a>
         </div>
 
 
