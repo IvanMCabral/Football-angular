@@ -22,16 +22,15 @@
       </ng-container>
 
       <ng-template #standingsContent>
-        <!-- V25D78-C55.2 phase 4 UI (c2): legend so users understand the
-             green/red row coloring below. -->
+
         <div class="zone-legend">
           <span class="zone-legend-item zone-promotion">
             <span class="zone-swatch"></span>
-            Zona de Ascenso ({{ TEAMS_PROMOTED_OR_RELEGATED }} mejores)
+            Zona de ascenso ({{ TEAMS_PROMOTED_OR_RELEGATED }} mejores)
           </span>
           <span class="zone-legend-item zone-relegation">
             <span class="zone-swatch"></span>
-            Zona de Descenso ({{ TEAMS_PROMOTED_OR_RELEGATED }} peores)
+            Zona de descenso ({{ TEAMS_PROMOTED_OR_RELEGATED }} peores)
           </span>
         </div>
 
@@ -62,11 +61,7 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <!-- V25D78-C55.2 phase 4 UI (c2): top-3 promotion zone (green)
-                       and bottom-3 relegation zone (red). Class binding is
-                       driven off the 0-indexed loop index so it works on any
-                       list size ≥ 6 (the minimum multi-division field is 60
-                       teams / 3 divisions × 20 each). -->
+
                   <tr *ngFor="let team of div.standings; let i = index"
                       [class.highlight]="team.teamId === userTeamId"
                       [class.zone-promotion]="i < TEAMS_PROMOTED_OR_RELEGATED"

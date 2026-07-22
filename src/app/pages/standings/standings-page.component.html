@@ -1,22 +1,16 @@
 <div class="standings-page">
   <header class="page-header">
     <div class="header-left">
-      <a routerLink="/dashboard" class="back-link" aria-label="Volver al dashboard">
-        <mat-icon>arrow_back</mat-icon>
+      <a routerLink="/dashboard" class="back-link" aria-label="Volver al inicio">
+        <span>Volver</span>
       </a>
       <h1>
         <span class="title-icon">🏆</span>
-        Tabla de Posiciones
+        Tabla de posiciones
       </h1>
     </div>
 
-    <!-- V25D78-C55.2 phase 4 UI (c) consume: show the user's division
-         tier as a prominent badge in the page header, so the user lands
-         on the page already knowing which tier they play in.
-         C55.10 Item 1: consume the backend label verbatim and pick the CSS
-         class via {@link tierCssClass} so any tier (CUARTA, QUINTA, SEXTA,
-         …) renders with a sensible default style instead of unstyled
-         text. -->
+
     <div class="header-right" *ngIf="userDivision">
       <span class="user-division-pill" [class]="tierCssClass(userDivision)">
         Tu división: {{ userDivision }}
@@ -24,16 +18,15 @@
     </div>
   </header>
 
-  <!-- V25D78-C55.2 phase 4 UI (c2): same legend as the modal so the
-       green/red row coloring below is self-explanatory. -->
+
   <div class="zone-legend">
     <span class="zone-legend-item zone-promotion">
       <span class="zone-swatch"></span>
-      Zona de Ascenso ({{ TEAMS_PROMOTED_OR_RELEGATED }} mejores)
+      Zona de ascenso ({{ TEAMS_PROMOTED_OR_RELEGATED }} mejores)
     </span>
     <span class="zone-legend-item zone-relegation">
       <span class="zone-swatch"></span>
-      Zona de Descenso ({{ TEAMS_PROMOTED_OR_RELEGATED }} peores)
+      Zona de descenso ({{ TEAMS_PROMOTED_OR_RELEGATED }} peores)
     </span>
   </div>
 
