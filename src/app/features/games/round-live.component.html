@@ -32,7 +32,7 @@
       <button *ngIf="!vm.allFinished && !vm.isRoundPaused" (click)="pauseAll()" class="btn btn-pause">⏸️ Pausar Todos</button>
       <button *ngIf="!vm.allFinished && vm.isRoundPaused" (click)="resumeAll()" class="btn btn-resume">▶️ Reanudar Todos</button>
       <button
-        *ngIf="!vm.allFinished"
+        *ngIf="showDebugControls && !vm.allFinished"
         (click)="toggleDebugFreeze()"
         class="btn btn-debug-freeze"
         [class.active]="debugFreezeEnabled"
@@ -42,7 +42,7 @@
         {{ debugFreezeEnabled ? '🧊 Debug freeze ON' : '🧊 Debug freeze OFF' }}
       </button>
       <button
-        *ngIf="isLocalDebugHost && !vm.allFinished"
+        *ngIf="showDebugControls && !vm.allFinished"
         (click)="toggleDebugSuppressAutoInjuryModals()"
         class="btn btn-debug-freeze"
         [class.active]="debugSuppressAutoInjuryModals"
@@ -53,7 +53,7 @@
         {{ debugSuppressAutoInjuryModals ? 'Lesion auto OFF' : 'Lesion auto ON' }}
       </button>
       <button
-        *ngIf="isLocalDebugHost && !vm.allFinished"
+        *ngIf="showDebugControls && !vm.allFinished"
         (click)="onDebugDoubleInjury()"
         class="btn btn-debug-freeze"
         data-testid="debug-double-injury-button"
@@ -62,7 +62,7 @@
         Test doble lesion
       </button>
       <button
-        *ngIf="isLocalDebugHost && !vm.allFinished"
+        *ngIf="showDebugControls && !vm.allFinished"
         (click)="onDebugPartidoInjury()"
         class="btn btn-debug-freeze"
         data-testid="debug-partido-injury-button"
@@ -83,7 +83,7 @@
     ⏸️ Partidos pausados
   </div>
 
-  <div *ngIf="debugFreezeEnabled && !vm.allFinished" class="banner banner-debug-freeze" role="status" aria-live="polite">
+  <div *ngIf="showDebugControls && debugFreezeEnabled && !vm.allFinished" class="banner banner-debug-freeze" role="status" aria-live="polite">
     🧊 Debug freeze activo: la fecha se pausa sola para pruebas visuales largas.
   </div>
 

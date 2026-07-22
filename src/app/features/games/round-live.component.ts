@@ -77,11 +77,13 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
 
   private readonly debugFreezeStorageKey = 'manager.debugFreezeLiveRound';
   private readonly debugSuppressAutoInjuryStorageKey = 'manager.debugSuppressAutoInjuryModals';
+  private readonly debugControlsStorageKey = 'manager.showRoundLiveDebugControls';
   private readonly injuryAutoModalStoragePrefix = 'manager.pendingInjuryAutoModals.v1';
-  debugFreezeEnabled = this.readDebugFreezeFlag();
-  debugSuppressAutoInjuryModals = this.readDebugSuppressAutoInjuryFlag();
   readonly isLocalDebugHost = typeof window !== 'undefined'
     && ['localhost', '127.0.0.1'].includes(window.location.hostname);
+  readonly showDebugControls = this.readDebugControlsFlag();
+  debugFreezeEnabled = this.showDebugControls && this.readDebugFreezeFlag();
+  debugSuppressAutoInjuryModals = this.showDebugControls && this.readDebugSuppressAutoInjuryFlag();
   private currentUserSessionTeamId: string | null = null;
   private debugFreezePauseInFlight = false;
   private debugFreezePausedRoundKeys = new Set<string>();
@@ -1115,6 +1117,14 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
   private readDebugSuppressAutoInjuryFlag(): boolean {
     try {
       return localStorage.getItem(this.debugSuppressAutoInjuryStorageKey) === '1';
+    } catch {
+      return false;
+    }
+  }
+
+  private readDebugControlsFlag(): boolean {
+    try {
+      return this.isLocalDebugHost && localStorage.getItem(this.debugControlsStorageKey) === '1';
     } catch {
       return false;
     }

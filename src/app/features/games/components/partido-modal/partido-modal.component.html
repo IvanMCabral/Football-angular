@@ -18,14 +18,14 @@
          of the formation change. Stays visible across tabs so the
          manager sees the error regardless of which tab they're on. -->
     <div *ngIf="errorMsg" class="banner banner-error" role="alert" data-testid="partido-error">
-      <mat-icon>error</mat-icon>
+      <mat-icon aria-hidden="true">error</mat-icon>
       <span>{{ errorMsg }}</span>
     </div>
 
     <!-- V25D89-FRONT-A: warning banner (auto-fill uncovered slots).
          Same orange styling as the F5 modal. -->
     <div *ngIf="warningMsg && !errorMsg" class="banner banner-warning" role="status" data-testid="partido-autofill-warning">
-      <mat-icon>warning</mat-icon>
+      <mat-icon aria-hidden="true">warning</mat-icon>
       <span>{{ warningMsg }}</span>
     </div>
 
