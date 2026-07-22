@@ -2303,7 +2303,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
 })
 export class SquadEditorModalComponent implements OnInit, OnDestroy {
   // can clamp their width to [0, 100] (engine values come in as
-  // multiplier Ã— 100, so e.g. a 165% ATT would overflow a 100% wide bar).
+  // multiplier x 100, so e.g. a 165% ATT would overflow a 100% wide bar).
   readonly Math = Math;
 
   private destroy$ = new Subject<void>();
@@ -2503,7 +2503,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
         },
         // Silent fail: backend might be slow / unavailable / endpoint
         // not deployed yet on dev. The fallback getters keep the panel
-        // showing the last known values (or "â€"" if never computed).
+        // showing the last known values (or "-" if never computed).
         error: () => {
 }
       });
@@ -3436,7 +3436,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
         debounceTime(300),
         distinctUntilChanged((a, b) => a.signature === b.signature),
         switchMap(snapshot => {
-          // Need exactly 11 to preview â€" earlier/later states emit null
+          // Need exactly 11 to preview; earlier/later states emit null
           // (template shows "Proyectando chemistry..." placeholder).
           if (!snapshot.ids || snapshot.ids.length !== 11) {
             this.previewError = false;
@@ -3561,7 +3561,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
 
         // via MAT_DIALOG_DATA) so the dialog opens with the SAME state the
         // parent shows. Was: response.formation || this.selectedFormation
-        // || '4-4-2' â€" fell back to 4-4-2 when response.formation was null
+        // Avoid falling back to 4-4-2 when response.formation is null.
         // and parent had e.g. 5-4-1, causing the dialog/parent desync.
         const formationName = response?.formation
           || this.data?.currentFormation
@@ -3591,7 +3591,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
         // (bench = filter !slotId sobre lineup, que da 0 cuando lineup = 11).
         const squadSource: any[] = (this.data?.squad && this.data.squad.length > 0)
           ? this.data.squad.map((sp: SessionPlayer) => ({
-              // SessionPlayer.sessionPlayerId â†’ lineup player playerId.
+              // SessionPlayer.sessionPlayerId -> lineup player playerId.
               // El back usa sessionPlayerId como playerId en /career/lineup/current,
               // entonces mapear mantiene la consistencia con persistedSlots y
               // slotPlayerMap que matchean por playerId.
@@ -3703,7 +3703,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
         for (const player of allPlayers) {
           if (!player.slotId) { continue; }
           if (this.isSlotInActiveFormation(player.slotId)) { continue; }
-          // stale slotId from a previous formation â€" free it
+          // stale slotId from a previous formation; free it
           delete this.slotPlayerMap[player.slotId];
           player.slotId = '';
         }
@@ -3736,7 +3736,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
         for (const player of allPlayers) {
           if (!player.slotId) { continue; }
           if (seenSubdivisionIds.has(player.slotId)) {
-            // Duplicate â€" clear the slotId, the player will go to bench.
+            // Duplicate; clear the slotId, the player will go to bench.
             delete this.slotPlayerMap[player.slotId];
             player.slotId = '';
             continue;
@@ -3899,8 +3899,8 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   }
 
   onSlotClick(sub: FieldSubdivisionDTO): void {
-    // are inert on click. Iván no quiere popup â€" ni siquiera "Sin asignar"
-    // â€" porque el player está fully relocated a su override position. El
+    // Free-position players are inert on slot click: their card already represents a manual field position.
+    // Slot popups are reserved for tactical slots that can still be assigned directly.
     // slot queda como un rectángulo visual sin función hasta que el
     // user drag-dropee al player de vuelta (handleSlotDrop restaura el
     // slotPlayerMap y el slot vuelve a ser clickeable con player info).
@@ -3962,7 +3962,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     this.selectedPlayerToAssign = '';
     this.saveLineup();
     this.triggerChemistryPreview();
-    // handleSlotDrop â€" if the click-assign puts a player into an off-role
+    // handleSlotDrop: if click-assign puts a player into an off-role
     // slot (e.g. assigning a CB to a MID slot via the assign panel), we want
     // the dropdown + marker visibility to flip into user-formation mode.
     this.updateFormationDetection();
@@ -3982,7 +3982,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     this.selectedSlot = null;
     this.saveLineup();
     this.triggerChemistryPreview();
-    // incomplete < 11 â†’ flips to user-formation mode automatically).
+    // incomplete < 11 -> flips to user-formation mode automatically).
     this.updateFormationDetection();
     this.cdr.detectChanges();
   }
@@ -4009,8 +4009,8 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   }
 
   handleSlotDrop(event: CdkDragDrop<any>): void {
-    // (cdkDropListDropped) bindings from slots â€" handleMarkerDragEnd is
-    // the primary drop handler â€" but we keep this method for backward
+    // CDK slot drops are not the primary path; handleMarkerDragEnd owns field positioning.
+    // Keep this method only for backward-compatible drag/drop integrations.
     // compat with the unit-test suite (5 specs still call handleSlotDrop
     // directly with mock events). The runtime binding is gone but the
     // logic lives on in assignPlayerToSlot.
@@ -4022,7 +4022,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
 
     const sourceDropListId = event.previousContainer.id;
     if (sourceDropListId === 'slot-' + targetSubdivisionId) {
-      return; // same slot â†’ no-op
+      return; // same slot -> no-op
     }
 
     const sourceSlotId = sourceDropListId === this.BENCH_DROP_LIST_ID
@@ -4099,16 +4099,16 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
     //
     // inside the field goes to FREE POSITIONING (xPercent/yPercent set).
     // If the user wants the marker at a slot, they drop it AT that
-    // slot's pixel location â€" no more 'salta a otro' (jumps to another).
+    // slot's pixel location; no more jumping to another slot.
     // Plus: explicit transform clear at the end of the handler so CDK's
     // leftover drag transform doesn't offset the marker visually.
     //
     // Bench still works (move-to-bench via cursor over a bench card).
     //
-    // a) cursor over a bench-player card  â†’ movePlayerToBench
-    // b) cursor anywhere else in field    â†’ FREE POSITIONING (xPct/yPct set,
+    // a) cursor over a bench-player card  -> movePlayerToBench
+    // b) cursor anywhere else in field    -> FREE POSITIONING (xPct/yPct set,
     //                                          original slot becomes empty)
-    // c) cursor outside field             â†’ clamp xPct/yPct to [0, 100] and
+    // c) cursor outside field             -> clamp xPct/yPct to [0, 100] and
     //                                          treat as free position
 
     // 2a. Bench hit-test (strict: only over a SPECIFIC bench-player card).
@@ -4132,7 +4132,7 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
     }
 
     //
-    // rect.left) / rect.width * 100`) â€" visually correct ONLY when the
+    // rect.left) / rect.width * 100`); visually correct ONLY when the
     // user clicked the marker's exact center. If user clicked anywhere
     // else, the marker snapped to "centered on cursor" at release,
     // creating a small but visible jump relative to where it had been
@@ -4279,9 +4279,9 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
 
   private findSlotAtPosition(xPct: number, yPct: number): FieldSubdivisionDTO | null {
     // dentro de alguna de las coordenadas que hay en la cancha'. Players
-    // must land at exact slot coordinates â€" no free positioning, no
+    // must land at exact slot coordinates; no free positioning, no
     // snap-to-nearest heuristic. Drops that don't land exactly on a slot
-    // are cancelled (marker snaps back) â€" see handleMarkerDragEnd.
+    // are cancelled (marker snaps back); see handleMarkerDragEnd.
     return this.subdivisions.find(s =>
       xPct >= s.left && xPct <= s.left + s.width
       && yPct >= s.top && yPct <= s.top + s.height
@@ -4339,7 +4339,7 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
         delete occupant.xPercent;
         delete occupant.yPercent;
       } else {
-        // Source was bench â†’ evict the occupant to the bench.
+        // Source was bench -> evict the occupant to the bench.
         occupant.slotId = '';
         delete occupant.xPercent;
         delete occupant.yPercent;
@@ -4497,7 +4497,7 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
     // slotPlayerMap entry for each player (handleFieldDrop intentionally
     // removed it so the slot looked truly empty). Without this restore
     // the markers would snap to slot centers but the slots would remain
-    // "unoccupied" in the slotPlayerMap â†’ isSlotOccupied would return
+    // "unoccupied" in the slotPlayerMap -> isSlotOccupied would return
     // removal: re-add player to slotPlayerMap[player.slotId].
     for (const player of this.homePlayers$.value) {
       delete player.xPercent;
@@ -4585,7 +4585,7 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
         if (zone === 'ATTACK') return 'ATT';
       }
     }
-    // No position info â†’ fall back to the player's underlying role.
+    // No position info -> fall back to the player's underlying role.
     return this.getRoleFamily(player.role);
   }
 
@@ -4773,14 +4773,14 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
     }
 
     // formación. En producción vía (ngModelChange) NgModel ya lo escribió,
-    // pero en llamadas programáticas (tests, debugging) necesitamos hacerlo
+    // Programmatic calls used by tests and QA flows still need the same completion signal.
     // nosotros para que el getter y el template queden consistentes.
     if (this.selectedFormation !== targetFormation) {
       this.selectedFormation = targetFormation;
     }
 
     // formación. En producción vía (ngModelChange) NgModel ya lo escribió,
-    // pero en llamadas programáticas (tests, debugging) necesitamos hacerlo
+    // Programmatic calls used by tests and QA flows still need the same completion signal.
     // nosotros para que el getter y el template queden consistentes.
     if (this.selectedFormation !== targetFormation) {
       this.selectedFormation = targetFormation;
@@ -4795,7 +4795,7 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
     this.isFormationChanging = true;
     this.cdr.markForCheck();
 
-    // con el padre â€" squad-management no escucha, pero lo emitimos por si
+    // Emit the update for parent components that may listen to squad changes.
     // otro caller en el futuro lo hace).
     this.formationChangeCompleteSubject = new Subject<void>();
 
@@ -5048,8 +5048,8 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
     const validHomePlayers = this.getUniqueValidHomePlayers();
     const playerCount = validHomePlayers.length;
     if (playerCount < 7) {
-      // commit 31822e3): clarify that 7 is a floor, NOT a ceiling â€" the user can save with
-      // any valid lineup between 7 and 11. The actual guard logic (< 7 â†’ block) is unchanged.
+      // commit 31822e3): clarify that 7 is a floor, NOT a ceiling; the user can save with
+      // any valid lineup between 7 and 11. The actual guard logic (< 7 means block) is unchanged.
       this.errorMessage$.next('Mínimo 7 jugadores para guardar (puedes tener más)');
       this.lineupWarning$.next(null);
       return;
@@ -5103,7 +5103,7 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
       },
       error: (err) => {
         console.error('[SQUAD-EDITOR] Error saving manual-select:', err);
-        // 422 with code (e.g. LINEUP_MINIMUM_PLAYERS_NOT_MET) â€" surface inline
+        // 422 with code (e.g. LINEUP_MINIMUM_PLAYERS_NOT_MET); surface inline
         if (err.error?.code) {
           this.errorMessage$.next(err.error.message || 'Error al guardar');
         }
