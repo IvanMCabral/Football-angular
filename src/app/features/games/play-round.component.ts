@@ -171,4 +171,27 @@ export class PlayRoundComponent implements OnInit {
     };
     animateNext();
   }
+
+  displayEventDescription(event: MatchEvent | null | undefined): string {
+    if (!event) return '';
+    const type = (event.type || '').toUpperCase();
+    const description = event.description || '';
+    const playerName = event.playerName || 'Jugador';
+
+    if (type === 'SUBSTITUTION') {
+      const match = description.match(/^Substitution:\s+(.+?)\s+on for\s+(.+)$/i);
+      if (match) return `Cambio: entra ${match[1]}, sale ${match[2]}`;
+      return 'Cambio realizado';
+    }
+
+    if (type === 'INJURY') return `${playerName} se lesionó`;
+    if (description === 'Shot saved') return 'Remate atajado';
+    if (description === 'Shot missed') return 'Remate desviado';
+    if (description === 'Goal') return 'Gol';
+
+    const formationMatch = description.match(/^Formation changed from (.+?) to (.+?)(?: \| pixels: (.*))?$/i);
+    if (formationMatch) return `Cambio táctico: ${formationMatch[1]} → ${formationMatch[2]}`;
+
+    return description || type || 'Evento';
+  }
 }

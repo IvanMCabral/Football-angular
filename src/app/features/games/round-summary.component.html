@@ -22,13 +22,13 @@
           <span class="team-score">{{ match.awayGoals }}</span>
           <span class="team-name">{{ getTeamName(match.awayTeamId) }}</span>
         </div>
-        <!-- V24D6O: link to V24 match detail page for completed matches -->
+
         <button *ngIf="match.status === 'COMPLETED'"
                 type="button"
                 class="btn-detail"
                 (click)="goToMatchDetail(match.matchId)"
-                title="Ver detalle V24 del partido">
-          📊 Ver Detalle V24
+                title="Ver detalle del partido">
+          📊 Ver detalle
         </button>
       </div>
     </div>
@@ -54,7 +54,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let standing of vm.standings; let i = index" 
+          <tr *ngFor="let standing of vm.standings; let i = index"
               [class.user-team]="standing.teamId === vm.userTeamId"
               [class.champion]="i === 0 && vm.tournamentStatus?.isFinished">
             <td class="position">{{ i + 1 }}</td>
@@ -69,7 +69,7 @@
             <td>{{ standing.lost }}</td>
             <td>{{ standing.goalsFor }}</td>
             <td>{{ standing.goalsAgainst }}</td>
-            <td [class.positive]="standing.goalDifference > 0" 
+            <td [class.positive]="standing.goalDifference > 0"
                 [class.negative]="standing.goalDifference < 0">
               {{ standing.goalDifference > 0 ? '+' : '' }}{{ standing.goalDifference }}
             </td>
@@ -97,16 +97,16 @@
         <h3>🏆 ¡Temporada Finalizada!</h3>
         <p>La temporada {{ vm.tournamentStatus?.season || 1 }} ha llegado a su fin.</p>
       </div>
-      
+
       <button (click)="goToChampion()" class="btn btn-champion btn-large">
         📊 Ver Tabla Final
       </button>
-      
+
       <button (click)="continueToNewSeason()" class="btn btn-success btn-large">
         🚀 Continuar Carrera (Nueva Temporada)
       </button>
     </ng-container>
-    
+
     <!-- TORNEO ACTIVO: Volver al equipo para preparar siguiente fecha -->
     <ng-container *ngIf="vm.careerPhase !== 'FINISHED'">
       <button (click)="backToGame()" class="btn btn-primary btn-large">

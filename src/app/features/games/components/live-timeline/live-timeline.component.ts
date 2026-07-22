@@ -133,28 +133,53 @@ export class LiveTimelineComponent {
     const t = (e.eventType || '').toUpperCase();
     const m = `${e.minute}'`;
     if (t === 'SUBSTITUTION' && e.playerOnName) {
-      return `${m} — Salió ${e.playerName || '?'}, entró ${e.playerOnName}`;
+      return `${m} ? sali? ${e.playerName || '?'}, entr? ${e.playerOnName}`;
     }
     if (t === 'SUBSTITUTION') {
-      return `${m} — Sustitución: ${e.playerName || '?'} → ${e.playerOnName || '?'}`;
+      return `${m} ? sustituci?n: ${e.playerName || '?'} ? ${e.playerOnName || '?'}`;
     }
-    return `${m} ${e.playerName || ''} — ${e.description || t}`;
+    return `${m} ${e.playerName || ''} ? ${this.displayEventDescription(e)}`;
+  }
+
+  eventLabel(e: MatchEvent): string {
+    return e.playerName || this.displayEventDescription(e);
+  }
+
+  private displayEventDescription(e: MatchEvent): string {
+    const description = e.description || '';
+    const playerName = e.playerName || 'Jugador';
+
+    if (e.eventType === 'SUBSTITUTION') {
+      const match = description.match(/^Substitution:\s+(.+?)\s+on for\s+(.+)$/i);
+      if (match) return `Cambio: entra ${match[1]}, sale ${match[2]}`;
+      return 'Cambio realizado';
+    }
+
+    if (e.eventType === 'INJURY') return `${playerName} se lesion?`;
+    if (description === 'Shot saved') return 'Remate atajado';
+    if (description === 'Shot missed') return 'Remate desviado';
+    if (description === 'Goal') return 'Gol';
+
+    const formationMatch = description.match(/^Formation changed from (.+?) to (.+?)(?: \| pixels: (.*))?$/i);
+    if (formationMatch) return `Cambio t?ctico: ${formationMatch[1]} ? ${formationMatch[2]}`;
+
+    return description || e.eventType || 'Evento';
   }
 
   /** Returns the icon glyph for an event type. */
   eventIcon(type: string | undefined): string {
     const t = (type || '').toUpperCase();
     switch (t) {
-      case 'GOAL':           return '⚽';
+      case 'GOAL':           return '?';
       case 'YELLOW_CARD':
-      case 'CARD':           return '🟨';
-      case 'RED_CARD':       return '🟥';
-      case 'INJURY':         return '🚑';
-      case 'SUBSTITUTION':   return '🔄';
-      case 'TACTICAL_CHANGE':return '🎯';
-      case 'CORNER':         return '🚩';
-      case 'OFFSIDE':        return '🚫';
-      default:               return '•';
+      case 'CARD':           return '??';
+      case 'RED_CARD':       return '??';
+      case 'INJURY':         return '??';
+      case 'SUBSTITUTION':   return '??';
+      case 'TACTICAL_CHANGE':return '??';
+      case 'CORNER':         return '??';
+      case 'OFFSIDE':        return '??';
+      default:               return '?';
     }
   }
 

@@ -1,6 +1,4 @@
-<!--
-Diseño mejorado para mostrar los partidos de la primera fecha y su resultado en tiempo real.
--->
+
 <div class="play-round-container">
   <h2>Primera Fecha</h2>
   <div *ngIf="loading" class="loading">Simulando partidos...</div>
@@ -25,7 +23,7 @@ Diseño mejorado para mostrar los partidos de la primera fecha y su resultado en
           <td>{{ anim.currentMinute }}</td>
           <td>{{ anim.partialHomeGoals }} - {{ anim.partialAwayGoals }}</td>
           <td>
-            <span *ngIf="anim.currentEvent">{{ anim.currentEvent.minute }}' - {{ anim.currentEvent.description }}</span>
+            <span *ngIf="anim.currentEvent">{{ anim.currentEvent.minute }}' - {{ displayEventDescription(anim.currentEvent) }}</span>
           </td>
           <td>
             <span *ngIf="anim.finished">Finalizado</span>

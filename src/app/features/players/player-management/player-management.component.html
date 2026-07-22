@@ -1,60 +1,60 @@
 <div class="container">
-  <h2 class="section-title">⚽ Manage Players & Teams</h2>
+  <h2 class="section-title">⚽ Gestionar jugadores y equipos</h2>
 
-  <!-- Team Selector (Session Teams from Redis) -->
+  <!-- Selector de equipo -->
   <div class="section">
-    <h3>Select Team</h3>
+    <h3>Elegir equipo</h3>
     <select [(ngModel)]="selectedTeamId" (change)="onTeamChange()" class="select-control">
-      <option value="">-- Select Team --</option>
+      <option value="">-- Elegir equipo --</option>
       <option *ngFor="let team of teams$ | async" [value]="team.sessionTeamId">{{ team.name }} ({{ team.country }})</option>
     </select>
-    <p *ngIf="(teams$ | async)?.length === 0" class="warning-text">No teams created yet. Create teams first!</p>
+    <p *ngIf="(teams$ | async)?.length === 0" class="warning-text">Todavia no hay equipos creados. Primero crea equipos.</p>
   </div>
 
-  <!-- Player Management Columns -->
+  <!-- Gestion de jugadores -->
   <div class="columns-container" *ngIf="selectedTeamId">
-    <!-- Assigned Players (Team Squad) -->
+    <!-- Jugadores asignados -->
     <div class="column">
-      <h3>🏟️ Team Squad</h3>
+      <h3>🏟️ Plantel</h3>
       <div class="players-list">
         <div *ngFor="let player of assignedPlayers$ | async" class="player-card">
           <div class="player-info">
             <h4>{{ player.name }}</h4>
             <p class="player-details">
               <span class="position">{{ player.position }}</span>
-              <span class="age">Age: {{ player.age }}</span>
+              <span class="age">Edad: {{ player.age }}</span>
               <span class="overall">OVR: {{ player.overall }}</span>
             </p>
           </div>
           <button (click)="removePlayerFromTeam(player)" class="btn-remove">
-            ➖ Remove
+            ➖ Quitar
           </button>
         </div>
         <div *ngIf="(assignedPlayers$ | async)?.length === 0" class="empty-state">
-          No players in team squad
+          No hay jugadores en el plantel
         </div>
       </div>
     </div>
 
-    <!-- Available Players (No Team) -->
+    <!-- Jugadores disponibles -->
     <div class="column">
-      <h3>🆓 Available Players</h3>
+      <h3>🆓 Jugadores disponibles</h3>
       <div class="players-list">
         <div *ngFor="let player of availablePlayers$ | async" class="player-card">
           <div class="player-info">
             <h4>{{ player.name }}</h4>
             <p class="player-details">
               <span class="position">{{ player.position }}</span>
-              <span class="age">Age: {{ player.age }}</span>
+              <span class="age">Edad: {{ player.age }}</span>
               <span class="overall">OVR: {{ player.overall }}</span>
             </p>
           </div>
           <button (click)="addPlayerToTeam(player)" class="btn-add">
-            ➕ Add
+            ➕ Agregar
           </button>
         </div>
         <div *ngIf="(availablePlayers$ | async)?.length === 0" class="empty-state">
-          No available players
+          No hay jugadores disponibles
         </div>
       </div>
     </div>

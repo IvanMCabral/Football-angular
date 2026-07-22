@@ -1,9 +1,5 @@
 <div class="round-live-container" *ngIf="vm$ | async as vm">
-  <!-- : page-level spinner while the initial route data
-       (route params + teams + career status + fixtures) is still
-       resolving. Replaces the silent empty-container UX gap. The
-       loadingSubject flips to false on first emission (success or error)
-       in round-live.component.ts. -->
+
   <div *ngIf="loading$ | async" class="loading-state" data-testid="round-live-loading">
     <div class="spinner"></div>
     <p>Cargando fecha...</p>
@@ -13,24 +9,17 @@
     <h2>Fecha {{ vm.roundNumber }} - En Vivo</h2>
     <span *ngIf="vm.byeTeam" class="bye-badge">BYE: {{ vm.byeTeam }}</span>
     <div class="controls">
-      <!-- UX fix + fallback: explicit "Iniciar Todos"
-           trigger. Shown only when no match has started yet AND the round is
-           not paused AND not all finished. Once the SSE flips anyStarted=true
-           the button hides automatically (no manual cleanup needed).
-           : under normal flow this button is hidden immediately because
-           the constructor's vm$.pipe(take(1)) auto-start subscription fires
-           before this template renders. The button is the manual fallback
-           for refresh / failed-auto-start recovery. -->
+
       <button
         *ngIf="!vm.allFinished && !vm.isRoundPaused && !vm.anyStarted"
         (click)="iniciarTodos()"
         class="btn btn-start"
         data-testid="iniciar-todos-button"
       >
-        ▶️ Iniciar Todos
+        ▶️ Iniciar todos
       </button>
-      <button *ngIf="!vm.allFinished && !vm.isRoundPaused" (click)="pauseAll()" class="btn btn-pause">⏸️ Pausar Todos</button>
-      <button *ngIf="!vm.allFinished && vm.isRoundPaused" (click)="resumeAll()" class="btn btn-resume">▶️ Reanudar Todos</button>
+      <button *ngIf="!vm.allFinished && !vm.isRoundPaused && vm.anyStarted" (click)="pauseAll()" class="btn btn-pause">⏸️ Pausar todos</button>
+      <button *ngIf="!vm.allFinished && vm.isRoundPaused" (click)="resumeAll()" class="btn btn-resume">▶️ Reanudar todos</button>
       <button
         *ngIf="showDebugControls && !vm.allFinished"
         (click)="toggleDeFreeze()"
@@ -39,7 +28,7 @@
         [attr.aria-pressed]="debugFreezeEnabled"
         title="Modo prueba: pausa automáticamente la fecha viva al entrar"
       >
-        {{ debugFreezeEnabled ? '🧊 Debug freeze ON' : '🧊 Debug freeze OFF' }}
+        {{ debugFreezeEnabled ? '🧊 Prueba pausa ON' : '🧊 Prueba pausa OFF' }}
       </button>
       <button
         *ngIf="showDebugControls && !vm.allFinished"
@@ -59,7 +48,7 @@
         data-testid="dedouble-injury-button"
         title="Modo prueba local: dispara dos lesiones propias para validar cola de modales"
       >
-        Test doble lesion
+        Probar doble lesion
       </button>
       <button
         *ngIf="showDebugControls && !vm.allFinished"
@@ -68,23 +57,19 @@
         data-testid="departido-injury-button"
         title="Modo prueba local: crea una lesion propia en el estado visual para validar Partido + AUTO"
       >
-        Test lesion Partido
+        Probar lesion en partido
       </button>
       <a [routerLink]="['/games', vm.gameId]" class="btn btn-back">Volver</a>
     </div>
   </div>
 
-  <!-- visual feedback when the round is paused
-       (either manually via the header button, OR automatically by a
-       substitution/formation modal). `vm.isRoundPaused` is set in
-       round-live.component.ts from any match with `state.status === 'PAUSED'`
-       in the SSE stream. -->
+
   <div *ngIf="vm.isRoundPaused" class="banner banner-paused" role="status" aria-live="polite">
     ⏸️ Partidos pausados
   </div>
 
   <div *ngIf="showDebugControls && debugFreezeEnabled && !vm.allFinished" class="banner banner-debug-freeze" role="status" aria-live="polite">
-    🧊 Debug freeze activo: la fecha se pausa sola para pruebas visuales largas.
+    🧊 Modo prueba activo: la fecha se pausa sola para revisiones visuales largas.
   </div>
 
   <div
@@ -99,7 +84,7 @@
 
   <div *ngIf="vm.errorMsg" class="error">{{ vm.errorMsg }}</div>
 
-  <!-- UX-5: tu partido destacado primero, los demas debajo con divider -->
+
   <div *ngIf="userMatch" class="user-match-section">
     <h3 class="section-title">⭐ Tu partido</h3>
     <app-match-card
@@ -131,9 +116,9 @@
   </div>
 
   <div class="footer" *ngIf="vm.allFinished">
-    <h3>¡Fecha {{ vm.roundNumber }} Finalizada!</h3>
+    <h3>¡Fecha {{ vm.roundNumber }} finalizada!</h3>
     <button (click)="goToRoundSummary()" class="btn btn-primary btn-large">
-      📋 Ver Resumen de Fecha
+      📋 Ver resumen de fecha
     </button>
   </div>
 </div>

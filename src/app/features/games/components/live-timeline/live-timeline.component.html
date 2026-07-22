@@ -22,7 +22,7 @@
             <span class="event-minute">{{ e.minute }}'</span>
             <span [class]="eventChipClass(e)">
               <span class="chip-icon">{{ eventIcon(e.eventType) }}</span>
-              <span class="chip-text">{{ e.playerName || e.description }}</span>
+              <span class="chip-text">{{ eventLabel(e) }}</span>
             </span>
           </div>
         </ng-container>

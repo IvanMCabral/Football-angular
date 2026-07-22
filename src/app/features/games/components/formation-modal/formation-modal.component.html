@@ -86,7 +86,7 @@
           <div class="pixel-pad" aria-label="Mover jugador por píxeles tácticos">
             <button mat-stroked-button type="button" (click)="nudgeSelectedSlot(0, -2)" [disabled]="isSelectedSlotLocked()">↑</button>
             <button mat-stroked-button type="button" (click)="nudgeSelectedSlot(-2, 0)" [disabled]="isSelectedSlotLocked()">←</button>
-            <button mat-stroked-button type="button" (click)="resetSelectedSlotCoords()" [disabled]="isSelectedSlotLocked()">Reset</button>
+            <button mat-stroked-button type="button" (click)="resetSelectedSlotCoords()" [disabled]="isSelectedSlotLocked()">Base</button>
             <button mat-stroked-button type="button" (click)="nudgeSelectedSlot(2, 0)" [disabled]="isSelectedSlotLocked()">→</button>
             <button mat-stroked-button type="button" (click)="nudgeSelectedSlot(0, 2)" [disabled]="isSelectedSlotLocked()">↓</button>
           </div>

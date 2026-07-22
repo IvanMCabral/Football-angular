@@ -13,12 +13,12 @@
 
     <div class="navbar-menu" [class.active]="menuOpen">
       @if (isAuthenticated$ | async) {
-        <a routerLink="/dashboard" routerLinkActive="active" class="nav-link">Dashboard</a>
-        <a routerLink="/matches" routerLinkActive="active" class="nav-link">Matches</a>
-        <button (click)="logout()" class="nav-button logout">Logout</button>
+        <a routerLink="/dashboard" routerLinkActive="active" class="nav-link">Inicio</a>
+        <a routerLink="/matches" routerLinkActive="active" class="nav-link">Partidos</a>
+        <button (click)="logout()" class="nav-button logout">Salir</button>
       } @else {
-        <a routerLink="/login" routerLinkActive="active" class="nav-link">Login</a>
-        <a routerLink="/register" class="nav-button register">Register</a>
+        <a routerLink="/login" routerLinkActive="active" class="nav-link">Ingresar</a>
+        <a routerLink="/register" class="nav-button register">Registrarse</a>
       }
     </div>
   </div>

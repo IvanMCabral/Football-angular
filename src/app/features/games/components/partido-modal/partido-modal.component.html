@@ -2,10 +2,7 @@
   <h2 mat-dialog-title class="partido-modal-title">
     <span class="title-icon">⚽</span>
     Partido
-    <!-- V25D90-FRONT-F3: score chip next to the minute tag. The score
-         arrives on PartidoDialogData.score (V25D89.2 wire-up) â€” bind it
-         directly, no backend change required. Defaults to 0-0 when the
-         dialog opens before the first SSE tick. -->
+
     <span class="score-chip" data-testid="partido-score-chip">
       {{ homeScore() }} - {{ awayScore() }}
     </span>
@@ -14,40 +11,31 @@
 
   <mat-dialog-content class="partido-modal-content">
 
-    <!-- V25D89-FRONT-A: shared error banner surfaces backend rejection
-         of the formation change. Stays visible across tabs so the
-         manager sees the error regardless of which tab they're on. -->
+
     <div *ngIf="errorMsg" class="banner banner-error" role="alert" data-testid="partido-error">
       <span>— Aviso: {{ errorMsg }}</span>
     </div>
 
-    <!-- V25D89-FRONT-A: warning banner (auto-fill uncovered slots).
-         Same orange styling as the F5 modal. -->
+
     <div *ngIf="warningMsg && !errorMsg" class="banner banner-warning" role="status" data-testid="partido-autofill-warning">
       <span>— Aviso: {{ warningMsg }}</span>
     </div>
 
-    <!-- V25D89-FRONT-A: dual-tab shell via mat-tab-group. The "Mi
-         FormaciÃ³n" tab is the editable manager pitch; "FormaciÃ³n Rival"
-         is the read-only AI-managed pitch. -->
+
     <mat-tab-group
       class="partido-tabs"
       [selectedIndex]="activeTab() === 'mine' ? 0 : 1"
       (selectedIndexChange)="onTabChange($event)"
       data-testid="partido-tabs">
 
-      <!-- ========== TAB 1: Mi FormaciÃ³n (editable) ========== -->
+
       <mat-tab label="Mi Formación" data-testid="tab-mine">
         <ng-template matTabContent>
 
           <div class="formation-row">
             <mat-form-field appearance="outline" class="formation-select">
               <mat-label>Formación</mat-label>
-              <!-- V25D90-FRONT-F4: panelClass used by partido-modal.component.ts
-                   to bump the cdk-overlay-pane z-index above the partido
-                   modal pane (which is at 1050). Without this the formation
-                   dropdown options render BEHIND the partido modal backdrop
-                   and become unclickable. -->
+
               <mat-select [value]="selectedFormation()"
                           (selectionChange)="onFormationChange($event.value)"
                           panelClass="formation-select-panel"
@@ -88,7 +76,7 @@
                           data-testid="nudge-reset"
                           [disabled]="!canNudgeSelectedSlot()"
                           (click)="resetSelectedSlotPosition()">
-                    Reset
+                    Base
                   </button>
                   <button mat-icon-button
                           type="button"
@@ -112,7 +100,7 @@
           </div>
 
           <div class="formation-grid">
-            <!-- Visual pitch (manager team starting XI) -->
+
             <section class="col col-pitch" data-area="pitch" aria-label="Mi formación">
               <h3>Mi XI (arrastra libremente por la cancha)</h3>
               <div class="pitch" role="img"
@@ -147,13 +135,9 @@
                        (dragend)="onSlotDragEnd()"
                        (click)="onPitchSlotClick(getSlotIndex(lineIdx, dotIdx))">
                     <ng-container *ngIf="playerAtSlot(getSlotIndex(lineIdx, dotIdx)) as p; else emptyDot">
-                      <!-- V25D90-FRONT-F1: render role label ALWAYS below the
-                           player name (was: only shown in empty slots). The
-                           same getDotLabel() drives both branches so the
-                           role vocabulary stays in sync with the empty-slot
-                           fallback (and with the rival tab). -->
+
                       <span class="dot-player-name"
-                            [title]="(isAutoFilledSlot(getSlotIndex(lineIdx, dotIdx)) ? 'Autorrellenado por XI incompleto - ' : '') + p.name + ' (' + p.position + ')'">
+                            [title]="(isAutoFilledSlot(getSlotIndex(lineIdx, dotIdx)) ? 'Autorrellenado por XI incompleto - ' : '') + p.name + ' (' + displayPosition(p.position) + ')'">
                         {{ p.name }}
                       </span>
                       <span class="dot-role" data-testid="dot-role">
@@ -168,8 +152,7 @@
                       </span>
                     </ng-container>
                     <ng-template #emptyDot>
-                      <!-- F1: empty slots keep the role label as the only
-                           content (no player name to anchor below). -->
+
                       <span class="dot-label" data-testid="dot-label-empty">{{ getDotLabel(lineIdx, dotIdx, count, false) }}</span>
                     </ng-template>
                   </div>
@@ -181,7 +164,7 @@
               </p>
             </section>
 
-            <!-- Bench (manager team â€” squad players not in XI) -->
+
             <section class="col col-bench" data-area="bench" aria-label="Banquillo">
               <h3>Banquillo</h3>
               <div class="bench-list">
@@ -193,9 +176,9 @@
                      (click)="onBenchPlayerClick(p.sessionPlayerId)"
                      (dragstart)="onBenchDragStart($event, p.sessionPlayerId)"
                      (dragend)="onSlotDragEnd()"
-                     [title]="p.name + ' (' + p.position + ')'">
+                     [title]="p.name + ' (' + displayPosition(p.position) + ')'">
                   <span class="bench-player-name">{{ p.name }}</span>
-                  <span class="bench-player-pos">{{ p.position }}</span>
+                  <span class="bench-player-pos">{{ displayPosition(p.position) }}</span>
                 </div>
                 <div *ngIf="benchPlayers.length === 0" class="bench-empty">
                   <mat-icon>info</mat-icon>
@@ -228,7 +211,7 @@
             </div>
           </section>
 
-          <!-- ========== V25D89.2: stats grid (full-width under pitch + bench) ========== -->
+
           <section class="partido-stats" data-testid="partido-stats" aria-label="Estadísticas del partido">
             <h3>
               <span>Estadísticas del partido</span>
@@ -238,11 +221,7 @@
               </span>
             </h3>
             <div class="stats-header-row">
-              <!-- V25D90-FRONT-F3: replace the dash placeholder with the
-                   real score. The 2fr column on the left of the stats
-                   header now reads "2 - 1" (or whatever the live snapshot
-                   carries) so the manager sees the scoreline without
-                   having to scan the stats rows. -->
+
               <span class="stat-label score-cell" data-testid="stats-score-cell">
                 {{ homeScore() }} - {{ awayScore() }}
               </span>
@@ -260,7 +239,7 @@
             </div>
           </section>
 
-          <!-- ========== V25D89.2: recent events timeline ========== -->
+
           <section class="recent-events" data-testid="recent-events" aria-label="Últimos eventos del partido">
             <h3>Últimos eventos</h3>
             <ul class="events-list" *ngIf="recentEvents().length > 0">
@@ -270,7 +249,7 @@
                 <span class="event-icon" aria-hidden="true">{{ getEventIcon(ev.eventType) }}</span>
                 <span class="event-minute">{{ ev.minute }}'</span>
                 <span class="event-player" [title]="ev.playerName">{{ ev.playerName }}</span>
-                <span class="event-desc" [title]="ev.description">{{ ev.description }}</span>
+                <span class="event-desc" [title]="displayEventDescription(ev)">{{ displayEventDescription(ev) }}</span>
               </li>
             </ul>
             <div *ngIf="recentEvents().length === 0" class="events-empty" data-testid="events-empty">
@@ -282,7 +261,7 @@
         </ng-template>
       </mat-tab>
 
-      <!-- ========== TAB 2: FormaciÃ³n Rival (read-only) ========== -->
+
       <mat-tab label="Formación Rival" data-testid="tab-rival">
         <ng-template matTabContent>
 
@@ -302,7 +281,7 @@
             <div class="pitch rival-pitch"
                  role="img"
                  data-testid="rival-pitch"
-                 [attr.aria-label]="'Formación rival ' + rivalFormation() + ' (read-only)'">
+                 [attr.aria-label]="'Formación rival ' + rivalFormation() + ' no editable'">
               <div class="pitch-line"
                    *ngFor="let count of rivalFormationLines; let lineIdx = index">
                 <div class="player-dot is-empty"
@@ -324,7 +303,7 @@
             </p>
           </div>
 
-          <!-- ========== V25D89.2: same stats + timeline in rival tab (match-level info) ========== -->
+
           <section class="partido-stats" data-testid="partido-stats-rival" aria-label="Estadísticas del partido">
             <h3>
               <span>Estadísticas del partido</span>
@@ -334,9 +313,7 @@
               </span>
             </h3>
             <div class="stats-header-row">
-              <!-- V25D90-FRONT-F3: same F3 fix mirrored on the rival tab
-                   (the rival stats section shows match-level data, not
-                   per-side data â€” so the score belongs there too). -->
+
               <span class="stat-label score-cell" data-testid="stats-score-cell-rival">
                 {{ homeScore() }} - {{ awayScore() }}
               </span>
@@ -363,7 +340,7 @@
                 <span class="event-icon" aria-hidden="true">{{ getEventIcon(ev.eventType) }}</span>
                 <span class="event-minute">{{ ev.minute }}'</span>
                 <span class="event-player" [title]="ev.playerName">{{ ev.playerName }}</span>
-                <span class="event-desc" [title]="ev.description">{{ ev.description }}</span>
+                <span class="event-desc" [title]="displayEventDescription(ev)">{{ displayEventDescription(ev) }}</span>
               </li>
             </ul>
             <div *ngIf="recentEvents().length === 0" class="events-empty" data-testid="events-empty-rival">
@@ -383,9 +360,7 @@
     </div>
   </mat-dialog-content>
 
-  <!-- V25D89-FRONT-A: footer with "Descartar" (left) + "Guardar"
-       (right, primary). Matches the task spec exactly. "Guardar" is
-       disabled when there are no pending changes OR while submitting. -->
+
   <mat-dialog-actions align="end" class="partido-modal-actions">
     <button mat-button
             (click)="discard()"

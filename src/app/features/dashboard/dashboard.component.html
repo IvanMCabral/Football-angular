@@ -1,16 +1,15 @@
 <div class="dashboard-container">
 
-  <!-- Hero Section with Play Button -->
+  <!-- Inicio -->
   <section class="hero-section">
-    <h1 class="welcome-title">⚽ MY FOOTBALL UNIVERSE</h1>
+    <h1 class="welcome-title">⚽ MI UNIVERSO DE FUTBOL</h1>
     <p class="welcome-subtitle">
-      <!-- V25D78-C55.7.7 BUG-L1: prefer displayName (when backend emits it),
-           fallback to email (instead of raw username). -->
-      Welcome back, <span class="welcome-name">{{ displayNameOf(user$ | async) }}</span>!
+
+      Bienvenido de nuevo, <span class="welcome-name">{{ displayNameOf(user$ | async) }}</span>.
     </p>
-    
-    <!-- No Career: Single Button -->
-    <!-- TEST: el contenido dentro de este ng-container debería verse si careerStatus$ emite cualquier valor -->
+
+    <!-- Sin carrera -->
+
 <!-- Si NO hay carrera, mostrar botón para crear -->
 <div *ngIf="(careerStatus$ | async) === undefined">
   <div class="play-card play-loading" aria-live="polite">
@@ -24,32 +23,26 @@
 </div>
 <!-- Si hay carrera, mostrar continuar/borrar o temporada completada -->
 <div *ngIf="(careerStatus$ | async) as careerStatus">
-  <!-- Active Career: Two Buttons -->
+  <!-- Carrera activa -->
   <div class="career-actions" *ngIf="careerStatus && !careerStatus.isFinished">
-    <!-- V25D78-C55.2 phase 4 UI (c): show the user's division tier as a
-         prominent badge right next to the action buttons, so the user
-         always knows what tier they play in (PRIMERA / SEGUNDA / TERCERA).
-         C55.10 Item 1: consume the backend label verbatim and pick the CSS
-         class via {@link tierCssClass} so any tier (CUARTA, QUINTA, SEXTA,
-         …) renders with a sensible default style instead of falling back
-         to unstyled text. -->
+
     <div *ngIf="careerStatus.userDivision" class="user-division-card">
       <span class="user-division-card-label">Tu división</span>
       <span class="user-division-pill" [class]="tierCssClass(careerStatus.userDivision)">
         {{ careerStatus.userDivision }}
       </span>
-      <!-- Quick link to the standalone /standings page (b2). -->
+
       <a routerLink="/standings" class="view-standings-link">Ver tabla completa →</a>
     </div>
 
-    <!-- NUEVO: Botón Jugar Próxima Fecha (solo si está en WAITING_USER) -->
+
     <div *ngIf="careerStatus.careerPhase === 'WAITING_USER'" class="squad-warning-container">
       <div *ngIf="hasSquadConditionWarning()" class="squad-condition-warning" role="alert">
         <span class="warning-icon">⚠️</span>
         <span class="warning-text">
-          <strong>Squad condition:</strong> {{squadConditionWarningText()}}
+          <strong>Estado del plantel:</strong> {{squadConditionWarningText()}}
         </span>
-        <span class="warning-cta">Review your lineup before simulating.</span>
+        <span class="warning-cta">Revisa tu once antes de simular.</span>
       </div>
       <button
             class="action-button primary play-next"
@@ -57,141 +50,139 @@
             [disabled]="loading">
       <span class="action-icon">⚽</span>
       <span class="action-text">
-        <!-- V25D78-C55.7.7 BUG-M3: season-aware label. Pre-fix this hardcoded
-             `currentRound + 1` and overshot totalRounds at season end
-             (T1 R10 finished → "Jugar Fecha 11" which doesn't exist). -->
+
         <span class="action-label">{{ playNextRoundLabel(careerStatus) }}</span>
         <span class="action-subtitle">{{ playNextRoundSubtitle(careerStatus) }}</span>
       </span>
     </button>
     </div>
-    
+
     <!-- Botón Continuar Career (si no está en WAITING_USER) -->
-    <button *ngIf="careerStatus.careerPhase !== 'WAITING_USER'" 
-            class="action-button primary" 
-            (click)="onContinueCareer()" 
+    <button *ngIf="careerStatus.careerPhase !== 'WAITING_USER'"
+            class="action-button primary"
+            (click)="onContinueCareer()"
             [disabled]="loading">
       <span class="action-icon">▶️</span>
       <span class="action-text">
-        <span class="action-label">Continue Career</span>
-        <span class="action-subtitle">Round {{careerStatus.currentRound}}/{{careerStatus.totalRounds}}</span>
+        <span class="action-label">Continuar carrera</span>
+        <span class="action-subtitle">Fecha {{careerStatus.currentRound}}/{{careerStatus.totalRounds}}</span>
       </span>
     </button>
-    
+
     <button class="action-button danger" (click)="onDeleteCareer()" [disabled]="loading">
       <span class="action-icon">🗑️</span>
       <span class="action-text">
-        <span class="action-label">Delete Career</span>
-        <span class="action-subtitle">Start over</span>
+        <span class="action-label">Borrar carrera</span>
+        <span class="action-subtitle">Empezar de nuevo</span>
       </span>
     </button>
   </div>
-  <!-- Finished Career: Single Button -->
+  <!-- Carrera finalizada -->
   <div class="play-card play-finished" *ngIf="careerStatus && careerStatus.isFinished">
     <button class="play-button" (click)="onPlayNow()" [disabled]="loading">
-      <span class="play-label">🏆 SEASON COMPLETED</span>
-      <span class="play-subtitle">Start a new season</span>
+      <span class="play-label">🏆 TEMPORADA COMPLETADA</span>
+      <span class="play-subtitle">Iniciar nueva temporada</span>
     </button>
   </div>
 </div>
 <ng-template #careerLoading>
-  <!-- Optionally, put skeleton loader/spinner here -->
+
 </ng-template>
 
   </section>
 
   <hr class="section-divider" />
 
-  <!-- My Stats Section -->
+  <!-- Estadisticas -->
   <section class="stats-section">
-    <h2 class="section-title">📊 MY STATS AS MANAGER</h2>
+    <h2 class="section-title">📊 MIS ESTADISTICAS COMO DT</h2>
     <div class="stats-grid" *ngIf="userStats$ | async as userStats">
       <div class="stat-card">
         <div class="stat-value">{{userStats.matchesPlayed}}</div>
-        <div class="stat-label">Matches</div>
+        <div class="stat-label">Partidos</div>
       </div>
       <div class="stat-card">
         <div class="stat-value">{{userStats.matchesWon}}</div>
-        <div class="stat-label">Wins</div>
+        <div class="stat-label">Victorias</div>
       </div>
       <div class="stat-card">
         <div class="stat-value">{{userStats.matchesLost}}</div>
-        <div class="stat-label">Losses</div>
+        <div class="stat-label">Derrotas</div>
       </div>
       <div class="stat-card">
         <div class="stat-value">{{userStats.winPercentage}}%</div>
-        <div class="stat-label">Win %</div>
+        <div class="stat-label">% Victorias</div>
       </div>
     </div>
   </section>
 
-  <!-- World Status Section -->
+  <!-- Mundo -->
   <section class="stats-section">
-    <h2 class="section-title">🌍 WORLD STATUS</h2>
+    <h2 class="section-title">🌍 ESTADO DEL MUNDO</h2>
     <div class="stats-grid world-stats" *ngIf="worldStatus$ | async as worldStatus; else loadingWorldStatus">
       <div class="stat-card">
         <div class="stat-value">{{worldStatus.clubs}}</div>
-        <div class="stat-label">Clubs</div>
+        <div class="stat-label">Clubes</div>
       </div>
       <div class="stat-card">
         <div class="stat-value">{{worldStatus.players}}</div>
-        <div class="stat-label">Players</div>
+        <div class="stat-label">Jugadores</div>
       </div>
       <div class="stat-card">
         <div class="stat-value">{{worldStatus.matches}}</div>
-        <div class="stat-label">Matches</div>
+        <div class="stat-label">Partidos</div>
       </div>
     </div>
     <ng-template #loadingWorldStatus>
       <div class="stats-grid world-stats">
         <div class="stat-card">
           <div class="skeleton-loader"></div>
-          <div class="stat-label">Clubs</div>
+          <div class="stat-label">Clubes</div>
         </div>
         <div class="stat-card">
           <div class="skeleton-loader"></div>
-          <div class="stat-label">Players</div>
+          <div class="stat-label">Jugadores</div>
         </div>
         <div class="stat-card">
           <div class="skeleton-loader"></div>
-          <div class="stat-label">Matches</div>
+          <div class="stat-label">Partidos</div>
         </div>
       </div>
     </ng-template>
   </section>
 
-  <!-- Quick Actions Section -->
+  <!-- Acciones -->
   <section class="actions-section">
-    <h2 class="section-title">⚡ QUICK ACTIONS</h2>
+    <h2 class="section-title">⚡ ACCIONES RAPIDAS</h2>
     <div class="actions-container">
       <a routerLink="/teams/create" class="action-button">
         <span class="action-icon">➕</span>
-        <span class="action-label">Create Club</span>
+        <span class="action-label">Crear club</span>
       </a>
-      
+
       <a routerLink="/players/create" class="action-button">
         <span class="action-icon">👤</span>
-        <span class="action-label">Create Player</span>
+        <span class="action-label">Crear jugador</span>
       </a>
 
       <a routerLink="/players/manage" class="action-button">
         <span class="action-icon">⚽</span>
-        <span class="action-label">Manage Players & Teams</span>
+        <span class="action-label">Gestionar jugadores y equipos</span>
       </a>
 
       <a routerLink="/teams/manage" class="action-button">
         <span class="action-icon">⚙️</span>
-        <span class="action-label">Manage Leagues & Teams</span>
+        <span class="action-label">Gestionar ligas y equipos</span>
       </a>
-      
+
       <a routerLink="/matches" class="action-button">
         <span class="action-icon">🏟️</span>
-        <span class="action-label">View Matches</span>
+        <span class="action-label">Ver partidos</span>
       </a>
-      
+
       <a routerLink="/matches/create" class="action-button">
         <span class="action-icon">🎯</span>
-        <span class="action-label">Schedule Match</span>
+        <span class="action-label">Programar partido</span>
       </a>
     </div>
   </section>

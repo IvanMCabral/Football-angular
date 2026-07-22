@@ -1,23 +1,23 @@
 <div class="container">
-  <h2>Create New Club</h2>
+  <h2>Crear nuevo club</h2>
   <p class="subtitle">Los clubes se guardan en tu sesión (no afectan la base de datos)</p>
   
   <ng-container *ngIf="randomTeam$ | async as randomTeam">
     <div *ngIf="randomTeam" class="success-banner">
       <span class="icon">✅</span>
-      {{ randomTeam.name ? 'Team "' + randomTeam.name + '" created successfully!' : randomTeam.count + ' teams created successfully!' }}
+      {{ randomTeam.name ? 'Equipo "' + randomTeam.name + '" creado correctamente.' : randomTeam.count + ' equipos creados correctamente.' }}
     </div>
   </ng-container>
   
   <!-- Sección de Equipos Random -->
   <div class="random-section">
-    <h3>🎲 Generar Equipos Aleatorios</h3>
+    <h3>🎲 Generar equipos aleatorios</h3>
     <div class="random-actions">
       <button type="button" (click)="generateRandomTeam()" class="btn-random">
-        🎲 Generar 1 Equipo Random
+        🎲 Generar 1 equipo aleatorio
       </button>
       <button type="button" (click)="generateRandomTeams(5)" class="btn-random">
-        🎲 Generar 5 Equipos Random
+        🎲 Generar 5 equipos aleatorios
       </button>
     </div>
   </div>
@@ -26,14 +26,14 @@
   
   <form [formGroup]="teamForm" (ngSubmit)="onSubmit()">
     <div class="form-group">
-      <label>Club Name *</label>
+      <label>Nombre del club *</label>
       <input type="text" formControlName="name" class="form-control" placeholder="Manchester United" />
     </div>
     
     <div class="form-group">
-      <label>Country *</label>
+      <label>Pais *</label>
       <select formControlName="country" class="form-control" (change)="onCountryChange()">
-        <option value="">Select Country</option>
+        <option value="">Elegir pais</option>
         <option *ngFor="let c of countries" [value]="c.name">
           {{ c.name }}
         </option>
@@ -41,9 +41,9 @@
     </div>
     
     <div class="form-group">
-      <label>City (opcional)</label>
+      <label>Ciudad (opcional)</label>
       <select formControlName="city" class="form-control">
-        <option value="">Select City</option>
+        <option value="">Elegir ciudad</option>
         <option *ngFor="let city of availableCities" [value]="city">
           {{ city }}
         </option>
@@ -51,12 +51,12 @@
     </div>
     
     <div class="form-group">
-      <label>Budget (millions) *</label>
+      <label>Presupuesto (millones) *</label>
       <input type="number" formControlName="budget" class="form-control" placeholder="100" />
     </div>
     
     <div class="form-group">
-      <label>Formation</label>
+      <label>Formacion</label>
       <select formControlName="formation" class="form-control">
         <option value="4-3-3">4-3-3</option>
         <option value="4-4-2">4-4-2</option>
@@ -67,8 +67,8 @@
     </div>
     
     <div class="actions">
-      <button type="submit" [disabled]="!teamForm.valid || loading">{{ loading ? 'Creating...' : 'Create Club' }}</button>
-      <a routerLink="/dashboard" class="btn-cancel">Back to Dashboard</a>
+      <button type="submit" [disabled]="!teamForm.valid || loading">{{ loading ? 'Creando...' : 'Crear club' }}</button>
+      <a routerLink="/dashboard" class="btn-cancel">Volver al inicio</a>
     </div>
   </form>
   <div *ngIf="errorMessage" class="error">{{ errorMessage }}</div>

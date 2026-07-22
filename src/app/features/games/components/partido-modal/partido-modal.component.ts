@@ -1464,6 +1464,58 @@ export class PartidoModalComponent {
     return iconMap[eventType] || 'EV';
   }
 
+  displayPosition(position: string | null | undefined): string {
+    const map: Record<string, string> = {
+      GK: 'ARQ',
+      DEF: 'DEF',
+      MID: 'MED',
+      WINGER: 'EXT',
+      ATT: 'DEL'
+    };
+    return map[(position || '').toUpperCase()] || position || '';
+  }
+
+  displayEventDescription(event: MatchEvent | null | undefined): string {
+    if (!event) return '';
+    const description = event.description || '';
+    const playerName = event.playerName || 'Jugador';
+    const relatedName = event.relatedPlayerName || '';
+
+    if (event.eventType === 'SUBSTITUTION') {
+      const match = description.match(/^Substitution:\s+(.+?)\s+on for\s+(.+)$/i);
+      if (match) {
+        return `Cambio: entra ${match[1]}, sale ${match[2]}`;
+      }
+      if (relatedName) {
+        return `Cambio: entra ${playerName}, sale ${relatedName}`;
+      }
+      return description || 'Cambio realizado';
+    }
+
+    if (event.eventType === 'INJURY') {
+      return `${playerName} se lesionó`;
+    }
+
+    if (description === 'Shot saved') {
+      return 'Remate atajado';
+    }
+
+    if (description === 'Shot missed') {
+      return 'Remate desviado';
+    }
+
+    if (description === 'Goal') {
+      return 'Gol';
+    }
+
+    const formationMatch = description.match(/^Formation changed from (.+?) to (.+?)(?: \| pixels: (.*))?$/i);
+    if (formationMatch) {
+      return `Cambio táctico: ${formationMatch[1]} → ${formationMatch[2]}`;
+    }
+
+    return description;
+  }
+
   // ========== : manager-tab formation state (F5 mirror) ==========
 
   /** Currently selected formation (signal-based for OnPush). */

@@ -1,76 +1,76 @@
 <div class="container">
-  <h2>Create Players for Career</h2>
+  <h2>Crear jugadores para la carrera</h2>
   <div class="random-section">
-    <h3>🎲 Generate Random Players</h3>
+    <h3>🎲 Generar jugadores aleatorios</h3>
     <div class="random-controls">
-      <label>How many players? (Max {{ MAX_RANDOM_PLAYERS }})</label>
+      <label>Cantidad de jugadores? (Max {{ MAX_RANDOM_PLAYERS }})</label>
       <input type="number" [(ngModel)]="randomCount" min="1" [max]="MAX_RANDOM_PLAYERS" class="form-control-inline" />
       <button type="button" (click)="createRandomBatch()" class="btn-random">
-        Generate {{ randomCount }} Random Player{{ randomCount > 1 ? 's' : '' }}
+        Generar {{ randomCount }} jugador{{ randomCount > 1 ? 'es' : '' }} aleatorio{{ randomCount > 1 ? 's' : '' }}
       </button>
       <button type="button" (click)="createRandom()" class="btn-random">
-        Generate 1 Random Player
+        Generar 1 jugador aleatorio
       </button>
     </div>
     <ng-container *ngIf="randomPlayers$ | async as randomPlayers">
       <div *ngIf="randomPlayers" class="success">
         <span class="icon">✅</span>
-        {{ randomPlayers.count ? (randomPlayers.count + ' players generated successfully!') : 'Random player generated successfully!' }}
+        {{ randomPlayers.count ? (randomPlayers.count + ' jugadores generados correctamente.') : 'Jugador aleatorio generado correctamente.' }}
       </div>
     </ng-container>
   </div>
   <hr/>
-  <h3>Or Create Custom Player</h3>
+  <h3>O crear jugador personalizado</h3>
   <form [formGroup]="playerForm" (ngSubmit)="onSubmit()">
     <div class="row">
       <div class="form-group">
-        <label>Name *</label>
+        <label>Nombre *</label>
         <input type="text" formControlName="name" class="form-control" />
       </div>
       <div class="form-group">
-        <label>Age *</label>
+        <label>Edad *</label>
         <input type="number" formControlName="age" class="form-control" />
       </div>
     </div>
     <div class="form-group">
-      <label>Position *</label>
+      <label>Posicion *</label>
       <select formControlName="position" class="form-control">
-        <option value="GK">Goalkeeper</option>
-        <option value="DEF">Defender</option>
-        <option value="MID">Midfielder</option>
-        <option value="WINGER">Winger</option>
-        <option value="ATT">Forward</option>
+        <option value="GK">Arquero</option>
+        <option value="DEF">Defensor</option>
+        <option value="MID">Mediocampista</option>
+        <option value="WINGER">Extremo</option>
+        <option value="ATT">Delantero</option>
       </select>
     </div>
     <div class="stats-grid">
       <div class="form-group">
-        <label>Attack (40-90)</label>
+        <label>Ataque (40-90)</label>
         <input type="number" formControlName="attack" class="form-control" min="40" max="90" />
       </div>
       <div class="form-group">
-        <label>Defense (40-90)</label>
+        <label>Defensa (40-90)</label>
         <input type="number" formControlName="defense" class="form-control" min="40" max="90" />
       </div>
       <div class="form-group">
-        <label>Technique (40-90)</label>
+        <label>Tecnica (40-90)</label>
         <input type="number" formControlName="technique" class="form-control" min="40" max="90" />
       </div>
       <div class="form-group">
-        <label>Speed (40-90)</label>
+        <label>Velocidad (40-90)</label>
         <input type="number" formControlName="speed" class="form-control" min="40" max="90" />
       </div>
       <div class="form-group">
-        <label>Stamina (40-90)</label>
+        <label>Resistencia (40-90)</label>
         <input type="number" formControlName="stamina" class="form-control" min="40" max="90" />
       </div>
       <div class="form-group">
-        <label>Mentality (40-90)</label>
+        <label>Mentalidad (40-90)</label>
         <input type="number" formControlName="mentality" class="form-control" min="40" max="90" />
       </div>
     </div>
     <div class="actions">
-      <button type="submit" [disabled]="!playerForm.valid || loading">{{ loading ? 'Creating...' : 'Create Player' }}</button>
-      <a routerLink="/dashboard" class="btn-cancel">Back to Dashboard</a>
+      <button type="submit" [disabled]="!playerForm.valid || loading">{{ loading ? 'Creando...' : 'Crear jugador' }}</button>
+      <a routerLink="/dashboard" class="btn-cancel">Volver al inicio</a>
     </div>
   </form>
   <div *ngIf="errorMessage" class="error">{{ errorMessage }}</div>
