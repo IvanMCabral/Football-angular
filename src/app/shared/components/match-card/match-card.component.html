@@ -2,7 +2,7 @@
      [class.user-match]="isUserMatch"
      [class.finished]="state?.status === 'FINISHED'">
 
-  <!-- Encabezado del partido -->
+
   <div class="match-header">
     <span class="match-label">
       {{ isUserMatch ? '⭐ TU PARTIDO' : 'Otro Partido' }}
@@ -12,7 +12,7 @@
     </span>
   </div>
 
-  <!-- Equipos y resultado -->
+
   <div class="match-teams">
     <div class="team">
       <div class="team-name">{{ homeTeamName }}</div>
@@ -25,12 +25,12 @@
     </div>
   </div>
 
-  <!-- Minuto -->
+
   <div class="match-minute">
     {{ state?.currentMinute || 0 }}'
   </div>
 
-  <!-- LIVE-MATCH-F3-UI-LIVE FE6: barra de posesión + style/formation badges -->
+
   <div *ngIf="isUserMatch && state && state.status !== 'FINISHED'" class="possession-block">
     <div class="possession-bar">
       <div class="possession-home" [style.flex]="homePossessionPct()">
@@ -46,12 +46,7 @@
     </div>
   </div>
 
-  <!-- LIVE-MATCH-F3-UI-LIVE FE6: shortcuts de sustitución / formación (solo user match).
-       V25D89-FRONT-A: added "Partido" button next to Sustituir/Formación. The
-       new button opens the dual-tab PartidoModalComponent (Mi Formación +
-       Formación Rival). The existing Sustituir and Formación buttons stay —
-       they're separate entry points per parent direction (KEEP existing
-       Formación button OK). -->
+
   <div *ngIf="isUserMatch && state && state.status !== 'FINISHED'" class="quick-actions">
     <button (click)="onSubstitutionOpen()" class="btn btn-action"
             aria-label="Sustituir jugadores">
@@ -68,7 +63,7 @@
     </button>
   </div>
 
-  <!-- Tácticas (solo para el partido del usuario) -->
+
   <div *ngIf="isUserMatch && state && state.status !== 'FINISHED'" class="tactics-section">
     <h4>Tácticas</h4>
     <div class="tactics-grid">
@@ -103,7 +98,7 @@
     </div>
   </div>
 
-  <!-- Últimos eventos -->
+
   <div class="events-mini" *ngIf="state?.events?.length">
     <div *ngFor="let event of getLastEvents(state?.events, 3)" class="event-mini">
       <span class="event-minute">{{ event.minute }}'</span>
