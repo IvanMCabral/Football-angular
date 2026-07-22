@@ -1546,7 +1546,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
   private updatePendingLiveModalNotice(): void {
     if (this.queuedAutoModals.length > 0) {
       const suffix = this.queuedAutoModals.length > 1 ? ` (${this.queuedAutoModals.length})` : '';
-      this.pendingLiveModalNotice = `Evento pendiente: lesion propia${suffix}. Al cerrar el modal actual se abrira Sustitucion.`;
+      this.pendingLiveModalNotice = `Evento pendiente: lesión propia${suffix}. Al cerrar el modal actual se abrirá Sustitución.`;
       return;
     }
     if (this.queuedRivalCardModal) {

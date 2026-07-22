@@ -37,9 +37,9 @@
         [class.active]="debugSuppressAutoInjuryModals"
         [attr.aria-pressed]="debugSuppressAutoInjuryModals"
         data-testid="desuppress-auto-injury-button"
-        title="Modo prueba local: bloquea modales automaticos de lesion para probar Partido limpio"
+        title="Modo prueba local: bloquea modales automáticos de lesión para probar Partido limpio"
       >
-        {{ debugSuppressAutoInjuryModals ? 'Lesion auto OFF' : 'Lesion auto ON' }}
+        {{ debugSuppressAutoInjuryModals ? 'Lesión auto OFF' : 'Lesión auto ON' }}
       </button>
       <button
         *ngIf="showDebugControls && !vm.allFinished"
@@ -48,16 +48,16 @@
         data-testid="dedouble-injury-button"
         title="Modo prueba local: dispara dos lesiones propias para validar cola de modales"
       >
-        Probar doble lesion
+        Probar doble lesión
       </button>
       <button
         *ngIf="showDebugControls && !vm.allFinished"
         (click)="onDebugPartidoInjury()"
         class="btn btn-defreeze"
         data-testid="departido-injury-button"
-        title="Modo prueba local: crea una lesion propia en el estado visual para validar Partido + AUTO"
+        title="Modo prueba local: crea una lesión propia en el estado visual para validar Partido + AUTO"
       >
-        Probar lesion en partido
+        Probar lesión en partido
       </button>
       <a [routerLink]="['/games', vm.gameId]" class="btn btn-back">Volver</a>
     </div>
