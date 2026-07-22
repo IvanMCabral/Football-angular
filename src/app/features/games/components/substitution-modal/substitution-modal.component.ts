@@ -28,16 +28,16 @@ export interface SubstitutionDialogData {
   bench: SubModalPlayer[];
   substitutionsRemaining: number;
   /**
-   * V25D63-C23 P0: map sessionPlayerId → effectiveness (0-1).
-   * Construido por live-match-modals.service desde
+   * P0: map sessionPlayerId → effectiveness (0-1).
+   * Construido por desde
    * formationEffectiveness.perPlayerEffectiveness (keyed subdivisionId)
    * invertido via lineup.slots. Null cuando formationEffectiveness es
-   * null/undefined (legacy pre-V25D47 lineup) — el modal renderiza sin
+   * null/undefined (legacy pre-lineup) — el modal renderiza sin
    * feedback de effectiveness en ese caso.
    */
   effectivenessMap?: Record<string, number>;
   /**
-   * V25D79: live formation of the manager team (e.g. "4-4-2"). Sourced
+   * : live formation of the manager team (e.g. "4-4-2"). Sourced
    * from {@code state.homeFormation} (when manager team is home) or
    * {@code state.awayFormation} (when away). The visual pitch uses
    * this to determine the line counts (GK + DEF + MID + ATT lines).
@@ -46,7 +46,7 @@ export interface SubstitutionDialogData {
    */
   formation?: string;
   /**
-   * V25D79: per-player live stats for the manager team. Sourced from
+   * : per-player live stats for the manager team. Sourced from
    * {@code state.homePlayerRatings} or {@code state.awayPlayerRatings}
    * depending on {@link managerSide}. Each dot in the visual pitch
    * renders its chips (goals / keyPasses / yellowCards / fouls /
@@ -56,13 +56,13 @@ export interface SubstitutionDialogData {
    */
   playerRatings?: V24LivePlayerRating[];
   /**
-   * V25D79: which side of the match the manager team is playing on.
+   * : which side of the match the manager team is playing on.
    * Used by the modal to pick homePlayerRatings or awayPlayerRatings.
    * Defaults to 'HOME' when not provided.
    */
   managerSide?: 'HOME' | 'AWAY';
   /**
-   * V25D81-BUG #3: when set, the modal auto-selects this sessionPlayerId
+   * #3: when set, the modal auto-selects this sessionPlayerId
    * as the "OFF" player when it opens. Used by the round-live
    * auto-modal listener to pre-populate the substitution modal after
    * an INJURY event arrives for the manager team. The manager only
@@ -76,7 +76,7 @@ export interface SubstitutionDialogData {
    */
   preSelectedPlayerId?: string;
   /**
-   * V25D81-BUG #3: reason the modal was opened. Surfaced in the modal
+   * #3: reason the modal was opened. Surfaced in the modal
    * header so the manager knows why they're being asked to substitute.
    * Currently {@code 'INJURY_FORCED_SUBSTITUTION'} is the only trigger
    * the auto-listener emits. Manual opens leave this undefined.
@@ -87,7 +87,7 @@ export interface SubstitutionDialogData {
 type CoachObjective = 'NEED_GOAL' | 'PROTECT_RESULT' | 'NEUTRAL';
 
 /**
- * V25D79 visual pitch helper: one entry per dot-row in the substitution
+ * visual pitch helper: one entry per dot-row in the substitution
  * modal's starting XI section. The `players` array is in SLOT ORDER (left
  * to right within the row) — the visual pitch renders them horizontally.
  *
@@ -122,7 +122,7 @@ interface RecommendedSubstitution {
 }
 
 /**
- * LIVE-MATCH-F3-UI-LIVE FE4: substitution modal — V25D79 refactor.
+ * FE4: substitution modal — refactor.
  *
  * <p>2-column visual layout: Visual pitch of the starting XI (left,
  * click-only, per-player stats chips sourced from the live SSE feed) and
@@ -141,7 +141,7 @@ interface RecommendedSubstitution {
  * in an inline {@code <mat-error>} block; the modal stays open so the user
  * can correct the selection.
  *
- * <p>V25D79 changes:
+ * <p>changes:
  * <ul>
  *   <li>Replaced the 3-column "starter list / bench / actions" with a
  *       2-column visual pitch + bench list. The visual pitch reuses the
@@ -168,11 +168,11 @@ interface RecommendedSubstitution {
   ],
   templateUrl: './substitution-modal.component.html',
   styleUrls: ['./substitution-modal.component.css'],
-  // V25D79: visual-pitch + chip styles inlined so `ɵcmp.styles` exposes the
+  // : visual-pitch + chip styles inlined so `ɵcmp.styles` exposes the
   // source to unit tests (external CSS via styleUrls is not reachable in
   // @angular-devkit/build-angular per the angular-testing-patterns memory).
   // The .css companion is kept for IDE hints; it only carries the legacy
-  // 3-column grid + dialog actions styling (untouched by V25D79).
+  // 3-column grid + dialog actions styling (untouched by ).
   styles: [`
     .v25d79-pitch {
       position: relative;
@@ -370,7 +370,7 @@ interface RecommendedSubstitution {
       background: #ffebee;
       color: #b71c1c;
     }
-    /* V25D81-BUG #3: reason banner for INJURY_FORCED_SUBSTITUTION auto-opens.
+    /* #3: reason banner for INJURY_FORCED_SUBSTITUTION auto-opens.
        Sits next to the minute tag in the modal title. Red theme to match
        the chip-injury timeline color and signal urgency. */
     .reason-badge {
@@ -559,7 +559,7 @@ export class SubstitutionModalComponent {
   private destroy$ = new Subject<void>();
 
   /**
-   * V25D81-BUG #3: pre-select the OFF player when the modal opens via
+   * #3: pre-select the OFF player when the modal opens via
    * the INJURY auto-listener. Runs once in {@code ngOnInit}; we don't
    * subscribe to data changes (the modal is created fresh per open).
    *
@@ -1081,11 +1081,11 @@ export class SubstitutionModalComponent {
   trackByPlayer = (_idx: number, p: SubModalPlayer) => p.sessionPlayerId;
 
   /**
-   * V25D63-C23 P0: effectiveness classification para chips SALE/ENTRA.
+   * P0: effectiveness classification para chips SALE/ENTRA.
    * Mismo threshold que squad-editor-modal (eff >= 0.9 good,
    * 0.7-0.9 warning, <0.7 bad). Retorna null si el jugador no está en
    * el effectivenessMap (bench sin data pre-match, o lineup legacy
-   * pre-V25D47 sin formationEffectiveness).
+   * pre-sin formationEffectiveness).
    */
   getEffClass(sessionPlayerId: string): 'eff-good' | 'eff-warning' | 'eff-bad' | null {
     const v = this.data.effectivenessMap?.[sessionPlayerId];
@@ -1096,7 +1096,7 @@ export class SubstitutionModalComponent {
   }
 
   /**
-   * V25D63-C23 P0: retorna el porcentaje rounded (e.g. '95%') o null
+   * P0: retorna el porcentaje rounded (e.g. '95%') o null
    * si no hay data para ese sessionPlayerId.
    */
   getEffBadge(sessionPlayerId: string): string | null {
@@ -1106,7 +1106,7 @@ export class SubstitutionModalComponent {
   }
 
   /**
-   * V25D79: visual pitch layout — group starting Xi by position category.
+   * : visual pitch layout — group starting Xi by position category.
    * GK first row (always 1), then DEF, MID, WINGER, ATT. Each line has
    * the players in slot order. Players with an unknown position fall
    * into the MID bucket as a defensive default.
@@ -1344,7 +1344,7 @@ export class SubstitutionModalComponent {
   }
 
   /**
-   * V25D79: dot's category-class binding. Maps the pitch-line category
+   * : dot's category-class binding. Maps the pitch-line category
    * (GK / DEF / MID / WINGER / ATT) to the CSS class used by the inline
    * styles (is-gk / is-def / is-mid / is-winger / is-att).
    */
@@ -1353,7 +1353,7 @@ export class SubstitutionModalComponent {
   }
 
   /**
-   * V25D79: lookup helper — read the per-player stats entry by playerId.
+   * : lookup helper — read the per-player stats entry by playerId.
    * Returns null when {@code data.playerRatings} is missing (no chips on
    * the dot) or when the player has no rating entry. The chips rendering
    * in the template uses this to decide whether to show the chip strip.
@@ -1367,7 +1367,7 @@ export class SubstitutionModalComponent {
   }
 
   /**
-   * V25D79: count of non-zero chips for a player — used by the template
+   * : count of non-zero chips for a player — used by the template
    * to decide if any chip strip is worth rendering. Empty rating or
    * zero across all stats → no strip.
    */
@@ -1379,7 +1379,7 @@ export class SubstitutionModalComponent {
   }
 
   /**
-   * V25D79: trackBy for the dot *ngFor so DOM nodes are reused across
+   * : trackBy for the dot *ngFor so DOM nodes are reused across
    * re-renders triggered by the SSE consumer (playerRatings change every
    * tick).
    */

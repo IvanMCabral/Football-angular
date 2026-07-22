@@ -862,7 +862,7 @@ const TIMELINE_DEBOUNCE_MS = 150;
 const TIMELINE_MAX_MINUTE = 90;
 const TIMELINE_STEP = 5;
 /**
- * V24D24.2: Default seed for the "Replay with seed" button. Same number as
+ * V24D24.2: Default seed for the "Repetir con seed" button. Same number as
  * the regression-test baseline so Iván can reproduce a known result with
  * one click. The user is free to override.
  */
@@ -910,20 +910,20 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
   template: `
     <div class="test-harness-page">
       <header class="page-header">
-        <h1 class="page-title">Test Harness</h1>
+        <h1 class="page-title">Banco de Pruebas</h1>
         <p class="page-subtitle">
-          Debug surface - change formation, replay, and inspect match detail.
+          Superficie de prueba: cambiar formacion, repetir partidos e inspeccionar el detalle.
         </p>
-        <a routerLink="/dashboard" class="link link-back" aria-label="Back to dashboard">
-          &larr; Back to dashboard
+        <a routerLink="/dashboard" class="link link-back" aria-label="Volver al dashboard">
+          &larr; Volver al dashboard
         </a>
       </header>
       <!-- Empty state: no career active -->
       <div *ngIf="!loading() && !loadError() && !hasCareer()" class="state-container" role="status">
         <div class="state-icon info-icon" aria-hidden="true">i</div>
-        <h2 class="state-title">No active career</h2>
-        <p class="state-text">You need an active career to use the test harness.</p>
-        <a routerLink="/career/setup" class="btn btn-primary">Set up a career</a>
+        <h2 class="state-title">Sin carrera activa</h2>
+        <p class="state-text">Necesitas una carrera activa para usar el banco de pruebas.</p>
+        <a routerLink="/career/setup" class="btn btn-primary">Crear carrera</a>
       </div>
       <!-- Load error -->
       <div *ngIf="!loading() && loadError()" class="state-container" role="alert">
@@ -934,18 +934,21 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
       <!-- Loading state -->
       <div *ngIf="loading()" class="state-container" role="status" aria-live="polite">
         <div class="state-spinner" aria-hidden="true"></div>
-        <p class="loading-text">Loading test harness?</p>
+        <p class="loading-text">Cargando banco de pruebas...</p>
       </div>
       <!-- Main grid -->
       <div *ngIf="!loading() && !loadError() && hasCareer()" class="test-harness-grid">
         <!-- Panel A: Reused V24 match detail (F2) -->
         <section class="panel panel-a" aria-labelledby="panel-a-heading">
-          <h2 id="panel-a-heading" class="panel-title">Panel A - Match Detail</h2>
+          <h2 id="panel-a-heading" class="panel-title">Panel A - Detalle del partido</h2>
           <p class="panel-hint" *ngIf="!selectedMatchId()">
-            Select a match in Panel C to view its V24 detail.
+            Elegi un partido en el Panel C para ver su detalle.
+          </p>
+          <p class="panel-hint" *ngIf="selectedMatchId() && !selectedMatchHasDetail()">
+            El partido esta pendiente: se puede usar para pruebas, pero todavia no tiene detalle ni linea de tiempo.
           </p>
           <app-v24-match-detail-page
-            *ngIf="selectedMatchId() && detailPanelVisible()"
+            *ngIf="selectedMatchId() && selectedMatchHasDetail() && detailPanelVisible()"
             [inputCareerId]="careerId()"
             [inputMatchId]="selectedMatchId()"
             [inputRefreshToken]="detailRefreshToken()"
@@ -953,7 +956,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
         </section>
         <!-- Panel B: Mutation controls -->
         <section class="panel panel-b" aria-labelledby="panel-b-heading">
-          <h2 id="panel-b-heading" class="panel-title">Panel B - Mutations</h2>
+          <h2 id="panel-b-heading" class="panel-title">Panel B - Cambios</h2>
           <div
             class="selected-match-context"
             data-testid="selected-match-context"
@@ -985,13 +988,13 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
               (click)="onResetInjuries()"
               [disabled]="mutationInFlight()"
             >
-              Reset Injuries
+              Limpiar lesiones
             </button>
           </div>
           <div class="compare-workflow-card" data-testid="compare-workflow-card">
             <div class="compare-workflow-header">
               <span class="context-label">Flujo profesional</span>
-              <strong>Modal DT -> Harness -> Motor -> Compare</strong>
+              <strong>Modal DT -> Banco -> Motor -> Comparador</strong>
             </div>
             <ol class="compare-workflow-steps">
               <li
@@ -1010,11 +1013,11 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
           </div>
           <div class="control-group">
             <mat-form-field appearance="outline" class="formation-field">
-              <mat-label>Formation</mat-label>
+              <mat-label>Formacion</mat-label>
               <mat-select
                 [(ngModel)]="selectedFormationModel"
                 (selectionChange)="onFormationChange($event.value)"
-                aria-label="Select formation"
+                aria-label="Seleccionar formacion"
               >
                 <mat-option *ngFor="let code of formationCodes" [value]="code">
                   {{ code }}
@@ -1027,9 +1030,9 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 color="primary"
                 (click)="applyFormation()"
                 [disabled]="mutationInFlight() || !selectedFormationModel"
-                aria-label="Apply selected formation"
+                aria-label="Aplicar formacion seleccionada"
               >
-                Set Formation
+                Aplicar formacion
               </button>
               <button
                 mat-stroked-button
@@ -1037,15 +1040,15 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight()"
                 aria-label="Reset all injuries"
               >
-                Reset Injuries
+                Limpiar lesiones
               </button>
               <button
                 mat-stroked-button
                 (click)="onReplaceFixtures()"
                 [disabled]="mutationInFlight()"
-                aria-label="Replace fixtures with a Barcelona rival"
+                aria-label="Recrear fixture con rival Barcelona"
               >
-                Replace Fixtures
+                Recrear fixture
               </button>
               <button
                 mat-stroked-button
@@ -1053,7 +1056,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight()"
                 aria-label="Open visual squad editor"
               >
-                Open squad editor
+                Abrir editor de equipo
               </button>
             </div>
           </div>
@@ -1085,9 +1088,9 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
               </mat-select>
               <mat-hint>{{ selectedStyleHint() }}</mat-hint>
             </mat-form-field>
-            <div class="swap-selector-row" aria-label="Player swap matrix selectors">
+            <div class="swap-selector-row" aria-label="Matriz cambio jugador selectors">
               <mat-form-field appearance="outline" class="swap-field">
-                <mat-label>Swap slot</mat-label>
+                <mat-label>Slot cambio</mat-label>
                 <mat-select
                   [(ngModel)]="selectedSwapStarterIdModel"
                   aria-label="Select starter slot for player swap matrix"
@@ -1099,7 +1102,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 </mat-select>
               </mat-form-field>
               <mat-form-field appearance="outline" class="swap-field">
-                <mat-label>Swap player</mat-label>
+                <mat-label>Jugador cambio</mat-label>
                 <mat-select
                   [(ngModel)]="selectedSwapBenchIdModel"
                   aria-label="Select bench player for player swap matrix"
@@ -1111,7 +1114,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 </mat-select>
               </mat-form-field>
               <mat-form-field appearance="outline" class="swap-seed-count-field">
-                <mat-label>Swap seeds</mat-label>
+                <mat-label>Seeds cambio</mat-label>
                 <input
                   matInput
                   type="number"
@@ -1124,7 +1127,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 <mat-hint>1-50 - Multi-seed usa min 20</mat-hint>
               </mat-form-field>
               <mat-form-field appearance="outline" class="swap-field">
-                <mat-label>Sub minute</mat-label>
+                <mat-label>Minuto cambio</mat-label>
                 <mat-select
                   [(ngModel)]="substitutionWhatIfMinuteModel"
                   aria-label="Select minute for substitution what-if"
@@ -1136,27 +1139,27 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 <mat-hint>Para comparar cambio temprano/tardío</mat-hint>
               </mat-form-field>
               <mat-form-field appearance="outline" class="swap-field">
-                <mat-label>Battery precision</mat-label>
+                <mat-label>Precision bateria</mat-label>
                 <mat-select
                   [(ngModel)]="playerSwapBatteryPrecisionModel"
                   (ngModelChange)="onPlayerSwapBatteryPrecisionChange($event)"
                   aria-label="Select player swap battery precision"
                 >
-                  <mat-option value="quick">Quick</mat-option>
-                  <mat-option value="balanced">Balanced</mat-option>
+                  <mat-option value="quick">Rapida</mat-option>
+                  <mat-option value="balanced">Balanceado</mat-option>
                   <mat-option value="reliable">Reliable</mat-option>
                 </mat-select>
                 <mat-hint>{{ playerSwapBatteryPrecisionHint() }}</mat-hint>
               </mat-form-field>
               <mat-form-field appearance="outline" class="swap-field">
-                <mat-label>Battery mode</mat-label>
+                <mat-label>Modo bateria</mat-label>
                 <mat-select
                   [(ngModel)]="playerSwapBatteryModeModel"
                   aria-label="Select player swap battery mode"
                 >
-                  <mat-option value="natural">Natural only</mat-option>
+                  <mat-option value="natural">Solo natural</mat-option>
                   <mat-option value="mixed">Include experiments</mat-option>
-                  <mat-option value="stress">Stress test</mat-option>
+                  <mat-option value="stress">Estres test</mat-option>
                 </mat-select>
                 <mat-hint>{{ playerSwapBatteryModeHint() }}</mat-hint>
               </mat-form-field>
@@ -1176,7 +1179,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 <mat-hint>{{ controlledTeamSideHint() }}</mat-hint>
               </mat-form-field>
               <mat-form-field appearance="outline" class="swap-field">
-                <mat-label>Slot lab</mat-label>
+                <mat-label>Slot prueba</mat-label>
                 <mat-select
                   [(ngModel)]="roleSlotImpactSlotIdModel"
                   aria-label="Select tactical slot for role impact lab"
@@ -1188,7 +1191,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 <mat-hint>{{ roleSlotImpactSlotHint() }}</mat-hint>
               </mat-form-field>
               <mat-form-field appearance="outline" class="swap-field">
-                <mat-label>Battery tablero</mat-label>
+                <mat-label>Tablero bateria</mat-label>
                 <mat-select
                   [(ngModel)]="scenarioBatteryGroupModel"
                   aria-label="Select tactical battery group"
@@ -1201,7 +1204,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 <mat-hint>{{ scenarioBatteryGroupHint() }}</mat-hint>
               </mat-form-field>
               <mat-form-field appearance="outline" class="swap-field">
-                <mat-label>Battery alcance</mat-label>
+                <mat-label>Alcance bateria</mat-label>
                 <mat-select
                   [(ngModel)]="scenarioBatteryScopeModel"
                   aria-label="Select tactical battery scope"
@@ -1226,14 +1229,14 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
               </mat-form-field>
             </div>
             <mat-form-field appearance="outline" class="round-field">
-              <mat-label>Round</mat-label>
+              <mat-label>Fecha</mat-label>
               <mat-select
                 [(ngModel)]="selectedRoundModel"
                 (selectionChange)="onRoundSelect($event.value)"
-                aria-label="Select round to simulate"
+                aria-label="Seleccionar fecha para simular"
               >
                 <mat-option *ngFor="let r of rounds()" [value]="r.round">
-                  Round {{ r.round }}
+                  Fecha {{ r.round }}
                 </mat-option>
               </mat-select>
             </mat-form-field>
@@ -1245,7 +1248,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight() || !selectedMatchId()"
                 aria-label="Replay selected match with seed"
               >
-                Replay with seed
+                Repetir con seed
               </button>
               <a
                 mat-stroked-button
@@ -1254,7 +1257,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [routerLink]="compareRoute"
                 aria-label="Open professional baseline vs live comparison for the selected match"
               >
-                Open Match Compare
+                Abrir comparador
               </a>
               <button
                 mat-stroked-button
@@ -1263,7 +1266,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 disabled
                 aria-label="Select a match before opening Match Compare"
               >
-                Open Match Compare
+                Abrir comparador
               </button>
               <button
                 mat-raised-button
@@ -1272,7 +1275,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
                 aria-label="Replay selected match with the current visual lineup and seed"
               >
-                Replay current lineup
+                Repetir XI actual
               </button>
               <button
                 mat-stroked-button
@@ -1280,7 +1283,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
                 aria-label="Replay current visual lineup across multiple seeds"
               >
-                Current lineup multi-seed
+                XI actual multi-seed
               </button>
               <button
                 mat-stroked-button
@@ -1288,7 +1291,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
                 aria-label="Compare canonical lineup against modal custom pixels across multiple seeds"
               >
-                Base vs modal pixels
+                Base vs pixeles del modal
               </button>
               <button
                 mat-stroked-button
@@ -1306,7 +1309,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight() || !selectedMatchId()"
                 aria-label="Compare a starter attacker against a bench attacker across multiple seeds"
               >
-                Player swap matrix
+                Matriz cambio jugador
               </button>
               <button
                 mat-stroked-button
@@ -1315,7 +1318,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
                 aria-label="Compare the selected starter and bench player as a live substitution at minute 60"
               >
-                Substitution what-if
+                Simular sustitucion
               </button>
               <button
                 mat-stroked-button
@@ -1324,7 +1327,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
                 aria-label="Run the substitution what-if using the same coach objective recommendation as the live modal"
               >
-                Modal recommendation what-if
+                Probar recomendacion modal
               </button>
               <button
                 mat-stroked-button
@@ -1333,16 +1336,16 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
                 aria-label="Compare the same substitution at minutes 45, 60, 70 and 80"
               >
-                Sub timing matrix
+                Matriz minuto de cambio
               </button>
               <button
                 mat-stroked-button
                 data-testid="player-swap-battery-button"
                 (click)="onRunPlayerSwapBattery()"
                 [disabled]="mutationInFlight() || !selectedMatchId()"
-                aria-label="Compare several starter and bench player swaps across multiple seeds"
+                aria-label="Compare several starter and bench cambios de jugador across multiple seeds"
               >
-                Player swap battery
+                Bateria cambio jugador
               </button>
               <button
                 mat-stroked-button
@@ -1351,7 +1354,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight() || !selectedMatchId()"
                 aria-label="Compare natural and stress player swap batteries together"
               >
-                Player swap full smoke
+                Smoke completo de cambios
               </button>
               <button
                 mat-stroked-button
@@ -1359,7 +1362,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight() || !selectedMatchId()"
                 aria-label="Compare player swap battery reads between quick and balanced precision"
               >
-                Compare precision
+                Comparar precision
               </button>
               <button
                 type="button"
@@ -1369,7 +1372,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight() || !selectedMatchId()"
                 aria-label="Compare multiple pixel movement presets for the selected starter across seeds"
               >
-                Position presets matrix
+                Matriz presets posicion
               </button>
               <button
                 type="button"
@@ -1379,7 +1382,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
                 aria-label="Compare a manual 4-4-2-like shape against stronger manual shape edits"
               >
-                Manual shape vs preset
+                Forma manual vs preset
               </button>
               <button
                 type="button"
@@ -1389,7 +1392,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
                 aria-label="Compare natural roles in the same tactical slot across seeds"
               >
-                Role slot impact
+                Impacto rol-slot
               </button>
               <button
                 type="button"
@@ -1399,7 +1402,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
                 aria-label="Run role impact smoke for every real slot in the current starting eleven"
               >
-                All role slots smoke
+                Smoke todos los roles-slot
               </button>
               <button
                 type="button"
@@ -1409,7 +1412,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
                 aria-label="Run role slot smoke across every formation"
               >
-                All formations role-slot smoke
+                Smoke roles-slot por formacion
               </button>
               <button
                 type="button"
@@ -1419,7 +1422,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight() || !selectedMatchId()"
                 aria-label="Replay the last position move made in the formation modal across seeds"
               >
-                Last modal move
+                Ultimo movimiento modal
               </button>
               <button
                 type="button"
@@ -1429,7 +1432,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
                 aria-label="Run a focused pixel lab for left and right wingbacks"
               >
-                Wingback pixel lab
+                Lab pixeles carrileros
               </button>
               <button
                 type="button"
@@ -1438,7 +1441,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight() || !selectedMatchId()"
                 aria-label="Run high-seed micro-movement sensitivity check for position pixels"
               >
-                Sensitivity check
+                Chequeo sensibilidad
               </button>
               <button
                 type="button"
@@ -1448,7 +1451,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight() || !selectedMatchId()"
                 aria-label="Run aggressive but football-plausible manual position extremes to hunt visual engine contradictions"
               >
-                Manual extremes hunt
+                Buscar extremos manuales
               </button>
               <button
                 mat-stroked-button
@@ -1456,7 +1459,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight() || !userTeamName()"
                 aria-label="Run position movement smoke across multiple completed user-team matches"
               >
-                Multi-match position smoke
+                Smoke posicion multi-partido
               </button>
               <button
                 mat-stroked-button
@@ -1464,7 +1467,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight() || !userTeamName()"
                 aria-label="Run midfield-only position movement smoke across multiple completed user-team matches"
               >
-                MID position smoke
+                Smoke posicion MID
               </button>
               <button
                 mat-stroked-button
@@ -1472,7 +1475,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight() || !userTeamName()"
                 aria-label="Run defensive-line position movement smoke across multiple completed user-team matches"
               >
-                DEF position smoke
+                Smoke posicion DEF
               </button>
               <button
                 mat-stroked-button
@@ -1480,7 +1483,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight() || !userTeamName()"
                 aria-label="Run attacking-line position movement smoke across multiple completed user-team matches"
               >
-                ATT position smoke
+                Smoke posicion ATT
               </button>
               <button
                 mat-stroked-button
@@ -1488,7 +1491,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight() || !userTeamName()"
                 aria-label="Run full position smoke comparison board across completed user-team matches"
               >
-                Full position smoke board
+                Tablero completo posicion
               </button>
               <button
                 mat-stroked-button
@@ -1497,7 +1500,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [title]="userLineupAuditDisabledReason()"
                 aria-label="Audit current formation DEF MID ATT candidates before running line smokes"
               >
-                Formation line audit
+                Auditoria lineas formacion
               </button>
               <button
                 mat-stroked-button
@@ -1506,7 +1509,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [title]="userLineupAuditDisabledReason()"
                 aria-label="Audit every formation DEF MID ATT candidates before running expensive line smokes"
               >
-                All formations line audit
+                Auditoria todas las formaciones
               </button>
               <button
                 mat-stroked-button
@@ -1515,7 +1518,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [title]="formationMatrixDisabledReason()"
                 aria-label="Replay selected match with every formation and the same seed"
               >
-                Formation matrix
+                Matriz formaciones
               </button>
               <button
                 mat-stroked-button
@@ -1525,7 +1528,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [title]="formationMatrixDisabledReason()"
                 aria-label="Average every formation across multiple seeds"
               >
-                Formation avg ({{ scenarioMatrixSummaryEffectiveSeedCount() }} seeds)
+                Promedio formaciones ({{ scenarioMatrixSummaryEffectiveSeedCount() }} seeds)
               </button>
               <button
                 mat-flat-button
@@ -1535,7 +1538,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight() || !selectedMatchId() || !canRunScenarioSummaryForControlledSide()"
                 aria-label="Run professional controlled smoke with formation averages and tactical scenario reads"
               >
-                Run professional smoke
+                Correr smoke profesional
               </button>
               <button
                 mat-stroked-button
@@ -1544,7 +1547,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight() || controlledTeamSideModel !== 'USER' || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
                 aria-label="Run full professional user-team smoke with formations scenarios pixels and swaps"
               >
-                Run professional smoke full
+                Correr smoke profesional completo
               </button>
               <button
                 mat-stroked-button
@@ -1553,7 +1556,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
                 aria-label="Compare 5-4-1 low block high base and low second line across seeds"
               >
-                5-4-1 low block lab
+                Lab bloque bajo 5-4-1
               </button>
               <button
                 mat-stroked-button
@@ -1562,7 +1565,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
                 aria-label="Compare 5-3-2 wingbacks low base and high across seeds"
               >
-                5-3-2 transition lab
+                Lab transicion 5-3-2
               </button>
               <button
                 mat-stroked-button
@@ -1597,7 +1600,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
                 aria-label="Run controlled live tactical scenarios for the selected match and seed"
               >
-                Scenario matrix
+                Matriz escenarios
               </button>
               <button
                 mat-stroked-button
@@ -1605,7 +1608,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight() || !selectedMatchId() || !canRunScenarioSummaryForControlledSide()"
                 aria-label="Run controlled live tactical scenarios across multiple seeds"
               >
-                Multi-seed matrix ({{ scenarioMatrixSummaryEffectiveSeedCount() }} seeds)
+                Matriz multi-seed ({{ scenarioMatrixSummaryEffectiveSeedCount() }} seeds)
               </button>
               <button
                 mat-stroked-button
@@ -1613,7 +1616,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight() || !selectedMatchId() || !canRunScenarioSummaryForControlledSide()"
                 aria-label="Run quick controlled live tactical scenario smoke across five seeds"
               >
-                Scenario smoke (5 seeds)
+                Smoke escenarios (5 seeds)
               </button>
               <button
                 mat-stroked-button
@@ -1622,7 +1625,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight() || !selectedMatchId() || controlledTeamSideModel !== 'USER' || !selectedMatchIncludesUserTeam()"
                 aria-label="Compare focused wide battery for 4-2-3-1 4-4-2 and 5-4-1 with balanced and wide play"
               >
-                Focused wide battery
+                Bateria bandas enfocada
               </button>
               <button
                 mat-stroked-button
@@ -1631,7 +1634,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight() || !selectedMatchId() || controlledTeamSideModel !== 'USER' || !selectedMatchIncludesUserTeam()"
                 aria-label="Run focused pixel battery for the selected formation with wide center forward and deeper moves"
               >
-                Focused pixel battery
+                Bateria pixeles enfocada
               </button>
               <button
                 mat-stroked-button
@@ -1663,7 +1666,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight() || scenarioBatteryCandidateMatches().length === 0"
                 aria-label="Run quick tactical battery board across several matches and both sides"
               >
-                Battery tablero
+                Tablero bateria
               </button>
               <span *ngIf="scenarioBatteryProgress()" class="inline-progress" aria-live="polite">
                 {{ scenarioBatteryProgress() }}
@@ -1677,7 +1680,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight()"
                 aria-label="Prepare controlled offensive substitution upgrade lab"
               >
-                Prepare offensive lab
+                Preparar lab ofensivo
               </button>
               <button
                 mat-stroked-button
@@ -1685,7 +1688,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight()"
                 aria-label="Restore controlled offensive substitution upgrade lab"
               >
-                Restore lab
+                Restaurar lab
               </button>
               <button
                 mat-stroked-button
@@ -1693,7 +1696,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight()"
                 aria-label="Prepare controlled defensive substitution downgrade lab"
               >
-                Prepare defensive lab
+                Preparar lab defensivo
               </button>
               <button
                 mat-stroked-button
@@ -1701,121 +1704,121 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight()"
                 aria-label="Restore controlled defensive substitution downgrade lab"
               >
-                Restore defensive lab
+                Restaurar lab defensivo
               </button>
               <button
                 mat-stroked-button
                 (click)="onPrepareObjectiveContrastLab()"
                 [disabled]="mutationInFlight()"
-                aria-label="Prepare objective contrast player swap lab"
+                aria-label="Preparar contraste objetivo lab cambio jugador"
               >
-                Prepare objective contrast
+                Preparar contraste objetivo
               </button>
               <button
                 mat-stroked-button
                 (click)="onRestoreObjectiveContrastLab()"
                 [disabled]="mutationInFlight()"
-                aria-label="Restore objective contrast player swap lab"
+                aria-label="Restaurar contraste objetivo lab cambio jugador"
               >
-                Restore objective contrast
+                Restaurar contraste objetivo
               </button>
               <button
                 mat-stroked-button
                 (click)="onPrepareWeakWideDefendersLab()"
                 [disabled]="mutationInFlight()"
-                aria-label="Prepare weak wide defenders exposure lab"
+                aria-label="Preparar lab exposicion defensores banda debiles"
               >
-                Prepare weak wide DEF lab
+                Preparar lab DEF bandas debiles
               </button>
               <button
                 mat-stroked-button
                 (click)="onRestoreWeakWideDefendersLab()"
                 [disabled]="mutationInFlight()"
-                aria-label="Restore weak wide defenders exposure lab"
+                aria-label="Restaurar lab exposicion defensores banda debiles"
               >
-                Restore weak wide DEF lab
+                Restaurar lab DEF bandas debiles
               </button>
               <button
                 mat-stroked-button
                 (click)="onPrepareOpponentWeakWideDefendersLab()"
                 [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
-                aria-label="Prepare selected opponent weak wide defenders lab"
+                aria-label="Preparar lab rival defensores banda debiles"
               >
-                Prepare rival weak wide DEF
+                Preparar rival DEF bandas debiles
               </button>
               <button
                 mat-stroked-button
                 (click)="onRestoreOpponentWeakWideDefendersLab()"
                 [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
-                aria-label="Restore selected opponent weak wide defenders lab"
+                aria-label="Restaurar lab rival defensores banda debiles"
               >
-                Restore rival weak wide DEF
+                Restaurar rival DEF bandas debiles
               </button>
               <button
                 mat-stroked-button
                 (click)="onPrepareOpponentWeakLeftDefenderLab()"
                 [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
-                aria-label="Prepare selected opponent weak left defender lab"
+                aria-label="Preparar lab rival defensor izquierdo debil"
               >
-                Prepare rival weak left DEF
+                Preparar rival DEF izquierda debil
               </button>
               <button
                 mat-stroked-button
                 (click)="onRestoreOpponentWeakLeftDefenderLab()"
                 [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
-                aria-label="Restore selected opponent weak left defender lab"
+                aria-label="Restaurar lab rival defensor izquierdo debil"
               >
-                Restore rival weak left DEF
+                Restaurar rival DEF izquierda debil
               </button>
               <button
                 mat-stroked-button
                 (click)="onPrepareOpponentWeakRightDefenderLab()"
                 [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
-                aria-label="Prepare selected opponent weak right defender lab"
+                aria-label="Preparar lab rival defensor derecho debil"
               >
-                Prepare rival weak right DEF
+                Preparar rival DEF derecha debil
               </button>
               <button
                 mat-stroked-button
                 (click)="onRestoreOpponentWeakRightDefenderLab()"
                 [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
-                aria-label="Restore selected opponent weak right defender lab"
+                aria-label="Restaurar lab rival defensor derecho debil"
               >
-                Restore rival weak right DEF
+                Restaurar rival DEF derecha debil
               </button>
               <button
                 mat-stroked-button
                 color="primary"
                 (click)="onRunSideMirrorSmoke()"
                 [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
-                aria-label="Run side mirror smoke"
+                aria-label="Correr smoke espejo bandas"
               >
-                Side mirror smoke
+                Smoke espejo bandas
               </button>
               <button
                 mat-stroked-button
                 color="primary"
                 (click)="onRunSideMirrorSyntheticLab()"
                 [disabled]="mutationInFlight()"
-                aria-label="Run synthetic side mirror lab"
+                aria-label="Correr lab espejo sintetico"
               >
-                Synthetic mirror lab
+                Lab espejo sintetico
               </button>
               <button
                 mat-stroked-button
                 (click)="onPrepareOpponentWeakCenterBacksLab()"
                 [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
-                aria-label="Prepare selected opponent weak center backs lab"
+                aria-label="Preparar lab rival centrales debiles"
               >
-                Prepare rival weak CB
+                Preparar rival centrales debiles
               </button>
               <button
                 mat-stroked-button
                 (click)="onRestoreOpponentWeakCenterBacksLab()"
                 [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
-                aria-label="Restore selected opponent weak center backs lab"
+                aria-label="Restaurar lab rival centrales debiles"
               >
-                Restore rival weak CB
+                Restaurar rival centrales debiles
               </button>
               <button
                 mat-stroked-button
@@ -1823,7 +1826,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight()"
                 aria-label="Prepare weak left defender channel lab"
               >
-                Prepare weak left DEF
+                Preparar DEF izquierda debil
               </button>
               <button
                 mat-stroked-button
@@ -1831,7 +1834,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight()"
                 aria-label="Restore weak left defender channel lab"
               >
-                Restore weak left DEF
+                Restaurar DEF izquierda debil
               </button>
               <button
                 mat-stroked-button
@@ -1839,7 +1842,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight()"
                 aria-label="Prepare weak right defender channel lab"
               >
-                Prepare weak right DEF
+                Preparar DEF derecha debil
               </button>
               <button
                 mat-stroked-button
@@ -1847,7 +1850,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight()"
                 aria-label="Restore weak right defender channel lab"
               >
-                Restore weak right DEF
+                Restaurar DEF derecha debil
               </button>
               <button
                 mat-stroked-button
@@ -1855,7 +1858,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight()"
                 aria-label="Prepare weak center backs channel lab"
               >
-                Prepare weak CB lab
+                Preparar lab centrales debiles
               </button>
               <button
                 mat-stroked-button
@@ -1863,7 +1866,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight()"
                 aria-label="Restore weak center backs channel lab"
               >
-                Restore weak CB lab
+                Restaurar lab centrales debiles
               </button>
               <button
                 mat-stroked-button
@@ -1871,7 +1874,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight()"
                 aria-label="Prepare defensive fallback lineup lab"
               >
-                Prepare DEF fallback lab
+                Preparar lab fallback DEF
               </button>
               <button
                 mat-stroked-button
@@ -1879,7 +1882,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight() || !defensiveFallbackRestore"
                 aria-label="Restore defensive fallback lineup lab"
               >
-                Restore DEF fallback lab
+                Restaurar lab fallback DEF
               </button>
               <button
                 mat-stroked-button
@@ -1887,7 +1890,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight() || selectedRoundModel === null"
                 aria-label="Simulate selected round"
               >
-                Simulate round {{ selectedRoundModel ?? '?' }}
+                Simular fecha {{ selectedRoundModel ?? '-' }}
               </button>
             </div>
             <p
@@ -1904,7 +1907,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
               aria-live="polite"
             >
               {{ analysisReadyMessage() }}
-              <button type="button" (click)="scrollToReplayAnalysis()">View Panel E</button>
+              <button type="button" (click)="scrollToReplayAnalysis()">Ver Panel E</button>
             </p>
           </div>
         </section>
@@ -1915,9 +1918,9 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
           class="panel panel-e"
           aria-labelledby="panel-e-heading"
         >
-          <h2 id="panel-e-heading" class="panel-title">Panel E - Replay Analysis</h2>
+          <h2 id="panel-e-heading" class="panel-title">Panel E - Analisis de repeticion</h2>
           <p class="panel-hint">
-            Compare the same match and seed across formations, live tactical changes and substitutions.
+            Compara el mismo partido y seed con formaciones, tacticas en vivo y sustituciones.
           </p>
           <div class="analysis-context-row">
             <span class="controlled-team-badge">Controlando: {{ controlledTeamDisplayName() }}</span>
@@ -1937,7 +1940,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
             </small>
           </article>
           <article *ngIf="professionalSmokeSummary() as smoke" class="position-read-summary professional-smoke-summary" data-testid="professional-smoke-summary">
-            <strong>Professional smoke</strong>
+            <strong>Smoke profesional</strong>
             <span *ngIf="smoke.verdict" class="qa-verdict-badge" [class]="professionalSmokeVerdictClass(smoke.verdict)">
               {{ smoke.verdict }}
             </span>
@@ -2102,7 +2105,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
           </div>
           <div *ngIf="formationLineSmokeRows().length > 0" class="formation-matrix analysis-matrix current-lineup-replay">
             <div class="matrix-header">
-              <strong>Formation line audit</strong>
+              <strong>Auditoria lineas formacion</strong>
               <span>DEF/MID/ATT candidates for the current visual formation</span>
             </div>
             <div class="table-scroll compact-position-table">
@@ -2138,7 +2141,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
             <div class="matrix-header">
               <strong>Current lineup replay</strong>
               <span>
-                {{ replay.label }} ? formation {{ replay.formation || '?' }}
+                {{ replay.label }} ? formacion {{ replay.formation || '?' }}
                 ? seed {{ replay.seed ?? 'auto' }} ? {{ selectedStyleLabel() }}
               </span>
               <button type="button" class="matrix-export" (click)="copyCurrentLineupReplayJson()">
@@ -2177,9 +2180,9 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
           </div>
           <div *ngIf="currentLineupMultiSeedSummary() as summary" class="formation-matrix analysis-matrix current-lineup-replay">
             <div class="matrix-header">
-              <strong>Current lineup multi-seed</strong>
+              <strong>XI actual multi-seed</strong>
               <span>
-                {{ summary.label }} ? formation {{ summary.formation || '?' }}
+                {{ summary.label }} ? formacion {{ summary.formation || '?' }}
                 ? seeds {{ summary.seedStart }}..{{ summary.seedEnd }} ? {{ selectedStyleLabel() }}
               </span>
               <button type="button" class="matrix-export" (click)="copyCurrentLineupMultiSeedJson()">
@@ -2189,14 +2192,14 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
             <div
               class="qa-readable-strip"
               data-testid="current-lineup-multiseed-readout"
-              aria-label="Current lineup multi-seed readable summary"
+              aria-label="XI actual multi-seed readable summary"
             >
               <span>{{ currentLineupMultiSeedReadable(summary) }}</span>
               <span [class]="deltaClass(summary.avgXgDiff)">xG {{ fmtDeltaNumber(summary.avgXgDiff) }}</span>
               <span [class]="deltaClass(summary.avgShotDiff)">Shots {{ fmtDeltaNumber(summary.avgShotDiff) }}</span>
               <span>{{ currentLineupMultiSeedSignal(summary) }}</span>
             </div>
-            <div class="current-replay-grid" role="group" aria-label="Current lineup multi-seed summary">
+            <div class="current-replay-grid" role="group" aria-label="XI actual multi-seed summary">
               <div class="metric-card">
                 <span class="metric-label">Avg Score</span>
                 <span class="metric-value">{{ fmtXg(summary.avgGoalsFor) }}-{{ fmtXg(summary.avgGoalsAgainst) }}</span>
@@ -2233,12 +2236,12 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
               </div>
             </div>
             <p class="panel-hint current-replay-starters">
-              Starters {{ summary.playerCount }}/11 ? {{ summary.starters.join(' ? ') }}
+              Titulares {{ summary.playerCount }}/11 ? {{ summary.starters.join(' ? ') }}
             </p>
           </div>
           <div *ngIf="modalVsCanonicalSummary() as summary" class="formation-matrix analysis-matrix current-lineup-replay">
             <div class="matrix-header">
-              <strong>Base vs modal pixels</strong>
+              <strong>Base vs pixeles del modal</strong>
               <span>
                 {{ summary.label }} · formación {{ summary.formation || '?' }}
                 · seeds {{ summary.seedStart }}..{{ summary.seedEnd }} · jugadores movidos {{ summary.customMovableSlotCount }}/{{ summary.customSlotCount }}
@@ -2252,7 +2255,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
               {{ summary.movedPlayers.length ? 'Movidos: ' + summary.movedPlayers.join(', ') + '.' : 'No hay jugadores de campo movidos.' }}
               Veredicto motor: {{ summary.engineImpactLabel }} — {{ summary.engineImpactDetail }}
             </p>
-            <div class="current-replay-grid" role="group" aria-label="Base vs modal pixels summary">
+            <div class="current-replay-grid" role="group" aria-label="Base vs pixeles del modal summary">
               <div class="metric-card">
                 <span class="metric-label">Coach read</span>
                 <span class="metric-value" [class]="summary.coachReadClass">{{ summary.coachRead }}</span>
@@ -2312,7 +2315,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
           </div>
           <div *ngIf="playerSwapMatrixSummary() as swap" class="formation-matrix analysis-matrix current-lineup-replay">
             <div class="matrix-header">
-              <strong>Player swap matrix</strong>
+              <strong>Matriz cambio jugador</strong>
               <span>
                 {{ swap.baselinePlayer }} vs {{ swap.swapPlayer }}
                 · slot {{ swap.slotId }} · seeds {{ swap.seedStart }}..{{ swap.seedEnd }}
@@ -2324,7 +2327,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 CSV
               </button>
             </div>
-            <div class="current-replay-grid" role="group" aria-label="Player swap matrix summary">
+            <div class="current-replay-grid" role="group" aria-label="Matriz cambio jugador summary">
               <div class="metric-card">
                 <span class="metric-label">Coach read</span>
                 <span class="metric-value" [class]="swap.swapReadClass">{{ swap.swapRead }}</span>
@@ -2387,11 +2390,11 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
             </p>
             <p class="panel-hint current-replay-starters">
               Poss {{ fmtPct(swap.baseline.avgPossessionFor) }} -> {{ fmtPct(swap.swapped.avgPossessionFor) }}
-              ? Zones for C/W/L
+              ? Zonas C/B/L
               {{ fmtXg(swap.baseline.avgCentralShotsFor) }}/{{ fmtXg(swap.baseline.avgWideShotsFor) }}/{{ fmtXg(swap.baseline.avgLongShotsFor) }}
               ->
               {{ fmtXg(swap.swapped.avgCentralShotsFor) }}/{{ fmtXg(swap.swapped.avgWideShotsFor) }}/{{ fmtXg(swap.swapped.avgLongShotsFor) }}
-              ? Against
+              ? En contra
               {{ fmtXg(swap.baseline.avgCentralShotsAgainst) }}/{{ fmtXg(swap.baseline.avgWideShotsAgainst) }}/{{ fmtXg(swap.baseline.avgLongShotsAgainst) }}
               ->
               {{ fmtXg(swap.swapped.avgCentralShotsAgainst) }}/{{ fmtXg(swap.swapped.avgWideShotsAgainst) }}/{{ fmtXg(swap.swapped.avgLongShotsAgainst) }}
@@ -2399,13 +2402,13 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
           </div>
           <div *ngIf="substitutionWhatIfSummary() as sub" class="formation-matrix analysis-matrix current-lineup-replay">
             <div class="matrix-header">
-              <strong>Substitution what-if</strong>
+              <strong>Simular sustitucion</strong>
               <span>
                 {{ sub.playerOffName }} -> {{ sub.playerOnName }}
                 ? min {{ sub.minute }} ? seeds {{ sub.seedStart }}..{{ sub.seedEnd }}
               </span>
             </div>
-            <div class="current-replay-grid" role="group" aria-label="Substitution what-if summary">
+            <div class="current-replay-grid" role="group" aria-label="Simular sustitucion summary">
               <div class="metric-card">
                 <span class="metric-label">Coach read</span>
                 <span class="metric-value" [class]="sub.readClass">{{ sub.read }}</span>
@@ -2530,7 +2533,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
           </div>
           <div *ngIf="playerSwapBatterySummaries().length > 0" class="formation-matrix analysis-matrix current-lineup-replay">
             <div class="matrix-header">
-              <strong>Player swap battery</strong>
+              <strong>Bateria cambio jugador</strong>
               <span>{{ playerSwapBatterySummaries().length }} swaps · seeds {{ playerSwapBatterySummaries()[0].seedStart }}..{{ playerSwapBatterySummaries()[0].seedEnd }}</span>
               <button type="button" class="matrix-export" (click)="copyPlayerSwapBatteryJson()">
                 Copy JSON
@@ -2542,7 +2545,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 CSV
               </button>
             </div>
-            <div *ngIf="playerSwapBatterySummary() as battery" class="current-replay-grid" role="group" aria-label="Player swap battery summary">
+            <div *ngIf="playerSwapBatterySummary() as battery" class="current-replay-grid" role="group" aria-label="Bateria cambio jugador summary">
               <div class="metric-card">
                 <span class="metric-label">Recommendation</span>
                 <span class="metric-value delta-positive">{{ playerSwapBatteryBestWorstText(battery.best) }}</span>
@@ -2637,8 +2640,8 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
           </div>
           <div *ngIf="playerSwapPrecisionComparisonRows().length > 0" class="formation-matrix analysis-matrix current-lineup-replay">
             <div class="matrix-header">
-              <strong>Player swap precision compare</strong>
-              <span>Quick 3 seeds vs Balanced 10 seeds ? {{ playerSwapPrecisionComparisonRows().length }} swaps</span>
+              <strong>Comparacion precision cambio jugador</strong>
+              <span>Rapido 3 seeds vs Balanceado 10 seeds ? {{ playerSwapPrecisionComparisonRows().length }} swaps</span>
             </div>
             <div class="table-scroll compact-position-table">
               <table>
@@ -2648,12 +2651,12 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                     <th>Fit</th>
                     <th>Starter</th>
                     <th>Bench</th>
-                    <th>Quick read</th>
-                    <th>Balanced read</th>
-                    <th>Quick xG Diff</th>
-                    <th>Balanced xG Diff</th>
-                    <th>Quick pre</th>
-                    <th>Balanced pre</th>
+                    <th>Rapido read</th>
+                    <th>Balanceado read</th>
+                    <th>Rapido xG Diff</th>
+                    <th>Balanceado xG Diff</th>
+                    <th>Rapido pre</th>
+                    <th>Balanceado pre</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2675,7 +2678,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
           </div>
           <div *ngIf="roleSlotImpactRows().length > 0" class="formation-matrix analysis-matrix current-lineup-replay">
             <div class="matrix-header">
-              <strong>Role slot impact</strong>
+              <strong>Impacto rol-slot</strong>
               <span *ngIf="roleSlotImpactRows()[0] as first">
                 {{ first.baselinePlayerName }} ? slot {{ first.slotId }}
                 ? XY {{ first.slotXPercent }}/{{ first.slotYPercent }}
@@ -2687,7 +2690,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
               {{ roleSlotImpactCoachRead() }}
             </p>
             <div class="matrix-table-wrap">
-              <table class="matrix-table" aria-label="Role slot impact summary">
+              <table class="matrix-table" aria-label="Impacto rol-slot summary">
                 <thead>
                   <tr>
                     <th>Rol probado</th>
@@ -2725,7 +2728,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
           </div>
           <div *ngIf="roleSlotImpactSmokeRows().length > 0" class="formation-matrix analysis-matrix current-lineup-replay">
             <div class="matrix-header">
-              <strong>All role slots smoke</strong>
+              <strong>Smoke todos los roles-slot</strong>
               <button type="button" class="matrix-export" (click)="copyRoleSlotImpactSmokeJson()">
                 Copy JSON
               </button>
@@ -2738,7 +2741,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
               Semáforo: si el mejor rol tiene mucha ventaja contra el peor, el slot está leyendo rol/posición de forma clara.
             </p>
             <div class="matrix-table-wrap">
-              <table class="matrix-table" aria-label="All role slots smoke">
+              <table class="matrix-table" aria-label="Smoke todos los roles-slot">
                 <thead>
                   <tr>
                     <th>Slot</th>
@@ -2768,7 +2771,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
           </div>
           <div *ngIf="allFormationRoleSlotSmokeRows().length > 0" class="formation-matrix analysis-matrix current-lineup-replay">
             <div class="matrix-header">
-              <strong>All formations role-slot smoke</strong>
+              <strong>Smoke roles-slot por formacion</strong>
               <span>{{ allFormationRoleSlotSmokeRows().length }} formaciones ? roles por slot real</span>
               <button type="button" class="matrix-export" (click)="copyAllFormationsRoleSlotSmokeJson()">
                 Copy JSON
@@ -2907,8 +2910,8 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
             <div class="matrix-header">
               <strong>Current lineup debug</strong>
               <span>
-                {{ debug.label }} · {{ lineupDebugScopeLabel(debug) }} · formation {{ debug.formation || '?' }}
-                · selected {{ debug.selectedFormation || '?' }}
+                {{ debug.label }} · {{ lineupDebugScopeLabel(debug) }} · formacion {{ debug.formation || '?' }}
+                · seleccionada {{ debug.selectedFormation || '?' }}
                 · players {{ debug.playerCount }}/11
                 · slots {{ debug.persistedSlotCount }}/{{ debug.effectiveSlotCount }}
                 · candidates {{ debug.candidatesCount }}
@@ -3136,7 +3139,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
               <div class="matrix-table position-smoke-table" role="table" aria-label="Position smoke comparison by scope">
                 <div class="matrix-row formation-matrix-row matrix-row-head" role="row">
                   <span role="columnheader">Scope</span>
-                  <span role="columnheader">Matches</span>
+                  <span role="columnheader">Partidos</span>
                   <span role="columnheader">Players</span>
                   <span role="columnheader">Rows</span>
                   <span role="columnheader">Stable</span>
@@ -3171,7 +3174,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
               </div>
             </div>
             <div *ngIf="positionPixelMatchSmokeSummary().length > 1" class="matrix-scroll position-smoke-summary">
-              <div class="matrix-table position-smoke-table" role="table" aria-label="Multi-match position smoke summary">
+              <div class="matrix-table position-smoke-table" role="table" aria-label="Smoke posicion multi-partido summary">
                 <div class="matrix-row formation-matrix-row matrix-row-head" role="row">
                   <span role="columnheader">Match</span>
                   <span role="columnheader">Rows</span>
@@ -3270,7 +3273,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
               <label>
                 Sort
                 <select [ngModel]="positionPixelSortMode()" (ngModelChange)="setPositionPixelSortMode($event)">
-                  <option value="default">Run order</option>
+                  <option value="default">Orden de ejecucion</option>
                   <option value="read-desc">Read priority</option>
                   <option value="impact-desc">Impact</option>
                   <option value="distance-desc">Movement distance</option>
@@ -3363,8 +3366,8 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
           </div>
           <div *ngIf="formationReplayResults().length > 0" class="formation-matrix analysis-matrix">
             <div class="matrix-header">
-              <strong>Formation matrix</strong>
-              <span>Same match + seed {{ seedInputModel ?? 'auto' }} + {{ selectedStyleLabel() }}</span>
+              <strong>Matriz formaciones</strong>
+              <span>Mismo partido + seed {{ seedInputModel ?? 'auto' }} + {{ selectedStyleLabel() }}</span>
               <button type="button" class="matrix-export" (click)="copyFormationMatrixJson()">
                 Copy JSON
               </button>
@@ -3411,7 +3414,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
               <strong>Formation averages</strong>
               <span>
                 Seeds {{ formationMatrixSummaryResults()[0].seedStart }}-{{ formationMatrixSummaryResults()[0].seedEnd }}
-                ? {{ formationMatrixSummaryResults()[0].seedCount }} runs per formation
+                ? {{ formationMatrixSummaryResults()[0].seedCount }} corridas por formacion
               </span>
             </div>
             <div *ngIf="formationCoachSummary() as coach" class="current-replay-grid" role="group" aria-label="Formation coach recommendations">
@@ -3503,14 +3506,14 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
           </div>
           <div *ngIf="focusedWideBatteryRows().length > 0" class="formation-matrix analysis-matrix">
             <div class="matrix-header">
-              <strong>Focused wide battery</strong>
+              <strong>Bateria bandas enfocada</strong>
               <span>
                 4-2-3-1 / 4-4-2 / 5-4-1 · Balanceado vs Bandas ·
                 {{ focusedWideBatteryRows()[0].seedCount }} seeds
               </span>
             </div>
             <div class="matrix-scroll">
-              <div class="matrix-table formation-matrix-table" role="table" aria-label="Focused wide battery results">
+              <div class="matrix-table formation-matrix-table" role="table" aria-label="Bateria bandas enfocada results">
                 <div class="matrix-row formation-matrix-row matrix-row-head" role="row">
                   <span role="columnheader">Form.</span>
                   <span role="columnheader">Estilo</span>
@@ -3544,7 +3547,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
           </div>
           <div *ngIf="lowBlockLabRows().length > 0" class="formation-matrix analysis-matrix">
             <div class="matrix-header">
-              <strong>5-4-1 low block lab</strong>
+              <strong>Lab bloque bajo 5-4-1</strong>
               <span>
                 Segunda línea alta / base / baja ? {{ lowBlockLabRows()[0].seedCount }} seeds
               </span>
@@ -3601,14 +3604,14 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
           </div>
           <div *ngIf="backFiveTransitionLabRows().length > 0" class="formation-matrix analysis-matrix">
             <div class="matrix-header">
-              <strong>5-3-2 transition lab</strong>
+              <strong>Lab transicion 5-3-2</strong>
               <span>Carrileros bajos / base / altos ? {{ backFiveTransitionLabRows()[0].seedCount }} seeds</span>
             </div>
             <p class="panel-hint">
               Compara el mismo partido y los mismos jugadores: solo cambia la altura visual de los carrileros del 5-3-2.
             </p>
             <div class="matrix-scroll">
-              <div class="matrix-table formation-matrix-table" role="table" aria-label="5-3-2 transition lab">
+              <div class="matrix-table formation-matrix-table" role="table" aria-label="Lab transicion 5-3-2">
                 <div class="matrix-row formation-matrix-row matrix-row-head" role="row">
                   <span role="columnheader">Variante</span>
                   <span role="columnheader">Lectura</span>
@@ -3652,7 +3655,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
               La referencia es 5-3-2; las diferencias muestran qu? gana y qu? pierde cada plan.
             </p>
             <div class="matrix-scroll">
-              <div class="matrix-table formation-matrix-table" role="table" aria-label="Back five family lab">
+              <div class="matrix-table formation-matrix-table" role="table" aria-label="Lab familia linea de 5">
                 <div class="matrix-row formation-matrix-row matrix-row-head" role="row">
                   <span role="columnheader">Plan</span>
                   <span role="columnheader">Lectura</span>
@@ -3736,7 +3739,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
               </article>
             </div>
             <div class="matrix-scroll">
-              <div class="matrix-table formation-matrix-table" role="table" aria-label="Back five context smoke">
+              <div class="matrix-table formation-matrix-table" role="table" aria-label="Smoke contexto linea de 5">
                 <div class="matrix-row formation-matrix-row matrix-row-head" role="row">
                   <span role="columnheader">Contexto</span>
                   <span role="columnheader">Lectura</span>
@@ -3769,9 +3772,9 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
           </div>
           <div *ngIf="sideMirrorSmokeRows().length > 0" class="formation-matrix analysis-matrix">
             <div class="matrix-header">
-              <strong>{{ sideMirrorSmokeMode() === 'synthetic' ? 'Synthetic mirror lab' : 'Side mirror smoke' }}</strong>
+              <strong>{{ sideMirrorSmokeMode() === 'synthetic' ? 'Lab espejo sintetico' : 'Smoke espejo bandas' }}</strong>
               <span>
-                {{ sideMirrorSmokeMode() === 'synthetic' ? 'Equipos espejados, solo cambia lateral débil' : 'Rival weak left/right' }}
+                {{ sideMirrorSmokeMode() === 'synthetic' ? 'Equipos espejados, solo cambia lateral débil' : 'Rival izquierda/derecha debil' }}
                 · Seeds {{ sideMirrorSmokeRows()[0].seedStart }}-{{ sideMirrorSmokeRows()[0].seedEnd }}
                 · {{ sideMirrorSmokeRows()[0].seedCount }} runs per formación
               </span>
@@ -3800,7 +3803,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
               </article>
             </div>
             <div class="matrix-scroll">
-              <div class="matrix-table formation-matrix-table" role="table" aria-label="Side mirror smoke comparison">
+              <div class="matrix-table formation-matrix-table" role="table" aria-label="Smoke espejo bandas comparison">
                 <div class="matrix-row formation-matrix-row matrix-row-head" role="row">
                   <span role="columnheader">Form.</span>
                   <span role="columnheader">Verdict</span>
@@ -3839,7 +3842,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
           <div *ngIf="wingbackLabRows().length > 0" class="formation-matrix analysis-matrix">
             <div class="matrix-header">
               <strong>Carrileros lab</strong>
-              <span>Lectura fina de LWB/RWB usando el mismo Side mirror smoke</span>
+              <span>Lectura fina de LWB/RWB usando el mismo Smoke espejo bandas</span>
             </div>
             <div class="matrix-scroll">
               <div class="matrix-table formation-matrix-table" role="table" aria-label="Wingback lab comparison">
@@ -3922,8 +3925,8 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
           </div>
           <div *ngIf="scenarioMatrixResults().length > 0" class="formation-matrix analysis-matrix scenario-matrix">
             <div class="matrix-header">
-              <strong>Scenario matrix</strong>
-              <span>Same match + seed {{ seedInputModel ?? 'auto' }} ? live tactical changes</span>
+              <strong>Matriz escenarios</strong>
+              <span>Mismo partido + seed {{ seedInputModel ?? 'auto' }} ? cambios tacticos en vivo</span>
               <button type="button" class="matrix-export" (click)="copyScenarioMatrixJson()">
                 Copy JSON
               </button>
@@ -3985,7 +3988,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
             <div class="matrix-header">
               <strong>Multi-seed scenario summary</strong>
               <span>
-                Same match - seeds {{ summarySeedStart() }}..{{ summarySeedEnd() }}
+                Mismo partido - seeds {{ summarySeedStart() }}..{{ summarySeedEnd() }}
                 - averages vs minute baselines
               </span>
               <span *ngIf="scenarioSummaryBaseFormation()" class="controlled-team-badge">
@@ -4056,7 +4059,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                   <option value="read-desc">Read priority</option>
                   <option value="impact-desc">Impact</option>
                   <option value="xg-desc">xG movement</option>
-                  <option value="default">Run order</option>
+                  <option value="default">Orden de ejecucion</option>
                 </select>
               </label>
               <span class="position-read-count">
@@ -4170,7 +4173,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
           </div>
           <div *ngIf="scenarioBatteryRows().length > 0" class="formation-matrix analysis-matrix scenario-battery">
             <div class="matrix-header">
-              <strong>Battery tablero tactico</strong>
+              <strong>Tablero bateria tactico</strong>
               <span>
                 {{ scenarioBatteryRows().length }} lecturas - seeds {{ summarySeedStart() }}..{{ summarySeedStart() + scenarioMatrixSmokeSeedCount() - 1 }}
                 - {{ scenarioBatteryGroupLabel(scenarioBatteryRows()[0]?.scenarioGroup || scenarioBatteryGroupModel) }}
@@ -4266,15 +4269,15 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
         </section>
         <!-- Panel C: Match list (full width) -->
         <section class="panel panel-c" aria-labelledby="panel-c-heading">
-          <h2 id="panel-c-heading" class="panel-title">Panel C - Matches</h2>
-          <p class="panel-hint">Click a match to load its detail in Panel A and the scrubber in Panel D.</p>
+          <h2 id="panel-c-heading" class="panel-title">Panel C - Partidos</h2>
+          <p class="panel-hint">Elegí un partido para cargar el detalle en Panel A y la línea de tiempo en Panel D.</p>
           <div *ngIf="rounds().length === 0" class="empty-rounds">
-            <p>No matches in the active career.</p>
+            <p>No hay partidos en la carrera activa.</p>
           </div>
           <ul class="rounds-list" *ngIf="rounds().length > 0">
             <li *ngFor="let r of rounds(); trackBy: trackByRound" class="round-block">
               <div class="round-header">
-                <span class="round-label">Round {{ r.round }}</span>
+                <span class="round-label">Fecha {{ r.round }}</span>
                 <span *ngIf="r.byeTeam" class="round-bye">BYE: {{ r.byeTeam }}</span>
               </div>
               <ul class="match-list">
@@ -4301,7 +4304,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                     <ng-container *ngIf="m.homeGoals !== null && m.awayGoals !== null; else pendingScore">
                       {{ m.homeGoals }} - {{ m.awayGoals }}
                     </ng-container>
-                    <ng-template #pendingScore>?</ng-template>
+                    <ng-template #pendingScore>vs</ng-template>
                   </span>
                   <span class="match-status" [attr.data-status]="m.status">{{ m.status }}</span>
                 </li>
@@ -4311,15 +4314,18 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
         </section>
         <!-- Panel D: Timeline scrubber (F3) -->
         <section class="panel panel-d" aria-labelledby="panel-d-heading">
-          <h2 id="panel-d-heading" class="panel-title">Panel D - Timeline Scrubber</h2>
+          <h2 id="panel-d-heading" class="panel-title">Panel D - Linea de tiempo</h2>
           <p class="panel-hint" *ngIf="!selectedMatchId()">
-            Select a match in Panel C to use the timeline scrubber.
+            Elegi un partido en el Panel C para usar la linea de tiempo.
           </p>
-          <div *ngIf="selectedMatchId()" class="scrubber-content">
+          <p class="panel-hint" *ngIf="selectedMatchId() && !selectedMatchHasDetail()">
+            La linea de tiempo aparece cuando el partido ya fue simulado.
+          </p>
+          <div *ngIf="selectedMatchId() && selectedMatchHasDetail()" class="scrubber-content">
             <div class="scrubber-header">
-              <span class="minute-label">Minute {{ selectedMinute() }}</span>
+              <span class="minute-label">Minuto {{ selectedMinute() }}</span>
               <span *ngIf="timelineSnapshot() as snap" class="match-context">
-                of {{ snap.events.length }} events
+                de {{ snap.events.length }} eventos
               </span>
             </div>
             <input
@@ -4330,7 +4336,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
               [step]="TIMELINE_STEP"
               [value]="selectedMinute()"
               (input)="onSliderInput($event)"
-              [attr.aria-label]="'Match minute, currently ' + selectedMinute()"
+              [attr.aria-label]="'Minuto del partido, actualmente ' + selectedMinute()"
               [attr.aria-valuemin]="0"
               [attr.aria-valuemax]="TIMELINE_MAX_MINUTE"
               [attr.aria-valuenow]="selectedMinute()"
@@ -4390,8 +4396,9 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
     </div>
   `,
   styles: [`
-    :host { display: block; padding: 1rem; max-width: 1400px; margin: 0 auto; }
-    .test-harness-page { color: var(--text-color, #222); }
+    :host { display: block; padding: 1rem; max-width: 1400px; margin: 0 auto; box-sizing: border-box; }
+    :host *, :host *::before, :host *::after { box-sizing: border-box; }
+    .test-harness-page { color: var(--text-color, #222); max-width: 100%; overflow-x: hidden; }
     .page-header { margin-bottom: 1.5rem; }
     .page-title { margin: 0; font-size: 1.5rem; }
     .page-subtitle { margin: 0.25rem 0 0; color: var(--text-muted, #666); font-size: 0.9rem; }
@@ -4411,14 +4418,17 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
         "c c"
         "d d";
       gap: 1rem;
+      max-width: 100%;
     }
+    .test-harness-grid > * { min-width: 0; }
     @media (max-width: 767px) {
+      :host { padding: 0.75rem; }
       .test-harness-grid {
         grid-template-columns: 1fr;
         grid-template-areas: "a" "b" "e" "c" "d";
       }
     }
-    .panel { border: 1px solid var(--border-color, #e0e0e0); border-radius: 6px; padding: 1rem; background: var(--panel-bg, #fff); }
+    .panel { border: 1px solid var(--border-color, #e0e0e0); border-radius: 6px; padding: 1rem; background: var(--panel-bg, #fff); min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
     .panel-a { grid-area: a; min-height: 320px; }
     .panel-b { grid-area: b; }
     .panel-e { grid-area: e; }
@@ -5485,7 +5495,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   scenarioBatteryGroupModel: 'ALL' | 'OFFENSE' | 'DEFENSE' | 'OPPONENT' = 'OFFENSE';
   scenarioBatteryScopeModel: 'quick' | 'balanced' = 'quick';
   scenarioBatteryCoachObjectiveModel: ScenarioBatteryCoachObjectiveModel = 'AUTO';
-  /** V24D24.2: seed for the "Replay with seed" button (null = non-reproducible). */
+  /** V24D24.2: seed for the "Repetir con seed" button (null = non-reproducible). */
   seedInputModel: number | null = DEFAULT_REPLAY_SEED;
   /** V24D24.2: round selected in the "Simulate round N" dropdown. */
   selectedRoundModel: number | null = null;
@@ -5769,9 +5779,9 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const sorted = [...rows].sort((a, b) => this.playerSwapDecisionScore(b, objective) - this.playerSwapDecisionScore(a, objective));
     const recommended = sorted.filter((row) => this.playerSwapIsActionableRecommendation(row));
     const seedCount = rows[0]?.seedCount ?? this.playerSwapSeedCountModel;
-    const hasStressRows = rows.some((row) => (row.testCase || '').toLowerCase().includes('stress'));
+    const hasEstresRows = rows.some((row) => (row.testCase || '').toLowerCase().includes('stress'));
     const hasNaturalRows = rows.some((row) => (row.testCase || '').toLowerCase().includes('battery: natural'));
-    const mode = hasStressRows && hasNaturalRows ? 'combined' : rows[0]?.testCase?.toLowerCase().includes('stress') ? 'stress' : this.playerSwapBatteryModeModel;
+    const mode = hasEstresRows && hasNaturalRows ? 'combined' : rows[0]?.testCase?.toLowerCase().includes('stress') ? 'stress' : this.playerSwapBatteryModeModel;
     return {
       total: rows.length,
       mode,
@@ -5879,12 +5889,12 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       .reduce((sum, [, count]) => sum + count, 0);
     const swapMode = swapBattery.mode;
     const swapRowsForChecklist = this.playerSwapBatterySummaries();
-    const swapStressActionableReads = swapRowsForChecklist
+    const swapEstresActionableReads = swapRowsForChecklist
       .filter((row) => (row.testCase || '').toLowerCase().includes('stress'))
       .filter((row) => !['No clear effect', 'Neutral', 'Noise / neutral', 'Sin lectura clara'].includes(row.swapRead))
       .length;
-    const swapStressSignalOk = (swapMode === 'stress' && swapActionableReads > 0)
-      || (swapMode === 'combined' && swapStressActionableReads > 0);
+    const swapEstresSignalOk = (swapMode === 'stress' && swapActionableReads > 0)
+      || (swapMode === 'combined' && swapEstresActionableReads > 0);
     const swapNaturalStable = swapMode === 'natural' && swapBattery.total > 0 && swapActionableReads === 0;
     const stableSwapReads = swapPrecisionRows.filter((row) => row.stability === 'Stable read').length;
     const changedSwapReads = swapPrecisionRows.filter((row) => row.stability === 'Changed read').length;
@@ -5895,23 +5905,23 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         ? `${swapPrecisionRows.length} precision swaps ? ${stableSwapReads} stable ? ${changedSwapReads} changed ? ${needsMoreSwapSeeds} need more seeds`
         : 'Not run yet';
     const swapVerdict: ProfessionalQaChecklistRow['verdict'] = hasSwapBattery
-      ? swapStressSignalOk ? 'OK' : swapNaturalStable ? 'Fallback' : swapActionableReads > 0 ? 'OK' : 'Review'
+      ? swapEstresSignalOk ? 'OK' : swapNaturalStable ? 'Fallback' : swapActionableReads > 0 ? 'OK' : 'Review'
       : hasSwapPrecision
         ? changedSwapReads > 0 ? 'Review' : needsMoreSwapSeeds > 0 ? 'Fallback' : 'OK'
         : 'Pending';
     const swapNext = hasSwapBattery
-      ? swapStressSignalOk
+      ? swapEstresSignalOk
         ? swapMode === 'combined'
           ? 'Combined smoke OK: natural stability plus stress sensitivity.'
-          : 'Stress sensitivity OK; use best/worst to tune role quality.'
+          : 'Estres sensitivity OK; use best/worst to tune role quality.'
         : swapNaturalStable
-          ? 'Natural swaps are stable/neutral; run Stress test to verify sensitivity.'
+          ? 'Natural swaps are stable/neutral; run Estres test to verify sensitivity.'
           : swapActionableReads > 0
             ? 'Use best/worst to tune role quality.'
             : 'Check whether substitutions influence engine enough.'
       : hasSwapPrecision
         ? changedSwapReads > 0 ? 'Trust balanced reads; quick is smoke only.' : needsMoreSwapSeeds > 0 ? 'Run balanced or more seeds for borderline swaps.' : 'Precision stable enough.'
-        : 'Run Player swap battery or Compare precision.';
+        : 'Run Bateria cambio jugador or Comparar precision.';
     const substitutionTimingRows = this.substitutionTimingMatrixRows();
     const hasSubstitutionWhatIf = !!substitutionSummary;
     const hasSubstitutionTiming = substitutionTimingRows.length > 0;
@@ -5952,7 +5962,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           ? `${rows.length}/${expectedFormationAuditRows} rows · ${auditedFormationCount}/${this.formationCodes.length} formations · ${countByVerdict('OK')} OK · ${countByVerdict('Fallback')} fallback · ${countByVerdict('Review')} review`
           : 'Not run yet',
         verdict: !hasAudit ? 'Pending' : !hasAllFormationAudit ? 'Review' : hardReviews.length > 0 ? 'Review' : fallbackRows.length > 0 ? 'Fallback' : 'OK',
-        next: !hasAudit ? 'Run All formations line audit.' : !hasAllFormationAudit ? 'Run the all-formations audit, not only current formation.' : hardReviews.length > 0 ? 'Inspect Review rows first.' : fallbackRows.length > 0 ? 'Fallbacks are allowed; preview/engine apply role-fit penalties.' : 'Keep as contract.',
+        next: !hasAudit ? 'Run Auditoria todas las formaciones.' : !hasAllFormationAudit ? 'Run the all-formations audit, not only current formation.' : hardReviews.length > 0 ? 'Inspect Review rows first.' : fallbackRows.length > 0 ? 'Fallbacks are allowed; preview/engine apply role-fit penalties.' : 'Keep as contract.',
       },
       {
         check: 'Defensive side mapping',
@@ -5983,7 +5993,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           : 'Not run yet',
         verdict: !hasPixelEvidence ? 'Pending' : hasVisiblePixelSignal ? 'OK' : pixelEvidenceNote ? 'Review' : 'Review',
         next: !hasPixelEvidence
-          ? 'Run Position presets matrix or line smokes.'
+          ? 'Run Matriz presets posicion or line smokes.'
           : pixelEvidenceNote && !hasVisiblePixelSignal
             ? pixelEvidenceNote
             : pixelVisibleRows > 0 || pixelVisibleFivePxRows > 0 || pixelBigTacticalMoveRows > 0
@@ -5991,7 +6001,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
             : pixelMeasurableSmoothRows > 0
               ? 'Smooth low-block signal: keep as valid unless tuning needs more weight.'
             : pixelRowsAreMicroOnly
-              ? 'Micro movements are stable; run Position presets matrix for larger tactical moves.'
+              ? 'Micro movements are stable; run Matriz presets posicion for larger tactical moves.'
               : 'Increase seeds or inspect engine sensitivity.',
       },
         {
@@ -5999,10 +6009,10 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           expected: '1px moves should be smooth, not strong cliff jumps.',
           observed: hasPixelEvidence ? `${pixelCliffRows} strong 1px cliff row(s) · ${pixelRepeatedFivePxRows} match repeated 5px bias · ${pixelPlayerRepeatedFivePxRows} player repeated 5px bias · ${pixelVisibleFivePxRows} visible 5px pattern(s) · ${pixelBigTacticalMoveRows} big tactical move(s)` : 'Not run yet',
           verdict: !hasPixelEvidence ? 'Pending' : pixelEvidenceNote || pixelCliffRows > 0 || pixelRepeatedFivePxRows > 0 || pixelPlayerRepeatedFivePxRows > 0 ? 'Review' : 'OK',
-          next: !hasPixelEvidence ? 'Run Sensitivity check.' : pixelEvidenceNote ? pixelEvidenceNote : pixelCliffRows > 0 ? 'Inspect 1px thresholds / zone boundaries.' : pixelRepeatedFivePxRows > 0 || pixelPlayerRepeatedFivePxRows > 0 ? 'Inspect 5px directional sensitivity / zone boundaries.' : pixelVisibleFivePxRows > 0 || pixelBigTacticalMoveRows > 0 ? 'Micro is smooth; calibrate 5px/big tactical sensitivity separately.' : 'Keep as contract.',
+          next: !hasPixelEvidence ? 'Run Chequeo sensibilidad.' : pixelEvidenceNote ? pixelEvidenceNote : pixelCliffRows > 0 ? 'Inspect 1px thresholds / zone boundaries.' : pixelRepeatedFivePxRows > 0 || pixelPlayerRepeatedFivePxRows > 0 ? 'Inspect 5px directional sensitivity / zone boundaries.' : pixelVisibleFivePxRows > 0 || pixelBigTacticalMoveRows > 0 ? 'Micro is smooth; calibrate 5px/big tactical sensitivity separately.' : 'Keep as contract.',
         },
       {
-        check: 'Player swap signal',
+        check: 'Senal cambio jugador',
         expected: 'Changing players should affect role quality and match averages.',
         observed: swapObserved,
         verdict: swapVerdict,
@@ -6014,7 +6024,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         observed: substitutionObserved,
         verdict: !hasSubstitutionWhatIf && !hasSubstitutionTiming ? 'Pending' : substitutionSignal && substitutionObjectiveOk ? 'OK' : 'Review',
         next: !hasSubstitutionWhatIf && !hasSubstitutionTiming
-          ? 'Run Substitution what-if or Professional smoke full.'
+          ? 'Run Simular sustitucion or Smoke profesional full.'
           : substitutionSignal && substitutionObjectiveOk
             ? 'Keep as modal -> harness -> engine contract.'
             : substitutionObjective === 'PROTECT_RESULT'
@@ -6415,6 +6425,10 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     }
     return m.homeTeamName === team || m.awayTeamName === team;
   });
+  readonly selectedMatchHasDetail = computed(() => {
+    const status = String(this.selectedMatch()?.status ?? '').toUpperCase();
+    return status === 'COMPLETED';
+  });
   readonly selectedMatchLabel = computed(() => {
     const m = this.selectedMatch();
     if (!m) {
@@ -6428,7 +6442,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     if (!m) {
       return '';
     }
-    return `Ojo: el partido seleccionado es ${m.homeTeamName} vs ${m.awayTeamName}, pero Set Formation / modal DT afectan a ${userTeam}. Para probar el motor de tu equipo, eleg? un partido donde juegue ${userTeam}. Si querés analizar este partido igual, usá Controlar: Local/Visitante.`;
+    return `Ojo: el partido seleccionado es ${m.homeTeamName} vs ${m.awayTeamName}, pero Aplicar formacion / modal DT afectan a ${userTeam}. Para probar el motor de tu equipo, elegi un partido donde juegue ${userTeam}. Si queres analizar este partido igual, usa Controlar: Local/Visitante.`;
   }
   controlledTeamContextLabel(): string {
     const m = this.selectedMatch();
@@ -6450,7 +6464,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   resultPerspectiveLabel(): string {
     const m = this.selectedMatch();
     if (!m) {
-      return 'For/Ag se activa al seleccionar un partido.';
+      return 'A favor/en contra se activa al seleccionar un partido.';
     }
     const side = this.effectiveControlledSide();
     const controlled = side === 'AWAY' ? m.awayTeamName : m.homeTeamName;
@@ -6485,7 +6499,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         clearTimeout(this.timelineFetchTimer);
         this.timelineFetchTimer = null;
       }
-      if (!matchId || !careerId) {
+      if (!matchId || !careerId || !this.selectedMatchHasDetail()) {
         this.timelineSnapshot.set(null);
         this.timelineError.set(null);
         this.timelineLoading.set(false);
@@ -6631,9 +6645,9 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       {
         title: '2. Correr baseline con seed',
         body: hasTimelineBaseline && !hasReplayResult
-          ? 'El partido ya tiene detalle minuto a minuto cargado; corre Replay with seed si queres fijar una referencia nueva.'
+          ? 'El partido ya tiene detalle minuto a minuto cargado; corre Repetir con seed si queres fijar una referencia nueva.'
           : hasMatch
-          ? `Usa Replay with seed (${this.seedInputModel ?? 'auto'}) para fijar una referencia reproducible.`
+          ? `Usa Repetir con seed (${this.seedInputModel ?? 'auto'}) para fijar una referencia reproducible.`
           : 'Primero necesitamos un partido seleccionado.',
         status: hasBaselineEvidence ? 'OK' : '2',
         state: hasBaselineEvidence ? 'done' : hasMatch ? 'active' : 'pending',
@@ -6649,7 +6663,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       {
         title: '4. Abrir comparación',
         body: hasMatch
-          ? 'Open Match Compare abre baseline vs live del mismo partido para leer goles, xG, tiros, posesión y timeline.'
+          ? 'Abrir comparador abre baseline vs live del mismo partido para leer goles, xG, tiros, posesión y timeline.'
           : 'La comparación se habilita cuando hay carrera y partido.',
         status: hasMatch ? 'GO' : '4',
         state: hasPanelE && hasMatch ? 'active' : hasMatch ? 'pending' : 'pending',
@@ -6814,7 +6828,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   copyFormationMatrixJson(): void {
     const payload = JSON.stringify(this.formationReplayResults(), null, 2);
     navigator.clipboard?.writeText(payload).then(
-      () => this.snackBar.open('Formation matrix JSON copied.', 'OK', { duration: 2500 }),
+      () => this.snackBar.open('Matriz formaciones JSON copied.', 'OK', { duration: 2500 }),
       () => this.snackBar.open(payload, 'OK', { duration: 5000 })
     );
   }
@@ -6828,7 +6842,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   copyCurrentLineupMultiSeedJson(): void {
     const payload = JSON.stringify(this.currentLineupMultiSeedSummary(), null, 2);
     navigator.clipboard?.writeText(payload).then(
-      () => this.snackBar.open('Current lineup multi-seed JSON copied.', 'OK', { duration: 2500 }),
+      () => this.snackBar.open('XI actual multi-seed JSON copied.', 'OK', { duration: 2500 }),
       () => this.snackBar.open(payload, 'OK', { duration: 5000 })
     );
   }
@@ -6842,7 +6856,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   copyPlayerSwapMatrixJson(): void {
     const payload = JSON.stringify(this.playerSwapMatrixSummary(), null, 2);
     navigator.clipboard?.writeText(payload).then(
-      () => this.snackBar.open('Player swap matrix JSON copied.', 'OK', { duration: 2500 }),
+      () => this.snackBar.open('Matriz cambio jugador JSON copied.', 'OK', { duration: 2500 }),
       () => this.snackBar.open(payload, 'OK', { duration: 5000 })
     );
   }
@@ -6853,14 +6867,14 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       rows: this.playerSwapBatterySummaries(),
     }, null, 2);
     navigator.clipboard?.writeText(payload).then(
-      () => this.snackBar.open('Player swap battery JSON copied.', 'OK', { duration: 2500 }),
+      () => this.snackBar.open('Bateria cambio jugador JSON copied.', 'OK', { duration: 2500 }),
       () => this.snackBar.open(payload, 'OK', { duration: 5000 })
     );
   }
   copyPlayerSwapBatteryReport(): void {
     const payload = this.playerSwapBatteryMarkdownReport();
     navigator.clipboard?.writeText(payload).then(
-      () => this.snackBar.open('Player swap battery report copied.', 'OK', { duration: 2500 }),
+      () => this.snackBar.open('Bateria cambio jugador report copied.', 'OK', { duration: 2500 }),
       () => this.snackBar.open(payload, 'OK', { duration: 5000 })
     );
   }
@@ -6874,7 +6888,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   copyScenarioMatrixJson(): void {
     const payload = JSON.stringify(this.scenarioMatrixResults(), null, 2);
     navigator.clipboard?.writeText(payload).then(
-      () => this.snackBar.open('Scenario matrix JSON copied.', 'OK', { duration: 2500 }),
+      () => this.snackBar.open('Matriz escenarios JSON copied.', 'OK', { duration: 2500 }),
       () => this.snackBar.open(payload, 'OK', { duration: 5000 })
     );
   }
@@ -7028,7 +7042,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   downloadPlayerSwapMatrixCsv(): void {
     const row = this.playerSwapMatrixSummary();
     if (!row) {
-      this.snackBar.open('Run Player swap matrix first.', 'OK', { duration: 2500 });
+      this.snackBar.open('Run Matriz cambio jugador first.', 'OK', { duration: 2500 });
       return;
     }
     const exportRow = this.playerSwapExportRow(row);
@@ -7060,12 +7074,12 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     a.download = `player-swap-${row.formation}-${row.slotId}-${row.seedStart}-${row.seedEnd}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    this.snackBar.open('Player swap matrix CSV exported.', 'OK', { duration: 2500 });
+    this.snackBar.open('Matriz cambio jugador CSV exported.', 'OK', { duration: 2500 });
   }
   downloadPlayerSwapBatteryCsv(): void {
     const rows = this.playerSwapBatterySummaries();
     if (rows.length === 0) {
-      this.snackBar.open('Run Player swap battery first.', 'OK', { duration: 2500 });
+      this.snackBar.open('Run Bateria cambio jugador first.', 'OK', { duration: 2500 });
       return;
     }
     const exportRows = rows.map((row) => this.playerSwapExportRow(row));
@@ -7097,7 +7111,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     a.download = `player-swap-battery-${this.playerSwapBatteryPrecisionModel}-${rows[0].formation}-${rows[0].seedStart}-${rows[0].seedEnd}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    this.snackBar.open(`Player swap battery CSV exported (${rows.length} rows).`, 'OK', { duration: 2500 });
+    this.snackBar.open(`Bateria cambio jugador CSV exported (${rows.length} rows).`, 'OK', { duration: 2500 });
   }
   downloadPositionPixelMatrixCsv(): void {
     const rows = this.displayedPositionPixelMatrixRows().map((row) => this.positionPixelExportRow(row));
@@ -7160,7 +7174,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   downloadScenarioBatteryCsv(): void {
     const rows = this.scenarioBatteryRows().map((row) => this.scenarioBatteryExportRow(row));
     if (rows.length === 0) {
-      this.snackBar.open('Run Battery tablero first.', 'OK', { duration: 2500 });
+      this.snackBar.open('Run Tablero bateria first.', 'OK', { duration: 2500 });
       return;
     }
     const header = [
@@ -7279,7 +7293,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   }
   private playerSwapBatteryCoachRead(summary: PlayerSwapBatterySummary): string {
     if (summary.total === 0) {
-      return 'No hay swaps medidos todavia. Ejecutar Player swap battery antes de sacar conclusiones.';
+      return 'No hay swaps medidos todavia. Ejecutar Bateria cambio jugador antes de sacar conclusiones.';
     }
     const upgrades = summary.reads['Clear upgrade'] ?? 0;
     const downgrades = summary.reads['Clear downgrade'] ?? 0;
@@ -7920,10 +7934,10 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   }
   private playerSwapResolvedTestCase(candidate: PlayerSwapCandidate | null, resolved: PlayerSwapCandidate | null): string {
     const base = candidate?.testCase ?? this.playerSwapFit(candidate);
-    if (!candidate?.testCase?.startsWith('Stress:') || !resolved) {
+    if (!candidate?.testCase?.startsWith('Estres:') || !resolved) {
       return base;
     }
-    const expected = this.playerSwapStressExpectedLines(candidate.testCase);
+    const expected = this.playerSwapEstresExpectedLines(candidate.testCase);
     if (!expected) {
       return base;
     }
@@ -7934,7 +7948,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     }
     return `${base} ? fallback ${starterLine}->${benchLine}`;
   }
-  private playerSwapStressExpectedLines(testCase: string): { starterLine: 'ATT' | 'MID' | 'DEF'; benchLine: 'ATT' | 'MID' | 'DEF' } | null {
+  private playerSwapEstresExpectedLines(testCase: string): { starterLine: 'ATT' | 'MID' | 'DEF'; benchLine: 'ATT' | 'MID' | 'DEF' } | null {
     if (testCase.includes('atacante por defensor')) return { starterLine: 'ATT', benchLine: 'DEF' };
     if (testCase.includes('defensor por atacante')) return { starterLine: 'DEF', benchLine: 'ATT' };
     if (testCase.includes('medio por atacante') || testCase.includes('medio por banda/ataque')) return { starterLine: 'MID', benchLine: 'ATT' };
@@ -9587,17 +9601,17 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       slotId: '',
     };
   }
-  private autoBackendStressSwapCandidates(): PlayerSwapCandidate[] {
+  private autoBackendEstresSwapCandidates(): PlayerSwapCandidate[] {
     return [
-      this.autoBackendStressSwapCandidate('ATT_TO_DEF', 'Stress: atacante por defensor'),
-      this.autoBackendStressSwapCandidate('DEF_TO_ATT', 'Stress: defensor por atacante'),
-      this.autoBackendStressSwapCandidate('MID_TO_ATT', 'Stress: medio por atacante'),
-      this.autoBackendStressSwapCandidate('MID_TO_DEF', 'Stress: medio por defensor'),
-      this.autoBackendStressSwapCandidate('OUT_OF_LINE', 'Stress: fuera de línea'),
-      this.autoBackendStressSwapCandidate('DOWNGRADE', 'Stress: menor OVR / encaje'),
+      this.autoBackendEstresSwapCandidate('ATT_TO_DEF', 'Estres: atacante por defensor'),
+      this.autoBackendEstresSwapCandidate('DEF_TO_ATT', 'Estres: defensor por atacante'),
+      this.autoBackendEstresSwapCandidate('MID_TO_ATT', 'Estres: medio por atacante'),
+      this.autoBackendEstresSwapCandidate('MID_TO_DEF', 'Estres: medio por defensor'),
+      this.autoBackendEstresSwapCandidate('OUT_OF_LINE', 'Estres: fuera de línea'),
+      this.autoBackendEstresSwapCandidate('DOWNGRADE', 'Estres: menor OVR / encaje'),
     ];
   }
-  private autoBackendStressSwapCandidate(mode: string, testCase: string): PlayerSwapCandidate {
+  private autoBackendEstresSwapCandidate(mode: string, testCase: string): PlayerSwapCandidate {
     return {
       starterId: `__AUTO_SWAP_${mode}`,
       starterName: `Auto ${mode}`,
@@ -9625,7 +9639,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       return profileOrder.indexOf(profileA) - profileOrder.indexOf(profileB);
     });
     if (mode === 'stress') {
-      return this.buildStressPlayerSwapBatteryCandidates(orderedStarters, eligibleBench, slotByPlayer, limit);
+      return this.buildEstresPlayerSwapBatteryCandidates(orderedStarters, eligibleBench, slotByPlayer, limit);
     }
     const natural = this.buildPlayerSwapBatteryCandidates(orderedStarters, eligibleBench, slotByPlayer, limit, 'natural');
     if (mode === 'natural' || natural.length >= limit) {
@@ -9633,7 +9647,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     }
     return this.buildPlayerSwapBatteryCandidates(orderedStarters, eligibleBench, slotByPlayer, limit, 'mixed', natural);
   }
-  private buildStressPlayerSwapBatteryCandidates(
+  private buildEstresPlayerSwapBatteryCandidates(
     starters: LineupDTO['players'],
     eligibleBench: SessionPlayer[],
     slotByPlayer: Map<string, string>,
@@ -9667,33 +9681,33 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       }
     };
     addCase(
-      'Stress: atacante por defensor',
+      'Estres: atacante por defensor',
       (starter) => this.positionPixelLine(starter.position) === 'ATT',
       (bench) => this.positionPixelLine(bench.position) === 'DEF'
     );
     addCase(
-      'Stress: defensor por atacante',
+      'Estres: defensor por atacante',
       (starter) => this.positionPixelLine(starter.position) === 'DEF',
       (bench) => this.positionPixelLine(bench.position) === 'ATT'
     );
     addCase(
-      'Stress: medio por banda/ataque',
+      'Estres: medio por banda/ataque',
       (starter) => this.positionPixelLine(starter.position) === 'MID',
       (bench) => this.positionPixelLine(bench.position) === 'ATT'
     );
     addCase(
-      'Stress: fuera de línea',
+      'Estres: fuera de línea',
       () => true,
       (bench, starter) => this.positionPixelLine(bench.position) !== this.positionPixelLine(starter.position)
     );
     addCase(
-      'Stress: menor OVR / encaje',
+      'Estres: menor OVR / encaje',
       () => true,
       (bench, starter) => this.sessionPlayerOverall(bench) <= starter.overall - 4,
       true
     );
     addCase(
-      'Stress: upgrade OVR',
+      'Estres: upgrade OVR',
       () => true,
       (bench, starter) => this.sessionPlayerOverall(bench) >= starter.overall + 4
     );
@@ -9857,7 +9871,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   /**
    * Opens the same visual editor used by /squad, directly from the replay lab.
    *
-   * This is intentionally not a second implementation: player swaps, bench
+   * This is intentionally not a second implementation: cambios de jugador, bench
    * moves, free pixel positioning, customX/customY persistence, tactical
    * chemistry preview and manual-select save all stay inside the production
    * SquadEditorModalComponent. The harness only provides the current career
@@ -9866,7 +9880,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   openSquadEditor(): void {
     const careerId = this.careerId();
     if (!careerId) {
-      this.snackBar.open('No active career loaded.', 'OK', { duration: 3000 });
+      this.snackBar.open('Sin carrera activa loaded.', 'OK', { duration: 3000 });
       return;
     }
     this.mutationInFlight.set(true);
@@ -10118,7 +10132,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const seedCount = CURRENT_LINEUP_MULTI_SEED_COUNT;
     this.currentLineupMultiSeedSummary.set(null);
     this.mutationInFlight.set(true);
-    this.analysisReadyMessage.set(`Current lineup multi-seed corriendo: ${seedCount} seeds...`);
+    this.analysisReadyMessage.set(`XI actual multi-seed corriendo: ${seedCount} seeds...`);
     this.harness.getCurrentLineup().pipe(
       take(1),
       switchMap((lineup) =>
@@ -10131,11 +10145,11 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       next: (summary) => {
         this.currentLineupMultiSeedSummary.set(summary);
         this.snackBar.open(
-          `Current lineup multi-seed complete (${summary.seedCount} seeds, avg xG ${this.fmtXg(summary.avgXgFor)}-${this.fmtXg(summary.avgXgAgainst)}).`,
+          `XI actual multi-seed complete (${summary.seedCount} seeds, avg xG ${this.fmtXg(summary.avgXgFor)}-${this.fmtXg(summary.avgXgAgainst)}).`,
           'OK',
           { duration: 4500 }
         );
-        this.markReplayAnalysisReady('Current lineup multi-seed listo en Panel E.');
+        this.markReplayAnalysisReady('XI actual multi-seed listo en Panel E.');
       },
       error: (err) => {
         this.mutationInFlight.set(false);
@@ -10175,7 +10189,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     let originalLineup: LineupDTO | null = null;
     this.modalVsCanonicalSummary.set(null);
     this.mutationInFlight.set(true);
-    this.analysisReadyMessage.set(`Base vs modal pixels rapido: ${seedCount} seeds por estado...`);
+    this.analysisReadyMessage.set(`Base vs pixeles del modal rapido: ${seedCount} seeds por estado...`);
     this.harness.getCurrentLineup().pipe(
       take(1),
       switchMap((lineup) => {
@@ -10183,7 +10197,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         const originalSlots = this.buildLineupSlots(lineup);
         const playerIds = this.lineupPlayerIdsFromSlots(originalSlots);
         if (this.countCustomMovableSlots(lineup) === 0) {
-          throw new Error('No hay jugador de campo con pixeles persistidos en la alineacion actual. Si queres medir el ultimo movimiento hecho en Partido, usa Last modal move; para pruebas automaticas usa Position presets matrix o Sensitivity check.');
+          throw new Error('No hay jugador de campo con pixeles persistidos en la alineacion actual. Si queres medir el ultimo movimiento hecho en Partido, usa Ultimo movimiento modal; para pruebas automaticas usa Matriz presets posicion o Chequeo sensibilidad.');
         }
         const canonicalSlots = this.canonicalizeLineupSlots(lineup);
         return this.harness.setStyle(this.selectedStyleModel).pipe(
@@ -10225,7 +10239,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           'OK',
           { duration: 4500 }
         );
-        this.markReplayAnalysisReady('Base vs modal pixels listo en Panel E.');
+        this.markReplayAnalysisReady('Base vs pixeles del modal listo en Panel E.');
       },
       error: (err) => {
         if (originalLineup) {
@@ -10236,7 +10250,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
             .subscribe();
         }
         this.mutationInFlight.set(false);
-        this.analysisReadyMessage.set(this.fmtError(err, 'Base vs modal pixels no pudo generar Panel E'));
+        this.analysisReadyMessage.set(this.fmtError(err, 'Base vs pixeles del modal no pudo generar Panel E'));
         this.snackBar.open(
           this.fmtError(err, 'Failed to compare base vs modal pixels'),
           'OK',
@@ -10266,7 +10280,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     this.playerSwapSeedCountModel = seedCount;
     let candidate: PlayerSwapCandidate | null = null;
     this.clearPlayerSwapAnalysisResults();
-    this.analysisReadyMessage.set(`Player swap matrix corriendo: ${seedCount} seeds...`);
+    this.analysisReadyMessage.set(`Matriz cambio jugador corriendo: ${seedCount} seeds...`);
     this.mutationInFlight.set(true);
     const source$ = this.selectedMatchIncludesUserTeam()
       ? forkJoin({
@@ -10301,10 +10315,10 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       error: (err) => {
         this.mutationInFlight.set(false);
         this.analysisReadyMessage.set(
-          this.fmtError(err, 'Player swap matrix falló antes de generar Panel E')
+          this.fmtError(err, 'Matriz cambio jugador falló antes de generar Panel E')
         );
         this.snackBar.open(
-          this.fmtError(err, 'Failed to run player swap matrix'),
+          this.fmtError(err, 'No se pudo correr matriz de cambio de jugador'),
           'OK',
           { duration: 5000 }
         );
@@ -10315,12 +10329,12 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         const summary = this.playerSwapMatrixSummary();
         this.snackBar.open(
           summary
-            ? `Player swap matrix complete: ${summary.baselinePlayer} vs ${summary.swapPlayer}, Delta xG ${this.fmtDeltaNumber(summary.deltaXgFor)}.`
-            : 'Player swap matrix completed with insufficient samples.',
+            ? `Matriz cambio jugador complete: ${summary.baselinePlayer} vs ${summary.swapPlayer}, Delta xG ${this.fmtDeltaNumber(summary.deltaXgFor)}.`
+            : 'Matriz cambio jugador completed with insufficient samples.',
           'OK',
           { duration: 4500 }
         );
-        this.markReplayAnalysisReady('Player swap matrix listo en Panel E.');
+        this.markReplayAnalysisReady('Matriz cambio jugador listo en Panel E.');
         this.refreshLineupContext();
         this.loadMatches();
         this.refreshDetailAfterMutation();
@@ -10337,7 +10351,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       return;
     }
     if (!this.selectedMatchIncludesUserTeam()) {
-      this.snackBar.open('Substitution what-if usa el XI de tu equipo para replicar el modal.', 'OK', { duration: 3500 });
+      this.snackBar.open('Simular sustitucion usa el XI de tu equipo para replicar el modal.', 'OK', { duration: 3500 });
       return;
     }
     const seedStart = this.seedInputModel ?? DEFAULT_REPLAY_SEED;
@@ -10350,7 +10364,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     this.substitutionWhatIfSummary.set(null);
     this.modalRecommendationCandidateAttempts.set([]);
     this.substitutionTimingMatrixRows.set([]);
-    this.analysisReadyMessage.set(`Substitution what-if corriendo: min ${minute}, ${seedCount} seeds...`);
+    this.analysisReadyMessage.set(`Simular sustitucion corriendo: min ${minute}, ${seedCount} seeds...`);
     this.mutationInFlight.set(true);
     forkJoin({
       lineup: this.harness.getCurrentLineup().pipe(take(1), timeout(10_000)),
@@ -10389,8 +10403,8 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.mutationInFlight.set(false);
-        this.analysisReadyMessage.set(this.fmtError(err, 'Substitution what-if falló antes de generar Panel E'));
-        this.snackBar.open(this.fmtError(err, 'Failed to run substitution what-if'), 'OK', { duration: 5000 });
+        this.analysisReadyMessage.set(this.fmtError(err, 'Simular sustitucion falló antes de generar Panel E'));
+        this.snackBar.open(this.fmtError(err, 'No se pudo correr simulacion de sustitucion'), 'OK', { duration: 5000 });
         this.refreshLineupContext();
       },
       complete: () => {
@@ -10398,12 +10412,12 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         const summary = this.substitutionWhatIfSummary();
         this.snackBar.open(
           summary
-            ? `Substitution what-if complete: ${summary.playerOffName} -> ${summary.playerOnName}, Delta xG ${this.fmtDeltaNumber(summary.deltaXgFor)}.`
-            : 'Substitution what-if completed with insufficient samples.',
+            ? `Simular sustitucion complete: ${summary.playerOffName} -> ${summary.playerOnName}, Delta xG ${this.fmtDeltaNumber(summary.deltaXgFor)}.`
+            : 'Simular sustitucion completed with insufficient samples.',
           'OK',
           { duration: 4500 }
         );
-        this.markReplayAnalysisReady('Substitution what-if listo en Panel E.');
+        this.markReplayAnalysisReady('Simular sustitucion listo en Panel E.');
         this.refreshLineupContext();
       },
     });
@@ -10417,7 +10431,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       return;
     }
     if (!this.selectedMatchIncludesUserTeam()) {
-      this.snackBar.open('Modal recommendation what-if usa el XI de tu equipo.', 'OK', { duration: 3500 });
+      this.snackBar.open('Probar recomendacion modal usa el XI de tu equipo.', 'OK', { duration: 3500 });
       return;
     }
     const seedStart = this.seedInputModel ?? DEFAULT_REPLAY_SEED;
@@ -10429,7 +10443,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     this.substitutionWhatIfSummary.set(null);
     this.modalRecommendationCandidateAttempts.set([]);
     this.substitutionTimingMatrixRows.set([]);
-    this.analysisReadyMessage.set(`Modal recommendation what-if corriendo: ${this.playerSwapCoachObjectiveRead()}, min ${minute}, ${seedCount} seeds...`);
+    this.analysisReadyMessage.set(`Probar recomendacion modal corriendo: ${this.playerSwapCoachObjectiveRead()}, min ${minute}, ${seedCount} seeds...`);
     this.mutationInFlight.set(true);
     let candidate: PlayerSwapCandidate | null = null;
     forkJoin({
@@ -10528,7 +10542,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.mutationInFlight.set(false);
-        this.analysisReadyMessage.set(this.fmtError(err, 'Modal recommendation what-if falló antes de generar Panel E'));
+        this.analysisReadyMessage.set(this.fmtError(err, 'Probar recomendacion modal falló antes de generar Panel E'));
         this.snackBar.open(this.fmtError(err, 'Failed to run modal recommendation what-if'), 'OK', { duration: 5000 });
         this.refreshLineupContext();
       },
@@ -10541,12 +10555,12 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         }
         this.snackBar.open(
           summary
-            ? `Modal recommendation what-if: ${summary.playerOffName} -> ${summary.playerOnName}, ${this.playerSwapCoachObjectiveRead()}.`
-            : 'Modal recommendation what-if completed with insufficient samples.',
+            ? `Probar recomendacion modal: ${summary.playerOffName} -> ${summary.playerOnName}, ${this.playerSwapCoachObjectiveRead()}.`
+            : 'Probar recomendacion modal completed with insufficient samples.',
           'OK',
           { duration: 4500 }
         );
-        this.markReplayAnalysisReady('Modal recommendation what-if listo en Panel E.');
+        this.markReplayAnalysisReady('Probar recomendacion modal listo en Panel E.');
         this.refreshLineupContext();
       },
     });
@@ -10560,7 +10574,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       return;
     }
     if (!this.selectedMatchIncludesUserTeam()) {
-      this.snackBar.open('Sub timing matrix usa el XI de tu equipo para replicar el modal.', 'OK', { duration: 3500 });
+      this.snackBar.open('Matriz minuto de cambio usa el XI de tu equipo para replicar el modal.', 'OK', { duration: 3500 });
       return;
     }
     const seedStart = this.seedInputModel ?? DEFAULT_REPLAY_SEED;
@@ -10568,7 +10582,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     this.playerSwapSeedCountModel = seedCount;
     this.substitutionWhatIfSummary.set(null);
     this.substitutionTimingMatrixRows.set([]);
-    this.analysisReadyMessage.set(`Sub timing matrix corriendo: ${seedCount} seeds x ${this.substitutionWhatIfMinuteOptions.length} minutos...`);
+    this.analysisReadyMessage.set(`Matriz minuto de cambio corriendo: ${seedCount} seeds x ${this.substitutionWhatIfMinuteOptions.length} minutos...`);
     this.mutationInFlight.set(true);
     forkJoin({
       lineup: this.harness.getCurrentLineup().pipe(take(1), timeout(10_000)),
@@ -10609,7 +10623,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.mutationInFlight.set(false);
-        this.analysisReadyMessage.set(this.fmtError(err, 'Sub timing matrix fallo antes de generar Panel E'));
+        this.analysisReadyMessage.set(this.fmtError(err, 'Matriz minuto de cambio fallo antes de generar Panel E'));
         this.snackBar.open(this.fmtError(err, 'Failed to run substitution timing matrix'), 'OK', { duration: 5000 });
         this.refreshLineupContext();
       },
@@ -10618,12 +10632,12 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         const rows = this.substitutionTimingMatrixRows();
         this.snackBar.open(
           rows.length > 0
-            ? `Sub timing matrix complete: ${rows[0].playerOffName} -> ${rows[0].playerOnName}, ${rows.length} minutos.`
-            : 'Sub timing matrix completed with insufficient samples.',
+            ? `Matriz minuto de cambio complete: ${rows[0].playerOffName} -> ${rows[0].playerOnName}, ${rows.length} minutos.`
+            : 'Matriz minuto de cambio completed with insufficient samples.',
           'OK',
           { duration: 4500 }
         );
-        this.markReplayAnalysisReady('Sub timing matrix listo en Panel E.');
+        this.markReplayAnalysisReady('Matriz minuto de cambio listo en Panel E.');
         this.refreshLineupContext();
       },
     });
@@ -10648,7 +10662,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       this.positionPixelMatrixRows.set(preservedPixelRows);
       this.positionPixelEvidenceNote.set(preservedPixelNote);
     }
-    this.analysisReadyMessage.set(`Player swap battery corriendo: ${seedCount} seeds por cambio...`);
+    this.analysisReadyMessage.set(`Bateria cambio jugador corriendo: ${seedCount} seeds por cambio...`);
     this.mutationInFlight.set(true);
     const source$ = this.selectedMatchIncludesUserTeam()
       ? forkJoin({
@@ -10666,7 +10680,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           const effectiveCandidates = candidates.length > 0
             ? candidates
             : this.playerSwapBatteryModeModel === 'stress'
-              ? this.autoBackendStressSwapCandidates()
+              ? this.autoBackendEstresSwapCandidates()
               : [this.autoBackendPlayerSwapCandidate()];
         return this.harness.setStyle(this.selectedStyleModel).pipe(
           switchMap(() => from(effectiveCandidates).pipe(
@@ -10692,20 +10706,20 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       error: (err) => {
         this.mutationInFlight.set(false);
         this.analysisReadyMessage.set(
-          this.fmtError(err, 'Player swap battery falló antes de generar Panel E')
+          this.fmtError(err, 'Bateria cambio jugador falló antes de generar Panel E')
         );
-        this.snackBar.open(this.fmtError(err, 'Failed to run player swap battery'), 'OK', { duration: 5000 });
+        this.snackBar.open(this.fmtError(err, 'No se pudo correr bateria de cambio de jugador'), 'OK', { duration: 5000 });
         this.refreshLineupContext();
       },
       complete: () => {
         this.mutationInFlight.set(false);
         const count = this.playerSwapBatterySummaries().length;
         this.snackBar.open(
-          count > 0 ? `Player swap battery complete: ${count} swaps measured.` : 'Player swap battery completed with insufficient samples.',
+          count > 0 ? `Bateria cambio jugador complete: ${count} swaps measured.` : 'Bateria cambio jugador completed with insufficient samples.',
           'OK',
           { duration: 4500 }
         );
-        this.markReplayAnalysisReady('Player swap battery lista en Panel E.');
+        this.markReplayAnalysisReady('Bateria cambio jugador lista en Panel E.');
         this.refreshLineupContext();
       },
     });
@@ -10737,7 +10751,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         const effectiveCandidates = candidates.length > 0
           ? candidates
           : this.playerSwapBatteryModeModel === 'stress'
-            ? this.autoBackendStressSwapCandidates()
+            ? this.autoBackendEstresSwapCandidates()
             : [this.autoBackendPlayerSwapCandidate()];
         return this.harness.setStyle(this.selectedStyleModel).pipe(
           switchMap(() => this.runPlayerSwapCandidates(matchId, effectiveCandidates, seedStart, 3)),
@@ -10755,7 +10769,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       error: (err) => {
         this.mutationInFlight.set(false);
         this.analysisReadyMessage.set(this.fmtError(err, 'Precision compare falló'));
-        this.snackBar.open(this.fmtError(err, 'Failed to compare player swap precision'), 'OK', { duration: 5000 });
+        this.snackBar.open(this.fmtError(err, 'No se pudo comparar precision de cambios'), 'OK', { duration: 5000 });
         this.refreshLineupContext();
       },
       complete: () => {
@@ -10841,7 +10855,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const effectiveCandidates = candidates.length > 0
       ? candidates
       : mode === 'stress'
-        ? this.autoBackendStressSwapCandidates()
+        ? this.autoBackendEstresSwapCandidates()
         : [this.autoBackendPlayerSwapCandidate()];
     return this.runPlayerSwapCandidates(matchId, effectiveCandidates, seedStart, seedCount);
   }
@@ -10895,7 +10909,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     this.runPositionPixelMatrixWithPresets(
       seedCount,
       (fromX, fromY) => this.positionMovementPresets(fromX, fromY),
-      'Position presets matrix'
+      'Matriz presets posicion'
     );
   }
   onRunManualShapeVsPresetSmoke(): void {
@@ -10904,7 +10918,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     this.runPositionPixelMatrixWithPresets(
       seedCount,
       (fromX, fromY, candidate) => this.manualShapeVsPresetPresets(fromX, fromY, candidate),
-      'Manual shape vs preset',
+      'Forma manual vs preset',
       null,
       (lineup) => this.pickManualShapeVsPresetCandidates(lineup),
       null,
@@ -10928,7 +10942,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const naturalPositions = this.roleSlotImpactNaturalPositionsForSlot(slotId);
     this.roleSlotImpactRows.set([]);
     this.mutationInFlight.set(true);
-    this.analysisReadyMessage.set(`Role slot impact corriendo: slot ${slotId}, ${seedCount} seeds...`);
+    this.analysisReadyMessage.set(`Impacto rol-slot corriendo: slot ${slotId}, ${seedCount} seeds...`);
     window.setTimeout(() => this.scrollToReplayAnalysis(), 0);
     this.harness.runRoleSlotImpactSummary(matchId, {
       slotId,
@@ -10941,11 +10955,11 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         const safeRows = [...(rows ?? [])].sort((a, b) => b.playerEffectiveness - a.playerEffectiveness);
         this.roleSlotImpactRows.set(safeRows);
         this.mutationInFlight.set(false);
-        this.markReplayAnalysisReady(`Role slot impact completo (${safeRows.length} roles, ${seedCount} seeds).`);
+        this.markReplayAnalysisReady(`Impacto rol-slot completo (${safeRows.length} roles, ${seedCount} seeds).`);
       },
       error: (err) => {
         this.mutationInFlight.set(false);
-        this.analysisReadyMessage.set(this.fmtError(err, 'Role slot impact falló'));
+        this.analysisReadyMessage.set(this.fmtError(err, 'Impacto rol-slot falló'));
       },
     });
   }
@@ -10966,7 +10980,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const seedCount = 10;
     this.roleSlotImpactSmokeRows.set([]);
     this.mutationInFlight.set(true);
-    this.analysisReadyMessage.set(`All role slots smoke corriendo: ${slots.length} slots x ${seedCount} seeds...`);
+    this.analysisReadyMessage.set(`Smoke todos los roles-slot corriendo: ${slots.length} slots x ${seedCount} seeds...`);
     window.setTimeout(() => this.scrollToReplayAnalysis(), 0);
     from(slots).pipe(
       concatMap((slot) =>
@@ -10996,11 +11010,11 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       next: (rows) => {
         this.roleSlotImpactSmokeRows.set(rows);
         this.mutationInFlight.set(false);
-        this.markReplayAnalysisReady(`All role slots smoke completo (${rows.length} slots).`);
+        this.markReplayAnalysisReady(`Smoke todos los roles-slot completo (${rows.length} slots).`);
       },
       error: (err) => {
         this.mutationInFlight.set(false);
-        this.analysisReadyMessage.set(this.fmtError(err, 'All role slots smoke falló'));
+        this.analysisReadyMessage.set(this.fmtError(err, 'Smoke todos los roles-slot falló'));
       },
     });
   }
@@ -11016,7 +11030,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     let restore: { formation: string; playerIds: string[]; slots: LineupSlotDTO[] } | null = null;
     this.allFormationRoleSlotSmokeRows.set([]);
     this.mutationInFlight.set(true);
-    this.analysisReadyMessage.set(`All formations role-slot smoke corriendo: ${formations.length} formaciones x 10 slots...`);
+    this.analysisReadyMessage.set(`Smoke roles-slot por formacion corriendo: ${formations.length} formaciones x 10 slots...`);
     window.setTimeout(() => this.scrollToReplayAnalysis(), 0);
     this.harness.getCurrentLineup().pipe(
       take(1),
@@ -11089,13 +11103,13 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         const reviews = rows.filter((row) => row.review > 0 || row.verdict.includes('Revisar')).length;
         this.markReplayAnalysisReady(
           reviews === 0
-            ? `All formations role-slot smoke OK (${rows.length} formaciones).`
-            : `All formations role-slot smoke: ${reviews} formaciones con slots a revisar.`
+            ? `Smoke roles-slot por formacion OK (${rows.length} formaciones).`
+            : `Smoke roles-slot por formacion: ${reviews} formaciones con slots a revisar.`
         );
       },
       error: (err) => {
         this.mutationInFlight.set(false);
-        this.analysisReadyMessage.set(this.fmtError(err, 'All formations role-slot smoke falló'));
+        this.analysisReadyMessage.set(this.fmtError(err, 'Smoke roles-slot por formacion falló'));
       },
     });
   }
@@ -11115,7 +11129,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     let restore: { formation: string; playerIds: string[]; slots: LineupSlotDTO[] } | null = null;
     this.clearReplayAnalysisResultsForLatestRun();
     this.mutationInFlight.set(true);
-    this.analysisReadyMessage.set(`Last modal move: preparando ${modalMove.playerName} (${seedCount} seeds)...`);
+    this.analysisReadyMessage.set(`Ultimo movimiento modal: preparando ${modalMove.playerName} (${seedCount} seeds)...`);
     window.setTimeout(() => this.scrollToReplayAnalysis(), 0);
     this.harness.resetInjuries().pipe(
       take(1),
@@ -11158,7 +11172,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         this.positionPixelMatrixRows.set([summary]);
         this.positionPixelMatrixSummary.set(summary);
         this.lineupDebugSnapshot.set({
-          label: 'Last modal move',
+          label: 'Ultimo movimiento modal',
           formation: modalMove.formation,
           selectedFormation: this.selectedFormationModel ?? modalMove.formation,
           playerCount: 1,
@@ -11193,16 +11207,16 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           ],
           warnings: modalMove.coachReadTitle ? [modalMove.coachReadTitle] : [],
         });
-        this.markReplayAnalysisReady(`Last modal move listo: ${modalMove.playerName}.`);
+        this.markReplayAnalysisReady(`Ultimo movimiento modal listo: ${modalMove.playerName}.`);
       },
       error: (err) => {
         this.mutationInFlight.set(false);
-        this.analysisReadyMessage.set(this.fmtError(err, 'Last modal move falló'));
+        this.analysisReadyMessage.set(this.fmtError(err, 'Ultimo movimiento modal falló'));
         this.snackBar.open(this.fmtError(err, 'Failed to run last modal move'), 'OK', { duration: 5000 });
       },
       complete: () => {
         this.mutationInFlight.set(false);
-        this.snackBar.open(`Last modal move complete: ${modalMove.playerName}, ${seedCount} seeds.`, 'OK', { duration: 4500 });
+        this.snackBar.open(`Ultimo movimiento modal complete: ${modalMove.playerName}, ${seedCount} seeds.`, 'OK', { duration: 4500 });
       },
     });
   }
@@ -11249,7 +11263,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     this.runPositionPixelMatrixWithPresets(
       seedCount,
       (fromX, fromY, candidate) => this.wingbackMovementPresets(fromX, fromY, candidate),
-      'Wingback pixel lab',
+      'Lab pixeles carrileros',
       null,
       (lineup) => this.pickWingbackPixelCandidates(lineup),
       null,
@@ -11261,7 +11275,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     this.runPositionPixelMatrixWithPresets(
       seedCount,
       (fromX, fromY) => this.positionMicroMovementPresets(fromX, fromY),
-      'Sensitivity check'
+      'Chequeo sensibilidad'
     );
   }
   onRunManualExtremesPositionHunt(): void {
@@ -11269,7 +11283,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     this.runPositionPixelMatrixWithPresets(
       seedCount,
       (fromX, fromY, candidate) => this.manualExtremeMovementPresets(fromX, fromY, candidate),
-      'Manual extremes hunt',
+      'Buscar extremos manuales',
       null,
       (lineup) => this.pickManualExtremeCandidates(lineup)
     );
@@ -11281,7 +11295,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       seedCount,
       (fromX, fromY) => this.positionMovementPresets(fromX, fromY)
         .filter((preset) => ['5px wide', '5px center', '5px forward', '5px deeper'].includes(preset.label)),
-      `Focused pixel battery · ${formation}`,
+      `Bateria pixeles enfocada · ${formation}`,
       null,
       (lineup) => this.pickFocusedPixelCandidates(lineup),
       null,
@@ -11358,8 +11372,8 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const runScope = (index: number): void => {
       const scope = scopes[index];
       if (!scope) {
-        this.snackBar.open('Full position smoke board complete.', 'OK', { duration: 4500 });
-        this.markReplayAnalysisReady('Full position smoke board listo en Panel E.');
+        this.snackBar.open('Tablero completo posicion complete.', 'OK', { duration: 4500 });
+        this.markReplayAnalysisReady('Tablero completo posicion listo en Panel E.');
         return;
       }
       if (scope === 'ALL') {
@@ -11419,7 +11433,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const formation = this.selectedFormationModel ?? '4-4-2';
     this.clearFormationLineAuditResults();
     this.mutationInFlight.set(true);
-    this.analysisReadyMessage.set(`Formation line audit corriendo para ${formation}...`);
+    this.analysisReadyMessage.set(`Auditoria lineas formacion corriendo para ${formation}...`);
     this.currentOrAutoSelectedLineup(formation).subscribe({
       next: (lineup) => {
         const rows = (['DEF', 'MID', 'ATT'] as const).map((line) =>
@@ -11429,21 +11443,21 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         const allOk = rows.every((row) => row.candidates > 0);
         this.lineupDebugSnapshot.set(this.buildLineupDebugSnapshot(
           lineup,
-          'Formation line audit',
+          'Auditoria lineas formacion',
           null,
           rows.flatMap((row) => this.pickPositionPixelLineCandidates(lineup, row.line, 6))
         ));
         this.mutationInFlight.set(false);
         this.snackBar.open(
-          allOk ? `Formation line audit OK (${formation}).` : `Formation line audit has warnings (${formation}).`,
+          allOk ? `Auditoria lineas formacion OK (${formation}).` : `Auditoria lineas formacion has warnings (${formation}).`,
           'OK',
           { duration: 4000 }
         );
-        this.markReplayAnalysisReady(`Formation line audit listo para ${formation}.`);
+        this.markReplayAnalysisReady(`Auditoria lineas formacion listo para ${formation}.`);
       },
       error: (err) => {
         this.mutationInFlight.set(false);
-        this.analysisReadyMessage.set(this.fmtError(err, 'Formation line audit falló'));
+        this.analysisReadyMessage.set(this.fmtError(err, 'Auditoria lineas formacion falló'));
         this.snackBar.open(this.fmtError(err, 'Failed to run formation line audit'), 'OK', { duration: 5000 });
       },
     });
@@ -11465,7 +11479,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const formations = [...this.formationCodes];
     this.clearFormationLineAuditResults();
     this.mutationInFlight.set(true);
-    this.analysisReadyMessage.set(`All formations line audit corriendo: ${formations.length} formaciones...`);
+    this.analysisReadyMessage.set(`Auditoria todas las formaciones corriendo: ${formations.length} formaciones...`);
     this.buildAllFormationsLineAuditRows$(matches.length).subscribe({
       next: ({ rows, last }) => {
         this.applyAllFormationsLineAuditRows(rows, last);
@@ -11479,13 +11493,13 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         );
         this.markReplayAnalysisReady(
           reviewCount === 0
-            ? `All formations line audit listo: ${rows.length} line checks ? ${fallbackCount} fallback penalizado.`
-            : `All formations line audit listo: ${rows.length} line checks ? ${reviewCount} revisar ? ${fallbackCount} fallback.`
+            ? `Auditoria todas las formaciones listo: ${rows.length} line checks ? ${fallbackCount} fallback penalizado.`
+            : `Auditoria todas las formaciones listo: ${rows.length} line checks ? ${reviewCount} revisar ? ${fallbackCount} fallback.`
         );
       },
       error: (err) => {
         this.mutationInFlight.set(false);
-        this.analysisReadyMessage.set(this.fmtError(err, 'All formations line audit falló'));
+        this.analysisReadyMessage.set(this.fmtError(err, 'Auditoria todas las formaciones falló'));
         this.snackBar.open(this.fmtError(err, 'Failed to run all formations line audit'), 'OK', { duration: 5000 });
       },
     });
@@ -11532,7 +11546,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     if (last) {
       this.lineupDebugSnapshot.set(this.buildLineupDebugSnapshot(
         last,
-        'All formations line audit (last formation)',
+        'Auditoria todas las formaciones (last formation)',
         null,
         (['DEF', 'MID', 'ATT'] as const).flatMap((line) => this.pickPositionPixelLineCandidates(last, line, 6))
       ));
@@ -11540,12 +11554,12 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   }
   private allFormationsLineAuditToast(totalRows: number, reviewCount: number, fallbackCount: number): string {
     if (reviewCount > 0) {
-      return `All formations line audit: ${reviewCount} line checks need review.`;
+      return `Auditoria todas las formaciones: ${reviewCount} line checks need review.`;
     }
     if (fallbackCount > 0) {
-      return `All formations line audit OK with ${fallbackCount} penalized fallback line checks (${totalRows} total).`;
+      return `Auditoria todas las formaciones OK with ${fallbackCount} penalized fallback line checks (${totalRows} total).`;
     }
-    return `All formations line audit OK (${totalRows} line checks).`;
+    return `Auditoria todas las formaciones OK (${totalRows} line checks).`;
   }
   private toFormationLineSmokeRow(
     lineup: LineupDTO,
@@ -12404,8 +12418,8 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         return 'Correr full position smoke';
       case 'Pixel no-cliff rule':
         return 'Correr sensitivity check';
-      case 'Player swap signal':
-        return 'Correr player swap battery';
+      case 'Senal cambio jugador':
+        return 'Correr bateria de cambio jugador';
       default:
         return 'Sin acción directa';
     }
@@ -12420,7 +12434,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         return !!this.userTeamName();
       case 'Pixel movement signal':
       case 'Pixel no-cliff rule':
-      case 'Player swap signal':
+      case 'Senal cambio jugador':
         return !!this.selectedMatchId();
       default:
         return false;
@@ -12460,7 +12474,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         this.onRunPositionSensitivityCheck();
         this.watchProfessionalQaActionCompletion(check);
         return;
-      case 'Player swap signal':
+      case 'Senal cambio jugador':
         this.onRunPlayerSwapBattery();
         this.watchProfessionalQaActionCompletion(check);
         return;
@@ -12475,7 +12489,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       'All formations audit',
       'Pixel movement signal',
       'Pixel no-cliff rule',
-      'Player swap signal',
+      'Senal cambio jugador',
     ];
     this.qaChecklistRunningAll.set(true);
     window.setTimeout(() => this.runProfessionalQaChecklistQueue(queue, 0), 250);
@@ -12696,15 +12710,15 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   playerSwapBatteryPrecisionHint(): string {
     const seeds = this.playerSwapBatteryEffectiveSeedCount();
     if (this.playerSwapBatteryModeModel === 'stress' && this.playerSwapBatteryPrecisionModel === 'quick') {
-      return `${seeds} seeds - Stress test usa minimo 10 para evitar ruido.`;
+      return `${seeds} seeds - Estres test usa minimo 10 para evitar ruido.`;
     }
     if (this.playerSwapBatteryPrecisionModel === 'reliable') return `${seeds} seeds - High confidence para calibracion fina.`;
-    if (this.playerSwapBatteryPrecisionModel === 'balanced') return `${seeds} seeds - Medium confidence, recomendado para decidir tuning.`;
+    if (this.playerSwapBatteryPrecisionModel === 'balanced') return `${seeds} seeds - Confianza media, recomendado para decidir tuning.`;
     return `${seeds} seeds - Low confidence, solo smoke exploratorio.`;
   }
   playerSwapBatteryConfidenceLabel(seedCount = this.playerSwapSeedCountModel): string {
     if (seedCount >= 30) return 'High confidence';
-    if (seedCount >= 10) return 'Medium confidence';
+    if (seedCount >= 10) return 'Confianza media';
     return 'Low confidence';
   }
   private playerSwapBatteryPrecisionSeedCount(precision: typeof this.playerSwapBatteryPrecisionModel): number {
@@ -12841,7 +12855,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       return 'Necesitás una carrera con equipo de usuario para auditar el lineup editable.';
     }
     if (this.controlledTeamSideModel !== 'USER') {
-      return 'Este audit usa el lineup editable de Mi equipo. Para Local/Visitante usá Formation matrix o Formation avg.';
+      return 'Este audit usa el lineup editable de Mi equipo. Para Local/Visitante usá Matriz formaciones o Formation avg.';
     }
     return 'Audita el lineup editable de Mi equipo.';
   }
@@ -13124,7 +13138,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   scenarioBatteryReviewHint(): string {
     const rows = this.scenarioBatteryRows();
     if (rows.length === 0) {
-      return 'Revision pendiente: corre Battery tablero.';
+      return 'Revision pendiente: corre Tablero bateria.';
     }
     const reviewCount = this.scenarioBatteryReviewCount();
     if (reviewCount === 0) {
@@ -15514,7 +15528,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           const originalSlots = originalLineup?.slots ?? [];
           if (originalPlayerIds.length !== 11) {
             throw new Error(
-              `Formation matrix needs exactly 11 current lineup players, got ${originalPlayerIds.length}.`
+              `Matriz formaciones needs exactly 11 current lineup players, got ${originalPlayerIds.length}.`
             );
           }
           return this.harness.setStyle(this.selectedStyleModel).pipe(
@@ -15560,11 +15574,11 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           this.refreshLineupContext();
         }
         this.snackBar.open(
-          `Formation matrix completed (${this.formationReplayResults().length} formations).`,
+          `Matriz formaciones completed (${this.formationReplayResults().length} formations).`,
           'OK',
           { duration: 3000 }
         );
-        this.markReplayAnalysisReady('Formation matrix lista en Panel E.');
+        this.markReplayAnalysisReady('Matriz formaciones lista en Panel E.');
         this.loadMatches();
         this.refreshDetailAfterMutation();
         this.refreshDetailAfterMutation(1200);
@@ -15634,7 +15648,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     this.scenarioMatrixSummaryResults.set([]);
     this.scenarioMatrixSummarySeedCount.set(formationSeedCount);
     this.analysisReadyMessage.set(
-      `Professional smoke corriendo para ${controlledName}: formaciones ${formationSeedCount} seeds + escenarios ${scenarioSeedCount} seeds...`
+      `Smoke profesional corriendo para ${controlledName}: formaciones ${formationSeedCount} seeds + escenarios ${scenarioSeedCount} seeds...`
     );
     this.mutationInFlight.set(true);
     this.guardProfessionalSmokeTimeout(runId, controlledName, controlledSide, formationSeedCount, scenarioSeedCount);
@@ -15687,27 +15701,27 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           skipped: userScope
             ? [
                 'Píxeles y swaps se corren desde sus botones dedicados para preservar evidencia detallada.',
-                'Compare baseline/live queda disponible en Open Match Compare.',
+                'Compare baseline/live queda disponible en Abrir comparador.',
               ]
             : [
                 'Píxeles y swaps requieren lineup editable de Mi equipo; no se simulan para Local/Visitante.',
-                'Compare baseline/live queda disponible en Open Match Compare.',
+                'Compare baseline/live queda disponible en Abrir comparador.',
               ],
           read: `${controlledName}: ${safeFormationRows.length} formaciones · ${safeScenarioRows.length} escenarios · scope ${controlledSide}${stepIssues.length > 0 ? ' · revisar etapa lenta/fallida' : ''}.`,
         });
         this.markReplayAnalysisReady(
-          `Professional smoke listo para ${controlledName}: ${safeFormationRows.length} formaciones · ${safeScenarioRows.length} escenarios${stepIssues.length > 0 ? ' · con observaciones' : ''}.`
+          `Smoke profesional listo para ${controlledName}: ${safeFormationRows.length} formaciones · ${safeScenarioRows.length} escenarios${stepIssues.length > 0 ? ' · con observaciones' : ''}.`
         );
         this.snackBar.open(
-          `Professional smoke complete: ${safeFormationRows.length} formations, ${safeScenarioRows.length} scenarios.`,
+          `Smoke profesional complete: ${safeFormationRows.length} formations, ${safeScenarioRows.length} scenarios.`,
           'OK',
           { duration: 4500 }
         );
       },
       error: (err) => {
         if (runId !== this.professionalSmokeRunId) return;
-        this.analysisReadyMessage.set(this.fmtError(err, 'Professional smoke falló'));
-        this.snackBar.open(this.fmtError(err, 'Failed to run professional smoke'), 'OK', { duration: 6000 });
+        this.analysisReadyMessage.set(this.fmtError(err, 'Smoke profesional falló'));
+        this.snackBar.open(this.fmtError(err, 'No se pudo correr smoke profesional'), 'OK', { duration: 6000 });
       },
       complete: () => {
         if (runId !== this.professionalSmokeRunId) return;
@@ -15741,11 +15755,11 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           `Formation avg: ${formationRows} formaciones`,
           `Scenario smoke: ${scenarioRows} escenarios`,
         ],
-        skipped: ['Professional smoke cortado por timeout defensivo; revisar partido/endpoint lento antes de calibrar.'],
+        skipped: ['Smoke profesional cortado por timeout defensivo; revisar partido/endpoint lento antes de calibrar.'],
         read: `${controlledName}: professional smoke parcial por timeout · ${formationRows} formaciones · ${scenarioRows} escenarios · scope ${controlledSide}.`,
       });
-      this.analysisReadyMessage.set('Professional smoke cortado por timeout defensivo. Resultados parciales abajo.');
-      this.snackBar.open('Professional smoke timeout: resultados parciales disponibles.', 'OK', { duration: 6000 });
+      this.analysisReadyMessage.set('Smoke profesional cortado por timeout defensivo. Resultados parciales abajo.');
+      this.snackBar.open('Smoke profesional timeout: resultados parciales disponibles.', 'OK', { duration: 6000 });
     }, 150_000);
   }
   onRunProfessionalSmokeFull(): void {
@@ -15769,7 +15783,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         return lower.includes('timeout') || lower.includes('timed out') || lower.includes('error');
       });
       if (baseHadIssue) {
-        this.analysisReadyMessage.set('Professional smoke full sigue con pixeles/swaps: la etapa base tuvo observaciones, pero no se corta la evidencia restante.');
+        this.analysisReadyMessage.set('Smoke profesional full sigue con pixeles/swaps: la etapa base tuvo observaciones, pero no se corta la evidencia restante.');
         this.snackBar.open('Smoke full: etapa base con observaciones; sigo con pixeles/swaps.', 'OK', { duration: 4500 });
       }
       this.runProfessionalSmokeFormationAuditStage(() => {
@@ -15778,7 +15792,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           if (runId !== this.professionalSmokeFullRunId) return;
           this.professionalSmokeFullPixelRows = this.positionPixelMatrixRows().length;
           this.onRunPlayerSwapBattery({ preservePositionPixels: true });
-          this.waitForProfessionalSmokeStep('player swaps', () => {
+          this.waitForProfessionalSmokeStep('cambios de jugador', () => {
             if (runId !== this.professionalSmokeFullRunId) return;
             this.runProfessionalSmokeSubstitutionStage(() => {
               if (runId !== this.professionalSmokeFullRunId) return;
@@ -15819,14 +15833,14 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           `Formation avg: ${formationRows} formaciones`,
           `Scenario smoke: ${scenarioRows} escenarios`,
           `Pixel sensitivity: ${pixelRows} filas`,
-          `Player swap battery: ${swapRows} cambios`,
-          `Substitution what-if: ${substitutionRows} caso(s)`,
+          `Bateria cambio jugador: ${swapRows} cambios`,
+          `Simular sustitucion: ${substitutionRows} caso(s)`,
         ],
         skipped: ['Smoke full cortado por timeout defensivo; revisar etapa lenta antes de calibrar.'],
         read: `${controlledName}: smoke full parcial por timeout · ${formationRows} formaciones · ${scenarioRows} escenarios · ${pixelRows} píxeles · ${swapRows} swaps.`,
       });
-      this.analysisReadyMessage.set('Professional smoke full cortado por timeout defensivo. Resultados parciales abajo.');
-      this.snackBar.open('Professional smoke full timeout: resultados parciales disponibles.', 'OK', { duration: 6000 });
+      this.analysisReadyMessage.set('Smoke profesional full cortado por timeout defensivo. Resultados parciales abajo.');
+      this.snackBar.open('Smoke profesional full timeout: resultados parciales disponibles.', 'OK', { duration: 6000 });
     }, 240_000);
   }
   private runProfessionalSmokeFormationAuditStage(onComplete: () => void): void {
@@ -15850,7 +15864,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         included: current?.included ?? [],
         skipped: [
           ...(current?.skipped ?? []),
-          'All formations line audit omitido: no hay partidos completados del usuario.',
+          'Auditoria todas las formaciones omitido: no hay partidos completados del usuario.',
         ],
         read: current?.read ?? `${this.controlledTeamDisplayName()}: smoke full en progreso.`,
       });
@@ -15859,13 +15873,13 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     }
     this.clearFormationLineAuditResults();
     this.mutationInFlight.set(true);
-    this.analysisReadyMessage.set('Professional smoke full: auditando slots/lados de todas las formaciones...');
+    this.analysisReadyMessage.set('Smoke profesional full: auditando slots/lados de todas las formaciones...');
     this.buildAllFormationsLineAuditRows$(matches.length).pipe(
       timeout(60_000),
       map((result) => ({ result, issue: null as string | null })),
       catchError((err) => of({
         result: { rows: [] as FormationLineSmokeRow[], last: null as LineupDTO | null },
-        issue: this.fmtError(err, 'All formations line audit timeout/error'),
+        issue: this.fmtError(err, 'Auditoria todas las formaciones timeout/error'),
       }))
     ).subscribe({
       next: ({ result, issue }) => {
@@ -15890,7 +15904,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           scenarioSeedCount: before?.scenarioSeedCount ?? this.scenarioMatrixSmokeSeedCount(),
           included: [
             ...(before?.included ?? []),
-            issue ?? `All formations line audit: ${rows.length} checks · ${fallbackRows} fallback · ${reviewRows} review`,
+            issue ?? `Auditoria todas las formaciones: ${rows.length} checks · ${fallbackRows} fallback · ${reviewRows} review`,
           ],
           skipped: before?.skipped ?? [],
           read: before?.read ?? `${this.controlledTeamDisplayName()}: smoke full en progreso.`,
@@ -15913,7 +15927,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           included: before?.included ?? [],
           skipped: [
             ...(before?.skipped ?? []),
-            this.fmtError(err, 'All formations line audit falló dentro del smoke full'),
+            this.fmtError(err, 'Auditoria todas las formaciones falló dentro del smoke full'),
           ],
           read: before?.read ?? `${this.controlledTeamDisplayName()}: smoke full en progreso.`,
         });
@@ -15936,7 +15950,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           '5px center',
           'big zone cross',
         ].includes(preset.label)),
-      'Professional smoke pixel sweep',
+      'Smoke profesional pixel sweep',
       null,
       null,
       null,
@@ -15955,7 +15969,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const seedCount = Math.max(10, Math.min(30, Math.round(this.playerSwapSeedCountModel || 10)));
     const minute = 60;
     this.substitutionWhatIfSummary.set(null);
-    this.analysisReadyMessage.set(`Professional smoke full: substitution what-if min ${minute}, ${seedCount} seeds...`);
+    this.analysisReadyMessage.set(`Smoke profesional full: substitution what-if min ${minute}, ${seedCount} seeds...`);
     this.mutationInFlight.set(true);
     forkJoin({
       lineup: this.harness.getCurrentLineup().pipe(take(1), timeout(10_000)),
@@ -15989,7 +16003,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       map((row) => ({ row, issue: null as string | null })),
       catchError((err) => of({
         row: null as SubstitutionWhatIfSummaryRow | null,
-        issue: this.fmtError(err, 'Substitution what-if timeout/error'),
+        issue: this.fmtError(err, 'Simular sustitucion timeout/error'),
       }))
     ).subscribe({
       next: ({ row, issue }) => {
@@ -16017,7 +16031,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           scenarioSeedCount: before?.scenarioSeedCount ?? this.scenarioMatrixSmokeSeedCount(),
           included: [
             ...(before?.included ?? []),
-            issue ?? `Substitution what-if: ${row?.playerOffName ?? 'starter'} -> ${row?.playerOnName ?? 'bench'} min ${minute} x ${seedCount} seeds`,
+            issue ?? `Simular sustitucion: ${row?.playerOffName ?? 'starter'} -> ${row?.playerOnName ?? 'bench'} min ${minute} x ${seedCount} seeds`,
           ],
           skipped: before?.skipped ?? [],
           read: before?.read ?? `${this.controlledTeamDisplayName()}: smoke full en progreso.`,
@@ -16032,7 +16046,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   private waitForProfessionalSmokeStep(label: string, next: () => void, attempts = 0): void {
     window.setTimeout(() => {
       if (attempts > 240) {
-        this.snackBar.open(`Professional smoke full: timeout esperando ${label}.`, 'OK', { duration: 5000 });
+        this.snackBar.open(`Smoke profesional full: timeout esperando ${label}.`, 'OK', { duration: 5000 });
         return;
       }
       if (this.mutationInFlight()) {
@@ -16058,7 +16072,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         const lower = item.toLowerCase();
         return !lower.includes('pixeles y swaps') && !lower.includes('compare baseline/live');
       })),
-      'Compare baseline/live queda disponible en Open Match Compare.',
+      'Compare baseline/live queda disponible en Abrir comparador.',
     ];
     const filteredSkipped = skipped.filter((item) => !item.toLowerCase().includes('preservar evidencia detallada'));
     const finalRead = `${controlledName}: smoke full · ${current?.formationRows ?? this.formationMatrixSummaryResults().length} formaciones · ${current?.scenarioRows ?? this.scenarioMatrixSummaryResults().length} escenarios · ${pixelRows} píxeles · ${swapRows} swaps · ${substitutionRows} sustituciones.`;
@@ -16080,14 +16094,14 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       included: [
         ...baseIncluded,
         `Pixel sensitivity: ${pixelRows} filas`,
-        `Player swap battery: ${swapRows} cambios`,
-        `Substitution what-if: ${substitutionRows} caso(s)`,
+        `Bateria cambio jugador: ${swapRows} cambios`,
+        `Simular sustitucion: ${substitutionRows} caso(s)`,
       ],
       skipped: filteredSkipped,
       read: finalRead,
     });
-    this.markReplayAnalysisReady(`Professional smoke full listo para ${controlledName}: ${pixelRows} píxeles · ${swapRows} swaps · ${substitutionRows} sustituciones.`);
-    this.snackBar.open(`Professional smoke full complete: ${pixelRows} pixel rows, ${swapRows} swaps, ${substitutionRows} substitutions.`, 'OK', { duration: 4500 });
+    this.markReplayAnalysisReady(`Smoke profesional full listo para ${controlledName}: ${pixelRows} píxeles · ${swapRows} swaps · ${substitutionRows} sustituciones.`);
+    this.snackBar.open(`Smoke profesional full complete: ${pixelRows} pixel rows, ${swapRows} swaps, ${substitutionRows} substitutions.`, 'OK', { duration: 4500 });
   }
   private professionalSmokeFinalVerdict(): { verdict: NonNullable<ProfessionalSmokeSummary['verdict']>; detail: string } {
     const checks = this.professionalQaChecklistRows();
@@ -16138,7 +16152,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     let restore: { formation: string; playerIds: string[]; slots: LineupSlotDTO[] } | null = null;
     this.lowBlockLabRows.set([]);
     this.mutationInFlight.set(true);
-    this.analysisReadyMessage.set(`5-4-1 low block lab corriendo: alta/base/baja x ${seedCount} seeds...`);
+    this.analysisReadyMessage.set(`Lab bloque bajo 5-4-1 corriendo: alta/base/baja x ${seedCount} seeds...`);
     window.setTimeout(() => this.scrollToReplayAnalysis(), 0);
     this.harness.getCurrentLineup().pipe(
       take(1),
@@ -16184,7 +16198,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       })
     ).subscribe({
       next: (rows) => {
-        this.markReplayAnalysisReady(`5-4-1 low block lab listo (${rows.length} variantes).`);
+        this.markReplayAnalysisReady(`Lab bloque bajo 5-4-1 listo (${rows.length} variantes).`);
       },
       error: (err) => {
         if (restore) {
@@ -16193,13 +16207,13 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
             .subscribe({ error: () => undefined });
         }
         this.mutationInFlight.set(false);
-        this.analysisReadyMessage.set(this.fmtError(err, '5-4-1 low block lab falló'));
+        this.analysisReadyMessage.set(this.fmtError(err, 'Lab bloque bajo 5-4-1 falló'));
         this.snackBar.open(this.fmtError(err, 'Failed to run low block lab'), 'OK', { duration: 6000 });
       },
       complete: () => {
         this.mutationInFlight.set(false);
         this.refreshLineupContext();
-        this.snackBar.open('5-4-1 low block lab completed.', 'OK', { duration: 3500 });
+        this.snackBar.open('Lab bloque bajo 5-4-1 completed.', 'OK', { duration: 3500 });
       },
     });
   }
@@ -16210,7 +16224,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       return;
     }
     if (!this.selectedMatchIncludesUserTeam()) {
-      this.snackBar.open('5-3-2 transition lab necesita un partido de tu equipo.', 'OK', { duration: 4000 });
+      this.snackBar.open('Lab transicion 5-3-2 necesita un partido de tu equipo.', 'OK', { duration: 4000 });
       return;
     }
     const seedStart = this.summarySeedStart();
@@ -16218,7 +16232,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     let restore: { formation: string; playerIds: string[]; slots: LineupSlotDTO[] } | null = null;
     this.backFiveTransitionLabRows.set([]);
     this.mutationInFlight.set(true);
-    this.analysisReadyMessage.set(`5-3-2 transition lab corriendo: carrileros bajos/base/altos x ${seedCount} seeds...`);
+    this.analysisReadyMessage.set(`Lab transicion 5-3-2 corriendo: carrileros bajos/base/altos x ${seedCount} seeds...`);
     window.setTimeout(() => this.scrollToReplayAnalysis(), 0);
     this.harness.getCurrentLineup().pipe(
       take(1),
@@ -16256,7 +16270,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         return this.harness.manualSelectLineup(restore.formation, restore.playerIds, restore.slots).pipe(map(() => rows));
       })
     ).subscribe({
-      next: (rows) => this.markReplayAnalysisReady(`5-3-2 transition lab listo (${rows.length} variantes).`),
+      next: (rows) => this.markReplayAnalysisReady(`Lab transicion 5-3-2 listo (${rows.length} variantes).`),
       error: (err) => {
         if (restore) {
           this.harness.manualSelectLineup(restore.formation, restore.playerIds, restore.slots)
@@ -16264,13 +16278,13 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
             .subscribe({ error: () => undefined });
         }
         this.mutationInFlight.set(false);
-        this.analysisReadyMessage.set(this.fmtError(err, '5-3-2 transition lab falló'));
-        this.snackBar.open(this.fmtError(err, 'Failed to run 5-3-2 transition lab'), 'OK', { duration: 6000 });
+        this.analysisReadyMessage.set(this.fmtError(err, 'Lab transicion 5-3-2 falló'));
+        this.snackBar.open(this.fmtError(err, 'Failed to run Lab transicion 5-3-2'), 'OK', { duration: 6000 });
       },
       complete: () => {
         this.mutationInFlight.set(false);
         this.refreshLineupContext();
-        this.snackBar.open('5-3-2 transition lab completed.', 'OK', { duration: 3500 });
+        this.snackBar.open('Lab transicion 5-3-2 completed.', 'OK', { duration: 3500 });
       },
     });
   }
@@ -16471,7 +16485,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const seedCount = this.scenarioMatrixSummaryEffectiveSeedCount();
     this.sideMirrorSmokeRows.set([]);
     this.sideMirrorSmokeMode.set('real');
-    this.analysisReadyMessage.set(`Side mirror smoke corriendo: ${seedCount} seeds por formación y por lado...`);
+    this.analysisReadyMessage.set(`Smoke espejo bandas corriendo: ${seedCount} seeds por formación y por lado...`);
     this.mutationInFlight.set(true);
     this.harness.setStyle(this.selectedStyleModel).pipe(
       switchMap(() => this.restoreSideMirrorLabs(matchId)),
@@ -16505,13 +16519,13 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         const rows = this.buildSideMirrorSmokeRows(weakLeftRows, weakRightRows);
         this.sideMirrorSmokeRows.set(rows);
         this.realSideMirrorRows.set(rows);
-        this.markReplayAnalysisReady(`Side mirror smoke listo: ${rows.length} formaciones comparadas.`);
-        this.snackBar.open(`Side mirror smoke completed (${rows.length} formaciones).`, 'OK', { duration: 3500 });
+        this.markReplayAnalysisReady(`Smoke espejo bandas listo: ${rows.length} formaciones comparadas.`);
+        this.snackBar.open(`Smoke espejo bandas completed (${rows.length} formaciones).`, 'OK', { duration: 3500 });
       },
       error: (err) => {
         this.mutationInFlight.set(false);
         this.restoreSideMirrorLabs(matchId).subscribe({ error: () => undefined });
-        this.analysisReadyMessage.set(`Side mirror smoke falló: ${this.fmtError(err, 'Failed to run side mirror smoke')}`);
+        this.analysisReadyMessage.set(`Smoke espejo bandas falló: ${this.fmtError(err, 'Failed to run side mirror smoke')}`);
         this.snackBar.open(this.fmtError(err, 'Failed to run side mirror smoke'), 'OK', { duration: 6000 });
       },
       complete: () => {
@@ -16524,19 +16538,19 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const seedCount = this.scenarioMatrixSummaryEffectiveSeedCount();
     this.sideMirrorSmokeRows.set([]);
     this.sideMirrorSmokeMode.set('synthetic');
-    this.analysisReadyMessage.set(`Synthetic mirror lab corriendo: ${seedCount} seeds por formación y por lado...`);
+    this.analysisReadyMessage.set(`Lab espejo sintetico corriendo: ${seedCount} seeds por formación y por lado...`);
     this.mutationInFlight.set(true);
     this.harness.runSideMirrorSyntheticLab(seedStart, seedCount).subscribe({
       next: (rows) => {
         const mappedRows = this.mapSyntheticSideMirrorRows(rows ?? []);
         this.sideMirrorSmokeRows.set(mappedRows);
         this.syntheticSideMirrorRows.set(mappedRows);
-        this.markReplayAnalysisReady(`Synthetic mirror lab listo: ${(rows ?? []).length} formaciones comparadas.`);
-        this.snackBar.open(`Synthetic mirror lab completed (${(rows ?? []).length} formaciones).`, 'OK', { duration: 3500 });
+        this.markReplayAnalysisReady(`Lab espejo sintetico listo: ${(rows ?? []).length} formaciones comparadas.`);
+        this.snackBar.open(`Lab espejo sintetico completed (${(rows ?? []).length} formaciones).`, 'OK', { duration: 3500 });
       },
       error: (err) => {
         this.mutationInFlight.set(false);
-        this.analysisReadyMessage.set(`Synthetic mirror lab falló: ${this.fmtError(err, 'Failed to run synthetic mirror lab')}`);
+        this.analysisReadyMessage.set(`Lab espejo sintetico falló: ${this.fmtError(err, 'Failed to run synthetic mirror lab')}`);
         this.snackBar.open(this.fmtError(err, 'Failed to run synthetic mirror lab'), 'OK', { duration: 6000 });
       },
       complete: () => {
@@ -16788,11 +16802,11 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         this.scenarioMatrixResults.set(rows ?? []);
         this.mutationInFlight.set(false);
         this.snackBar.open(
-          `Scenario matrix completed (${rows?.length ?? 0} scenarios).`,
+          `Matriz escenarios completed (${rows?.length ?? 0} scenarios).`,
           'OK',
           { duration: 3000 }
         );
-        this.markReplayAnalysisReady('Scenario matrix lista en Panel E.');
+        this.markReplayAnalysisReady('Matriz escenarios lista en Panel E.');
       },
       error: (err) => {
         this.mutationInFlight.set(false);
@@ -16824,7 +16838,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   onRunFocusedWideBattery(): void {
     const matchId = this.selectedMatchId();
     if (!matchId || !this.selectedMatchIncludesUserTeam()) {
-      this.snackBar.open('Elegí un partido de tu equipo para correr Focused wide battery.', 'OK', { duration: 4000 });
+      this.snackBar.open('Elegí un partido de tu equipo para correr Bateria bandas enfocada.', 'OK', { duration: 4000 });
       return;
     }
     const seedStart = this.seedInputModel ?? 12345;
@@ -16834,7 +16848,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const originalStyle = this.selectedStyleModel;
     this.focusedWideBatteryRows.set([]);
     this.scenarioMatrixSummarySeedCount.set(seedCount);
-    this.analysisReadyMessage.set(`Focused wide battery corriendo: ${formations.length} formaciones x ${styles.length} estilos x ${seedCount} seeds...`);
+    this.analysisReadyMessage.set(`Bateria bandas enfocada corriendo: ${formations.length} formaciones x ${styles.length} estilos x ${seedCount} seeds...`);
     this.mutationInFlight.set(true);
 
     this.harness.getCurrentLineup().pipe(
@@ -16844,7 +16858,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         const originalPlayerIds = (originalLineup.players ?? []).map((player) => player.playerId);
         const originalSlots = originalLineup.slots ?? [];
         if (originalPlayerIds.length !== 11 || originalSlots.length !== 11) {
-          throw new Error(`Focused wide battery necesita 11 titulares y 11 slots; tiene ${originalPlayerIds.length}/${originalSlots.length}.`);
+          throw new Error(`Bateria bandas enfocada necesita 11 titulares y 11 slots; tiene ${originalPlayerIds.length}/${originalSlots.length}.`);
         }
         const jobs = formations.flatMap((formation) => styles.map((style) => ({ formation, style })));
         return from(jobs).pipe(
@@ -16868,11 +16882,11 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     ).subscribe({
       next: (rows) => {
         this.focusedWideBatteryRows.set(rows);
-        this.markReplayAnalysisReady(`Focused wide battery lista: ${rows.length} lecturas.`);
-        this.snackBar.open('Focused wide battery completed.', 'OK', { duration: 3500 });
+        this.markReplayAnalysisReady(`Bateria bandas enfocada lista: ${rows.length} lecturas.`);
+        this.snackBar.open('Bateria bandas enfocada completed.', 'OK', { duration: 3500 });
       },
       error: (err) => {
-        this.analysisReadyMessage.set(this.fmtError(err, 'Focused wide battery falló'));
+        this.analysisReadyMessage.set(this.fmtError(err, 'Bateria bandas enfocada falló'));
       },
     });
   }
@@ -17009,8 +17023,8 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         this.mutationInFlight.set(false);
         this.scenarioBatteryProgress.set('');
         this.scenarioBatteryWorkload.set('');
-        this.markReplayAnalysisReady(`Battery tablero listo: ${partialRows.filter(Boolean).length} lecturas (${this.scenarioBatteryGroupLabel(scenarioGroup)}, ${matches.length} partidos x local/visitante).`);
-        this.snackBar.open(`Battery tablero completo: ${partialRows.filter(Boolean).length} lecturas (${this.scenarioBatteryGroupLabel(scenarioGroup)}).`, 'OK', { duration: 3500 });
+        this.markReplayAnalysisReady(`Tablero bateria listo: ${partialRows.filter(Boolean).length} lecturas (${this.scenarioBatteryGroupLabel(scenarioGroup)}, ${matches.length} partidos x local/visitante).`);
+        this.snackBar.open(`Tablero bateria completo: ${partialRows.filter(Boolean).length} lecturas (${this.scenarioBatteryGroupLabel(scenarioGroup)}).`, 'OK', { duration: 3500 });
       },
       error: (err) => {
         this.mutationInFlight.set(false);
@@ -17098,7 +17112,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         this.scenarioMatrixResults.set([]);
         this.scenarioMatrixSummaryResults.set([]);
         this.snackBar.open(
-          `${result.message}. Run Scenario matrix to measure m60-offensive-upgrade-sub.`,
+          `${result.message}. Run Matriz escenarios to measure m60-offensive-upgrade-sub.`,
           'OK',
           { duration: 5000 }
         );
@@ -17121,7 +17135,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         this.scenarioMatrixResults.set([]);
         this.scenarioMatrixSummaryResults.set([]);
         this.snackBar.open(
-          `${result.message}. Run Scenario matrix again for baseline squad.`,
+          `${result.message}. Run Matriz escenarios again for baseline squad.`,
           'OK',
           { duration: 5000 }
         );
@@ -17144,7 +17158,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         this.scenarioMatrixResults.set([]);
         this.scenarioMatrixSummaryResults.set([]);
         this.snackBar.open(
-          `${result.message}. Run Scenario matrix to measure m60-defensive-downgrade-sub.`,
+          `${result.message}. Run Matriz escenarios to measure m60-defensive-downgrade-sub.`,
           'OK',
           { duration: 5000 }
         );
@@ -17167,7 +17181,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         this.scenarioMatrixResults.set([]);
         this.scenarioMatrixSummaryResults.set([]);
         this.snackBar.open(
-          `${result.message}. Run Scenario matrix again for baseline squad.`,
+          `${result.message}. Run Matriz escenarios again for baseline squad.`,
           'OK',
           { duration: 5000 }
         );
@@ -17188,7 +17202,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       next: (result) => {
         this.handleLabMutationSuccess();
         this.snackBar.open(
-          `${result.message}. Run Player swap full smoke to compare Objetivo DT, Mejor ataque and Mejor cierre.`,
+          `${result.message}. Run Smoke completo de cambios to compare Objetivo DT, Mejor ataque and Mejor cierre.`,
           'OK',
           { duration: 7000 }
         );
@@ -17209,7 +17223,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       next: (result) => {
         this.handleLabMutationSuccess();
         this.snackBar.open(
-          `${result.message}. Run Player swap full smoke again for baseline objective reads.`,
+          `${result.message}. Run Smoke completo de cambios again for baseline objective reads.`,
           'OK',
           { duration: 6000 }
         );
@@ -17426,7 +17440,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const seedCount = this.playerSwapBatteryEffectiveSeedCount();
     this.playerSwapSeedCountModel = seedCount;
     this.clearReplayAnalysisResultsForLatestRun();
-    this.analysisReadyMessage.set(`Player swap full smoke corriendo: natural + stress, ${seedCount} seeds por cambio...`);
+    this.analysisReadyMessage.set(`Smoke completo de cambios corriendo: natural + stress, ${seedCount} seeds por cambio...`);
     this.mutationInFlight.set(true);
     const source$ = this.selectedMatchIncludesUserTeam()
       ? forkJoin({
@@ -17454,20 +17468,20 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       error: (err) => {
         this.mutationInFlight.set(false);
         this.analysisReadyMessage.set(
-          this.fmtError(err, 'Player swap full smoke fallo antes de generar Panel E')
+          this.fmtError(err, 'Smoke completo de cambios fallo antes de generar Panel E')
         );
-        this.snackBar.open(this.fmtError(err, 'Failed to run player swap full smoke'), 'OK', { duration: 5000 });
+        this.snackBar.open(this.fmtError(err, 'No se pudo correr smoke completo de cambios'), 'OK', { duration: 5000 });
         this.refreshLineupContext();
       },
       complete: () => {
         this.mutationInFlight.set(false);
         const count = this.playerSwapBatterySummaries().length;
         this.snackBar.open(
-          count > 0 ? `Player swap full smoke complete: ${count} swaps measured.` : 'Player swap full smoke completed with insufficient samples.',
+          count > 0 ? `Smoke completo de cambios complete: ${count} swaps measured.` : 'Smoke completo de cambios completed with insufficient samples.',
           'OK',
           { duration: 4500 }
         );
-        this.markReplayAnalysisReady('Player swap full smoke listo en Panel E.');
+        this.markReplayAnalysisReady('Smoke completo de cambios listo en Panel E.');
         this.refreshLineupContext();
       },
     });
@@ -17761,7 +17775,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const next = nextJob
       ? ` Próximo: ${nextJob.match.homeTeamName} vs ${nextJob.match.awayTeamName} (${nextJob.controlledSide === 'HOME' ? 'local' : 'visitante'}).`
       : ' Cerrando tablero...';
-    return `Battery tablero: ${completed}/${total} lecturas (${availableMatches}/${targetMatches} partidos).${next}`;
+    return `Tablero bateria: ${completed}/${total} lecturas (${availableMatches}/${targetMatches} partidos).${next}`;
   }
   private scenarioBatteryScenarioCountEstimate(group: 'ALL' | 'OFFENSE' | 'DEFENSE' | 'OPPONENT'): number {
     switch (group) {
@@ -17786,7 +17800,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         if (expectedMatchCount > 0 && completed >= expectedMatchCount) {
           this.clearRoundRefreshTimers();
           this.snackBar.open(
-            `Round ${roundNumber} completed (${completed}/${expectedMatchCount}). Battery tablero ya tiene mas muestra.`,
+            `Round ${roundNumber} completed (${completed}/${expectedMatchCount}). Tablero bateria ya tiene mas muestra.`,
             'OK',
             { duration: 3500 }
           );
@@ -17891,7 +17905,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
    * Previous implementation temporarily set selectedMatchId(null) and then
    * restored it on the next microtask. That remounted Panel A, but it also made
    * Panel B/D briefly believe no match was selected. During long replay flows
-   * like Formation matrix, that transient null could collapse controls and make
+   * like Matriz formaciones, that transient null could collapse controls and make
    * the matrix table disappear or leave buttons disabled. Keep selectedMatchId
    * stable and toggle only the detail panel visibility.
    */

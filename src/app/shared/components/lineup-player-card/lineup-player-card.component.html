@@ -14,8 +14,8 @@
     </span>
   </div>
   <div class="lineup-player-meta">
-    <span>Age: {{player.age}}</span>
-    <span *ngIf="player.injured" class="injured-badge" title="This player is injured">🤕</span>
+    <span>Edad: {{player.age}}</span>
+    <span *ngIf="player.injured" class="injured-badge" title="Este jugador está lesionado">🤕</span>
   </div>
   <div *ngIf="hasConditionWarning()" class="condition-warning"
        [class]="conditionClass()"

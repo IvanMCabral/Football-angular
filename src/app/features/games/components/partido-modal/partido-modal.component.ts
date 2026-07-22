@@ -1,4 +1,4 @@
-﻿import { ChangeDetectionStrategy, ChangeDetectorRef, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
@@ -24,13 +24,13 @@ import { SessionPlayer } from '../../../../shared/models/player.model';
 import { MatchEvent } from '../../../../core/services/match-engine.model';
 
 /**
- * V25D89.2 (stats live): a single row in the stats grid. Each row maps
+ * : a single row in the stats grid. Each row maps
  * one MatchEvent-derived counter to its home/away value. {@link label}
- * is the display string ("PosesiÃ³n", "Tiros totales", etc.), {@link home}
+ * is the display string ("Posesion", "Tiros totales", etc.), {@link home}
  * and {@link away} are the formatted values ("55%", "8", "0", etc.).
  *
  * <p>Why a single shape instead of 8 separate getters: the template binds
- * to {@code statsRows()} via {@code *ngFor} â€” keeping the row shape flat
+ * to {@code statsRows()} via {@code *ngFor}  -  keeping the row shape flat
  * means the grid layout (label + home + away) renders identically for
  * every stat without per-stat conditional markup.
  */
@@ -52,7 +52,7 @@ export interface PartidoDialogData {
   currentFormation: string;
   homeTeamId: string;
   /**
-   * V25D89.2: rival team sessionTeamId, needed so the stats derivation
+   * : rival team sessionTeamId, needed so the stats derivation
    * can attribute events to home vs away (without it we cannot tell which
    * shots belong to which side). Sourced from {@code state.awayTeamId}
    * via {@link LiveMatchModalsService.openPartidoModal}.
@@ -78,36 +78,36 @@ export interface PartidoDialogData {
   preSelectedPlayerId?: string;
   reason?: 'INJURY_FORCED_SUBSTITUTION' | string;
   /**
-   * V25D89-FRONT-A: rival formation string (e.g. "4-3-3") sourced from
-   * {@code state.awayFormation}. Read-only â€” the AI controls the rival.
+   * : rival formation string (e.g. "4-3-3") sourced from
+   * {@code state.awayFormation}. Read-only  -  the the rival is controlled by the match engine.
    * The rival tab renders this formation's pitch layout (role labels only,
-   * no player names because the rival XI is not exposed by the SSE feed â€”
-   * see report section 1.3 / known-limitation V25D89.1).
+   * no player names because the rival XI is not exposed by the SSE feed  - 
+   * see report section 1.3 / known-limitation ).
    */
   rivalFormation: string;
   /**
-   * V25D89.2: live minute at modal-open, sourced from
+   * : live minute at modal-open, sourced from
    * {@code state.currentMinute}. Drives the stats header tag ("Minuto 47").
-   * Optional â€” defaults to 0 when the SSE feed hasn't reached tick 1 yet
+   * Optional  -  defaults to 0 when the SSE feed hasn't reached tick 1 yet
    * (modal opens while the match is still NOT_STARTED in rare cases).
    */
   currentMinute?: number;
   /**
-   * V25D89.2: current score from {@code state.score}. Drives the goals row
+   * : current score from {@code state.score}. Drives the goals row
    * in the stats grid (the only stat we trust more than the event count
-   * â€” score.home/away is the canonical source, not GOAL events). Optional
+   *  -  score.home/away is the canonical source, not GOAL events). Optional
    * with default {0,0}.
    */
   score?: { home: number; away: number };
   /**
-   * V25D89.2: live possession 0-100 from BE1 (LIVE-MATCH-F3-UI-LIVE). The
-   * PosesiÃ³n row uses these verbatim â€” the event list doesn't carry a
+   * : live possession 0-100 from BE1 (). The
+   * Posesion row uses these verbatim  -  the event list doesn't carry a
    * possession sample, so we MUST read it from the snapshot.
    */
   homePossession?: number;
   awayPossession?: number;
   /**
-   * V25D89.2: human-readable team names. When missing the modal falls
+   * : human-readable team names. When missing the modal falls
    * back to the teamIds (less readable but still functional). Sourced
    * from the round-live {@code teamNameMap} via the 3rd param of
    * {@link LiveMatchModalsService.openPartidoModal}.
@@ -115,14 +115,14 @@ export interface PartidoDialogData {
   homeTeamName?: string;
   awayTeamName?: string;
   /**
-   * V25D89.2: full event timeline from {@code state.events}. Used to
+   * : full event timeline from {@code state.events}. Used to
    * derive shots/corners/fouls/yellow/red + populate the recent events
    * timeline. When empty (pre-kickoff) the stats section shows a graceful
    * "disponibles cuando arranque el partido" message instead of zeros.
    */
   events?: MatchEvent[];
   /**
-   * V25D89.2: subs the manager team can still make (V25D79 D5 source of
+   * : subs the manager team can still make (D5 source of
    * truth). Rendered as a chip "Subs: 3/5" in the stats header so the
    * manager knows at a glance how many changes they have left.
    */
@@ -130,9 +130,9 @@ export interface PartidoDialogData {
 }
 
 /**
- * V25D89-FRONT-A: per-formation role labels por dot. Mirrors the same map
+ * : per-formation role labels por dot. Mirrors the same map
  * in {@code formation-modal.component.ts} (F5) so the manager-side and
- * rival-side pitches use the same role vocabulary. Kept in sync by hand â€”
+ * rival-side pitches use the same role vocabulary. Kept in sync by hand  - 
  * any formation added to {@link FORMATION_LINES_BY_FORMATION} in the F5
  * modal must be added here too (or vice-versa). The 12 formations match
  * {@link ALL_FORMATIONS}.
@@ -153,29 +153,29 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
 };
 
 /**
- * V25D89-FRONT-A: Partido modal â€” unified "Partido" entry point that
+ * : Partido modal  -  unified "Partido" entry point that
  * shows BOTH the manager's formation (editable) AND the rival's formation
  * (read-only) in a single modal.
  *
  * <p>Two tabs via {@code mat-tab-group}:
  * <ul>
- *   <li><b>"Mi FormaciÃ³n"</b> â€” editable pitch with drag-and-drop,
- *       formation dropdown, auto-fill bench. Reuses the SAME slotâ†’player
+ *   <li><b>"Mi Formacion"</b>  -  editable pitch with drag-and-drop,
+ *       formation dropdown, auto-fill bench. Reuses the SAME slot -> player
  *       data flow as the existing F5
  *       {@code FormationModalComponent}. Why not embed the F5 component
  *       directly? Because {@code FormationModalComponent} injects
  *       {@code MAT_DIALOG_DATA} + {@code MatDialogRef} (a MatDialog leaf
  *       component), and providing stub tokens to it inside another
- *       MatDialog is brittle â€” every F5 close() call would need a
+ *       MatDialog is brittle  -  every F5 close() call would need a
  *       re-emit bridge to the parent. Reimplementing the pitch+drag
  *       logic here is bounded duplication (~150 lines) and keeps F5
  *       untouched. The F5 spec continues to test the formation flow
  *       independently, and this spec tests the partido flow.</li>
- *   <li><b>"FormaciÃ³n Rival"</b> â€” read-only pitch with the rival's
+ *   <li><b>"Formacion Rival"</b>  -  read-only pitch with the rival's
  *       formation string. Dots are grayed out + show only role labels
  *       (no player names because the rival XI is not exposed by the
- *       SSE feed â€” known-limitation V25D89.1 follow-up). Banner at the
- *       top: "ðŸ¤– Lo maneja la IA â€” no editable durante el partido".</li>
+ *       SSE feed  -  known-limitation follow-up). Banner at the
+ *       top: "Lo maneja el motor del partido - no editable durante el partido".</li>
  * </ul>
  *
  * <p>Footer: <b>"Descartar"</b> closes the modal without saving;
@@ -185,19 +185,19 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
  * <p>Save semantics: matches the F5 modal. {@code autoFillEmptySlots}
  * fills every empty slot from the bench before POSTing (with a lock
  * badge for auto-filled slots, same as F5). On success, snackbar
- * shows "FormaciÃ³n cambiada a {formation}" and dialog closes with
+ * shows "Formacion cambiada a {formation}" and dialog closes with
  * {@code success: true}. On error, the inline error banner surfaces
  * the backend's error message and the modal stays open so the manager
  * can correct.
  *
- * <p>V25D89-FRONT-A: NO backend changes â€” the formation endpoint
+ * <p>: NO backend changes  -  the formation endpoint
  * {@code POST /api/v1/match-engine/matches/{matchId}/formation} already
  * exists (see {@code FormationChangeController.java}) and is the same
  * one F5 calls.
  *
- * <p>V25D56-style inlined styles: {@code styles: [...]} instead of
+ * <p>inlined styles: {@code styles: [...]} instead of
  * {@code styleUrls: [...]} so {@code Éµcmp.styles} exposes the CSS
- * source to unit tests (per angular-testing-patterns memory â€” the
+ * source to unit tests (per angular-testing-patterns memory  -  the
  * .css companion file is kept for IDE hints only).
  */
 @Component({
@@ -215,25 +215,25 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
     MatProgressSpinnerModule
   ],
   templateUrl: './partido-modal.component.html',
-  // V25D56 (Sprint C17) + V25D79 (Sprint C18) convention: NO `styleUrls`
+  // convention: NO `styleUrls`
   // because the Karma/test webpack config does not have a CSS loader
   // (only `styles: [...]` inline arrays work). The .css companion file
-  // is kept on disk for IDE hints only â€” see partido-modal.component.css.
+  // is kept on disk for IDE hints only  -  see partido-modal.component.css.
   styles: [`
-    /* V25D89.4-FRONT: full-width modal. The V25D89.3 cap (540px) made
+    /* : full-width modal. The cap (540px) made
        the modal look like it floated in a corner of the viewport on
-       desktop â€” IvÃ¡n saw ~40-50% of empty white space to the right of
+       desktop  -  early visual tests showed too much empty white space to the right of
        a 540px modal on a 1920px screen. New target: use 95% of the
        viewport width so the pitch + bench + stats + events layout
-       has room to breathe. We keep the V25D89.3 compact spacing for
-       internal padding/margins â€” only the outer container expands. */
+       has room to breathe. We keep the compact spacing for
+       internal padding/margins  -  only the outer container expands. */
     .partido-modal-root {
       min-width: 0;
       max-width: 100%;
       font-family: 'Segoe UI', system-ui, sans-serif;
     }
 
-    /* V25D89.4-FRONT: override Angular Material MDC dialog container
+    /* : override Angular Material MDC dialog container
        to fill the viewport instead of capping at 540px. Both width AND
        max-width are set so the dialog actually takes the requested
        width (Material's default behavior with max-width alone leaves
@@ -247,12 +247,12 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       align-self: center;
     }
 
-    /* V25D89.3-FRONT: override Angular Material MDC dialog default
+    /* : override Angular Material MDC dialog default
        padding so the title bar and content hug the modal edges.
        Without these overrides Material adds ~24px padding around the
-       title and the content body â€” that's the bulk of the "espacio
-       blanco lateral / superior" IvÃ¡n saw in the V25D89.2 screenshot.
-       V25D89.4: also cap max-height + enable vertical scroll so the
+       title and the content body  -  that's the bulk of the "espacio
+       blanco lateral / superior" seen in the screenshot.
+       : also cap max-height + enable vertical scroll so the
        expanded modal doesn't overflow the viewport on shorter screens
        (the pitch + bench + stats + events stack can exceed 100vh on
        laptops with the height of the formation pitch + stats header +
@@ -313,11 +313,11 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       border: 1px solid rgba(219, 234, 254, 0.18);
     }
 
-    /* V25D90-FRONT-F3: score chip in the modal title bar â€” sits between
+    /* : score chip in the modal title bar  -  sits between
        the icon and the minute tag. Same pill visual vocabulary as the
        minute tag so the title looks like a single coherent chip row.
        Background uses the score-themed green (not the neutral grey of
-       the minute tag) so the eye lands on it first â€” it's the most
+       the minute tag) so the eye lands on it first  -  it's the most
        information-dense element of the modal. */
     .score-chip {
       display: inline-block;
@@ -344,7 +344,7 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       box-shadow: 0 28px 80px rgba(2, 6, 23, 0.35);
     }
 
-    /* V25D89-FRONT-A: banner styling mirrors the F5 modal's banner so
+    /* : banner styling mirrors the F5 modal's banner so
        the look-and-feel is consistent across both modal entry points. */
     .banner {
       display: flex;
@@ -370,7 +370,7 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       color: #8a5300;
       border: 1px solid #ffe0a0;
     }
-    /* V25D89-FRONT-A: AI-managed banner for the rival tab. Blue tone to
+    /* : AI-managed banner for the rival tab. Blue tone to
        distinguish from red error / yellow warning. */
     .banner-info-ai {
       background: #e3f2fd;
@@ -400,11 +400,11 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       max-width: 220px;
     }
 
-    /* V25D89.1-FRONT: pitch now has halfway line + center circle drawn
+    /* : pitch now has halfway line + center circle drawn
        via ::before / ::after pseudo-elements so the manager can read the
        formation at a glance (lines act as visual anchors for "two halves"
        and "midfield zone"). The white pitch border already provides the
-       touch-lines and goal-lines. Pure CSS â€” no DOM change, no new
+       touch-lines and goal-lines. Pure CSS  -  no DOM change, no new
        assets, scales with the modal width. */
     .pitch {
       position: relative;
@@ -423,9 +423,9 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
         inset 0 28px 70px rgba(255, 255, 255, 0.06),
         inset 0 -28px 80px rgba(0, 0, 0, 0.14),
         0 22px 42px rgba(15, 23, 42, 0.22);
-      /* V25D90-FRONT-F2: 280px â†’ 380px so the larger 56x56 dots
-         (4 lines Ã— 64px pitch-line + 3 gaps Ã— ~5px + 2 padding Ã—
-         8px â‰ˆ 285px of inner content) don't crowd the pitch border.
+      /* : 280px  ->  380px so the larger 56x56 dots
+         (4 lines x 64px pitch-line + 3 gaps x ~5px + 2 padding x
+         8px ~ 285px of inner content) don't crowd the pitch border.
          380px leaves ~95px of headroom for the center circle + the
          halfway line pseudo-elements. */
       min-height: clamp(420px, 58vh, 680px);
@@ -434,7 +434,7 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       overflow: hidden;
       touch-action: none;
     }
-    /* Halfway line â€” horizontal stripe at 50% height, full pitch width.
+    /* Halfway line  -  horizontal stripe at 50% height, full pitch width.
        White at 65% opacity so the player dots stay legible on top. */
     .pitch::before {
       content: '';
@@ -448,7 +448,7 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       pointer-events: none;
       z-index: 0;
     }
-    /* Center circle â€” fixed 64Ã—64 px ring so it stays circular on any
+    /* Center circle  -  fixed 64x64 px ring so it stays circular on any
        modal width. Centered on the pitch; visually anchors the midfield
        line in the formation layout. pointer-events:none so drag/drop
        on the dots still works. */
@@ -475,7 +475,7 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       display: flex;
       justify-content: space-around;
       align-items: center;
-      /* V25D90-FRONT-F2: bumped from 30px to 64px so the larger 56x56
+      /* : bumped from 30px to 64px so the larger 56x56
          player-dots (F2) have room without clipping the role label
          below the name. The extra headroom also keeps drag targets
          comfortable on touch devices. */
@@ -483,8 +483,8 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
     }
 
     .player-dot {
-      /* V25D90-FRONT-F2: 30px â†’ 56px so the full player name (e.g.
-         "Bellingham", "VinÃ­cius", "MbappÃ©") fits without aggressive
+      /* : 30px  ->  56px so the full player name (e.g.
+         "Bellingham", "Vinicius", "Mbappe") fits without aggressive
          ellipsis. The 56px width lets ~7 chars fit on one line at
          0.65rem; longer names wrap to 2 lines (white-space: normal
          on .dot-player-name below). Height matches width for a true
@@ -530,7 +530,7 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       box-shadow: 0 0 0 3px #d32f2f, 0 1px 3px rgba(0, 0, 0, 0.3);
     }
 
-    /* V25D89-FRONT-A: auto-fill lock badge (same as F5 modal). */
+    /* : auto-fill lock badge (same as F5 modal). */
     .player-dot.is-auto-filled {
       box-shadow: 0 0 0 2px #f57c00, 0 1px 3px rgba(0, 0, 0, 0.3);
     }
@@ -540,7 +540,7 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       box-shadow: 0 0 0 2px #f59e0b, 0 2px 6px rgba(0, 0, 0, 0.35);
     }
 
-    /* V25D99.20.3.39: when the DT drops a marker freely on the pitch,
+    /* : when the DT drops a marker freely on the pitch,
        render it by real pitch percentages instead of nudging the slot.
        This matches the pre-match editor's mental model and keeps the
        visible marker aligned with the customX/customY sent to the engine. */
@@ -650,13 +650,13 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
     }
 
     .dot-player-name {
-      /* V25D90-FRONT-F2: bumped from 0.55rem to 0.7rem + max-width 50px
+      /* : bumped from 0.55rem to 0.7rem + max-width 50px
          so the full name fits on one line (or wraps to two for names
          like "Bellingham"). Killed the aggressive text-overflow:
-         ellipsis that was truncating "MbappÃ©" â†’ "Mb". The white-space
+         ellipsis that was truncating "Mbappe"  ->  "Mb". The white-space
          rule is now normal (was nowrap) so long names break onto a
          second line instead of being cut. The 50px max-width matches
-         the 56px dot minus 2Ã—2px padding minus 2Ã—2px border. */
+         the 56px dot minus 2x2px padding minus 2x2px border. */
       font-size: 0.7rem;
       font-weight: 700;
       line-height: 1.1;
@@ -668,7 +668,7 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       color: #1e3c72;
     }
 
-    /* V25D90-FRONT-F1: the role label now lives INSIDE every slot
+    /* : the role label now lives INSIDE every slot
        (was: only empty slots). Same vocabulary as .dot-label so
        empty slots and filled slots read identically. Slightly dimmer
        than the player name (opacity 0.78) so the eye lands on the
@@ -685,10 +685,10 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
 
     .dot-label { user-select: none; }
 
-    /* ========== V25D89.2: stats grid (full-width under pitch + bench) ========== */
+    /* ========== : stats grid (full-width under pitch + bench) ========== */
     /* Layout: header row with team names + Subs chip, then 8 stat rows
        (label + home value + away value). 3-col grid keeps every row
-       visually aligned so the manager can scan "PosesiÃ³n", "Goles",
+       visually aligned so the manager can scan "Posesion", "Goles",
        "Tiros totales" etc. left-to-right per team. */
     .partido-stats {
       margin-top: 0.35rem;
@@ -819,7 +819,7 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       height: 1rem;
     }
 
-    /* ========== V25D89.2: recent events timeline (compact list) ========== */
+    /* ========== : recent events timeline (compact list) ========== */
     /* Layout: header + scrollable list of 6 events max. Each row is a
        4-col grid (icon, minute, player, description) so the manager can
        scan "who did what when" without parsing descriptions. */
@@ -920,13 +920,13 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       height: 1rem;
     }
 
-    /* ========== V25D89-FRONT-A: rival tab â€” read-only ========== */
+    /* ========== : rival tab  -  read-only ========== */
 
     .rival-pitch-wrapper {
       padding: 0.2rem 0 0.3rem;
     }
 
-    /* V25D89-FRONT-A: rival dots are visually de-emphasized (grayed
+    /* : rival dots are visually de-emphasized (grayed
        out) and interaction-disabled (no pointer events, no cursor).
        No drag handlers are bound. */
     .rival-pitch .player-dot {
@@ -938,7 +938,7 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       transform: none;
     }
 
-    /* V25D89-FRONT-A: the rival formation header is a non-interactive
+    /* : the rival formation header is a non-interactive
        read-only display of the awayFormation string (no mat-select). */
     .rival-formation-readonly {
       display: inline-block;
@@ -1050,7 +1050,7 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       height: 1rem;
     }
 
-    /* ========== V25D89-FRONT-A: tab styling (mat-tab overrides) ========== */
+    /* ========== : tab styling (mat-tab overrides) ========== */
 
     .partido-tabs ::ng-deep .mat-mdc-tab-header {
       background: #f5f7fa;
@@ -1078,7 +1078,7 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       border-top: 1px solid rgba(15, 23, 42, 0.08);
     }
 
-    /* V25D89-FRONT-A: success toast styling (snackbar) â€” same as F5. */
+    /* : success toast styling (snackbar)  -  same as F5. */
     :host ::ng-deep .success-toast {
       --mdc-snackbar-container-color: #2e7d32;
       --mdc-snackbar-supporting-text-color: #ffffff;
@@ -1086,7 +1086,7 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       font-weight: 600;
     }
 
-    /* ========== Responsive â€” V25D56 mirror ========== */
+    /* ========== Responsive  -  mirror ========== */
 
     @media (max-width: 600px) {
       .partido-modal-root {
@@ -1094,7 +1094,7 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
         max-width: 100vw;
         padding: 0 0.25rem;
       }
-      /* V25D89.4-FRONT: also override the dialog container cap at
+      /* : also override the dialog container cap at
          mobile so the 95vw base rule doesn't fight the 100vw mobile
          rule (CSS cascade picks the later rule, which is this one). */
       :host ::ng-deep .mat-mdc-dialog-container {
@@ -1104,9 +1104,9 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       .pitch {
         padding: 0.35rem 0.25rem;
         gap: 0.2rem;
-        /* V25D90-FRONT-F2: mobile pitch keeps the smaller dot scale so
+        /* : mobile pitch keeps the smaller dot scale so
            11 dots still fit on a portrait phone (320-360px viewport).
-           320px is enough for 11 Ã— ~24px dots with ~5px gaps. */
+           320px is enough for 11 x ~24px dots with ~5px gaps. */
         min-height: min(62vh, 420px);
       }
       .pitch::after {
@@ -1118,7 +1118,7 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
         min-height: 36px;
       }
       .player-dot {
-        /* V25D90-FRONT-F2: mobile dot scale â€” still bigger than the
+        /* : mobile dot scale  -  still bigger than the
            legacy 18px so the role label below the name stays legible,
            but small enough that 11 dots fit on a 320px viewport with
            the standard pitch-line gap. */
@@ -1157,7 +1157,7 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
     }
 
     @media (min-width: 601px) and (max-width: 1024px) {
-      /* V25D89.4-FRONT: tablet â€” drop the 460px cap so the modal uses
+      /* : tablet  -  drop the 460px cap so the modal uses
          the full 95vw from the base rule. Keep a sensible min-width
          (320px) so the pitch doesn't get squashed on portrait tablets. */
       .partido-modal-root {
@@ -1168,7 +1168,7 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       .pitch::after { width: 54px; height: 54px; }
       .pitch-line { gap: 8px; min-height: 48px; }
       .player-dot {
-        /* V25D90-FRONT-F2: tablet scale â€” bigger than mobile, smaller
+        /* : tablet scale  -  bigger than mobile, smaller
            than the 56px desktop base. Gives portrait tablets (~768px)
            enough room for 11 dots without the names overflowing the
            4-3-3 / 4-4-2 lines. */
@@ -1189,17 +1189,17 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
     }
 
     @media (min-width: 1600px) {
-      /* V25D89.4-FRONT: xlarge viewport â€” keep the player-dot scale-up
+      /* : xlarge viewport  -  keep the player-dot scale-up
          but DROP the 800px max-width cap so the 95vw base rule applies.
          On a 1920px+ monitor the modal now fills 95% of the width
          (~1824px) instead of being capped at 800px. */
       .partido-modal-root { max-width: 100%; }
       .player-dot {
-        /* V25D90-FRONT-F2: xlarge scale â€” bigger than the 56px base
+        /* : xlarge scale  -  bigger than the 56px base
            so the dot feels proportional to the wider modal. The 4-4-2
            line has 4 dots, so on a 1824px modal each dot can claim
            ~440px of horizontal space; 64px leaves room for ~9 chars
-           on a single line (e.g. "VinÃ­cius"). */
+           on a single line (e.g. "Vinicius"). */
         width: 82px;
         height: 68px;
         font-size: 0.78rem;
@@ -1211,7 +1211,7 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       .dot-role { font-size: 0.6rem; }
     }
 
-    /* ========== V25D90-FRONT-F4: z-index layering for the Formation
+    /* ========== : z-index layering for the Formation
        mat-select dropdown so it stays visible above the partido
        modal backdrop. Material CDK renders each overlay in its own
        cdk-overlay-container div appended to the body, and the cdk
@@ -1223,7 +1223,7 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
        render on top of the partido backdrop.
 
        The partido modal pane class is "partido-modal-pane" (added via
-       MatDialogConfig.panelClass in live-match-modals.service.ts so
+       MatDialogConfig.panelClass in so
        both the substitution / formation / partido / rival-card modals
        can share the layer). The mat-select panel class is
        "formation-select-panel" (added via MatSelectConfig.panelClass
@@ -1257,15 +1257,15 @@ export class PartidoModalComponent {
   /** Available formations (12 codes from the shared constants). */
   readonly formations: readonly string[] = ALL_FORMATIONS;
 
-  // ========== V25D89-FRONT-A: tab state ==========
+  // ========== : tab state ==========
 
   /** Currently visible tab. Default = 'mine' (manager formation first). */
   readonly activeTab = signal<'mine' | 'rival'>('mine');
 
-  // ========== V25D89.2: stats live data (derived from MatchEvent list) ==========
+  // ========== : stats live data (derived from MatchEvent list) ==========
 
   /**
-   * V25D89.2: full MatchEvent list from the snapshot, defensively defaulted
+   * : full MatchEvent list from the snapshot, defensively defaulted
    * to {@code []} when the SSE feed hasn't reached tick 1 (modal opens while
    * the round is still NOT_STARTED). All derived stats + the timeline read
    * from this signal.
@@ -1273,15 +1273,15 @@ export class PartidoModalComponent {
   private readonly eventList = (): MatchEvent[] => this.data.events ?? [];
 
   /**
-   * V25D89.2: derived match stats from {@link eventList}. Returns a flat
+   * : derived match stats from {@link eventList}. Returns a flat
    * row-per-stat shape so the template can {@code *ngFor} over a single
    * collection. Each row carries:
    * <ul>
-   *   <li>{@code label} â€” display string in Spanish</li>
-   *   <li>{@code home} / {@code away} â€” formatted value</li>
+   *   <li>{@code label}  -  display string in Spanish</li>
+   *   <li>{@code home} / {@code away}  -  formatted value</li>
    * </ul>
    * Computed eagerly (not as a {@code computed} signal) because Angular's
-   * signals don't deeply track {@code data.events} reference changes â€”
+   * signals don't deeply track {@code data.events} reference changes  - 
    * the SSE feed pushes a NEW MatchState object every tick, so the dialog
    * data is replaced wholesale on each round-live vm$ emission. Calling
    * this getter per change-detection cycle is cheap (8 filter passes over
@@ -1289,15 +1289,15 @@ export class PartidoModalComponent {
    *
    * <p>Stats derived:
    * <ul>
-   *   <li>PosesiÃ³n â€” {@code state.homePossession}/{@code state.awayPossession}
+   *   <li>Posesion  -  {@code state.homePossession}/{@code state.awayPossession}
    *       (NOT derived from events; possession is its own BE1 field).</li>
-   *   <li>Goles â€” {@code state.score.home/away} (canonical, not GOAL events).</li>
-   *   <li>Tiros totales â€” count(SHOT + SHOT_ON_TARGET) for each team.</li>
-   *   <li>Tiros a puerta â€” count(SHOT_ON_TARGET) for each team.</li>
-   *   <li>Corners â€” count(CORNER) for each team.</li>
-   *   <li>Faltas â€” count(FOUL) for each team.</li>
-   *   <li>Offsides â€” count(OFFSIDE) for each team.</li>
-   *   <li>Tarjetas â€” count(YELLOW_CARD + RED_CARD) shown as "A:R" for each
+   *   <li>Goles  -  {@code state.score.home/away} (canonical, not GOAL events).</li>
+   *   <li>Tiros totales  -  count(SHOT + SHOT_ON_TARGET) for each team.</li>
+   *   <li>Tiros a puerta  -  count(SHOT_ON_TARGET) for each team.</li>
+   *   <li>Corners  -  count(CORNER) for each team.</li>
+   *   <li>Faltas  -  count(FOUL) for each team.</li>
+   *   <li>Offsides  -  count(OFFSIDE) for each team.</li>
+   *   <li>Tarjetas  -  count(YELLOW_CARD + RED_CARD) shown as "A:R" for each
    *       team (yellows:reds) so the manager can spot ejections at a glance.</li>
    * </ul>
    *
@@ -1305,7 +1305,7 @@ export class PartidoModalComponent {
    * {@code teamId}. We match it against {@code data.homeTeamId} /
    * {@code data.awayTeamId} (both strings) and increment the corresponding
    * bucket. Events without a {@code teamId} (legacy V23 synthetic events)
-   * are skipped â€” they don't carry enough info to attribute to a side.
+   * are skipped  -  they don't carry enough info to attribute to a side.
    *
    * <p>Why string-comparison: {@code state.homeTeamId} and the event's
    * {@code teamId} may have different types (UUID vs string) depending on
@@ -1383,10 +1383,10 @@ export class PartidoModalComponent {
   }
 
   /**
-   * V25D89.2: last 6 events, most recent first. Drives the timeline section
+   * : last 6 events, most recent first. Drives the timeline section
    * below the stats. Capped at 6 so the section stays within ~140px (the
    * modal's available height after the pitch + bench + stats + footer).
-   * No pagination â€” the timeline is a glance, not a full event log; the
+   * No pagination  -  the timeline is a glance, not a full event log; the
    * match-card already has a fuller feed on the round-live page.
    */
   recentEvents(): MatchEvent[] {
@@ -1394,7 +1394,7 @@ export class PartidoModalComponent {
   }
 
   /**
-   * V25D89.2: true when the modal has received at least one event. Drives
+   * : true when the modal has received at least one event. Drives
    * the "stats disponibles cuando arranque el partido" empty state.
    */
   hasEvents(): boolean {
@@ -1402,18 +1402,17 @@ export class PartidoModalComponent {
   }
 
   /**
-   * V25D89.2: current minute accessor used by the template header tag.
+   * : current minute accessor used by the template header tag.
    * Falls back to 0 when the modal opens while the round hasn't ticked
-   * yet (NOT_STARTED â†’ minute 0).
+   * yet (NOT_STARTED  ->  minute 0).
    */
   currentMinute(): number {
     return this.data.currentMinute ?? 0;
   }
 
   /**
-   * V25D90-FRONT-F3: home score accessor for the score chip in the modal
-   * title bar AND the stats-header-row "score-cell" (replaces the V25D89.2
-   * dash placeholder). Sourced from {@code data.score.home}, falling back
+   * : home score accessor for the score chip in the modal
+   * title bar AND the stats-header-row "score-cell" (replaces the * dash placeholder). Sourced from {@code data.score.home}, falling back
    * to 0 when the SSE feed hasn't reached tick 1.
    */
   homeScore(): number {
@@ -1421,7 +1420,7 @@ export class PartidoModalComponent {
   }
 
   /**
-   * V25D90-FRONT-F3: away score accessor (sister of {@link homeScore}).
+   * : away score accessor (sister of {@link homeScore}).
    * Same fall-back semantics.
    */
   awayScore(): number {
@@ -1429,17 +1428,17 @@ export class PartidoModalComponent {
   }
 
   /**
-   * V25D89.2: subs remaining for the manager team. {@code 5 - 0} is the
+   * : subs remaining for the manager team. {@code 5 - 0} is the
    * full quota; the chip "Subs: 3/5" lets the manager see at a glance
    * how many changes they have left. Source of truth is the backend
-   * (V25D79 D5 = {@code max(0, 5 - count(SUBSTITUTION events))}).
+   * (D5 = {@code max(0, 5 - count(SUBSTITUTION events))}).
    */
   substitutionsRemaining(): number {
     return this.data.substitutionsRemaining ?? 5;
   }
 
   /**
-   * V25D89.2: human-readable event icon for the timeline. Matches the
+   * : human-readable event icon for the timeline. Matches the
    * F3 timeline icons used on the round-live page (round-live.component.ts
    * {@code getEventIcon}) so the visual vocabulary stays consistent.
    */
@@ -1465,7 +1464,7 @@ export class PartidoModalComponent {
     return iconMap[eventType] || 'EV';
   }
 
-  // ========== V25D89-FRONT-A: manager-tab formation state (F5 mirror) ==========
+  // ========== : manager-tab formation state (F5 mirror) ==========
 
   /** Currently selected formation (signal-based for OnPush). */
   readonly selectedFormation = signal<FormationCode>(
@@ -1473,7 +1472,7 @@ export class PartidoModalComponent {
   );
 
   /**
-   * Mutable slotâ†’playerId map. Initialized from {@code data.currentSlots}
+   * Mutable slot -> playerId map. Initialized from {@code data.currentSlots}
    * and updated by drag-and-drop handlers + formation-change re-flow. The
    * visual pitch template binds to this map to render the player name
    * in each dot.
@@ -1481,7 +1480,7 @@ export class PartidoModalComponent {
   slotAssignments: Map<number, string | null> = new Map();
 
   /**
-   * V25D99.20.3.38: free-position overrides for the live Partido pitch.
+   * : free-position overrides for the live Partido pitch.
    * Keyed by slot index; values are percentages relative to the pitch.
    */
   freeSlotCoords: Map<number, { x: number; y: number }> = new Map();
@@ -1501,7 +1500,7 @@ export class PartidoModalComponent {
   private pointerDragMoved = false;
   private suppressNextSlotClick = false;
 
-  /** Slots that were filled by the auto-fill pass â€” render a lock icon. */
+  /** Slots that were filled by the auto-fill pass  -  render a lock icon. */
   readonly autoFilledSlots = new Map<number, string>();
   readonly autoFillSourcePlayerBySlot = new Map<number, string>();
 
@@ -1513,7 +1512,7 @@ export class PartidoModalComponent {
   private destroy$ = new Subject<void>();
 
   /**
-   * Position group mapping for the bench fill â€” mirrors the F5 modal's
+   * Position group mapping for the bench fill  -  mirrors the F5 modal's
    * POSITION_GROUPS so the auto-fill behavior is consistent across both
    * modal entry points.
    */
@@ -1525,7 +1524,7 @@ export class PartidoModalComponent {
   };
 
   /**
-   * V25D89-FRONT-A: footer signal â€” true when the manager has unsaved
+   * : footer signal  -  true when the manager has unsaved
    * changes (formation string OR slot assignments differ from initial).
    * Drives the "Guardar" button enable/disable. Recomputed reactively
    * whenever selectedFormation changes or slotAssignments mutates (via
@@ -1539,7 +1538,7 @@ export class PartidoModalComponent {
     return formationChanged || slotsChanged || this.pendingSubstitutions.length > 0;
   });
 
-  // ========== V25D89-FRONT-A: rival-tab formation ==========
+  // ========== : rival-tab formation ==========
 
   /**
    * Rival formation (read-only). Sourced from
@@ -1552,7 +1551,7 @@ export class PartidoModalComponent {
   );
 
   constructor() {
-    // V25D89-FRONT-A: initialize slotAssignments from the dialog data.
+    // : initialize slotAssignments from the dialog data.
     for (const s of this.data.currentSlots ?? []) {
       this.slotAssignments.set(s.slotIndex, s.sessionPlayerId || null);
       if (this.isFinitePercent(s.customXPercent) && this.isFinitePercent(s.customYPercent)) {
@@ -1600,7 +1599,7 @@ export class PartidoModalComponent {
     return '4-4-2';
   }
 
-  // ========== V25D89-FRONT-A: manager-tab event handlers (F5 mirror) ==========
+  // ========== : manager-tab event handlers (F5 mirror) ==========
 
   onFormationChange(value: string): void {
     const newFormation = this.normalizeFormation(value);
@@ -1653,7 +1652,7 @@ export class PartidoModalComponent {
     this.selectedNudgeSlotIdx = null;
   }
 
-  /** Tab change handler â€” drives the "Mi FormaciÃ³n" / "FormaciÃ³n Rival" UI. */
+  /** Tab change handler  -  drives the "Mi Formacion" / "Formacion Rival" UI. */
   onTabChange(idx: number): void {
     this.activeTab.set(idx === 0 ? 'mine' : 'rival');
   }
@@ -2090,7 +2089,7 @@ export class PartidoModalComponent {
     return (this.data.events ?? []).some(event =>
       event.eventType === 'INJURY'
       && typeof event.description === 'string'
-      && event.description.includes('Debug Partido:')
+      && event.description.includes('DebugPartido:')
     );
   }
 
@@ -2273,7 +2272,7 @@ export class PartidoModalComponent {
     this.autoFillSourcePlayerBySlot.delete(slotIdx);
   }
 
-  // ========== V25D89-FRONT-A: pitch helpers (F5 mirror) ==========
+  // ========== : pitch helpers (F5 mirror) ==========
 
   playerAtSlot(slotIdx: number): SessionPlayer | null {
     const pid = this.slotAssignments.get(slotIdx);
@@ -2318,7 +2317,7 @@ export class PartidoModalComponent {
     return lines[lineIdx][n] ?? '';
   }
 
-  // ========== V25D89-FRONT-A: rival-tab helpers ==========
+  // ========== : rival-tab helpers ==========
 
   /**
    * Pitch lines for the rival formation. Mirrors the manager tab's
@@ -2332,7 +2331,7 @@ export class PartidoModalComponent {
     return lines.map(line => line.length);
   }
 
-  /** Role label for a rival dot â€” no player name (rival XI not exposed). */
+  /** Role label for a rival dot  -  no player name (rival XI not exposed). */
   getRivalDotLabel(lineIdx: number, dotIdx: number): string {
     const lines = FORMATION_LINES_BY_FORMATION[this.rivalFormation()];
     if (!lines || !lines[lineIdx]) {
@@ -2341,7 +2340,7 @@ export class PartidoModalComponent {
     return lines[lineIdx][dotIdx] ?? '';
   }
 
-  // ========== V25D89-FRONT-A: diff + save ==========
+  // ========== : diff + save ==========
 
   private slotsDifferFromInitial(): boolean {
     const initial = new Map<number, string>();
@@ -2596,10 +2595,10 @@ export class PartidoModalComponent {
     return (this.data.squad ?? []).find(p => p.sessionPlayerId === playerId)?.name ?? playerId;
   }
 
-  // ========== V25D89-FRONT-A: footer actions ==========
+  // ========== : footer actions ==========
 
   /**
-   * V25D89-FRONT-A: footer "Guardar" handler. Mirrors F5's
+   * : footer "Guardar" handler. Mirrors F5's
    * {@code FormationModalComponent.confirm} but exposed as
    * {@link save} to match the task spec's label ("Guardar" instead of
    * "Confirmar"). POSTs the formation change via
@@ -2616,7 +2615,7 @@ export class PartidoModalComponent {
       return;
     }
     if (!this.hasPendingChanges()) {
-      // No changes â€” close immediately without API call.
+      // No changes  -  close immediately without API call.
       this.dialogRef.close({ success: false, reason: 'no-change' });
       return;
     }
@@ -2763,15 +2762,15 @@ export class PartidoModalComponent {
   }
 
   /**
-   * V25D89-FRONT-A: footer "Descartar" handler. Closes the dialog
-   * without saving â€” the dialog opens again with the original
-   * formation (SSE-driven vm$ is untouched).
+   * : footer "Descartar" handler. Closes the dialog
+   * without saving  -  the dialog opens again with the original
+   * formation (SSE-drel usuario vm$ is untouched).
    */
   discard(): void {
     this.dialogRef.close({ success: false, reason: 'discarded' });
   }
 
-  /** @deprecated alias kept for symmetry with F5 modal â€” calls discard. */
+  /** @deprecated alias kept for symmetry with F5 modal  -  calls discard. */
   cancel(): void {
     this.discard();
   }

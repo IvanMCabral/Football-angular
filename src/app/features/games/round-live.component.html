@@ -1,5 +1,5 @@
 <div class="round-live-container" *ngIf="vm$ | async as vm">
-  <!-- V25D83 sprint: page-level spinner while the initial route data
+  <!-- : page-level spinner while the initial route data
        (route params + teams + career status + fixtures) is still
        resolving. Replaces the silent empty-container UX gap. The
        loadingSubject flips to false on first emission (success or error)
@@ -13,11 +13,11 @@
     <h2>Fecha {{ vm.roundNumber }} - En Vivo</h2>
     <span *ngIf="vm.byeTeam" class="bye-badge">BYE: {{ vm.byeTeam }}</span>
     <div class="controls">
-      <!-- V25D82 sprint 2 UX fix + V25D84 fallback: explicit "Iniciar Todos"
+      <!-- UX fix + fallback: explicit "Iniciar Todos"
            trigger. Shown only when no match has started yet AND the round is
            not paused AND not all finished. Once the SSE flips anyStarted=true
            the button hides automatically (no manual cleanup needed).
-           V25D84: under normal flow this button is hidden immediately because
+           : under normal flow this button is hidden immediately because
            the constructor's vm$.pipe(take(1)) auto-start subscription fires
            before this template renders. The button is the manual fallback
            for refresh / failed-auto-start recovery. -->
@@ -33,8 +33,8 @@
       <button *ngIf="!vm.allFinished && vm.isRoundPaused" (click)="resumeAll()" class="btn btn-resume">▶️ Reanudar Todos</button>
       <button
         *ngIf="showDebugControls && !vm.allFinished"
-        (click)="toggleDebugFreeze()"
-        class="btn btn-debug-freeze"
+        (click)="toggleDeFreeze()"
+        class="btn btn-defreeze"
         [class.active]="debugFreezeEnabled"
         [attr.aria-pressed]="debugFreezeEnabled"
         title="Modo prueba: pausa automáticamente la fecha viva al entrar"
@@ -43,20 +43,20 @@
       </button>
       <button
         *ngIf="showDebugControls && !vm.allFinished"
-        (click)="toggleDebugSuppressAutoInjuryModals()"
-        class="btn btn-debug-freeze"
+        (click)="toggleDeSuppressAutoInjuryModals()"
+        class="btn btn-defreeze"
         [class.active]="debugSuppressAutoInjuryModals"
         [attr.aria-pressed]="debugSuppressAutoInjuryModals"
-        data-testid="debug-suppress-auto-injury-button"
+        data-testid="desuppress-auto-injury-button"
         title="Modo prueba local: bloquea modales automaticos de lesion para probar Partido limpio"
       >
         {{ debugSuppressAutoInjuryModals ? 'Lesion auto OFF' : 'Lesion auto ON' }}
       </button>
       <button
         *ngIf="showDebugControls && !vm.allFinished"
-        (click)="onDebugDoubleInjury()"
-        class="btn btn-debug-freeze"
-        data-testid="debug-double-injury-button"
+        (click)="onDeDoubleInjury()"
+        class="btn btn-defreeze"
+        data-testid="dedouble-injury-button"
         title="Modo prueba local: dispara dos lesiones propias para validar cola de modales"
       >
         Test doble lesion
@@ -64,8 +64,8 @@
       <button
         *ngIf="showDebugControls && !vm.allFinished"
         (click)="onDebugPartidoInjury()"
-        class="btn btn-debug-freeze"
-        data-testid="debug-partido-injury-button"
+        class="btn btn-defreeze"
+        data-testid="departido-injury-button"
         title="Modo prueba local: crea una lesion propia en el estado visual para validar Partido + AUTO"
       >
         Test lesion Partido
@@ -74,7 +74,7 @@
     </div>
   </div>
 
-  <!-- LIVE-MATCH-F5.3.3 BUG-015: visual feedback when the round is paused
+  <!-- visual feedback when the round is paused
        (either manually via the header button, OR automatically by a
        substitution/formation modal). `vm.isRoundPaused` is set in
        round-live.component.ts from any match with `state.status === 'PAUSED'`
@@ -99,7 +99,7 @@
 
   <div *ngIf="vm.errorMsg" class="error">{{ vm.errorMsg }}</div>
 
-  <!-- V24D11 UX-5: tu partido destacado primero, los demas debajo con divider -->
+  <!-- UX-5: tu partido destacado primero, los demas debajo con divider -->
   <div *ngIf="userMatch" class="user-match-section">
     <h3 class="section-title">⭐ Tu partido</h3>
     <app-match-card

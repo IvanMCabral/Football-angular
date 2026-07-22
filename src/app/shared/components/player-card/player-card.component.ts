@@ -14,10 +14,10 @@ export class PlayerCardComponent {
   @Input() isSquad: boolean = false;
   /**
    * V25D78-C55.7.7 BUG-L3: optional current round number. When provided,
-   * the injury detail surfaces a "Returns Fecha N" hint (e.g. "Out 1 match
-   * · Returns Fecha 6") so the user knows exactly when the player is
+   * the injury detail surfaces a "Vuelve en fecha N" hint (e.g. "Fuera 1 partido
+   * · Vuelve en fecha 6") so the user knows exactly when the player is
    * available again. When null/undefined, the detail falls back to the
-   * pre-fix "Out N matches" wording (back-compat for callers that don't
+   * pre-fix "Fuera N partidos" wording (back-compat for callers that don't
    * have career context — e.g. detail pages with no current round loaded).
    */
   @Input() currentRound: number | null = null;
@@ -27,23 +27,23 @@ export class PlayerCardComponent {
   }
 
   suspendedLabel(): string {
-    return 'Suspended';
+    return 'Suspendido';
   }
 
   suspendedDetail(): string {
     const remaining = this.player.suspensionRemainingMatches ?? 0;
     if (remaining > 0) {
-      return remaining === 1 ? 'Unavailable for 1 match' : `Unavailable for ${remaining} matches`;
+      return remaining === 1 ? 'No disponible por 1 partido' : `No disponible por ${remaining} partidos`;
     }
-    return 'Unavailable';
+    return 'No disponible';
   }
 
   suspendedTooltip(): string {
     const remaining = this.player.suspensionRemainingMatches ?? 0;
     if (remaining > 0) {
-      return `Player is suspended for ${remaining} match(es) and cannot be selected`;
+      return `El jugador está suspendido por ${remaining} partido(s) y no puede ser seleccionado`;
     }
-    return 'Player is suspended and cannot be selected';
+    return 'El jugador está suspendido y no puede ser seleccionado';
   }
 
   isInjured(): boolean {
@@ -54,30 +54,30 @@ export class PlayerCardComponent {
     if (this.player.injured !== true) { return ''; }
     const remaining = this.player.injuryRemainingMatches;
     if (remaining === null || remaining === undefined || remaining <= 0) {
-      return 'Injured';
+      return 'Lesionado';
     }
-    return remaining === 1 ? 'Returning soon' : 'Injured';
+    return remaining === 1 ? 'Vuelve pronto' : 'Lesionado';
   }
 
   injuryDetail(): string {
     if (this.player.injured !== true) { return ''; }
     const remaining = this.player.injuryRemainingMatches;
     if (remaining === null || remaining === undefined || remaining <= 0) {
-      return 'Unavailable';
+      return 'No disponible';
     }
     // V25D78-C55.7.7 BUG-L3: when the parent provides the current round,
-    // append "Returns Fecha N" so the user knows when the player is back.
-    // Pre-fix the detail was just "Out N matches" with no specificity.
+    // append "Vuelve en fecha N" so the user knows when the player is back.
+    // Pre-fix the detail was just "Fuera N partidos" with no specificity.
     const returnRound = this.computeReturnRound(remaining);
-    const baseText = remaining === 1 ? 'Out 1 match' : `Out ${remaining} matches`;
-    return returnRound !== null ? `${baseText} · Returns Fecha ${returnRound}` : baseText;
+    const baseText = remaining === 1 ? 'Fuera 1 partido' : `Fuera ${remaining} partidos`;
+    return returnRound !== null ? `${baseText} · Vuelve en fecha ${returnRound}` : baseText;
   }
 
   /**
    * V25D78-C55.7.7 BUG-L3: compute the absolute round number when the
    * player is expected to return. Returns null when currentRound is
    * missing (no career context) so the caller can fall back to the
-   * pre-fix "Out N matches" wording.
+   * pre-fix "Fuera N partidos" wording.
    */
   private computeReturnRound(remaining: number): number | null {
     if (this.currentRound === null || this.currentRound === undefined) return null;
@@ -106,17 +106,17 @@ export class PlayerCardComponent {
 
   energyLabel(): string {
     const labels: Record<string, string> = {
-      'fresh': 'Fresh',
-      'good': 'Good',
-      'tired': 'Tired',
-      'very-tired': 'Very Tired',
-      'exhausted': 'Exhausted'
+      'fresh': 'Fresco',
+      'good': 'Bien',
+      'tired': 'Cansado',
+      'very-tired': 'Muy cansado',
+      'exhausted': 'Agotado'
     };
     return labels[this.energyStatus()] ?? '';
   }
 
   energyTooltip(): string {
-    return `Energy level: ${this.energyPercent()}% — ${this.energyLabel()}`;
+    return `Energía: ${this.energyPercent()}% — ${this.energyLabel()}`;
   }
 
   energyPercent(): number {

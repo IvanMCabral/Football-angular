@@ -83,7 +83,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
                   [disabled]="isFormationChanging"
                   [title]="(isCustomLineup() ? 'Tu lineup personalizado no coincide con una formación canónica' : '')">
             <option *ngFor="let f of formations" [value]="f">{{f}}</option>
-            <option [value]="userFormationLabel" [disabled]="true">Formación del User</option>
+            <option [value]="userFormationLabel" [disabled]="true">Formacion manual</option>
           </select>
           <span *ngIf="isFormationChanging" class="formation-change-blocked">(espera...)</span>
         </div>
@@ -103,7 +103,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
           <div class="header-preview-stack">
             <div class="chemistry-preview-row">
             <ng-container *ngIf="getDisplayedChemistryScore() as displayedScore; else previewEmpty">
-              <span class="preview-label">Chemistry proyectado:</span>
+              <span class="preview-label">Quimica proyectada:</span>
               <span class="preview-score"
                     [class.high]="displayedScore >= 80"
                     [class.mid]="displayedScore >= 60 && displayedScore < 80"
@@ -6562,81 +6562,87 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
   }
 
   /**
-   * Ejecuta el cambio de formación vía POST /career/lineup/auto-select y aplica
-   * los players retornados a los slots del campo.
-   *
-   * <p>V25D91.5-FRONT F6 fix: antes este método retornaba una Promise que solo
-   * resolvía después del HTTP. El reset de {@code isFormationChanging} vivía
-   * en {@code onFormationChange.then()} y dependía de que el padre
-   * escuchara {@code formationChangeCompleteSubject}. Como el padre no lo hace,
-   * el flag quedaba en true para siempre y el select quedaba disabled.
-   *
-   * <p>Ahora el reset del flag vive directamente en los callbacks next/error
-   * de este método, sin depender del padre. También agregamos
-   * {@code cdr.markForCheck()} + {@code cdr.detectChanges()} para forzar change
-   * detection en el squad-header (donde está el select y la chemistry preview).
+   * Moves the current starting XI into the requested formation without
+   * auto-selecting bench players. Manual formation changes are tactical shape
+   * changes; squad replacement stays behind the explicit Auto Select action.
    */
+  private applyCurrentXiToFormation(formationName: string): void {
+    const positions = this.formationPositions[formationName] || [];
+    if (positions.length === 0) { return; }
+
+    const currentXi = this.getUniqueValidHomePlayers().slice(0, 11);
+    this.slotPlayerMap = {};
+
+    const usedPositionIndexes = new Set<number>();
+    const indexedPositions = positions.map((position, index) => ({ position, index }));
+
+    const assignPlayer = (player: PlayerOnFieldDto, candidates: Array<{ position: FormationPositionDTO; index: number }>): boolean => {
+      const candidate = candidates.find(entry =>
+        !usedPositionIndexes.has(entry.index)
+        && this.canPlayerUseSlot(player, entry.position.subdivisionId)
+      );
+      if (!candidate) { return false; }
+      player.slotId = candidate.position.subdivisionId;
+      delete player.xPercent;
+      delete player.yPercent;
+      this.slotPlayerMap[candidate.position.subdivisionId] = player;
+      usedPositionIndexes.add(candidate.index);
+      return true;
+    };
+
+    for (const player of currentXi) {
+      if (this.isGoalkeeperPlayer(player)) {
+        assignPlayer(player, indexedPositions.filter(entry => entry.position.subdivisionId === 'GK-1'));
+      }
+    }
+
+    for (const player of currentXi) {
+      if (this.isGoalkeeperPlayer(player) || player.slotId === 'GK-1') { continue; }
+      const playerFamily = this.getRoleFamily(player.role ?? player.position);
+      assignPlayer(player, indexedPositions.filter(entry => this.getRoleFamily(entry.position.role) === playerFamily));
+    }
+
+    for (const player of currentXi) {
+      if (player.slotId && this.slotPlayerMap[player.slotId] === player) { continue; }
+      assignPlayer(player, indexedPositions);
+    }
+
+    const starters = currentXi.filter(player => player.slotId && this.slotPlayerMap[player.slotId] === player);
+    const starterIds = new Set(starters.map(player => player.playerId));
+    const benchById = new Map<string, PlayerOnFieldDto>();
+    for (const player of [...this.benchPlayers$.value, ...this.homePlayers$.value]) {
+      if (starterIds.has(player.playerId)) { continue; }
+      player.slotId = '';
+      delete player.xPercent;
+      delete player.yPercent;
+      benchById.set(player.playerId, player);
+    }
+
+    this.homePlayers$.next(starters);
+    this.benchPlayers$.next(Array.from(benchById.values()));
+    this.selectedFormation = formationName;
+    this.homeFormation$.next(formationName);
+    this._isCustomLineup = false;
+  }
+
   private executeFormationChange(newFormation: string): void {
-    const startTime = performance.now();
     this.loadingFormation$.next(true);
     this.cdr.markForCheck();
 
-    // Llamar al endpoint auto-select para obtener los mejores jugadores
-    this.http.post<any>(`${environment.apiUrl}/career/lineup/auto-select`, {
-      formation: newFormation
-    }).subscribe({
-      next: (response) => {
-        this.loadingFormation$.next(false);
-        this.applyLineupToSlots(newFormation, response?.players || [], response?.slots || []);
-        // V25D99.20.6-FRONT: preserve exact requested variant; see
-        // applyLineupToSlots() for why detectFormation() is intentionally
-        // not used after explicit formation selection.
-        this.selectedFormation = newFormation;
-        this.homeFormation$.next(newFormation);
-        this._isCustomLineup = false;
-        // MVP1-lineup-cancha-1.5 FIX (F4, defensivo): persistir los slots
-        // después del auto-select. Si F1 (back) está bien implementado,
-        // el back ya persistió el subdivision map; este saveLineup es
-        // redundante pero defensivo. Si F1 tiene un bug, este saveLineup
-        // asegura persistencia. El guard interno bloquea si lineup < 7.
-        this.saveLineup();
-        // V25D99.19-FRONT (BUG-2 fix): refresh the chip ratings (ATT /
-        // MID / DEF) against the new formation baseline. Pre-fix the chips
-        // held the previous formation's values until the next drag-drop
-        // because executeFormationChange called /auto-select + saveLineup
-        // but never /preview-ratings. captureRatingsFromFormationEffectiveness
-        // first because the /current response (already loaded) carries the
-        // formationEffectiveness snapshot for the new formation that the
-        // /auto-select just persisted; then requestRatingsPreview hits
-        // /preview-ratings with the freshly-applied slots to get the
-        // engine-authoritative numbers.
-        this.captureRatingsFromFormationEffectiveness();
-        this.requestRatingsPreview();
-        // EMITIR EVENTO AL PADRE con los players directamente (sin esperar backend)
-        this.formationChanged.emit({
-          formation: newFormation,
-          players: this.homePlayers$.value.slice(0, 11)
-        });
-        // Legacy: emit formationChangeComplete con el subject (no-op si nadie escucha).
-        this.formationChangeComplete.emit(this.formationChangeCompleteSubject);
-
-        // V25D91.5-FRONT F6 fix: reset del flag + cd explicit. Antes dependía del
-        // padre escuchando formationChangeComplete, lo que nunca pasaba.
-        this.isFormationChanging = false;
-        this.cdr.markForCheck();
-        this.cdr.detectChanges();
-      },
-      error: (err) => {
-        this.loadingFormation$.next(false);
-        const elapsed = (performance.now() - startTime).toFixed(0);
-        console.error(`[SQUAD-EDITOR] Auto-select ERROR after ${elapsed}ms:`, err);
-        this.errorMessage$.next('Error al auto-seleccionar jugadores');
-        // V25D91.5-FRONT F6 fix: reset también en error path.
-        this.isFormationChanging = false;
-        this.cdr.markForCheck();
-        this.cdr.detectChanges();
-      }
+    this.applyCurrentXiToFormation(newFormation);
+    this.saveLineup();
+    this.captureRatingsFromFormationEffectiveness();
+    this.requestRatingsPreview();
+    this.formationChanged.emit({
+      formation: newFormation,
+      players: this.homePlayers$.value.slice(0, 11)
     });
+    this.formationChangeComplete.emit(this.formationChangeCompleteSubject);
+
+    this.loadingFormation$.next(false);
+    this.isFormationChanging = false;
+    this.cdr.markForCheck();
+    this.cdr.detectChanges();
   }
 
   /** Guarda la alineación en el backend.
@@ -6749,13 +6755,13 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
   /** Muestra warning si el jugador seleccionado tiene condición de riesgo */
   showConditionWarning(player: PlayerOnFieldDto): void {
     if (player.injured) {
-      this.conditionWarning$.next('⚡ ï¸ Injured player selected. Consider replacing them before confirming.');
+      this.conditionWarning$.next('Jugador lesionado seleccionado. Conviene reemplazarlo antes de confirmar.');
     } else if ((player.stamina ?? 100) <= 19) {
-      this.conditionWarning$.next('⚡ Exhausted player selected. Starting them may affect performance.');
+      this.conditionWarning$.next('Jugador agotado seleccionado. Ponerlo puede afectar su rendimiento.');
     } else if ((player.stamina ?? 100) <= 39) {
-      this.conditionWarning$.next('⚡ Very tired player selected. Consider resting them.');
+      this.conditionWarning$.next('Jugador muy cansado seleccionado. Conviene darle descanso.');
     } else if ((player.stamina ?? 100) <= 59) {
-      this.conditionWarning$.next('⚡ Tired player selected. They may not perform at full capacity.');
+      this.conditionWarning$.next('Jugador cansado seleccionado. Puede rendir por debajo de su nivel.');
     } else {
       this.conditionWarning$.next('');
     }

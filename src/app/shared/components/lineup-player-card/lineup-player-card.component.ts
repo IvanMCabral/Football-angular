@@ -39,11 +39,11 @@ export class LineupPlayerCardComponent {
   }
 
   conditionWarningLabel(): string {
-    if (this.isSuspended()) { return 'Suspended'; }
-    if (this.isInjured()) { return 'Injured'; }
-    if (this.isExhausted()) { return 'Exhausted'; }
-    if (this.isVeryTired()) { return 'Very tired'; }
-    if (this.isTired()) { return 'Tired'; }
+    if (this.isSuspended()) { return 'Suspendido'; }
+    if (this.isInjured()) { return 'Lesionado'; }
+    if (this.isExhausted()) { return 'Agotado'; }
+    if (this.isVeryTired()) { return 'Muy cansado'; }
+    if (this.isTired()) { return 'Cansado'; }
     return '';
   }
 
@@ -51,21 +51,21 @@ export class LineupPlayerCardComponent {
     if (this.isSuspended()) {
       const remaining = this.player.suspensionRemainingMatches ?? 0;
       if (remaining > 0) {
-        return `This player is suspended and unavailable for ${remaining} match(es).`;
+        return `Este jugador está suspendido por ${remaining} partido(s).`;
       }
-      return 'This player is suspended and cannot be selected.';
+      return 'Este jugador está suspendido y no puede ser seleccionado.';
     }
     if (this.isInjured()) {
-      return 'This player is injured. Consider replacing them before confirming the lineup.';
+      return 'Este jugador está lesionado. Conviene reemplazarlo antes de confirmar la formación.';
     }
     if (this.isExhausted()) {
-      return 'This player is exhausted. Starting them may affect performance.';
+      return 'Este jugador está agotado. Ponerlo de titular puede afectar su rendimiento.';
     }
     if (this.isVeryTired()) {
-      return 'This player is very tired. Consider resting them.';
+      return 'Este jugador está muy cansado. Conviene darle descanso.';
     }
     if (this.isTired()) {
-      return 'This player has reduced energy.';
+      return 'Este jugador tiene energía reducida.';
     }
     return '';
   }
