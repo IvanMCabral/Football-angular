@@ -272,7 +272,6 @@ export class MatchLiveComponent implements OnInit, OnDestroy {
           if (result.success) {
             // The SSE tick will update s.homeStyle on the next emission;
             // we don't need to manually push to matchStateSubject.
-            console.log(`[MATCH-LIVE] [F5.4] Style changed to ${result.currentStyle} at minute ${result.minuteApplied}`);
           } else {
             this.snackBar.open(result.error || 'No se pudo cambiar la táctica', 'OK', { duration: 3000 });
           }

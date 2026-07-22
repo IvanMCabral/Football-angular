@@ -30,14 +30,12 @@ export class PlayRoundComponent implements OnInit {
       const id = params.get('id');
       if (!id) return;
       this.gameId = id;
-      console.log('ngOnInit: gameId', this.gameId);
       this.careerService.getCareerTeams(this.gameId).subscribe(teams => {
         this.teamNameMap = {};
         teams.forEach(team => {
           const teamId = team.sessionTeamId || team.id;
           this.teamNameMap[teamId] = team.name;
         });
-        console.log('ngOnInit: teamNameMap', this.teamNameMap);
         this.simulateAndAnimateFirstRound();
       });
     });
@@ -46,11 +44,9 @@ export class PlayRoundComponent implements OnInit {
   simulateAndAnimateFirstRound() {
     this.animatedMatches = [];
     this.matchService.getMatchesByGameId(this.gameId).subscribe((matches: Match[]) => {
-      console.log('simulateAndAnimateFirstRound: matches', matches);
       const rounds = matches.filter((m: Match) => m.round != null).map((m: Match) => m.round!);
       const firstRound = rounds.length > 0 ? Math.min(...rounds) : 1;
       const firstRoundMatches = matches.filter((m: Match) => m.round === firstRound);
-      console.log('simulateAndAnimateFirstRound: firstRound', firstRound, 'firstRoundMatches', firstRoundMatches);
       if (firstRoundMatches.length === 0) {
         this.animatedMatches = [];
         this.loading = false;
@@ -82,7 +78,6 @@ export class PlayRoundComponent implements OnInit {
   }
 
   animateMatches(matches: Match[]) {
-    console.log('animateMatches: matches', matches);
     this.animatedMatches = [];
     // Si TODOS los partidos no tienen eventos, mostrar todos de una vez y salir del loading
     const allNoEvents = matches.every(m => (m.result?.events?.length ?? 0) === 0);
@@ -104,7 +99,6 @@ export class PlayRoundComponent implements OnInit {
       if (i >= matches.length) return;
       const match = matches[i];
       const events = match.result?.events || [];
-      console.log('animateMatches: match', match, 'events', events);
       if (events.length === 0) {
         this.animatedMatches.push({
           match,

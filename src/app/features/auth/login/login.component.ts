@@ -38,10 +38,8 @@ export class LoginComponent {
     if (this.loginForm.invalid) return;
     this.loading = true;
     const { email, password } = this.loginForm.value;
-    console.log('[LOGIN] Intentando login con', email);
     this.authService.login(email, password).subscribe({
       next: () => {
-        console.log('[LOGIN] Login exitoso, navegando a dashboard');
         this.router.navigate(['/dashboard']);
       },
       error: (error) => {

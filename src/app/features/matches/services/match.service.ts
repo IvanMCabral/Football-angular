@@ -16,7 +16,6 @@ export class MatchService {
   }
 
   getMatches(): Observable<Match[]> {
-    console.log('[MATCH SERVICE] getMatches llamado');
     return this.http.get<Match[]>(this.apiUrl);
   }
 

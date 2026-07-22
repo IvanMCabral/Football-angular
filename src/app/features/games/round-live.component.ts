@@ -1254,7 +1254,6 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
         if (state && state.roundId) {
           this.resolvedRoundId$.next(state.roundId);
         }
-        console.log('[ROUND-LIVE] all matches started via Iniciar Todos', state);
       },
       error: (err) => {
         console.error('[ROUND-LIVE] Iniciar Todos failed', err);
@@ -1317,11 +1316,9 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
       // All matches already started (e.g. user refreshed an in-flight
       // round). Nothing to POST â€” the SSE stream from
       // startRoundEngine will catch up via polling/SSE reconnect.
-      console.log('[ROUND-LIVE] V25D84 auto-start skipped: no NOT_STARTED matches in VM');
       return;
     }
 
-    console.log('[ROUND-LIVE] V25D84 auto-starting', pending.length, 'matches');
     this.engineService.startRound(vm.gameId, pending).subscribe({
       next: (state) => {
         // V25D86 sprint: capture the backend-resolved roundId so the
@@ -1335,7 +1332,6 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
         if (state && state.roundId) {
           this.resolvedRoundId$.next(state.roundId);
         }
-        console.log('[ROUND-LIVE] V25D84 auto-start success', state);
       },
       error: (err) => {
         // V25D84: a failed auto-start leaves the round stuck on

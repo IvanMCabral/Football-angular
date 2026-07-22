@@ -16,7 +16,6 @@ export class LeagueService {
   constructor(private http: HttpClient) {}
 
   getAllLeagues(): Observable<League[]> {
-    console.log('[LEAGUE SERVICE] Llamando GET', this.apiUrl);
     return this.http.get<League[]>(this.apiUrl);
   }
 

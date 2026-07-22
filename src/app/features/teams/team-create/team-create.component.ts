@@ -3,7 +3,7 @@ import { Observable, of } from 'rxjs';
 import { map, catchError, switchMap } from 'rxjs/operators';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { RouterLink } from '@angular/router';
 import { TeamService } from '../services/team.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { AuthService } from '../../../core/services/auth.service';
@@ -25,7 +25,6 @@ export class TeamCreateComponent {
   successMessage = '';
   randomTeam$: Observable<{ name?: string; count?: number } | null> = of(null);
   private fb = inject(FormBuilder);
-  private router = inject(Router);
   private teamService = inject(TeamService);
   private toastService = inject(ToastService);
   private authService = inject(AuthService);
@@ -33,7 +32,7 @@ export class TeamCreateComponent {
   teamForm: FormGroup;
   loading = false;
   errorMessage = '';
-  
+
   countries: Country[] = [
     {
       code: 'AR',
@@ -66,7 +65,7 @@ export class TeamCreateComponent {
       cities: ['Paris', 'Marseille', 'Lyon', 'Toulouse', 'Nice']
     }
   ];
-  
+
   availableCities: string[] = [];
 
   constructor() {
@@ -83,7 +82,7 @@ export class TeamCreateComponent {
     const countryName = this.teamForm.get('country')?.value;
     const country = this.countries.find(c => c.name === countryName);
     this.availableCities = country?.cities || [];
-    this.teamForm.patchValue({ city: '' }); // Reset city
+    this.teamForm.patchValue({ city: '' });
   }
 
   generateRandomTeam(): void {
@@ -120,7 +119,6 @@ export class TeamCreateComponent {
 
   onSubmit(): void {
     if (this.teamForm.invalid) {
-      console.log('[TEAM CREATE] Form invalid, not submitting');
       return;
     }
 
@@ -129,38 +127,30 @@ export class TeamCreateComponent {
     this.errorMessage = '';
 
     const start = performance.now();
-    
-    // Obtener userId del AuthService y crear payload
+
     this.authService.getUserInfo().pipe(
       switchMap(userInfo => {
         const payload = {
           userId: userInfo.id,
           name: this.teamForm.value.name,
           country: this.teamForm.value.country,
-          budget: this.teamForm.value.budget * 1000000, // Convert millions to actual value
+          budget: this.teamForm.value.budget * 1000000,
           formation: this.teamForm.value.formation
         };
-        console.log('[TEAM CREATE] Payload con userId:', payload);
         return this.teamService.createSessionTeam(payload);
       }),
       map((team: any) => {
-        const end = performance.now();
-        const duration = end - start;
-        console.log(`[TEAM CREATE] Tiempo de respuesta create-team: ${duration.toFixed(2)} ms`);
+        const duration = performance.now() - start;
         this.loading = false;
         this.toastService.success(`Team \"${team.name}\" created successfully! (tardó ${duration.toFixed(0)} ms)`);
-        // Reset form immediately
         this.teamForm.reset({ budget: 100, formation: '4-3-3' });
         this.availableCities = [];
         return team;
       }),
       catchError((err: any) => {
-        const end = performance.now();
-        const duration = end - start;
-        console.log(`[TEAM CREATE] ERROR tiempo de respuesta create-team: ${duration.toFixed(2)} ms`);
         this.errorMessage = err.error?.message || 'Failed to create club';
         this.loading = false;
-        this.toastService.error(this.errorMessage + ` (tardó ${duration.toFixed(0)} ms)`);
+        this.toastService.error(this.errorMessage);
         return of(null);
       })
     ).subscribe();

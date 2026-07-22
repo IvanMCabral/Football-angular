@@ -94,7 +94,6 @@ export class GameDetailComponent implements OnInit {
     if (id) {
       this.gameService.getGameById(id).subscribe({
         next: (game) => {
-          console.log('[GAME DETAIL] Loaded game:', game);
           if (!game) {
             // Defensive: back should now return 404 for missing games, but if
             // a regression sends 200+null we still surface the error state

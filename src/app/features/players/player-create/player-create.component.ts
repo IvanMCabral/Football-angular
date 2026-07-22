@@ -3,7 +3,7 @@ import { Observable, of } from 'rxjs';
 import { map, catchError, switchMap } from 'rxjs/operators';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { ToastService } from '../../../core/services/toast.service';
 import { AuthService } from '../../../core/services/auth.service';
@@ -17,18 +17,17 @@ import { AuthService } from '../../../core/services/auth.service';
 })
 export class PlayerCreateComponent {
   private fb = inject(FormBuilder);
-  private router = inject(Router);
   private http = inject(HttpClient);
   private toastService = inject(ToastService);
   private authService = inject(AuthService);
 
   playerForm: FormGroup;
   loading = false;
-  randomCount = 10; // Default quantity for random generation
+  randomCount = 10;
   errorMessage = '';
   successMessage = '';
   randomPlayers$?: Observable<{ count?: number } | null>;
-  readonly MAX_RANDOM_PLAYERS = 20; // Límite máximo por operación
+  readonly MAX_RANDOM_PLAYERS = 20;
 
   constructor() {
     this.playerForm = this.fb.group({
@@ -44,18 +43,16 @@ export class PlayerCreateComponent {
     });
   }
 
-  onSubmit() {
+  onSubmit(): void {
     if (this.playerForm.invalid) {
-      console.log('[PLAYER CREATE] Form invalid, not submitting');
       return;
     }
 
     this.loading = true;
     this.errorMessage = '';
-    
+
     const start = performance.now();
-    
-    // Obtener userId del AuthService
+
     this.authService.getUserInfo().pipe(
       switchMap(userInfo => {
         const payload = {
@@ -65,12 +62,9 @@ export class PlayerCreateComponent {
         return this.http.post('/api/v1/world/create-custom-player', payload);
       }),
       map((player: any) => {
-        const end = performance.now();
-        const duration = end - start;
-        console.log(`[PLAYER CREATE] Tiempo de respuesta create-player: ${duration.toFixed(2)} ms`);
+        const duration = performance.now() - start;
         this.loading = false;
         this.toastService.success(`Player \"${player.name}\" created successfully! (tardó ${duration.toFixed(0)} ms)`);
-        // Reset form immediately
         this.playerForm.reset({
           position: 'MID',
           age: 25,
@@ -84,21 +78,18 @@ export class PlayerCreateComponent {
         return player;
       }),
       catchError((err: any) => {
-        const end = performance.now();
-        const duration = end - start;
-        console.log(`[PLAYER CREATE] ERROR tiempo de respuesta create-player: ${duration.toFixed(2)} ms`);
         this.errorMessage = err.error?.message || 'Error creating player';
         this.loading = false;
-        this.toastService.error(this.errorMessage + ` (tardó ${duration.toFixed(0)} ms)`);
+        this.toastService.error(this.errorMessage);
         return of(null);
       })
     ).subscribe();
   }
 
-  createRandom() {
+  createRandom(): void {
     this.errorMessage = '';
     this.randomPlayers$ = this.authService.getUserInfo().pipe(
-      switchMap(userInfo => 
+      switchMap(userInfo =>
         this.http.post('/api/v1/world/create-random-player', { userId: userInfo.id })
       ),
       map((player: any) => {
@@ -113,17 +104,17 @@ export class PlayerCreateComponent {
     );
   }
 
-  createRandomBatch() {
+  createRandomBatch(): void {
     if (this.randomCount < 1 || this.randomCount > this.MAX_RANDOM_PLAYERS) {
       this.toastService.error(`Amount must be between 1 and ${this.MAX_RANDOM_PLAYERS}`);
       return;
     }
     this.errorMessage = '';
     this.randomPlayers$ = this.authService.getUserInfo().pipe(
-      switchMap(userInfo => 
-        this.http.post<{ count: number }>('/api/v1/world/create-random-players', { 
+      switchMap(userInfo =>
+        this.http.post<{ count: number }>('/api/v1/world/create-random-players', {
           userId: userInfo.id,
-          count: this.randomCount 
+          count: this.randomCount
         })
       ),
       map((res: any) => {

@@ -1,10 +1,10 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
+import { Observable } from 'rxjs';
 import { TeamService } from '../services/team.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { SessionTeam } from '../../../shared/models/team.model';
-import { Observable } from 'rxjs';
 
 @Component({
   selector: 'app-team-list',
@@ -16,7 +16,7 @@ import { Observable } from 'rxjs';
 export class TeamListComponent implements OnInit {
   private teamService = inject(TeamService);
   private toastService = inject(ToastService);
-  
+
   sessionTeams$: Observable<SessionTeam[]> = this.teamService.sessionTeams$;
   loading = false;
   errorMessage = '';
@@ -26,13 +26,11 @@ export class TeamListComponent implements OnInit {
   }
 
   loadSessionTeams(): void {
-    console.log('[TEAM LIST] Loading session teams');
     this.loading = true;
     this.errorMessage = '';
-    
+
     this.teamService.getSessionTeams().subscribe({
-      next: (teams) => {
-        console.log('[TEAM LIST] Session teams loaded:', teams);
+      next: () => {
         this.loading = false;
       },
       error: (err) => {
@@ -44,10 +42,8 @@ export class TeamListComponent implements OnInit {
   }
 
   deleteTeam(team: SessionTeam): void {
-    console.log('[TEAM LIST] Delete requested for:', team.name);
     this.teamService.deleteSessionTeam(team.sessionTeamId).subscribe({
       next: () => {
-        console.log('[TEAM LIST] Team deleted successfully');
         this.toastService.success(`Equipo "${team.name}" eliminado`);
       },
       error: (err) => {
@@ -59,21 +55,23 @@ export class TeamListComponent implements OnInit {
 
   getOriginLabel(origin: string): string {
     switch (origin) {
-      case 'CLONED': return '📋 Clonado';
-      case 'CUSTOM': return '✏️ Custom';
-      case 'RANDOM': return '🎲 Random';
+      case 'CLONED': return 'Clonado';
+      case 'CUSTOM': return 'Custom';
+      case 'RANDOM': return 'Random';
       default: return origin;
     }
   }
 
   formatBudget(budget: number): string {
     if (budget >= 1000000000) {
-      return (budget / 1000000000).toFixed(1) + 'B €';
-    } else if (budget >= 1000000) {
-      return (budget / 1000000).toFixed(1) + 'M €';
-    } else if (budget >= 1000) {
-      return (budget / 1000).toFixed(1) + 'K €';
+      return `${(budget / 1000000000).toFixed(1)}B €`;
     }
-    return budget + ' €';
+    if (budget >= 1000000) {
+      return `${(budget / 1000000).toFixed(1)}M €`;
+    }
+    if (budget >= 1000) {
+      return `${(budget / 1000).toFixed(1)}K €`;
+    }
+    return `${budget} €`;
   }
 }

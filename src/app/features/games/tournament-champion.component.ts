@@ -61,21 +61,17 @@ export class TournamentChampionComponent implements OnInit {
   private detectCareerMode() {
     this.careerService.getCareerStatus().subscribe({
       next: (status) => {
-        console.log('[TournamentChampion] Career status:', JSON.stringify(status));
         
         // Guardar careerPhase para usar en template
         this.careerPhase = status.careerPhase || '';
-        console.log('[TournamentChampion] careerPhase:', this.careerPhase);
         
         // Solo es modo career si hay un careerId válido
         if (status && status.careerId) {
           this.isCareerMode = true;
-          console.log('[TournamentChampion] ✅ Modo Career activado');
           this.loadChampionFromCareer();
           this.loadStandingsFromCareer();
         } else {
           this.isCareerMode = false;
-          console.log('[TournamentChampion] ❌ No hay carrera activa');
           this.loadChampion();
           this.loadStandings();
         }

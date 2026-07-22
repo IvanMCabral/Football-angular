@@ -365,7 +365,6 @@ export class MatchEngineService {
 
           // Connection opened successfully.
           connected = true;
-          console.log(`[SSE-${label}] [V25D85-SSE] Connection opened (${url})`);
           attempt = 0;
           setHealth('HEALTHY');
           armDegradedTimer();
@@ -414,7 +413,6 @@ export class MatchEngineService {
                   this.ngZone.run(() => {
                     observer.next(payload);
                     if (isComplete(payload)) {
-                      console.log(`[SSE-${label}] 🏁 Complete payload received, closing`);
                       closed = true;
                       connected = false;
                       clearDegradedTimer();
@@ -457,7 +455,6 @@ export class MatchEngineService {
         const jitter = baseDelay * RECONNECT_JITTER * (Math.random() * 2 - 1);
         const delay = Math.max(250, Math.round(baseDelay + jitter));
         attempt++;
-        console.log(`[SSE-${label}] [V25D85-SSE] RECONNECTING in ${delay}ms (attempt ${attempt}/${RECONNECT_MAX_ATTEMPTS})`);
         setHealth('RECONNECTING');
         backoffTimer = setTimeout(() => {
           backoffTimer = null;

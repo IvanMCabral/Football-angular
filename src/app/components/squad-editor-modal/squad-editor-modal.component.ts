@@ -6342,7 +6342,6 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
   onFormationChange(newFormation?: string): void {
     // Bloquear si hay un cambio en progreso
     if (this.isFormationChanging) {
-      console.log('[SQUAD-EDITOR] Formation change blocked - waiting for previous change to complete');
       return;
     }
 
