@@ -155,7 +155,7 @@ export class LiveTimelineComponent {
       return 'Cambio realizado';
     }
 
-    if (e.eventType === 'INJURY') return `${playerName} se lesion?`;
+    if (e.eventType === 'INJURY') return `${playerName} se lesionó`;
     if (description === 'Shot saved') return 'Remate atajado';
     if (description === 'Shot missed') return 'Remate desviado';
     if (description === 'Goal') return 'Gol';

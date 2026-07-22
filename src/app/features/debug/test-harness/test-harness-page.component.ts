@@ -1318,7 +1318,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
                 aria-label="Compare the selected starter and bench player as a live substitution at minute 60"
               >
-                Simular sustitucion
+                Simular sustitución
               </button>
               <button
                 mat-stroked-button
@@ -1920,7 +1920,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
         >
           <h2 id="panel-e-heading" class="panel-title">Panel E - Analisis de repeticion</h2>
           <p class="panel-hint">
-            Compara el mismo partido y seed con formaciones, tacticas en vivo y sustituciones.
+            Compara el mismo partido y seed con formaciones, tácticas en vivo y sustituciones.
           </p>
           <div class="analysis-context-row">
             <span class="controlled-team-badge">Controlando: {{ controlledTeamDisplayName() }}</span>
@@ -2402,13 +2402,13 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
           </div>
           <div *ngIf="substitutionWhatIfSummary() as sub" class="formation-matrix analysis-matrix current-lineup-replay">
             <div class="matrix-header">
-              <strong>Simular sustitucion</strong>
+              <strong>Simular sustitución</strong>
               <span>
                 {{ sub.playerOffName }} -> {{ sub.playerOnName }}
                 ? min {{ sub.minute }} ? seeds {{ sub.seedStart }}..{{ sub.seedEnd }}
               </span>
             </div>
-            <div class="current-replay-grid" role="group" aria-label="Simular sustitucion summary">
+            <div class="current-replay-grid" role="group" aria-label="Simular sustitución summary">
               <div class="metric-card">
                 <span class="metric-label">Coach read</span>
                 <span class="metric-value" [class]="sub.readClass">{{ sub.read }}</span>
@@ -6037,7 +6037,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         observed: substitutionObserved,
         verdict: !hasSubstitutionWhatIf && !hasSubstitutionTiming ? 'Pending' : substitutionSignal && substitutionObjectiveOk ? 'OK' : 'Review',
         next: !hasSubstitutionWhatIf && !hasSubstitutionTiming
-          ? 'Run Simular sustitucion or Smoke profesional full.'
+          ? 'Run Simular sustitución or Smoke profesional full.'
           : substitutionSignal && substitutionObjectiveOk
             ? 'Keep as modal -> harness -> engine contract.'
             : substitutionObjective === 'PROTECT_RESULT'
@@ -10364,7 +10364,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       return;
     }
     if (!this.selectedMatchIncludesUserTeam()) {
-      this.snackBar.open('Simular sustitucion usa el XI de tu equipo para replicar el modal.', 'OK', { duration: 3500 });
+      this.snackBar.open('Simular sustitución usa el XI de tu equipo para replicar el modal.', 'OK', { duration: 3500 });
       return;
     }
     const seedStart = this.seedInputModel ?? DEFAULT_REPLAY_SEED;
@@ -10377,7 +10377,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     this.substitutionWhatIfSummary.set(null);
     this.modalRecommendationCandidateAttempts.set([]);
     this.substitutionTimingMatrixRows.set([]);
-    this.analysisReadyMessage.set(`Simular sustitucion corriendo: min ${minute}, ${seedCount} seeds...`);
+    this.analysisReadyMessage.set(`Simular sustitución corriendo: min ${minute}, ${seedCount} seeds...`);
     this.mutationInFlight.set(true);
     forkJoin({
       lineup: this.harness.getCurrentLineup().pipe(take(1), timeout(10_000)),
@@ -10416,8 +10416,8 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.mutationInFlight.set(false);
-        this.analysisReadyMessage.set(this.fmtError(err, 'Simular sustitucion falló antes de generar Panel E'));
-        this.snackBar.open(this.fmtError(err, 'No se pudo correr simulacion de sustitucion'), 'OK', { duration: 5000 });
+        this.analysisReadyMessage.set(this.fmtError(err, 'Simular sustitución falló antes de generar Panel E'));
+        this.snackBar.open(this.fmtError(err, 'No se pudo correr simulación de sustitución'), 'OK', { duration: 5000 });
         this.refreshLineupContext();
       },
       complete: () => {
@@ -10425,12 +10425,12 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         const summary = this.substitutionWhatIfSummary();
         this.snackBar.open(
           summary
-            ? `Simular sustitucion complete: ${summary.playerOffName} -> ${summary.playerOnName}, Delta xG ${this.fmtDeltaNumber(summary.deltaXgFor)}.`
-            : 'Simular sustitucion completed with insufficient samples.',
+            ? `Simular sustitución complete: ${summary.playerOffName} -> ${summary.playerOnName}, Delta xG ${this.fmtDeltaNumber(summary.deltaXgFor)}.`
+            : 'Simular sustitución completed with insufficient samples.',
           'OK',
           { duration: 4500 }
         );
-        this.markReplayAnalysisReady('Simular sustitucion listo en Panel E.');
+        this.markReplayAnalysisReady('Simular sustitución listo en Panel E.');
         this.refreshLineupContext();
       },
     });
@@ -10610,7 +10610,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         const playerOffId = this.selectedSwapStarterIdModel || candidate?.starterId;
         const playerOnId = this.selectedSwapBenchIdModel || candidate?.benchId;
         if (!playerOffId || !playerOnId) {
-          throw new Error('No pude resolver titular y suplente para la matriz de sustitucion.');
+          throw new Error('No pude resolver titular y suplente para la matriz de sustitución.');
         }
         return this.harness.setStyle(this.selectedStyleModel).pipe(
           switchMap(() =>
@@ -15847,7 +15847,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           `Scenario smoke: ${scenarioRows} escenarios`,
           `Pixel sensitivity: ${pixelRows} filas`,
           `Bateria cambio jugador: ${swapRows} cambios`,
-          `Simular sustitucion: ${substitutionRows} caso(s)`,
+          `Simular sustitución: ${substitutionRows} caso(s)`,
         ],
         skipped: ['Smoke full cortado por timeout defensivo; revisar etapa lenta antes de calibrar.'],
         read: `${controlledName}: smoke full parcial por timeout · ${formationRows} formaciones · ${scenarioRows} escenarios · ${pixelRows} píxeles · ${swapRows} swaps.`,
@@ -16016,7 +16016,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       map((row) => ({ row, issue: null as string | null })),
       catchError((err) => of({
         row: null as SubstitutionWhatIfSummaryRow | null,
-        issue: this.fmtError(err, 'Simular sustitucion timeout/error'),
+        issue: this.fmtError(err, 'Simular sustitución timeout/error'),
       }))
     ).subscribe({
       next: ({ row, issue }) => {
@@ -16044,7 +16044,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           scenarioSeedCount: before?.scenarioSeedCount ?? this.scenarioMatrixSmokeSeedCount(),
           included: [
             ...(before?.included ?? []),
-            issue ?? `Simular sustitucion: ${row?.playerOffName ?? 'starter'} -> ${row?.playerOnName ?? 'bench'} min ${minute} x ${seedCount} seeds`,
+            issue ?? `Simular sustitución: ${row?.playerOffName ?? 'starter'} -> ${row?.playerOnName ?? 'bench'} min ${minute} x ${seedCount} seeds`,
           ],
           skipped: before?.skipped ?? [],
           read: before?.read ?? `${this.controlledTeamDisplayName()}: smoke full en progreso.`,
@@ -16108,7 +16108,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         ...baseIncluded,
         `Pixel sensitivity: ${pixelRows} filas`,
         `Bateria cambio jugador: ${swapRows} cambios`,
-        `Simular sustitucion: ${substitutionRows} caso(s)`,
+        `Simular sustitución: ${substitutionRows} caso(s)`,
       ],
       skipped: filteredSkipped,
       read: finalRead,

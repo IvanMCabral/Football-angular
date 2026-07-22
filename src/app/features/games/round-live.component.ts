@@ -395,7 +395,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
     const userMatch = currentVm.matches.find(match => match.isUserMatch && match.state);
     const state = userMatch?.state;
     if (!userMatch || !state) {
-      return { reason: 'No hay partido de usuario vivo para simular lesion propia en Partido.' };
+      return { reason: 'No hay partido de usuario vivo para simular lesión propia en Partido.' };
     }
 
     const userTeamId = this.resolveManagerTeamId(userMatch, state);
@@ -409,12 +409,12 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
     );
     if (activeDebugPartidoEvents.length > 0) {
       return {
-        reason: 'Ya hay una lesion debug de partido activa. Cerra/reabri o avanza a un estado limpio antes de crear otra.'
+        reason: 'Ya hay una lesión debug de partido activa. Cerrá/reabrí o avanzá a un estado limpio antes de crear otra.'
       };
     }
     if (!normalizedSourceSlots) {
       return {
-        reason: 'El XI del usuario ya esta incompleto; no se simula otra lesion Partido para no crear huecos falsos.'
+        reason: 'El XI del usuario ya está incompleto; no se simula otra lesión Partido para no crear huecos falsos.'
       };
     }
 
@@ -423,7 +423,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
       .find(slot => !playerId || String(slot.sessionPlayerId ?? slot.playerId ?? '') === playerId);
     const injuredPlayerId = String(selectedSlot?.sessionPlayerId ?? selectedSlot?.playerId ?? '');
     if (!selectedSlot || !injuredPlayerId) {
-      return { reason: 'No hay jugador de campo del usuario para simular lesion propia en Partido.' };
+      return { reason: 'No hay jugador de campo del usuario para simular lesión propia en Partido.' };
     }
 
     const slotIndex = typeof selectedSlot.slotIndex === 'number'
@@ -439,7 +439,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
       minute: state.currentMinute ?? 0,
       playerId: injuredPlayerId,
       playerName: `Jugador propio ${injuredPlayerId}`,
-      description: `DebugPartido: lesion propia para ${injuredPlayerId}`,
+      description: `DebugPartido: lesión propia para ${injuredPlayerId}`,
       teamId: userTeamId
     };
     const nextState: MatchState = {

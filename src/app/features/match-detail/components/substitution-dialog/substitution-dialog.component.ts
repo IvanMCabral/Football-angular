@@ -68,11 +68,11 @@ export interface SubstitutionDialogResult {
       </div>
     </mat-dialog-content>
     <mat-dialog-actions align="end">
-      <button mat-button (click)="cancel()" aria-label="Cancelar sustitucion">Cancelar</button>
+      <button mat-button (click)="cancel()" aria-label="Cancelar sustitución">Cancelar</button>
       <button mat-raised-button color="primary"
               [disabled]="!canSubmit()"
               (click)="confirm()"
-              aria-label="Confirmar sustitucion">
+              aria-label="Confirmar sustitución">
         Confirmar
       </button>
     </mat-dialog-actions>
