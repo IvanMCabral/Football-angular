@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, ChangeDetectorRef, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, computed, inject, isDevMode, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
@@ -24,15 +24,9 @@ import { SessionPlayer } from '../../../../shared/models/player.model';
 import { MatchEvent } from '../../../../core/services/match-engine.model';
 
 /**
- * : a single row in the stats grid. Each row maps
- * one MatchEvent-derived counter to its home/away value. {@link label}
- * is the display string ("Posesion", "Tiros totales", etc.), {@link home}
- * and {@link away} are the formatted values ("55%", "8", "0", etc.).
- *
- * <p>Why a single shape instead of 8 separate getters: the template binds
- * to {@code statsRows()} via {@code *ngFor}  -  keeping the row shape flat
- * means the grid layout (label + home + away) renders identically for
- * every stat without per-stat conditional markup.
+ * Single row in the stats grid. Each row maps one match-event counter to
+ * its home/away value. The flat shape keeps the template simple and makes
+ * every stat render with the same layout.
  */
 export interface PartidoStatRow {
   label: string;
@@ -101,7 +95,7 @@ export interface PartidoDialogData {
   score?: { home: number; away: number };
   /**
    * : live possession 0-100 from BE1 (). The
-   * Posesion row uses these verbatim  -  the event list doesn't carry a
+   * Posesión row uses these verbatim  -  the event list doesn't carry a
    * possession sample, so we MUST read it from the snapshot.
    */
   homePossession?: number;
@@ -688,7 +682,7 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
     /* ========== : stats grid (full-width under pitch + bench) ========== */
     /* Layout: header row with team names + Subs chip, then 8 stat rows
        (label + home value + away value). 3-col grid keeps every row
-       visually aligned so the manager can scan "Posesion", "Goles",
+       visually aligned so the manager can scan "Posesión", "Goles",
        "Tiros totales" etc. left-to-right per team. */
     .partido-stats {
       margin-top: 0.35rem;
@@ -1289,7 +1283,7 @@ export class PartidoModalComponent {
    *
    * <p>Stats derived:
    * <ul>
-   *   <li>Posesion  -  {@code state.homePossession}/{@code state.awayPossession}
+   *   <li>Posesión  -  {@code state.homePossession}/{@code state.awayPossession}
    *       (NOT derived from events; possession is its own BE1 field).</li>
    *   <li>Goles  -  {@code state.score.home/away} (canonical, not GOAL events).</li>
    *   <li>Tiros totales  -  count(SHOT + SHOT_ON_TARGET) for each team.</li>
@@ -2312,8 +2306,8 @@ export class PartidoModalComponent {
     };
     try {
       window.localStorage.setItem('manager:last-modal-position-move', JSON.stringify(payload));
-    } catch (err) {
-      console.warn('[PARTIDO-MODAL] Could not persist nudge move for harness:', err);
+    } catch {
+      // Local QA metadata is best-effort; the user-facing save flow must continue.
     }
   }
 
@@ -2771,7 +2765,9 @@ export class PartidoModalComponent {
         error: (err) => {
           this.errorMsg = this.describeSaveError(err);
           this.cdr.markForCheck();
-          console.error('[PARTIDO-MODAL] error', err);
+          if (isDevMode()) {
+            console.error('[PARTIDO-MODAL] error', err);
+          }
         }
       });
   }
