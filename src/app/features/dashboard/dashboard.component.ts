@@ -15,6 +15,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
 import { PromotionsDialogComponent } from '../../components/promotions-dialog/promotions-dialog.component';
 import { PromotionResult } from '../../core/services/career.model';
 import { UserInfo } from '../../shared/models/auth.model';
+import { ConfirmActionDialogComponent } from '../../shared/components/confirm-action-dialog/confirm-action-dialog.component';
 
 interface UserStats {
   matchesPlayed: number;
@@ -73,7 +74,7 @@ export class DashboardComponent implements OnInit {
   private dialog = inject(MatDialog);
 
   // BehaviorSubject para career status reactivo
-  private careerStatusSubject = new BehaviorSubject<CareerStatus | null>(null);
+  private careerStatusSubject = new BehaviorSubject<CareerStatus | null | undefined>(undefined);
   careerStatus$ = this.careerStatusSubject.asObservable();
 
   /**
@@ -112,11 +113,11 @@ export class DashboardComponent implements OnInit {
    * used as a friendlier fallback than the opaque username.
    */
   displayNameOf(info: { displayName?: string | null; email?: string; username?: string } | null | undefined): string {
-    if (!info) return '';
+    if (!info) return 'manager';
     const dn = (info.displayName ?? '').trim();
     if (dn) return dn;
     if (info.email) return info.email;
-    return info.username ?? '';
+    return info.username ?? 'manager';
   }
   userStats$?: Observable<UserStats>;
   worldStatus$?: Observable<WorldStatus>;
@@ -451,10 +452,6 @@ export class DashboardComponent implements OnInit {
    * que avanza la fase de WAITING_USER a PRE_MATCH
    */
   onPlayNextRound(): void {
-    if (!confirm('¿Comenzar la siguiente fecha? Podrás ajustar táctica y formación antes de que_startMatch los partidos.')) {
-      return;
-    }
-
     this.loading = true;
 
     firstValueFrom(this.careerStatus$).then(status => {
@@ -512,17 +509,31 @@ export class DashboardComponent implements OnInit {
   }
 
   onDeleteCareer(): void {
-    if (!confirm('Are you sure you want to delete your career? This action cannot be undone.')) {
-      return;
-    }
-    this.http.delete(`${environment.apiUrl}/career/reset`).subscribe({
-      next: () => {
-        // Refrescar el observable para que el UI reaccione inmediatamente
-        this.refreshCareerStatus();
+    const ref = this.dialog.open<ConfirmActionDialogComponent, any, boolean>(ConfirmActionDialogComponent, {
+      data: {
+        title: 'Borrar carrera',
+        message: 'Esta acción borra tu carrera actual y no se puede deshacer.',
+        confirmLabel: 'Borrar carrera',
+        cancelLabel: 'Volver',
+        tone: 'danger'
       },
-      error: (err) => {
-        alert('Error deleting career. Please try again.');
+      maxWidth: '92vw',
+      panelClass: 'confirm-action-dialog-pane'
+    });
+
+    ref.afterClosed().subscribe(confirmed => {
+      if (!confirmed) {
+        return;
       }
+      this.http.delete(`${environment.apiUrl}/career/reset`).subscribe({
+        next: () => {
+          // Refrescar el observable para que el UI reaccione inmediatamente
+          this.refreshCareerStatus();
+        },
+        error: () => {
+          this.toastService.error('No se pudo borrar la carrera. Probá de nuevo.');
+        }
+      });
     });
   }
 

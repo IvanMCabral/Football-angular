@@ -1,7 +1,6 @@
 // F6 Sprint 2 (LIVE-MATCH-F6-MATCH-COMPARE): Side-by-side comparison of
-// baseline vs live match. Pattern mirrors V24MatchDetailPageComponent
-// (subscribe + cdr.detectChanges) but uses OnPush because data loads
-// once.
+// baseline vs live match. This page is intentionally coach-readable: it keeps
+// the raw baseline/live deltas, but also explains the match in tactical blocks.
 
 import { CommonModule } from '@angular/common';
 import {
@@ -17,7 +16,16 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatchCompareApiService } from '../services/match-compare-api.service';
 import { MatchComparison } from '../models/match-compare.model';
-import { MatchDetail } from '../models/match-detail.model';
+import { MatchDetail, MatchEvent } from '../models/match-detail.model';
+
+interface TimelineCompareRow {
+  label: string;
+  baselineSummary: string;
+  liveSummary: string;
+  xgDeltaHome: number;
+  xgDeltaAway: number;
+  quiet: boolean;
+}
 
 @Component({
   selector: 'app-match-compare-page',
@@ -42,7 +50,6 @@ import { MatchDetail } from '../models/match-detail.model';
 
       <ng-container *ngIf="comparison && !loading">
         <div class="compare-grid">
-          <!-- Score + stats -->
           <section class="stats-section">
             <h2>📊 Estadísticas</h2>
             <table class="stats-table">
@@ -111,28 +118,53 @@ import { MatchDetail } from '../models/match-detail.model';
             </table>
           </section>
 
-          <!-- Timeline diff (bucket-based) -->
+          <section class="coach-read-section">
+            <h2>🧠 Lectura DT</h2>
+            <div class="coach-read-card">
+              <strong>{{ coachHeadline(comparison) }}</strong>
+              <p>{{ coachSummary(comparison) }}</p>
+            </div>
+            <div class="coach-metrics">
+              <span [class]="deltaClass(comparison.diff.xgDeltaHome)">
+                xG local {{ formatDelta(comparison.diff.xgDeltaHome, 2) }}
+              </span>
+              <span [class]="deltaClass(comparison.diff.xgDeltaAway)">
+                xG visitante {{ formatDelta(comparison.diff.xgDeltaAway, 2) }}
+              </span>
+              <span [class]="deltaClass(comparison.diff.shotsDeltaHome)">
+                tiros local {{ formatDelta(comparison.diff.shotsDeltaHome, 0) }}
+              </span>
+              <span [class]="deltaClass(comparison.diff.possessionDeltaHome)">
+                posesión local {{ formatDelta(comparison.diff.possessionDeltaHome, 0) }}%
+              </span>
+            </div>
+          </section>
+
           <section class="timeline-section">
-            <h2>⏱️ Timeline (bloques de 5 min)</h2>
+            <h2>⏱️ Timeline profesional (bloques de 5 min)</h2>
             <p class="timeline-hint">
-              Cuenta de eventos por bucket. No se matchea por jugador porque el engine consume draws distintos en cada corrida.
+              Lectura por tramo: eventos, xG y dominio. No matchea jugador por jugador porque el engine consume draws distintos en cada corrida.
             </p>
             <div class="timeline-grid">
-              <div *ngFor="let bucket of bucketLabels" class="timeline-row">
-                <span class="bucket-label">{{ bucket }}</span>
-                <ng-container *ngFor="let type of diffTypes">
-                  <span class="bucket-cell"
-                        *ngIf="getCount(comparison, bucketIdx(bucket), type, 'baseline') > 0 || getCount(comparison, bucketIdx(bucket), type, 'live') > 0">
-                    <strong>{{ typeAbbrev(type) }}</strong>
-                    <span class="base-count">{{ getCount(comparison, bucketIdx(bucket), type, 'baseline') }}</span>
-                    <span class="live-count">{{ getCount(comparison, bucketIdx(bucket), type, 'live') }}</span>
-                  </span>
-                </ng-container>
+              <div *ngFor="let row of timelineRows(comparison)" class="timeline-row" [class.quiet-row]="row.quiet">
+                <div class="bucket-label">{{ row.label }}</div>
+                <div class="bucket-side">
+                  <strong>Baseline</strong>
+                  <span>{{ row.baselineSummary }}</span>
+                </div>
+                <div class="bucket-delta" [class]="deltaClass(row.xgDeltaHome + row.xgDeltaAway)">
+                  ΔxG {{ formatDelta(row.xgDeltaHome, 2) }} / {{ formatDelta(row.xgDeltaAway, 2) }}
+                </div>
+                <div class="bucket-side live-side">
+                  <strong>Live</strong>
+                  <span>{{ row.liveSummary }}</span>
+                </div>
               </div>
             </div>
             <div class="timeline-legend">
               <span class="legend-base">baseline</span>
               <span class="legend-live">live</span>
+              <span>G gol · T tiro · C chance · Y amarilla · R roja · S cambio</span>
             </div>
           </section>
         </div>
@@ -146,14 +178,13 @@ import { MatchDetail } from '../models/match-detail.model';
       padding: 1.5rem;
       font-family: 'Roboto', sans-serif;
     }
-    .compare-header {
-      margin-bottom: 1.5rem;
-    }
+    .compare-header { margin-bottom: 1.5rem; }
     .back-link {
       display: inline-block;
       margin-bottom: 0.5rem;
       color: #1976d2;
       text-decoration: none;
+      cursor: pointer;
     }
     .back-link:hover { text-decoration: underline; }
     .compare-title {
@@ -178,14 +209,15 @@ import { MatchDetail } from '../models/match-detail.model';
     }
     @media (min-width: 960px) {
       .compare-grid { grid-template-columns: 1fr 1fr; }
+      .timeline-section { grid-column: 1 / -1; }
     }
-    .stats-section, .timeline-section {
+    .stats-section, .timeline-section, .coach-read-section {
       background: #fff;
       border: 1px solid #e0e0e0;
       border-radius: 8px;
       padding: 1rem 1.25rem;
     }
-    .stats-section h2, .timeline-section h2 {
+    .stats-section h2, .timeline-section h2, .coach-read-section h2 {
       margin: 0 0 0.75rem;
       font-size: 1.1rem;
     }
@@ -198,14 +230,35 @@ import { MatchDetail } from '../models/match-detail.model';
       text-align: center;
       border-bottom: 1px solid #f0f0f0;
     }
-    .stats-table th:first-child, .stats-table td:first-child {
-      text-align: left;
-    }
+    .stats-table th:first-child, .stats-table td:first-child { text-align: left; }
     .col-baseline { background: #f5f5f5; }
     .col-live { background: #e3f2fd; }
     .delta-positive { color: #2e7d32; font-weight: bold; }
     .delta-negative { color: #c62828; font-weight: bold; }
     .delta-zero { color: #999; }
+    .coach-read-card {
+      padding: 0.9rem;
+      border-radius: 8px;
+      background: #f7fbff;
+      border: 1px solid #d8eafd;
+      margin-bottom: 0.75rem;
+    }
+    .coach-read-card p {
+      margin: 0.35rem 0 0;
+      color: #455a64;
+      line-height: 1.35;
+    }
+    .coach-metrics {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    .coach-metrics span {
+      padding: 0.25rem 0.45rem;
+      border-radius: 999px;
+      background: #f5f5f5;
+      font-size: 0.8rem;
+    }
     .timeline-hint {
       font-size: 0.85rem;
       color: #666;
@@ -217,28 +270,40 @@ import { MatchDetail } from '../models/match-detail.model';
       gap: 0.25rem;
     }
     .timeline-row {
-      display: flex;
-      align-items: center;
+      display: grid;
+      grid-template-columns: 64px 1fr auto 1fr;
+      align-items: stretch;
       gap: 0.5rem;
-      padding: 0.25rem 0;
+      padding: 0.4rem 0;
       border-bottom: 1px dashed #f0f0f0;
     }
+    .quiet-row { opacity: 0.62; }
     .bucket-label {
       font-weight: bold;
       min-width: 60px;
+      padding-top: 0.2rem;
     }
-    .bucket-cell {
-      display: inline-flex;
-      gap: 0.25rem;
+    .bucket-side {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
       font-size: 0.8rem;
-      padding: 0.15rem 0.4rem;
+      padding: 0.35rem 0.5rem;
       background: #fafafa;
-      border-radius: 4px;
+      border-radius: 6px;
     }
-    .base-count { color: #555; }
-    .live-count { color: #1976d2; font-weight: bold; }
+    .live-side { background: #e3f2fd; }
+    .bucket-delta {
+      align-self: center;
+      white-space: nowrap;
+      font-size: 0.78rem;
+      padding: 0.25rem 0.45rem;
+      border-radius: 999px;
+      background: #f5f5f5;
+    }
     .timeline-legend {
       display: flex;
+      flex-wrap: wrap;
       gap: 1rem;
       font-size: 0.75rem;
       color: #666;
@@ -261,15 +326,11 @@ export class MatchComparePageComponent implements OnInit {
   loading = false;
   error = '';
 
-  // 18 buckets covering minutes [0,5), [5,10), ..., [85,90).
   readonly bucketLabels: string[] = Array.from({ length: 18 }, (_, i) => {
     const start = i * 5;
     const end = start + 5;
     return `${start}-${end}'`;
   });
-
-  // 5 event types that are most relevant for the manager.
-  readonly diffTypes: string[] = ['GOAL', 'SHOT', 'YELLOW_CARD', 'RED_CARD', 'SUBSTITUTION'];
 
   ngOnInit(): void {
     window.scrollTo(0, 0);
@@ -299,7 +360,7 @@ export class MatchComparePageComponent implements OnInit {
         }
         this.cdr.markForCheck();
       },
-      error: (err) => {
+      error: () => {
         this.error = 'Error al cargar la comparación. Intente nuevamente.';
         this.loading = false;
         this.snackBar.open(this.error, 'Cerrar', { duration: 5000 });
@@ -320,26 +381,103 @@ export class MatchComparePageComponent implements OnInit {
     return 'delta-zero';
   }
 
-  bucketIdx(label: string): number {
-    return this.bucketLabels.indexOf(label);
+  coachHeadline(cmp: MatchComparison): string {
+    const liveHomeEdge = cmp.live.homeXg - cmp.live.awayXg;
+    const baselineHomeEdge = cmp.baseline.homeXg - cmp.baseline.awayXg;
+    const swing = liveHomeEdge - baselineHomeEdge;
+    if (Math.abs(swing) < 0.08) return 'Partido parecido: el cambio no rompió el guion.';
+    return swing > 0
+      ? 'El live favoreció más al local que el baseline.'
+      : 'El live favoreció menos al local que el baseline.';
   }
 
-  getCount(cmp: MatchComparison, bucket: number, type: string, side: 'baseline' | 'live'): number {
-    const entry = cmp.diff.timelineDiff.find(
-      (e) => e.bucket === bucket && e.type === type
-    );
-    if (!entry) return 0;
-    return side === 'baseline' ? entry.baselineCount : entry.liveCount;
+  coachSummary(cmp: MatchComparison): string {
+    const pieces: string[] = [];
+    pieces.push(`Resultado ${cmp.baseline.homeGoals}-${cmp.baseline.awayGoals} → ${cmp.live.homeGoals}-${cmp.live.awayGoals}.`);
+    pieces.push(`xG ${cmp.baseline.homeXg.toFixed(2)}/${cmp.baseline.awayXg.toFixed(2)} → ${cmp.live.homeXg.toFixed(2)}/${cmp.live.awayXg.toFixed(2)}.`);
+    pieces.push(`Tiros ${cmp.baseline.homeShots}/${cmp.baseline.awayShots} → ${cmp.live.homeShots}/${cmp.live.awayShots}.`);
+    return pieces.join(' ');
   }
 
-  typeAbbrev(type: string): string {
+  timelineRows(cmp: MatchComparison): TimelineCompareRow[] {
+    return this.bucketLabels.map((label, bucket) => {
+      const baselineEvents = this.eventsForBucket(cmp.baseline, bucket);
+      const liveEvents = this.eventsForBucket(cmp.live, bucket);
+      const xgDeltaHome = this.bucketXg(cmp.live, bucket, cmp.live.homeTeamId)
+        - this.bucketXg(cmp.baseline, bucket, cmp.baseline.homeTeamId);
+      const xgDeltaAway = this.bucketXg(cmp.live, bucket, cmp.live.awayTeamId)
+        - this.bucketXg(cmp.baseline, bucket, cmp.baseline.awayTeamId);
+      return {
+        label,
+        baselineSummary: this.eventSummary(baselineEvents, cmp.baseline),
+        liveSummary: this.eventSummary(liveEvents, cmp.live),
+        xgDeltaHome,
+        xgDeltaAway,
+        quiet: baselineEvents.length === 0 && liveEvents.length === 0,
+      };
+    });
+  }
+
+  private eventsForBucket(detail: MatchDetail, bucket: number): MatchEvent[] {
+    const start = bucket * 5;
+    const end = start + 5;
+    return detail.timeline.filter((event) => event.minute >= start && event.minute < end);
+  }
+
+  private bucketXg(detail: MatchDetail, bucket: number, teamId: string): number {
+    return this.eventsForBucket(detail, bucket)
+      .filter((event) => event.teamId === teamId)
+      .reduce((sum, event) => sum + (event.xg ?? 0), 0);
+  }
+
+  private eventSummary(events: MatchEvent[], detail: MatchDetail): string {
+    if (events.length === 0) return 'Sin eventos fuertes';
+    const goals = this.countEvents(events, 'GOAL');
+    const shots = events.filter((event) => ['SHOT', 'SHOT_ON_TARGET', 'MISS', 'GOAL'].includes(event.type)).length;
+    const chances = this.countEvents(events, 'CHANCE_CREATED');
+    const yellows = this.countEvents(events, 'YELLOW_CARD');
+    const reds = this.countEvents(events, 'RED_CARD');
+    const subs = this.countEvents(events, 'SUBSTITUTION');
+    const xgHome = events
+      .filter((event) => event.teamId === detail.homeTeamId)
+      .reduce((sum, event) => sum + (event.xg ?? 0), 0);
+    const xgAway = events
+      .filter((event) => event.teamId === detail.awayTeamId)
+      .reduce((sum, event) => sum + (event.xg ?? 0), 0);
+    const parts = [
+      goals ? `G ${goals}` : '',
+      shots ? `T ${shots}` : '',
+      chances ? `C ${chances}` : '',
+      yellows ? `Y ${yellows}` : '',
+      reds ? `R ${reds}` : '',
+      subs ? `S ${subs}` : '',
+      (xgHome || xgAway) ? `xG ${xgHome.toFixed(2)}/${xgAway.toFixed(2)}` : '',
+    ].filter(Boolean);
+    return parts.join(' · ') || this.genericEventSummary(events);
+  }
+
+  private countEvents(events: MatchEvent[], type: string): number {
+    return events.filter((event) => event.type === type).length;
+  }
+
+  private genericEventSummary(events: MatchEvent[]): string {
+    const counts = new Map<string, number>();
+    events.forEach((event) => counts.set(event.type, (counts.get(event.type) ?? 0) + 1));
+    return Array.from(counts.entries())
+      .map(([type, count]) => `${this.readableEventType(type)} ${count}`)
+      .join(' · ');
+  }
+
+  private readableEventType(type: string): string {
     switch (type) {
-      case 'GOAL': return 'G';
-      case 'SHOT': return 'S';
-      case 'YELLOW_CARD': return 'Y';
-      case 'RED_CARD': return 'R';
-      case 'SUBSTITUTION': return '⊕';
-      default: return type.substring(0, 3);
+      case 'FOUL': return 'Falta';
+      case 'OFFSIDE': return 'Offside';
+      case 'CORNER': return 'Córner';
+      case 'SAVE': return 'Atajada';
+      case 'BLOCK': return 'Bloqueo';
+      case 'INJURY': return 'Lesión';
+      case 'TACTICAL_CHANGE': return 'Cambio táctico';
+      default: return type.replace(/_/g, ' ').toLowerCase();
     }
   }
 

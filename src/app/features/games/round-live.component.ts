@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, OnDestroy } from '@angular/core';
+﻿import { Component, inject, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 import { MatchEngineService } from '../../core/services/match-engine.service';
@@ -11,6 +11,20 @@ import { Subject } from 'rxjs';
 import { MatchCardComponent } from '../../shared/components/match-card/match-card.component';
 import { RoundLiveViewModel, RoundMatchVM } from './models/round-live.model';
 import { MatchState, RoundState } from '../../core/services/match-engine.model';
+
+declare global {
+  interface Window {
+    managerDebugRoundLive?: {
+      triggerUserInjuries: (playerIds?: string[]) => { queued: string[]; reason?: string };
+      triggerUserPartidoInjury: (playerId?: string) => { injuredPlayerId?: string; reason?: string };
+    };
+  }
+}
+
+interface PersistedInjuryAutoModal {
+  matchId: string;
+  preSelectedPlayerId: string;
+}
 
 @Component({
   selector: 'app-round-live',
@@ -44,11 +58,34 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
    * multiple dialogs on top of each other.
    */
   private isAutoModalOpen = false;
-  private queuedAutoModal: {
+  private queuedAutoModals: Array<{
     matchId: string;
     state: MatchState;
     preSelectedPlayerId: string;
-  } | null = null;
+  }> = [];
+  private activeInjuryAutoModal: PersistedInjuryAutoModal | null = null;
+  private restoredPersistedInjuryAutoModals = false;
+  private releaseQueuedAutoModalResumeHold: (() => void) | null = null;
+
+  /**
+   * V25D99.20.3.5: single gate for critical live-manager modals.
+   * Substitution, Formation and Partido all pause/resume the live round,
+   * so only one of them can be open at a time. Injury auto-modals queue
+   * behind this gate instead of stacking over a manual modal.
+   */
+  private isCriticalLiveModalOpen = false;
+
+  private readonly debugFreezeStorageKey = 'manager.debugFreezeLiveRound';
+  private readonly debugSuppressAutoInjuryStorageKey = 'manager.debugSuppressAutoInjuryModals';
+  private readonly injuryAutoModalStoragePrefix = 'manager.pendingInjuryAutoModals.v1';
+  debugFreezeEnabled = this.readDebugFreezeFlag();
+  debugSuppressAutoInjuryModals = this.readDebugSuppressAutoInjuryFlag();
+  readonly isLocalDebugHost = typeof window !== 'undefined'
+    && ['localhost', '127.0.0.1'].includes(window.location.hostname);
+  private currentUserSessionTeamId: string | null = null;
+  private debugFreezePauseInFlight = false;
+  private debugFreezePausedRoundKeys = new Set<string>();
+  private debugRoundLiveHook?: Window['managerDebugRoundLive'];
 
   /**
    * V25D81.1 BUG #3: dedup set for rival RED_CARD awareness modals. Keyed
@@ -71,12 +108,14 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
     minute: number;
   } | null = null;
 
+  pendingLiveModalNotice: string | null = null;
+
   /**
    * V25D84 sprint: guard for the auto-start subscription so the
    * backend POST to {@code POST /api/v1/match-engine/rounds/start}
    * fires exactly once per component instance. Set to {@code true}
    * the moment the take(1) subscription observes the first vm$
-   * emission that has NOT_STARTED matches — subsequent calls to
+   * emission that has NOT_STARTED matches â€” subsequent calls to
    * {@link tryAutoStartRound} short-circuit.
    *
    * <p>Why a flag (instead of just {@code take(1)}): the existing
@@ -92,7 +131,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
   /**
    * V25D86 sprint: resolved roundId from the latest successful
    * {@code engineService.startRound(...)} POST response. The
-   * backend registers the {@code RoundEngine} under THIS roundId —
+   * backend registers the {@code RoundEngine} under THIS roundId â€”
    * not necessarily whatever string the request body sent (the
    * server may canonicalize to a real UUID, or the player's
    * careerId may not be a parseable UUID at the SSE endpoint).
@@ -110,7 +149,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
    *       {@code GET /api/v1/match-engine/rounds/{roundId}/stream}.</li>
    *   <li>Without this, {@code MatchEngineController:48} returns
    *       {@code Flux.empty()} because the registry has no entry for
-   *       the frontend's {@code gameId} — silently idle SSE.</li>
+   *       the frontend's {@code gameId} â€” silently idle SSE.</li>
    * </ul>
    */
   private resolvedRoundId$ = new BehaviorSubject<string | null>(null);
@@ -137,7 +176,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
    *
    * <p>Before this fix the round-live page rendered an empty
    * {@code .round-live-container} immediately because the
-   * {@code vmSubject} initialized with an empty matches array — the user
+   * {@code vmSubject} initialized with an empty matches array â€” the user
    * saw a blank screen with no feedback while the four HTTP fetches
    * raced in. We now expose this flag (driven by a BehaviorSubject that
    * the constructor flips to {@code false} on the first combineLatest
@@ -155,24 +194,26 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
 
   constructor() {
     this.vm$ = this.vmSubject.asObservable();
+    this.registerDebugRoundLiveHook();
+    setTimeout(() => this.registerDebugRoundLiveHook(), 0);
 
     // V25D84 sprint: auto-start the round as soon as the first vm$
     // emission shows NOT_STARTED matches. This replaces the previous
     // UX where the manager had to click the "Iniciar Todos" button on
-    // every round-live mount — under normal flow (no refresh, no SSE
+    // every round-live mount â€” under normal flow (no refresh, no SSE
     // gap) the round starts itself and the button stays hidden as a
     // fallback for refresh / failed-auto-start recovery.
     //
     // <p>Implementation:
     // <ul>
     //   <li>{@code take(1)} so the subscription fires exactly once per
-    //       component instance — we only want the FIRST emission, the
+    //       component instance â€” we only want the FIRST emission, the
     //       rest is driven by SSE via {@link startRoundEngine}.</li>
     //   <li>{@code filter} skips the BehaviorSubject's initial empty-VM
     //       replay (which fires synchronously to new subscribers and
     //       would otherwise burn the take(1) before the real VM from
     //       combineLatest arrives).</li>
-    //   <li>Filter accepts VMs that have matches OR an error message —
+    //   <li>Filter accepts VMs that have matches OR an error message â€”
     //       both are real states worth observing (the errorMsg branch
     //       is the no-op path inside tryAutoStartRound).</li>
     //   <li>Delegate the actual startRound call to {@link tryAutoStartRound}
@@ -180,7 +221,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
     // </ul>
     //
     // <p>Order matters: this subscription must be set up BEFORE the
-    // {@code combineLatest} tap below — the tap eventually calls
+    // {@code combineLatest} tap below â€” the tap eventually calls
     // {@code vmSubject.next(...)} which fires synchronously to all
     // subscribers, and we want this listener registered first.
     this.vm$.pipe(
@@ -238,15 +279,25 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
         }
 
         const userSessionTeamId = careerStatus.userSessionTeamId || '';
+        this.currentUserSessionTeamId = userSessionTeamId || null;
         const fixtures = fixturesData.matches;
         const byeTeam: string | null = fixturesData.byeTeam ?? null;
+        const hydratedTeamMap = { ...teamMap };
+        for (const fixture of fixtures) {
+          if (fixture.homeTeamId && fixture.homeTeamName) {
+            hydratedTeamMap[String(fixture.homeTeamId)] = fixture.homeTeamName;
+          }
+          if (fixture.awayTeamId && fixture.awayTeamName) {
+            hydratedTeamMap[String(fixture.awayTeamId)] = fixture.awayTeamName;
+          }
+        }
 
         if (fixtures.length === 0) {
           this.updateVm({
             gameId: params.gameId,
             roundNumber: params.roundNumber,
             matches: [],
-            teamNameMap: teamMap,
+            teamNameMap: hydratedTeamMap,
             allFinished: false,
             errorMsg: `No hay partidos para la fecha ${params.roundNumber}`,
             isRoundPaused: false,
@@ -285,7 +336,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
           gameId: params.gameId,
           roundNumber: params.roundNumber,
           matches,
-          teamNameMap: teamMap,
+          teamNameMap: hydratedTeamMap,
           allFinished: false,
           errorMsg: '',
           isRoundPaused: false,
@@ -311,6 +362,9 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    if (typeof window !== 'undefined' && window.managerDebugRoundLive === this.debugRoundLiveHook) {
+      delete window.managerDebugRoundLive;
+    }
     this.destroy$.next();
     this.destroy$.complete();
   }
@@ -319,10 +373,226 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
     this.vmSubject.next(vm);
   }
 
+  private registerDebugRoundLiveHook(): void {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    if (!['localhost', '127.0.0.1'].includes(window.location.hostname)) {
+      return;
+    }
+    const hook = {
+      triggerUserInjuries: (playerIds?: string[]) => this.debugTriggerUserInjuryModals(playerIds),
+      triggerUserPartidoInjury: (playerId?: string) => this.debugTriggerUserPartidoInjury(playerId)
+    };
+    this.debugRoundLiveHook = hook;
+    window.managerDebugRoundLive = hook;
+  }
+
+  debugTriggerUserPartidoInjury(playerId?: string): { injuredPlayerId?: string; reason?: string } {
+    const currentVm = this.vmSubject.value;
+    const userMatch = currentVm.matches.find(match => match.isUserMatch && match.state);
+    const state = userMatch?.state;
+    if (!userMatch || !state) {
+      return { reason: 'No hay partido de usuario vivo para simular lesion propia en Partido.' };
+    }
+
+    const userTeamId = this.resolveManagerTeamId(userMatch, state);
+    const managerIsAway = userTeamId === String(state.awayTeamId);
+    const sourceSlots = managerIsAway ? (state.awaySlots ?? []) : (state.homeSlots ?? []);
+    const normalizedSourceSlots = this.normalizeTacticalSlotSnapshotForDebug(sourceSlots);
+    const activeDebugPartidoEvents = (state.events ?? []).filter(event =>
+      event.eventType === 'INJURY'
+      && typeof event.description === 'string'
+      && event.description.includes('Debug Partido:')
+    );
+    if (activeDebugPartidoEvents.length > 0) {
+      return {
+        reason: 'Ya hay una lesion Debug Partido activa. Cerra/reabri o avanza a un estado limpio antes de crear otra.'
+      };
+    }
+    if (!normalizedSourceSlots) {
+      return {
+        reason: 'El XI del usuario ya esta incompleto; no se simula otra lesion Partido para no crear huecos falsos.'
+      };
+    }
+
+    const selectedSlot = normalizedSourceSlots
+      .filter(slot => (slot.position || '').toUpperCase() !== 'GK')
+      .find(slot => !playerId || String(slot.sessionPlayerId ?? slot.playerId ?? '') === playerId);
+    const injuredPlayerId = String(selectedSlot?.sessionPlayerId ?? selectedSlot?.playerId ?? '');
+    if (!selectedSlot || !injuredPlayerId) {
+      return { reason: 'No hay jugador de campo del usuario para simular lesion propia en Partido.' };
+    }
+
+    const slotIndex = typeof selectedSlot.slotIndex === 'number'
+      ? selectedSlot.slotIndex
+      : normalizedSourceSlots.indexOf(selectedSlot);
+    const nextSlots = normalizedSourceSlots.filter((slot, index) => {
+      const slotPlayerId = String(slot.sessionPlayerId ?? slot.playerId ?? '');
+      const currentSlotIndex = typeof slot.slotIndex === 'number' ? slot.slotIndex : index;
+      return slotPlayerId !== injuredPlayerId || currentSlotIndex !== slotIndex;
+    });
+    const nextEvent = {
+      eventType: 'INJURY' as const,
+      minute: state.currentMinute ?? 0,
+      playerId: injuredPlayerId,
+      playerName: `Jugador propio ${injuredPlayerId}`,
+      description: `Debug Partido: lesion propia para ${injuredPlayerId}`,
+      teamId: userTeamId
+    };
+    const nextState: MatchState = {
+      ...state,
+      status: state.status === 'NOT_STARTED' ? 'PAUSED' : state.status,
+      events: [...(state.events ?? []), nextEvent],
+      homeSlots: managerIsAway ? state.homeSlots : nextSlots,
+      awaySlots: managerIsAway ? nextSlots : state.awaySlots,
+      homePlayerRatings: managerIsAway
+        ? state.homePlayerRatings
+        : (state.homePlayerRatings ?? []).map(rating => rating.playerId === injuredPlayerId
+            ? { ...rating, injuries: Math.max(1, rating.injuries ?? 0) }
+            : rating),
+      awayPlayerRatings: managerIsAway
+        ? (state.awayPlayerRatings ?? []).map(rating => rating.playerId === injuredPlayerId
+            ? { ...rating, injuries: Math.max(1, rating.injuries ?? 0) }
+            : rating)
+        : state.awayPlayerRatings
+    };
+    const nextMatches = currentVm.matches.map(match =>
+      match === userMatch
+        ? { ...match, state: nextState }
+        : match
+    );
+    this.updateVm({ ...currentVm, matches: nextMatches });
+    return { injuredPlayerId };
+  }
+
+  private normalizeTacticalSlotSnapshotForDebug<T extends { sessionPlayerId?: string | null; playerId?: string | null; slotIndex?: number | null }>(
+    slots: T[]
+  ): T[] | null {
+    const uniqueByPlayer = new Map<string, T>();
+    for (const slot of slots ?? []) {
+      const playerId = String(slot.sessionPlayerId ?? slot.playerId ?? '');
+      if (!playerId || uniqueByPlayer.has(playerId)) {
+        return null;
+      }
+      uniqueByPlayer.set(playerId, slot);
+    }
+    if (uniqueByPlayer.size !== 11) {
+      return null;
+    }
+
+    if (this.hasCompleteTacticalSlotSnapshot(slots)) {
+      return [...slots].sort((a, b) => (a.slotIndex ?? 0) - (b.slotIndex ?? 0));
+    }
+
+    const usedIndexes = new Set<number>();
+    const normalized: T[] = [];
+    const deferred: T[] = [];
+
+    for (const slot of uniqueByPlayer.values()) {
+      const slotIndex = typeof slot.slotIndex === 'number' ? slot.slotIndex : null;
+      if (slotIndex !== null && slotIndex >= 0 && slotIndex <= 10 && !usedIndexes.has(slotIndex)) {
+        usedIndexes.add(slotIndex);
+        normalized.push(slot);
+      } else {
+        deferred.push(slot);
+      }
+    }
+
+    const missingIndexes = Array.from({ length: 11 }, (_, index) => index)
+      .filter(index => !usedIndexes.has(index));
+    if (missingIndexes.length !== deferred.length) {
+      return null;
+    }
+
+    deferred.forEach((slot, index) => {
+      normalized.push({
+        ...slot,
+        slotIndex: missingIndexes[index]
+      });
+    });
+
+    return normalized.sort((a, b) => (a.slotIndex ?? 0) - (b.slotIndex ?? 0));
+  }
+
+  private hasCompleteTacticalSlotSnapshot(
+    slots: Array<{ sessionPlayerId?: string | null; playerId?: string | null; slotIndex?: number | null }>
+  ): boolean {
+    const playerIds = new Set<string>();
+    const slotIndexes = new Set<number>();
+
+    for (const [fallbackIndex, slot] of (slots ?? []).entries()) {
+      const playerId = String(slot.sessionPlayerId ?? slot.playerId ?? '');
+      if (!playerId) {
+        return false;
+      }
+      playerIds.add(playerId);
+
+      const slotIndex = typeof slot.slotIndex === 'number' ? slot.slotIndex : fallbackIndex;
+      if (slotIndex < 0 || slotIndex > 10) {
+        return false;
+      }
+      slotIndexes.add(slotIndex);
+    }
+
+    return playerIds.size === 11
+      && slotIndexes.size === 11
+      && Array.from({ length: 11 }, (_, index) => index).every(index => slotIndexes.has(index));
+  }
+
+  private debugTriggerUserInjuryModals(playerIds?: string[]): { queued: string[]; reason?: string } {
+    const userMatch = this.vmSubject.value.matches.find(match => match.isUserMatch && match.state);
+    const state = userMatch?.state;
+    if (!userMatch || !state) {
+      return { queued: [], reason: 'No hay partido de usuario vivo para simular lesiones.' };
+    }
+
+    const userTeamId = this.resolveManagerTeamId(userMatch, state);
+    const slots = userTeamId === String(state.awayTeamId)
+      ? (state.awaySlots ?? [])
+      : (state.homeSlots ?? []);
+    const autoIds = slots
+      .filter(slot => (slot.position || '').toUpperCase() !== 'GK')
+      .map(slot => String(slot.sessionPlayerId ?? slot.playerId ?? ''))
+      .filter(id => !!id)
+      .slice(0, 2);
+    const ids = (playerIds?.length ? playerIds : autoIds).filter(id => !!id);
+    if (ids.length === 0) {
+      return { queued: [], reason: 'No hay jugadores de campo disponibles para simular lesiones.' };
+    }
+
+    ids.forEach(playerId => {
+      this.queueOrOpenAutoModal({
+        matchId: String(state.matchId),
+        state,
+        preSelectedPlayerId: playerId
+      });
+    });
+
+    return { queued: ids };
+  }
+
+  onDebugDoubleInjury(): void {
+    const result = this.debugTriggerUserInjuryModals();
+    if (result.reason) {
+      console.warn('[ROUND-LIVE] debug double injury skipped:', result.reason);
+    }
+  }
+
+  onDebugPartidoInjury(): void {
+    const result = this.debugTriggerUserPartidoInjury();
+    if (result.reason) {
+      console.warn('[ROUND-LIVE] debug Partido injury skipped:', result.reason);
+      this.pendingLiveModalNotice = result.reason;
+      return;
+    }
+    this.pendingLiveModalNotice = 'Lesion Debug Partido creada. Abrí Partido para validar AUTO + cambio manual.';
+  }
+
   private startRoundEngine(gameId: string, matches: RoundMatchVM[]) {
     // V25D86 sprint: roundId is NOT a local alias for gameId anymore.
     // The backend registers the RoundEngine under whatever
-    // `state.roundId` it returns from the POST response — frontend
+    // `state.roundId` it returns from the POST response â€” frontend
     // cannot assume gameId is a parseable UUID or that the backend
     // uses it 1:1. We keep gameId as the POST body parameter (so the
     // idempotency key matches what the upstream auto-start sent) and
@@ -351,7 +621,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
     // <p>The union type is annotated explicitly because {@code of(null)}
     // and {@code engineService.startRound(...)} (which returns
     // {@code Observable<RoundState>}) produce incompatible types at the
-    // TS level — TS infers {@code Observable<null> | Observable<RoundState>}
+    // TS level â€” TS infers {@code Observable<null> | Observable<RoundState>}
     // which has no common subscribe signature without the explicit
     // {@code Observable<RoundState | null>} annotation.
     //
@@ -361,7 +631,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
     // {@code requestRoundId}. When {@code autoStartTriggered} short-
     // circuits to {@code of(null)}, we rely on the matching tap in
     // {@link tryAutoStartRound} (which fires the POST that wins the
-    // race) to populate {@code resolvedRoundId$} — the two paths
+    // race) to populate {@code resolvedRoundId$} â€” the two paths
     // rendezvous on the same BehaviorSubject.
     const startRound$: Observable<RoundState | null> = this.autoStartTriggered
       ? of(null)
@@ -401,7 +671,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
             : undefined;
           // V24D14-LIVE-FIX-1.7 Bug #2: propagate the live state status into the
           // embedded Match.status so post-FINISHED snapshots don't show stale
-          // "En Juego" — mapFixtureStatus now handles both fixture statuses
+          // "En Juego" â€” mapFixtureStatus now handles both fixture statuses
           // (PENDING/SIMULATING/COMPLETED/CANCELLED) and live state statuses
           // (NOT_STARTED/RUNNING/PAUSED/FINISHED/CANCELLED).
           const match = normalizedMatchState
@@ -427,7 +697,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
           // transitioned past NOT_STARTED. Drives the "Iniciar Todos"
           // button visibility (button hides once the round has started
           // ticking). Note: MatchState.status uses 'RUNNING' (not
-          // 'IN_PROGRESS' — that's the RoundState.status value).
+          // 'IN_PROGRESS' â€” that's the RoundState.status value).
           anyStarted: updatedMatches.some(m =>
             m.state?.status === 'RUNNING' ||
             m.state?.status === 'HALF_TIME' ||
@@ -438,6 +708,8 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
         };
 
         this.updateVm(newVm);
+        this.applyDebugFreezeIfNeeded(newVm);
+        this.restorePersistedInjuryAutoModals(updatedMatches);
 
         // V25D81-BUG #3: scan for new INJURY events on the manager team
         // and auto-open the substitution modal. Runs AFTER the VM is
@@ -448,7 +720,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
         // V25D81.1 BUG #3: scan ALL matches (user + rival) for RED_CARD
         // events on a non-user team and auto-open the awareness modal.
         // Same pattern as the injury flow but the modal is informational
-        // only — no pre-select, no round pause.
+        // only â€” no pre-select, no round pause.
         this.maybeOpenRivalCardInfoModal(updatedMatches);
       },
       error: (err) => {
@@ -468,25 +740,31 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
    * <ul>
    *   <li>Event type === 'INJURY' (the chip-injury timeline event).</li>
    *   <li>Event has a {@code playerId} (legacy V23 events without
-   *       playerId are skipped — no clean way to pre-select the
+   *       playerId are skipped â€” no clean way to pre-select the
    *       visual pitch dot).</li>
    *   <li>Event team is the manager team (the modal would auto-suggest
    *       a swap on the wrong team, which is a no-op anyway).</li>
    *   <li>Match status is RUNNING or PAUSED (no auto-modal for finished
-   *       / cancelled matches — too late).</li>
+   *       / cancelled matches â€” too late).</li>
    *   <li>Event hasn't been shown before (tracked via
    *       {@code autoModalShownEventIds} so SSE reconnects don't
    *       re-trigger).</li>
    * </ul>
    *
    * <p>Concurrency: if a previous auto-modal is still open, the next
-   * matching INJURY is queued (replaces any older queued entry — the
+   * matching INJURY is queued (replaces any older queued entry â€” the
    * manager only sees the most recent injury when they finish the
    * current sub). When the active modal closes, the queued one fires
    * (if any).
    */
   private maybeOpenInjuryAutoModal(matches: RoundMatchVM[]): void {
-    const userTeamId = this.vmSubject.value.matches.find(m => m.isUserMatch)?.match.homeTeamId;
+    if (this.debugSuppressAutoInjuryModals) {
+      return;
+    }
+    const currentUserMatch = this.vmSubject.value.matches.find(m => m.isUserMatch && m.state);
+    const userTeamId = currentUserMatch?.state
+      ? this.resolveManagerTeamId(currentUserMatch, currentUserMatch.state)
+      : (this.currentUserSessionTeamId ?? this.vmSubject.value.matches.find(m => m.isUserMatch)?.match.homeTeamId);
     const userTeamIdStr = userTeamId ? String(userTeamId) : null;
     if (!userTeamIdStr) {
       return;
@@ -496,7 +774,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
       if (!rm.state || !rm.state.events) {
         continue;
       }
-      // Only the user match drives the auto-modal — injuries on the
+      // Only the user match drives the auto-modal â€” injuries on the
       // rival are not actionable.
       const matchHomeId = String(rm.state.homeTeamId ?? '');
       const matchAwayId = String(rm.state.awayTeamId ?? '');
@@ -515,16 +793,23 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
           continue;
         }
         if (!ev.playerId) {
-          // No id → can't pre-select the visual pitch dot. Skip.
+          // No id â†’ can't pre-select the visual pitch dot. Skip.
           continue;
         }
         const eventTeamId = ev.teamId ? String(ev.teamId) : null;
         if (eventTeamId !== userTeamIdStr) {
-          // Injury on the rival — not actionable for the manager.
+          // Injury on the rival â€” not actionable for the manager.
           continue;
         }
         const eventId = `${rm.state.matchId}|${ev.minute}|${ev.playerId}`;
         if (this.autoModalShownEventIds.has(eventId)) {
+          continue;
+        }
+        if (this.wasPlayerSubstitutedOffInState(rm.state, String(ev.playerId))) {
+          // Reload/SSE snapshots keep historical INJURY events. If the
+          // injured player already left the pitch, reopening the forced modal
+          // creates an empty/ghost dialog instead of a useful decision.
+          this.autoModalShownEventIds.add(eventId);
           continue;
         }
         // First-time-seen INJURY on the manager team.
@@ -534,13 +819,6 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
           state: rm.state,
           preSelectedPlayerId: ev.playerId
         });
-        // Only the FIRST new injury on this tick opens a modal — we
-        // don't want to stack 3 dialogs if 3 players got hurt on the
-        // same action. Subsequent injuries are still recorded in
-        // autoModalShownEventIds, so the manager can manually open
-        // the modal via the "Sustituir" button on the next tick if
-        // they need to handle a second injury.
-        return;
       }
     }
   }
@@ -553,7 +831,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
    * <p>Trigger rules:
    * <ul>
    *   <li>Event type === 'RED_CARD' (yellow cards are intentionally
-   *       skipped — not impactful enough to interrupt the manager).</li>
+   *       skipped â€” not impactful enough to interrupt the manager).</li>
    *   <li>Only the user match is scanned. Red cards in other matches of
    *       the round must not interrupt the manager.</li>
    *   <li>Event has a {@code teamId} AND that teamId is NOT the user's
@@ -566,7 +844,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
    *       re-trigger).</li>
    * </ul>
    *
-   * <p>Concurrency: shared pattern with maybeOpenInjuryAutoModal — if the
+   * <p>Concurrency: shared pattern with maybeOpenInjuryAutoModal â€” if the
    * previous rival card modal is still open, the next matching RED_CARD
    * is queued (replaces any older queued entry). When the active modal
    * closes the queued one fires (if any).
@@ -630,8 +908,14 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
     playerName: string;
     minute: number;
   }): void {
-    if (this.isRivalCardModalOpen) {
+    if (payload.state.status === 'RUNNING') {
       this.queuedRivalCardModal = payload;
+      this.updatePendingLiveModalNotice();
+      return;
+    }
+    if (this.isRivalCardModalOpen || this.isCriticalLiveModalOpen) {
+      this.queuedRivalCardModal = payload;
+      this.updatePendingLiveModalNotice();
       return;
     }
     this.openRivalCardInfoModal(payload);
@@ -641,7 +925,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
    * V25D81.1 BUG #3: actually open the rival card awareness dialog with
    * the player name + minute. Resets {@code isRivalCardModalOpen} when
    * the dialog closes (whether dismissed or auto-closed) and drains the
-   * queue. Does NOT pause/resume the round — the modal is informational.
+   * queue. Does NOT pause/resume the round â€” the modal is informational.
    */
   private openRivalCardInfoModal(payload: {
     matchId: string;
@@ -650,6 +934,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
     minute: number;
   }): void {
     this.isRivalCardModalOpen = true;
+    this.updatePendingLiveModalNotice();
     this.modals.openRivalCardInfoModal(
       payload.matchId,
       payload.state,
@@ -661,6 +946,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
           this.isRivalCardModalOpen = false;
           const queued = this.queuedRivalCardModal;
           this.queuedRivalCardModal = null;
+          this.updatePendingLiveModalNotice();
           if (queued) {
             // Defer to the next macrotask so the dialog close animation
             // finishes before a new dialog opens.
@@ -671,6 +957,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
           console.error('[ROUND-LIVE] rival card awareness modal error', err);
           this.isRivalCardModalOpen = false;
           this.queuedRivalCardModal = null;
+          this.updatePendingLiveModalNotice();
         }
       });
   }
@@ -685,17 +972,38 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
     state: MatchState;
     preSelectedPlayerId: string;
   }): void {
-    if (this.isAutoModalOpen) {
-      this.queuedAutoModal = payload;
+    if (this.isAutoModalOpen || this.isCriticalLiveModalOpen) {
+      this.enqueueAutoModal(payload);
+      this.updatePendingLiveModalNotice();
       return;
     }
     this.openInjuryAutoModal(payload);
   }
 
+  private enqueueAutoModal(payload: {
+    matchId: string;
+    state: MatchState;
+    preSelectedPlayerId: string;
+  }): void {
+    if ((this.isAutoModalOpen || this.isCriticalLiveModalOpen) && !this.releaseQueuedAutoModalResumeHold) {
+      this.releaseQueuedAutoModalResumeHold = this.modals.holdRoundResumeAfterModalClose();
+    }
+    const alreadyQueued = this.queuedAutoModals.some(queued =>
+      queued.matchId === payload.matchId
+      && queued.preSelectedPlayerId === payload.preSelectedPlayerId
+    );
+    if (!alreadyQueued) {
+      this.queuedAutoModals = [...this.queuedAutoModals, payload];
+      this.persistInjuryAutoModals();
+    }
+  }
+
   /**
-   * V25D81-BUG #3: actually open the substitution modal with the
-   * INJURY pre-select. Resets {@code isAutoModalOpen} when the modal
-   * closes (whether confirmed or cancelled) and drains the queue.
+   * V25D99.43: actually open the professional Partido modal with the
+   * INJURY pre-select. The old substitution-only modal still exists as
+   * a manual shortcut, but forced injuries now open the full DT surface
+   * so the manager can replace the player, change formation and tune
+   * pixels in one decision.
    */
   private openInjuryAutoModal(payload: {
     matchId: string;
@@ -703,29 +1011,39 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
     preSelectedPlayerId: string;
   }): void {
     this.isAutoModalOpen = true;
-    this.modals.openSubstitutionModal(payload.matchId, payload.state, {
+    this.isCriticalLiveModalOpen = true;
+    this.activeInjuryAutoModal = {
+      matchId: payload.matchId,
+      preSelectedPlayerId: payload.preSelectedPlayerId
+    };
+    this.persistInjuryAutoModals();
+    this.updatePendingLiveModalNotice();
+    const currentVm = this.vmSubject.value;
+    this.modals.openPartidoModal(payload.matchId, payload.state, {
+      home: this.getTeamName(payload.state.homeTeamId, currentVm.teamNameMap),
+      away: this.getTeamName(payload.state.awayTeamId, currentVm.teamNameMap)
+    }, {
       preSelectedPlayerId: payload.preSelectedPlayerId,
       reason: 'INJURY_FORCED_SUBSTITUTION'
     })
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        next: () => {
+        complete: () => {
           // Modal closed (confirmed or cancelled). Reset flag + drain
           // the queue.
           this.isAutoModalOpen = false;
-          const queued = this.queuedAutoModal;
-          this.queuedAutoModal = null;
-          if (queued) {
-            // Defer to the next macrotask so the dialog close
-            // animation finishes before a new dialog opens (avoids
-            // a visual stutter on the backdrop).
-            setTimeout(() => this.openInjuryAutoModal(queued), 0);
-          }
+          this.activeInjuryAutoModal = null;
+          this.persistInjuryAutoModals();
+          this.releaseCriticalLiveModalGate();
         },
         error: (err) => {
           console.error('[ROUND-LIVE] injury auto-modal error', err);
           this.isAutoModalOpen = false;
-          this.queuedAutoModal = null;
+          this.isCriticalLiveModalOpen = false;
+          this.activeInjuryAutoModal = null;
+          this.queuedAutoModals = [];
+          this.persistInjuryAutoModals();
+          this.updatePendingLiveModalNotice();
         }
       });
   }
@@ -738,8 +1056,95 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
     }
 
     this.engineService.pauseRoundForMatch(vm.gameId, String(anchorMatch.match.id)).subscribe({
-      next: () => this.updateVm({ ...this.vmSubject.value, isRoundPaused: true }),
+      next: () => {
+        this.updateVm({ ...this.vmSubject.value, isRoundPaused: true });
+        this.drainQueuedLiveModals();
+      },
       error: (err) => console.error('[ROUND-LIVE] pauseAll failed', err)
+    });
+  }
+
+  toggleDebugFreeze(): void {
+    this.debugFreezeEnabled = !this.debugFreezeEnabled;
+    try {
+      localStorage.setItem(this.debugFreezeStorageKey, this.debugFreezeEnabled ? '1' : '0');
+    } catch {
+      // Non-fatal: the in-memory flag still works for this session.
+    }
+
+    if (this.debugFreezeEnabled) {
+      const vm = this.vmSubject.value;
+      this.debugFreezePausedRoundKeys.delete(`${vm.gameId}|${vm.roundNumber}`);
+      this.applyDebugFreezeIfNeeded(vm);
+    }
+  }
+
+  private resolveManagerTeamId(userMatch: RoundMatchVM, state: MatchState): string {
+    const explicit = userMatch.userTeamId ?? this.currentUserSessionTeamId;
+    if (explicit && [String(state.homeTeamId), String(state.awayTeamId)].includes(String(explicit))) {
+      return String(explicit);
+    }
+    return String(userMatch.match.homeTeamId ?? state.homeTeamId);
+  }
+
+  toggleDebugSuppressAutoInjuryModals(): void {
+    this.debugSuppressAutoInjuryModals = !this.debugSuppressAutoInjuryModals;
+    try {
+      localStorage.setItem(
+        this.debugSuppressAutoInjuryStorageKey,
+        this.debugSuppressAutoInjuryModals ? '1' : '0'
+      );
+    } catch {
+      // Non-fatal: the in-memory flag still works for this session.
+    }
+
+    if (this.debugSuppressAutoInjuryModals) {
+      this.queuedAutoModals = [];
+      this.updatePendingLiveModalNotice();
+    }
+  }
+
+  private readDebugFreezeFlag(): boolean {
+    try {
+      return localStorage.getItem(this.debugFreezeStorageKey) === '1';
+    } catch {
+      return false;
+    }
+  }
+
+  private readDebugSuppressAutoInjuryFlag(): boolean {
+    try {
+      return localStorage.getItem(this.debugSuppressAutoInjuryStorageKey) === '1';
+    } catch {
+      return false;
+    }
+  }
+
+  private applyDebugFreezeIfNeeded(vm: RoundLiveViewModel, force = false): void {
+    if (!this.debugFreezeEnabled || vm.allFinished || (!force && vm.isRoundPaused) || this.debugFreezePauseInFlight) {
+      return;
+    }
+
+    const anchorMatch = this.findRoundControlAnchorMatch(vm);
+    if (!anchorMatch || !anchorMatch.state || this.isTerminalState(anchorMatch.state.status)) {
+      return;
+    }
+
+    const roundKey = `${vm.gameId}|${vm.roundNumber}`;
+    if (!force && this.debugFreezePausedRoundKeys.has(roundKey)) {
+      return;
+    }
+
+    this.debugFreezePauseInFlight = true;
+    this.engineService.pauseRoundForMatch(vm.gameId, String(anchorMatch.match.id)).subscribe({
+      next: () => {
+        this.debugFreezePausedRoundKeys.add(roundKey);
+        this.updateVm({ ...this.vmSubject.value, isRoundPaused: true });
+      },
+      error: (err) => console.error('[ROUND-LIVE] debug freeze pause failed', err),
+      complete: () => {
+        this.debugFreezePauseInFlight = false;
+      }
     });
   }
 
@@ -805,7 +1210,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
    * <ul>
    *   <li>Filters VM matches to those without state OR with state.status
    *       {@code NOT_STARTED}. Matches already RUNNING / FINISHED / etc.
-   *       are skipped — re-sending them would be wasteful (and could
+   *       are skipped â€” re-sending them would be wasteful (and could
    *       trip backend idempotency checks depending on the route).</li>
    *   <li>If the filtered list is empty (every match already started),
    *       the method is a no-op and does not hit the backend.</li>
@@ -831,7 +1236,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
       }));
 
     if (pending.length === 0) {
-      // No NOT_STARTED matches left — button should already be hidden via
+      // No NOT_STARTED matches left â€” button should already be hidden via
       // the *ngIf="!vm.anyStarted" guard, but guard defensively here.
       return;
     }
@@ -860,7 +1265,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
   /**
    * V25D84 sprint: auto-start the round once the first vm$ emission
    * has NOT_STARTED matches. Triggered by the take(1) subscription
-   * in the constructor — the explicit "Iniciar Todos" button in the
+   * in the constructor â€” the explicit "Iniciar Todos" button in the
    * header remains as a manual fallback for refresh / recovery cases
    * where the auto-start POST was rejected by the backend.
    *
@@ -871,7 +1276,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
    *       short-circuit and skip their own POST.</li>
    *   <li>No-ops on error/empty VMs (the round can't be started
    *       without matches).</li>
-   *   <li>No-ops when no match has status {@code NOT_STARTED} — the
+   *   <li>No-ops when no match has status {@code NOT_STARTED} â€” the
    *       round already started ticking (covers the refresh case
    *       where the backend round is RUNNING but the frontend VM was
    *       rebuilt from scratch).</li>
@@ -896,7 +1301,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
     this.autoStartTriggered = true;
 
     if (vm.errorMsg || vm.matches.length === 0) {
-      // Nothing to start — round can't be played (error or empty).
+      // Nothing to start â€” round can't be played (error or empty).
       return;
     }
 
@@ -910,7 +1315,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
 
     if (pending.length === 0) {
       // All matches already started (e.g. user refreshed an in-flight
-      // round). Nothing to POST — the SSE stream from
+      // round). Nothing to POST â€” the SSE stream from
       // startRoundEngine will catch up via polling/SSE reconnect.
       console.log('[ROUND-LIVE] V25D84 auto-start skipped: no NOT_STARTED matches in VM');
       return;
@@ -925,7 +1330,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
         // uses the SAME roundId as the registry key. Before this fix
         // the SSE chain did `streamRoundState(vm.gameId)`, but the
         // backend roundEngineRegistry.get(vm.gameId) returned null
-        // and MatchEngineController returned Flux.empty() — silent
+        // and MatchEngineController returned Flux.empty() â€” silent
         // idle SSE.
         if (state && state.roundId) {
           this.resolvedRoundId$.next(state.roundId);
@@ -970,10 +1375,18 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
     if (!state) {
       return;
     }
+    if (this.isCriticalLiveModalOpen) {
+      return;
+    }
+    this.isCriticalLiveModalOpen = true;
     this.modals.openSubstitutionModal(String(match.id), state)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        error: (err) => console.error('[ROUND-LIVE] openSubstitutionModal error', err)
+        complete: () => this.releaseCriticalLiveModalGate(),
+        error: (err) => {
+          this.releaseCriticalLiveModalGate();
+          console.error('[ROUND-LIVE] openSubstitutionModal error', err);
+        }
       });
   }
 
@@ -985,16 +1398,207 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
     if (!state) {
       return;
     }
+    if (this.isCriticalLiveModalOpen) {
+      return;
+    }
+    this.isCriticalLiveModalOpen = true;
     this.modals.openFormationModal(String(match.id), state)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        error: (err) => console.error('[ROUND-LIVE] openFormationModal error', err)
+        next: (result: any) => {
+          if (result?.success && result.formation) {
+            this.patchVisibleFormation(String(match.id), state, String(result.formation));
+          }
+        },
+        complete: () => this.releaseCriticalLiveModalGate(),
+        error: (err) => {
+          this.releaseCriticalLiveModalGate();
+          console.error('[ROUND-LIVE] openFormationModal error', err);
+        }
       });
   }
 
+  private releaseCriticalLiveModalGate(): void {
+    this.isCriticalLiveModalOpen = false;
+    if (this.debugFreezeEnabled) {
+      setTimeout(() => this.applyDebugFreezeIfNeeded(this.vmSubject.value, true), 0);
+    }
+    setTimeout(() => this.drainQueuedLiveModals(), 0);
+  }
+
   /**
-   * V25D89-FRONT-A: open the Partido modal (dual-tab: Mi Formación editable +
-   * Formación Rival read-only) for the user match. Called from the
+   * V25D99.24: debug/QA injury modals can exist only in component memory
+   * (e.g. `Test doble lesion` queues two forced-substitution dialogs without
+   * creating backend INJURY events). If the page reloads while one is open or
+   * queued, that obligation must not disappear. Persist only ids, then rebuild
+   * against the latest live MatchState after the SSE stream reconnects.
+   */
+  private persistInjuryAutoModals(): void {
+    if (typeof sessionStorage === 'undefined') {
+      return;
+    }
+    const active = this.activeInjuryAutoModal ? [this.activeInjuryAutoModal] : [];
+    const queued = this.queuedAutoModals.map(payload => ({
+      matchId: payload.matchId,
+      preSelectedPlayerId: payload.preSelectedPlayerId
+    }));
+    const payload = {
+      active,
+      queued
+    };
+    const key = this.injuryAutoModalStorageKey();
+    if (active.length === 0 && queued.length === 0) {
+      sessionStorage.removeItem(key);
+      return;
+    }
+    sessionStorage.setItem(key, JSON.stringify(payload));
+  }
+
+  private restorePersistedInjuryAutoModals(matches: RoundMatchVM[]): void {
+    if (this.restoredPersistedInjuryAutoModals || typeof sessionStorage === 'undefined') {
+      return;
+    }
+    this.restoredPersistedInjuryAutoModals = true;
+    const key = this.injuryAutoModalStorageKey();
+    const raw = sessionStorage.getItem(key);
+    if (!raw) {
+      return;
+    }
+
+    let parsed: {
+      active?: PersistedInjuryAutoModal[];
+      queued?: PersistedInjuryAutoModal[];
+    };
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      sessionStorage.removeItem(key);
+      return;
+    }
+
+    const items = [
+      ...(parsed.active ?? []),
+      ...(parsed.queued ?? [])
+    ].filter(item => !!item?.matchId && !!item?.preSelectedPlayerId);
+
+    sessionStorage.removeItem(key);
+    if (items.length === 0) {
+      return;
+    }
+
+    for (const item of items) {
+      const match = matches.find(candidate => String(candidate.state?.matchId ?? candidate.match.id) === item.matchId);
+      const state = match?.state;
+      if (!state || state.status === 'FINISHED' || state.status === 'CANCELLED') {
+        continue;
+      }
+      if (this.wasPlayerSubstitutedOffInState(state, item.preSelectedPlayerId)) {
+        continue;
+      }
+      this.queueOrOpenAutoModal({
+        matchId: item.matchId,
+        state,
+        preSelectedPlayerId: item.preSelectedPlayerId
+      });
+    }
+    this.persistInjuryAutoModals();
+  }
+
+  private injuryAutoModalStorageKey(): string {
+    const vm = this.vmSubject.value;
+    return `${this.injuryAutoModalStoragePrefix}:${vm.gameId}:${vm.roundNumber}`;
+  }
+
+  private wasPlayerSubstitutedOffInState(state: MatchState, playerId: string): boolean {
+    return (state.events ?? []).some(event =>
+      event.eventType === 'SUBSTITUTION'
+      && String(event.playerId ?? '') === playerId
+    );
+  }
+
+  /**
+   * V25D99.21.1: one drain point for auto-modals waiting behind a
+   * manager-controlled modal. Priority is:
+   * 1) forced injury substitution, because it affects playability;
+   * 2) rival red-card awareness, because it is informational.
+   */
+  private drainQueuedLiveModals(): void {
+    const queued = this.queuedAutoModals.shift();
+    this.updatePendingLiveModalNotice();
+    if (queued) {
+      setTimeout(() => this.openQueuedInjuryAutoModalIfStillNeeded(queued), 0);
+      return;
+    }
+    const queuedRival = this.queuedRivalCardModal;
+    this.queuedRivalCardModal = null;
+    this.updatePendingLiveModalNotice();
+    if (queuedRival) {
+      setTimeout(() => this.openRivalCardInfoModal(queuedRival), 0);
+    }
+  }
+
+  private updatePendingLiveModalNotice(): void {
+    if (this.queuedAutoModals.length > 0) {
+      const suffix = this.queuedAutoModals.length > 1 ? ` (${this.queuedAutoModals.length})` : '';
+      this.pendingLiveModalNotice = `Evento pendiente: lesion propia${suffix}. Al cerrar el modal actual se abrira Sustitucion.`;
+      return;
+    }
+    if (this.queuedRivalCardModal) {
+      this.pendingLiveModalNotice = this.isCriticalLiveModalOpen
+        ? 'Evento pendiente: roja rival. Al cerrar el modal actual verás el aviso táctico.'
+        : 'Evento pendiente: roja rival. Pausá el partido o abrí Partido para revisarlo sin cortar el juego.';
+      return;
+    }
+    this.pendingLiveModalNotice = null;
+  }
+
+  /**
+   * V25D99.20.3.36: queued injury modals are revalidated just before
+   * opening. Example: two injuries arrive, the second waits in queue, but
+   * the manager already substituted that second injured player from the
+   * first/manual modal. In that case the queued modal would be noise, so we
+   * silently drop it. If the player still needs attention, the modal opens.
+   */
+  private openQueuedInjuryAutoModalIfStillNeeded(payload: {
+    matchId: string;
+    state: MatchState;
+    preSelectedPlayerId: string;
+  }): void {
+    this.releaseQueuedAutoModalResumeHold?.();
+    this.releaseQueuedAutoModalResumeHold = null;
+    if (this.modals.wasPlayerConfirmedSubstitutedOff(payload.matchId, payload.preSelectedPlayerId)) {
+      setTimeout(() => this.drainQueuedLiveModals(), 0);
+      return;
+    }
+    if (this.queuedAutoModals.length > 0) {
+      this.releaseQueuedAutoModalResumeHold = this.modals.holdRoundResumeAfterModalClose();
+    }
+    this.queueOrOpenAutoModal(payload);
+  }
+
+  /**
+   * V25D99.20.3.2: after the live formation modal confirms, update the
+   * visible card immediately. The backend/SSE remains the source of truth;
+   * this is the local UX bridge so the manager sees their decision at once.
+   */
+  private patchVisibleFormation(matchId: string, state: MatchState, formation: string): void {
+    const currentVm = this.vmSubject.value;
+    const patchedMatches = currentVm.matches.map(rm => {
+      if (String(rm.match.id) !== matchId || !rm.state) {
+        return rm;
+      }
+      const managerTeamId = rm.userTeamId ?? state.homeTeamId;
+      const patchedState: MatchState = managerTeamId === rm.state.homeTeamId
+        ? { ...rm.state, homeFormation: formation }
+        : { ...rm.state, awayFormation: formation };
+      return { ...rm, state: patchedState };
+    });
+    this.vmSubject.next({ ...currentVm, matches: patchedMatches });
+  }
+
+  /**
+   * V25D89-FRONT-A: open the Partido modal (dual-tab: Mi FormaciÃ³n editable +
+   * FormaciÃ³n Rival read-only) for the user match. Called from the
    * match-card's (partidoOpen) output. Delegates to
    * {@link LiveMatchModalsService.openPartidoModal} which handles
    * pause/resume round + dialog opening.
@@ -1004,13 +1608,18 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
    * modal as the 3rd parameter, so the stats section shows readable
    * team names ("REAL MADRID 55% | 45% BARCELONA") instead of raw
    * sessionTeamIds. The modal's stats derivation falls back to the
-   * teamIds if these are missing — passing them is cosmetic, not
+   * teamIds if these are missing â€” passing them is cosmetic, not
    * required for correctness.
    */
   onPartidoOpen(match: Match, state: MatchState | undefined): void {
     if (!state) {
       return;
     }
+    if (this.isCriticalLiveModalOpen) {
+      return;
+    }
+    this.isCriticalLiveModalOpen = true;
+    this.updatePendingLiveModalNotice();
     const currentVm = this.vmSubject.value;
     this.modals.openPartidoModal(String(match.id), state, {
       home: this.getTeamName(state.homeTeamId, currentVm.teamNameMap),
@@ -1018,7 +1627,11 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
     })
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        error: (err) => console.error('[ROUND-LIVE] openPartidoModal error', err)
+        complete: () => this.releaseCriticalLiveModalGate(),
+        error: (err) => {
+          this.releaseCriticalLiveModalGate();
+          console.error('[ROUND-LIVE] openPartidoModal error', err);
+        }
       });
   }
 
@@ -1061,7 +1674,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
   private mapFixtureStatus(fixtureStatus: string): 'SCHEDULED' | 'SIMULATED' | 'CANCELLED' {
     // V24D14-LIVE-FIX-1.7 Bug #2: also accept live state statuses (NOT_STARTED /
     // RUNNING / PAUSED / FINISHED) so SSE-driven updates of rm.match.status
-    // correctly flip SCHEDULED → SIMULATED when the match ends.
+    // correctly flip SCHEDULED â†’ SIMULATED when the match ends.
     switch (fixtureStatus) {
       case 'PENDING': case 'SIMULATING':
       case 'NOT_STARTED': case 'RUNNING': case 'PAUSED':

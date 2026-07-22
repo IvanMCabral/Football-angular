@@ -18,6 +18,8 @@ import { PlayerCardComponent } from 'app/shared/components/player-card/player-ca
 import { LineupPlayerCardComponent } from 'app/shared/components/lineup-player-card/lineup-player-card.component';
 import { SeasonStatsTabComponent } from '../../player-season-stats/components/season-stats-tab/season-stats-tab.component';
 import { LineupDTO, PlayerLineupDTO, ChemistryBreakdownDTO } from 'app/shared/models/lineup/lineup.dto';
+import { FormationDTO } from 'app/shared/models/lineup/formation.dto';
+import { LineupSlotDTO } from 'app/shared/models/lineup/lineup-slot.dto';
 import { LineupWarningDTO } from 'app/shared/models/lineup/lineup-warning.dto';
 import { ALL_FORMATIONS } from 'app/shared/constants/formations';
 import { SquadEditorModalComponent } from 'app/components/squad-editor-modal/squad-editor-modal.component';
@@ -537,16 +539,24 @@ this.squad$ = combineLatest([
 
      const current = this.lineupSubject$.value;
      const playerIds: string[] = (current?.players ?? []).map(p => p.playerId);
-     const slots = (current?.slots ?? []).map(s => ({
+     const currentSlots = current?.slots ?? [];
+     const fallbackSlots = currentSlots.map(s => ({
        playerId: s.playerId,
        subdivisionId: s.subdivisionId,
        customXPercent: s.customXPercent,
        customYPercent: s.customYPercent,
      }));
 
-     this.http.post<LineupDTO>(
-       `${environment.apiUrl}/career/lineup/manual-select`,
-       { formation, playerIds, slots }
+     const slots$ = this.http.get<FormationDTO[]>(`${environment.apiUrl}/editor/formations`).pipe(
+       map(formations => this.reflowCurrentPlayersIntoFormation(formation, current, formations) ?? fallbackSlots),
+       catchError(() => of(fallbackSlots))
+     );
+
+     slots$.pipe(
+       switchMap(slots => this.http.post<LineupDTO>(
+         `${environment.apiUrl}/career/lineup/manual-select`,
+         { formation, playerIds, slots }
+       ))
      ).subscribe({
        next: () => {
          this.http.get<LineupDTO>(`${environment.apiUrl}/career/lineup/current`)
@@ -568,6 +578,26 @@ this.squad$ = combineLatest([
          this.lineupError$.next(userMsg);
        }
      });
+   }
+
+   private reflowCurrentPlayersIntoFormation(
+     formation: string,
+     current: LineupDTO | null,
+     formations: FormationDTO[]
+   ): LineupSlotDTO[] | null {
+     const players = current?.players ?? [];
+     if (players.length !== 11) {
+       return null;
+     }
+     const target = formations.find(f => f.name === formation);
+     const positions = [...(target?.positions ?? [])].sort((a, b) => a.index - b.index);
+     if (positions.length !== 11) {
+       return null;
+     }
+     return players.map((player, index) => ({
+       playerId: player.playerId,
+       subdivisionId: positions[index].subdivisionId,
+     }));
    }
 
    setActiveTab(tab: 'squad' | 'stats'): void {
@@ -739,7 +769,7 @@ this.http.post(`${environment.apiUrl}/career/lineup/confirm`, {}).subscribe({
 
                  if (response.success) {
                    if (response.tournamentFinished) {
-                     alert('🏆 ¡Temporada completada!\n\nPosición final: ' + response.userPosition + '°');
+                     this.lineupError$.next('Temporada completada. Posición final: ' + response.userPosition + '°');
                      this.refreshCareerStatus();
                    } else {
                      this.router.navigate([`/games/${careerStatus.careerId}/round/${response.currentRound}/live`]);
@@ -787,19 +817,10 @@ this.http.post(`${environment.apiUrl}/career/lineup/confirm`, {}).subscribe({
     }
 
     continueToNewSeason(): void {
-      if (!confirm('¿Iniciar una nueva temporada con tu equipo actual?')) {
-        return;
-      }
-
       this.http.post<any>(`${environment.apiUrl}/career/continue`, {}).subscribe({
         next: (response) => {
           if (response.success) {
             this.refreshCareerStatus();
-            // V25D75-C40 B2: backend ContinueSeasonUseCase.ContinueResult
-            // serializes the season as `newSeason` (NOT `season`). Reading
-            // response.season produced the literal "undefined" in the alert.
-            const newSeason = response.newSeason ?? response.season ?? '?';
-            alert('🏆 ¡Nueva temporada ' + newSeason + ' iniciada!');
             // V25D78-C55.13 BUG-1 (BUG_V25D78_CONTINUE_CAREER_SQUAD_BUTTON_NOOP):
             // Backend successfully creates T3 (careerPhase=PRE_MATCH) but the
             // squad-management component keeps showing the stale T2 FINISHED
@@ -811,12 +832,12 @@ this.http.post(`${environment.apiUrl}/career/lineup/confirm`, {}).subscribe({
             // reload — simplest and most robust fix for a 2-button component.
             this.reloadPage();
           } else {
-            alert('Error: ' + response.message);
+            this.lineupError$.next(response.message || 'Error al iniciar nueva temporada');
           }
         },
         error: (err) => {
           console.error('[SQUAD] Error iniciando nueva temporada:', err);
-          alert(err.error?.message || 'Error al iniciar nueva temporada');
+          this.lineupError$.next(err.error?.message || 'Error al iniciar nueva temporada');
         }
       });
     }
@@ -849,7 +870,7 @@ this.http.post(`${environment.apiUrl}/career/lineup/confirm`, {}).subscribe({
         },
         error: (err) => {
           console.error('[PALMARES-FRONT] Error obteniendo datos:', err);
-          alert('Error al obtener datos del palmarés');
+          this.lineupError$.next('Error al obtener datos del palmarés');
         }
       });
     }
@@ -865,7 +886,7 @@ this.http.post(`${environment.apiUrl}/career/lineup/confirm`, {}).subscribe({
         },
         error: (err) => {
           console.error('[SQUAD] Error obteniendo promociones:', err);
-          alert('Error al obtener promociones');
+          this.lineupError$.next('Error al obtener promociones');
         }
       });
     }

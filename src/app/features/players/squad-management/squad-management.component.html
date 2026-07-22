@@ -330,7 +330,7 @@
               <span class="warning-icon">⚠️</span>
               <span class="warning-text">{{warning}}</span>
             </div>
-            <button
+            <button *ngIf="false"
               (click)="onConfirmLineup()"
               [disabled]="(lineupLoading$ | async) || lineupSlotsCount < 7 || lineupSlotsCount > 11"
               [title]="lineupSlotsCount < 7

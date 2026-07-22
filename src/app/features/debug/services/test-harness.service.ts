@@ -325,6 +325,20 @@ export class TestHarnessService {
     );
   }
 
+  prepareObjectiveContrastLab(): Observable<LabMutationResult> {
+    return this.http.post<LabMutationResult>(
+      `${this.apiUrl}/labs/objective-contrast/prepare`,
+      {}
+    );
+  }
+
+  restoreObjectiveContrastLab(): Observable<LabMutationResult> {
+    return this.http.post<LabMutationResult>(
+      `${this.apiUrl}/labs/objective-contrast/restore`,
+      {}
+    );
+  }
+
   prepareWeakWideDefendersLab(): Observable<LabMutationResult> {
     return this.http.post<LabMutationResult>(
       `${this.apiUrl}/labs/weak-wide-defenders/prepare`,

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * V24D14-LIVE-FIX-1.7 Bug #2: unit tests for {@link RoundLiveComponent}'s SSE
  * snapshot propagation.
  *
@@ -12,13 +12,13 @@
  *
  * <p>Coverage:
  * <ol>
- *   <li>SSE update with {@code state.status='FINISHED'} → {@code match.status}
+ *   <li>SSE update with {@code state.status='FINISHED'} â†’ {@code match.status}
  *       flips to {@code 'SIMULATED'} (the canonical post-match MatchStatus).</li>
- *   <li>SSE update with {@code state.status='RUNNING'} → {@code match.status}
+ *   <li>SSE update with {@code state.status='RUNNING'} â†’ {@code match.status}
  *       stays on {@code 'SCHEDULED'} (in-play is not yet terminal).</li>
- *   <li>SSE update with {@code state.status='CANCELLED'} → {@code match.status}
+ *   <li>SSE update with {@code state.status='CANCELLED'} â†’ {@code match.status}
  *       flips to {@code 'CANCELLED'}.</li>
- *   <li>SSE update without a matching matchState → {@code match.status} is
+ *   <li>SSE update without a matching matchState â†’ {@code match.status} is
  *       unchanged.</li>
  * </ol>
  *
@@ -32,7 +32,7 @@ import { ActivatedRoute, provideRouter, Router } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { BehaviorSubject, of, Subject, Observable, throwError } from 'rxjs';
+import { BehaviorSubject, NEVER, of, Subject, Observable, throwError } from 'rxjs';
 import { RoundLiveComponent } from './round-live.component';
 import { CareerService } from '../../core/services/career.service';
 import { MatchEngineService } from '../../core/services/match-engine.service';
@@ -104,9 +104,13 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
   let careerServiceSpy: jasmine.SpyObj<CareerService>;
   let modalsSpy: jasmine.SpyObj<LiveMatchModalsService>;
   let roundStateSubject: Subject<RoundState>;
+  let consoleLogSpy: jasmine.Spy;
+  let consoleErrorSpy: jasmine.Spy;
 
   beforeEach(async () => {
     roundStateSubject = new Subject<RoundState>();
+    consoleLogSpy = spyOn(console, 'log').and.stub();
+    consoleErrorSpy = spyOn(console, 'error').and.stub();
 
     engineServiceSpy = jasmine.createSpyObj<MatchEngineService>('MatchEngineService', [
       'startRound',
@@ -130,14 +134,30 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
       'getCareerStatus',
       'getFixturesByRoundWithBye'
     ]);
+    // Keep constructor-owned streams valid but silent by default.
+    // Most tests inject the VM directly via setVm(); returning NEVER avoids
+    // the old "undefined stream" console error without letting constructor
+    // emissions overwrite hand-built test state or consume the auto-start
+    // take(1) guard before each assertion.
+    careerServiceSpy.getCareerTeams.and.returnValue(NEVER);
+    careerServiceSpy.getCareerStatus.and.returnValue(NEVER);
+    careerServiceSpy.getFixturesByRoundWithBye.and.returnValue(NEVER);
 
     modalsSpy = jasmine.createSpyObj<LiveMatchModalsService>('LiveMatchModalsService', [
       'openSubstitutionModal',
       'openFormationModal',
+      'openPartidoModal',
       // V25D81.1 BUG #3: rival RED_CARD awareness modal.
-      'openRivalCardInfoModal'
+      'openRivalCardInfoModal',
+      'wasPlayerConfirmedSubstitutedOff',
+      'holdRoundResumeAfterModalClose'
     ]);
+    modalsSpy.openSubstitutionModal.and.returnValue(of({}));
+    modalsSpy.openFormationModal.and.returnValue(of({}));
+    modalsSpy.openPartidoModal.and.returnValue(of({}));
     modalsSpy.openRivalCardInfoModal.and.returnValue(of({ dismissed: true }));
+    modalsSpy.wasPlayerConfirmedSubstitutedOff.and.returnValue(false);
+    modalsSpy.holdRoundResumeAfterModalClose.and.returnValue(() => {});
 
     await TestBed.configureTestingModule({
       imports: [RoundLiveComponent, NoopAnimationsModule],
@@ -254,7 +274,7 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
     setVm([{ match: makeMatch('SCHEDULED'), isUserMatch: true }]);
     (component as any).startRoundEngine(SAMPLE_GAME_ID, (component as any).vmSubject.value.matches);
 
-    // Emit SSE update for a DIFFERENT matchId — our match's state should not be touched.
+    // Emit SSE update for a DIFFERENT matchId â€” our match's state should not be touched.
     roundStateSubject.next(makeRoundState([makeMatchState({ matchId: 'match-other', status: 'FINISHED' })]));
 
     const vm = (component as any).vmSubject.value as RoundLiveViewModel;
@@ -285,11 +305,11 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
     return matches;
   }
 
-  it('BUG #3 (1/5): RED_CARD on rival opens awareness modal', (done) => {
+  it('BUG #3 (1/5): RED_CARD on rival while RUNNING queues awareness without interrupting', (done) => {
     setVm([{ match: makeMatch('SCHEDULED'), isUserMatch: true }]);
     (component as any).startRoundEngine(SAMPLE_GAME_ID, (component as any).vmSubject.value.matches);
 
-    // RED_CARD for the AWAY team (the rival) — must trigger openRivalCardInfoModal.
+    // RED_CARD for the AWAY team (the rival) â€” must trigger openRivalCardInfoModal.
     roundStateSubject.next(makeRoundState([makeMatchState({
       status: 'RUNNING',
       currentMinute: 47,
@@ -297,7 +317,7 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
         {
           eventType: 'RED_CARD',
           minute: 47,
-          playerName: 'Gerard Piqué',
+          playerName: 'Gerard PiquÃ©',
           playerId: 'p-rival-1',
           teamId: SAMPLE_AWAY_TEAM_ID,
           description: 'InJURED_V23_LEGACY'
@@ -306,13 +326,8 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
     })]));
 
     fixture.whenStable().then(() => {
-      expect(modalsSpy.openRivalCardInfoModal).toHaveBeenCalledTimes(1);
-      const [matchIdArg, stateArg, infoArg] = modalsSpy.openRivalCardInfoModal.calls.mostRecent().args;
-      expect(matchIdArg).toBe(SAMPLE_MATCH_ID);
-      expect(stateArg.matchId).toBe(SAMPLE_MATCH_ID);
-      expect(infoArg.playerName).toBe('Gerard Piqué');
-      expect(infoArg.minute).toBe(47);
-      expect(infoArg.cardType).toBe('RED');
+      expect(modalsSpy.openRivalCardInfoModal).not.toHaveBeenCalled();
+      expect(component.pendingLiveModalNotice).toContain('roja rival');
       done();
     });
   });
@@ -322,7 +337,7 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
     (component as any).startRoundEngine(SAMPLE_GAME_ID, (component as any).vmSubject.value.matches);
 
     // RED_CARD for the HOME team (the manager team). Awareness modal must
-    // NOT fire — manager cards are already shown in their own timeline.
+    // NOT fire â€” manager cards are already shown in their own timeline.
     roundStateSubject.next(makeRoundState([makeMatchState({
       status: 'RUNNING',
       currentMinute: 32,
@@ -344,11 +359,42 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
     });
   });
 
+  it('BUG #3 (1b/5): RED_CARD on rival while PAUSED opens awareness modal', (done) => {
+    setVm([{ match: makeMatch('SCHEDULED'), isUserMatch: true }]);
+    (component as any).startRoundEngine(SAMPLE_GAME_ID, (component as any).vmSubject.value.matches);
+
+    roundStateSubject.next(makeRoundState([makeMatchState({
+      status: 'PAUSED',
+      currentMinute: 47,
+      events: [
+        {
+          eventType: 'RED_CARD',
+          minute: 47,
+          playerName: 'Gerard Piqué',
+          playerId: 'p-rival-1-paused',
+          teamId: SAMPLE_AWAY_TEAM_ID,
+          description: 'Rival red card'
+        }
+      ]
+    })]));
+
+    fixture.whenStable().then(() => {
+      expect(modalsSpy.openRivalCardInfoModal).toHaveBeenCalledTimes(1);
+      const [matchIdArg, stateArg, infoArg] = modalsSpy.openRivalCardInfoModal.calls.mostRecent().args;
+      expect(matchIdArg).toBe(SAMPLE_MATCH_ID);
+      expect(stateArg.matchId).toBe(SAMPLE_MATCH_ID);
+      expect(infoArg.playerName).toBe('Gerard Piqué');
+      expect(infoArg.minute).toBe(47);
+      expect(infoArg.cardType).toBe('RED');
+      done();
+    });
+  });
+
   it('BUG #3 (3/5): RED_CARD on FINISHED match does NOT trigger awareness modal', (done) => {
     setVm([{ match: makeMatch('SCHEDULED'), isUserMatch: true }]);
     (component as any).startRoundEngine(SAMPLE_GAME_ID, (component as any).vmSubject.value.matches);
 
-    // RED_CARD on FINISHED match — late tick from a stale replay. Must not fire.
+    // RED_CARD on FINISHED match â€” late tick from a stale replay. Must not fire.
     roundStateSubject.next(makeRoundState([makeMatchState({
       status: 'FINISHED',
       currentMinute: 90,
@@ -356,7 +402,7 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
         {
           eventType: 'RED_CARD',
           minute: 88,
-          playerName: 'Diego Godín',
+          playerName: 'Diego GodÃ­n',
           playerId: 'p-rival-2',
           teamId: SAMPLE_AWAY_TEAM_ID,
           description: 'InJURED_V23_LEGACY'
@@ -383,9 +429,9 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
       description: 'InJURED_V23_LEGACY'
     };
 
-    // First SSE: red card arrives → modal opens.
+    // First SSE: red card arrives â†’ modal opens.
     roundStateSubject.next(makeRoundState([makeMatchState({
-      status: 'RUNNING',
+      status: 'PAUSED',
       currentMinute: 60,
       events: [rivalCard]
     })]));
@@ -395,7 +441,7 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
       // Second SSE: same event already in events list (SSE replay after
       // reconnect). Dedup must suppress the second open.
       roundStateSubject.next(makeRoundState([makeMatchState({
-        status: 'RUNNING',
+      status: 'PAUSED',
         currentMinute: 70,
         events: [rivalCard]
       })]));
@@ -427,15 +473,15 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
     setVm([{ match: makeMatch('SCHEDULED'), isUserMatch: true }]);
     (component as any).startRoundEngine(SAMPLE_GAME_ID, (component as any).vmSubject.value.matches);
 
-    // First rival red card — opens awareness modal (still "open").
+    // First rival red card â€” opens awareness modal (still "open").
     roundStateSubject.next(makeRoundState([makeMatchState({
-      status: 'RUNNING',
+      status: 'PAUSED',
       currentMinute: 30,
       events: [
         {
           eventType: 'RED_CARD',
           minute: 30,
-          playerName: 'Diego Godín',
+          playerName: 'Diego GodÃ­n',
           playerId: 'p-rival-3',
           teamId: SAMPLE_AWAY_TEAM_ID,
           description: 'InJURED_V23_LEGACY'
@@ -443,15 +489,15 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
       ]
     })]));
 
-    // Second rival red card while the first is still "open" — must be queued.
+    // Second rival red card while the first is still "open" â€” must be queued.
     roundStateSubject.next(makeRoundState([makeMatchState({
-      status: 'RUNNING',
+      status: 'PAUSED',
       currentMinute: 75,
       events: [
         {
           eventType: 'RED_CARD',
           minute: 30,
-          playerName: 'Diego Godín',
+          playerName: 'Diego GodÃ­n',
           playerId: 'p-rival-3',
           teamId: SAMPLE_AWAY_TEAM_ID,
           description: 'InJURED_V23_LEGACY'
@@ -472,7 +518,7 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
       // The second red card's modal call is queued, not yet emitted.
       expect(modalsSpy.openRivalCardInfoModal).toHaveBeenCalledTimes(1);
 
-      // Close the first modal — should fire the queued modal.
+      // Close the first modal â€” should fire the queued modal.
       resolveFirst();
       // Wait for the macrotask setTimeout in openRivalCardInfoModal.
       return new Promise<void>(r => setTimeout(r, 10));
@@ -483,6 +529,513 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
       expect(queuedCall.args[2].minute).toBe(75);
       done();
     });
+  });
+
+  it('V25D99.20.3.36: skips a queued injury modal when that injured player was already substituted', (done) => {
+    const firstModalClosed$ = new Subject<unknown>();
+    modalsSpy.openPartidoModal.and.returnValue(firstModalClosed$.asObservable());
+
+    const state = makeMatchState({ status: 'RUNNING', currentMinute: 62 });
+
+    (component as any).openInjuryAutoModal({
+      matchId: SAMPLE_MATCH_ID,
+      state,
+      preSelectedPlayerId: 'injured-a'
+    });
+    (component as any).queueOrOpenAutoModal({
+      matchId: SAMPLE_MATCH_ID,
+      state,
+      preSelectedPlayerId: 'injured-b'
+    });
+
+    expect(modalsSpy.openPartidoModal).toHaveBeenCalledTimes(1);
+
+    modalsSpy.wasPlayerConfirmedSubstitutedOff.and.callFake((_matchId: string, playerId: string) => {
+      return playerId === 'injured-b';
+    });
+    firstModalClosed$.complete();
+
+    setTimeout(() => {
+      expect(modalsSpy.wasPlayerConfirmedSubstitutedOff)
+        .toHaveBeenCalledWith(SAMPLE_MATCH_ID, 'injured-b');
+      expect(modalsSpy.openPartidoModal)
+        .withContext('the stale queued modal must not open after its player was already changed')
+        .toHaveBeenCalledTimes(1);
+      done();
+    }, 10);
+  });
+
+  it('V25D99.20.3.36: opens a queued injury modal when that player still needs attention', (done) => {
+    const firstModalClosed$ = new Subject<unknown>();
+    modalsSpy.openPartidoModal.and.callFake(() => {
+      if (modalsSpy.openPartidoModal.calls.count() === 1) {
+        return firstModalClosed$.asObservable();
+      }
+      return of({});
+    });
+    modalsSpy.wasPlayerConfirmedSubstitutedOff.and.returnValue(false);
+
+    const state = makeMatchState({ status: 'RUNNING', currentMinute: 64 });
+
+    (component as any).openInjuryAutoModal({
+      matchId: SAMPLE_MATCH_ID,
+      state,
+      preSelectedPlayerId: 'injured-a'
+    });
+    (component as any).queueOrOpenAutoModal({
+      matchId: SAMPLE_MATCH_ID,
+      state,
+      preSelectedPlayerId: 'injured-b'
+    });
+
+    firstModalClosed$.complete();
+
+    setTimeout(() => {
+      expect(modalsSpy.openPartidoModal)
+        .withContext('the queued modal should still open when the player was not already changed')
+        .toHaveBeenCalledTimes(2);
+      const queuedCall = modalsSpy.openPartidoModal.calls.mostRecent();
+      expect(queuedCall.args[3]?.preSelectedPlayerId).toBe('injured-b');
+      done();
+    }, 10);
+  });
+
+  it('V25D99.24: does not reopen an injury modal when that injured player already left the pitch', () => {
+    const state = makeMatchState({
+      status: 'PAUSED',
+      currentMinute: 31,
+      events: [
+        {
+          eventType: 'INJURY',
+          minute: 31,
+          playerId: 'injured-a',
+          teamId: SAMPLE_HOME_TEAM_ID,
+          playerName: 'Injured A',
+          description: 'Injured A lesionado'
+        } as any,
+        {
+          eventType: 'SUBSTITUTION',
+          minute: 31,
+          playerId: 'injured-a',
+          relatedPlayerId: 'bench-a',
+          teamId: SAMPLE_HOME_TEAM_ID,
+          playerName: 'Injured A',
+          playerOnName: 'Bench A',
+          description: 'Bench A entra por Injured A'
+        } as any
+      ]
+    });
+    setVm([{
+      match: makeMatch('SCHEDULED'),
+      state,
+      isUserMatch: true,
+      userTeamId: SAMPLE_HOME_TEAM_ID
+    }]);
+
+    (component as any).maybeOpenInjuryAutoModal([(component as any).vmSubject.value.matches[0]]);
+
+    expect(modalsSpy.openPartidoModal)
+      .withContext('historical treated injury must not create a ghost/empty auto-modal')
+      .not.toHaveBeenCalled();
+  });
+
+  it('V25D99.22: drains multiple queued injury modals in FIFO order', (done) => {
+    const firstModalClosed$ = new Subject<unknown>();
+    const secondModalClosed$ = new Subject<unknown>();
+    const firstResumeHoldRelease = jasmine.createSpy('firstResumeHoldRelease');
+    const secondResumeHoldRelease = jasmine.createSpy('secondResumeHoldRelease');
+    modalsSpy.holdRoundResumeAfterModalClose.and.returnValues(
+      firstResumeHoldRelease,
+      secondResumeHoldRelease
+    );
+    modalsSpy.openPartidoModal.and.callFake(() => {
+      const count = modalsSpy.openPartidoModal.calls.count();
+      if (count === 1) {
+        return firstModalClosed$.asObservable();
+      }
+      if (count === 2) {
+        return secondModalClosed$.asObservable();
+      }
+      return of({});
+    });
+    modalsSpy.wasPlayerConfirmedSubstitutedOff.and.returnValue(false);
+
+    const state = makeMatchState({ status: 'RUNNING', currentMinute: 66 });
+
+    (component as any).openInjuryAutoModal({
+      matchId: SAMPLE_MATCH_ID,
+      state,
+      preSelectedPlayerId: 'injured-a'
+    });
+    (component as any).queueOrOpenAutoModal({
+      matchId: SAMPLE_MATCH_ID,
+      state,
+      preSelectedPlayerId: 'injured-b'
+    });
+    (component as any).queueOrOpenAutoModal({
+      matchId: SAMPLE_MATCH_ID,
+      state,
+      preSelectedPlayerId: 'injured-c'
+    });
+
+    expect(component.pendingLiveModalNotice).toContain('(2)');
+    expect(modalsSpy.holdRoundResumeAfterModalClose)
+      .withContext('queued injury chain must keep the round frozen between modal 1 and modal 2')
+      .toHaveBeenCalledTimes(1);
+
+    firstModalClosed$.complete();
+
+    setTimeout(() => {
+      expect(firstResumeHoldRelease).toHaveBeenCalled();
+      expect(modalsSpy.openPartidoModal.calls.count()).toBe(2);
+      expect(modalsSpy.openPartidoModal.calls.mostRecent().args[3]?.preSelectedPlayerId)
+        .toBe('injured-b');
+      expect(modalsSpy.holdRoundResumeAfterModalClose)
+        .withContext('remaining queued injury must keep the round frozen between modal 2 and modal 3')
+        .toHaveBeenCalledTimes(2);
+
+      secondModalClosed$.complete();
+
+      setTimeout(() => {
+        expect(secondResumeHoldRelease).toHaveBeenCalled();
+        expect(modalsSpy.openPartidoModal.calls.count()).toBe(3);
+        expect(modalsSpy.openPartidoModal.calls.mostRecent().args[3]?.preSelectedPlayerId)
+          .toBe('injured-c');
+        done();
+      }, 10);
+    }, 10);
+  });
+
+  it('V25D99.22: skips a queued injury modal if that player was already substituted from the first modal', (done) => {
+    const firstModalClosed$ = new Subject<unknown>();
+    modalsSpy.openPartidoModal.and.callFake(() => {
+      if (modalsSpy.openPartidoModal.calls.count() === 1) {
+        return firstModalClosed$.asObservable();
+      }
+      return of({});
+    });
+    modalsSpy.wasPlayerConfirmedSubstitutedOff.and.callFake((_matchId: string, playerId: string) =>
+      playerId === 'injured-b'
+    );
+
+    const state = makeMatchState({ status: 'RUNNING', currentMinute: 67 });
+
+    (component as any).openInjuryAutoModal({
+      matchId: SAMPLE_MATCH_ID,
+      state,
+      preSelectedPlayerId: 'injured-a'
+    });
+    (component as any).queueOrOpenAutoModal({
+      matchId: SAMPLE_MATCH_ID,
+      state,
+      preSelectedPlayerId: 'injured-b'
+    });
+    (component as any).queueOrOpenAutoModal({
+      matchId: SAMPLE_MATCH_ID,
+      state,
+      preSelectedPlayerId: 'injured-c'
+    });
+
+    firstModalClosed$.complete();
+
+    setTimeout(() => {
+      expect(modalsSpy.openPartidoModal.calls.count()).toBe(2);
+      expect(modalsSpy.openPartidoModal.calls.mostRecent().args[3]?.preSelectedPlayerId)
+        .toBe('injured-c');
+      done();
+    }, 20);
+  });
+
+  it('V25D99.21.1: queues an injury modal behind an open Partido modal', (done) => {
+    const partidoClosed$ = new Subject<unknown>();
+    modalsSpy.openPartidoModal.and.returnValue(partidoClosed$.asObservable());
+    modalsSpy.openSubstitutionModal.calls.reset();
+    modalsSpy.wasPlayerConfirmedSubstitutedOff.and.returnValue(false);
+
+    const state = makeMatchState({ status: 'RUNNING', currentMinute: 50 });
+    setVm([{
+      match: makeMatch('SCHEDULED'),
+      state,
+      isUserMatch: true,
+      userTeamId: SAMPLE_HOME_TEAM_ID
+    }]);
+
+    component.onPartidoOpen(makeMatch('SCHEDULED'), state);
+    (component as any).queueOrOpenAutoModal({
+      matchId: SAMPLE_MATCH_ID,
+      state,
+      preSelectedPlayerId: 'injured-behind-partido'
+    });
+
+    expect(modalsSpy.openPartidoModal).toHaveBeenCalledTimes(1);
+    expect(modalsSpy.openSubstitutionModal)
+      .withContext('injury modal must wait while Partido is open')
+      .not.toHaveBeenCalled();
+    expect(component.pendingLiveModalNotice).toContain('propia');
+
+    partidoClosed$.complete();
+
+    setTimeout(() => {
+      expect(modalsSpy.openPartidoModal).toHaveBeenCalledTimes(2);
+      expect(modalsSpy.openPartidoModal.calls.mostRecent().args[3]?.preSelectedPlayerId)
+        .toBe('injured-behind-partido');
+      expect(component.pendingLiveModalNotice).toBeNull();
+      done();
+    }, 10);
+  });
+
+  it('V25D99.21.11: local debug can suppress automatic injury modals for clean Partido QA', () => {
+    modalsSpy.openSubstitutionModal.calls.reset();
+    component.debugSuppressAutoInjuryModals = true;
+    const state = makeMatchState({
+      status: 'RUNNING',
+      currentMinute: 45,
+      events: [{
+        minute: 45,
+        eventType: 'INJURY',
+        teamId: SAMPLE_HOME_TEAM_ID,
+        playerId: 'injured-player-1'
+      } as any]
+    });
+    setVm([{
+      match: makeMatch('SCHEDULED'),
+      state,
+      isUserMatch: true,
+      userTeamId: SAMPLE_HOME_TEAM_ID
+    }]);
+
+    (component as any).maybeOpenInjuryAutoModal([{
+      match: makeMatch('SCHEDULED'),
+      state,
+      isUserMatch: true,
+      userTeamId: SAMPLE_HOME_TEAM_ID
+    }]);
+
+    expect(modalsSpy.openSubstitutionModal).not.toHaveBeenCalled();
+    expect(component.pendingLiveModalNotice).toBeNull();
+  });
+
+  it('V25D99.21.12: local debug can create a manager-side Partido injury state without opening substitution modal', () => {
+    modalsSpy.openSubstitutionModal.calls.reset();
+    const state = makeMatchState({
+      status: 'PAUSED',
+      currentMinute: 45,
+      homeSlots: Array.from({ length: 11 }, (_, index) => ({
+        sessionPlayerId: index === 0 ? 'gk-1' : index === 1 ? 'mid-1' : `home-${index}`,
+        position: index === 0 ? 'GK' : index === 2 ? 'CB' : 'CM',
+        slotIndex: index
+      })),
+      awaySlots: [
+        { sessionPlayerId: 'rival-1', position: 'CM', slotIndex: 1 }
+      ],
+      events: []
+    });
+    setVm([{
+      match: makeMatch('SCHEDULED'),
+      state,
+      isUserMatch: true,
+      userTeamId: SAMPLE_HOME_TEAM_ID
+    }]);
+
+    const result = component.debugTriggerUserPartidoInjury('mid-1');
+
+    const vm = (component as any).vmSubject.value as RoundLiveViewModel;
+    const nextState = vm.matches[0].state!;
+    expect(result).toEqual({ injuredPlayerId: 'mid-1' });
+    expect(nextState.homeSlots?.some(slot => slot.sessionPlayerId === 'mid-1')).toBeFalse();
+    expect(nextState.awaySlots?.some(slot => slot.sessionPlayerId === 'rival-1')).toBeTrue();
+    expect(nextState.events.at(-1)).toEqual(jasmine.objectContaining({
+      eventType: 'INJURY',
+      playerId: 'mid-1',
+      teamId: SAMPLE_HOME_TEAM_ID,
+      minute: 45
+    }));
+    expect(modalsSpy.openSubstitutionModal).not.toHaveBeenCalled();
+  });
+
+  it('V25D99.21.12: local Partido injury debug uses career manager team when user match vm lacks userTeamId', () => {
+    (component as any).currentUserSessionTeamId = SAMPLE_AWAY_TEAM_ID;
+    const state = makeMatchState({
+      status: 'PAUSED',
+      currentMinute: 45,
+      homeSlots: [
+        { sessionPlayerId: 'home-mid-1', position: 'CM', slotIndex: 1 }
+      ],
+      awaySlots: Array.from({ length: 11 }, (_, index) => ({
+        sessionPlayerId: index === 0 ? 'away-gk-1' : index === 10 ? 'away-st-1' : `away-${index}`,
+        position: index === 0 ? 'GK' : index === 10 ? 'ST' : 'CM',
+        slotIndex: index
+      })),
+      events: []
+    });
+    setVm([{
+      match: makeMatch('SCHEDULED'),
+      state,
+      isUserMatch: true
+    }]);
+
+    const result = component.debugTriggerUserPartidoInjury('away-st-1');
+
+    const vm = (component as any).vmSubject.value as RoundLiveViewModel;
+    const nextState = vm.matches[0].state!;
+    expect(result).toEqual({ injuredPlayerId: 'away-st-1' });
+    expect(nextState.awaySlots?.some(slot => slot.sessionPlayerId === 'away-st-1')).toBeFalse();
+    expect(nextState.homeSlots?.some(slot => slot.sessionPlayerId === 'home-mid-1')).toBeTrue();
+    expect(nextState.events.at(-1)).toEqual(jasmine.objectContaining({
+      eventType: 'INJURY',
+      playerId: 'away-st-1',
+      teamId: SAMPLE_AWAY_TEAM_ID
+    }));
+  });
+
+  it('V25D99.21.13: local Partido injury debug does not stack over an active debug injury', () => {
+    const state = makeMatchState({
+      status: 'PAUSED',
+      currentMinute: 45,
+      homeSlots: Array.from({ length: 11 }, (_, index) => ({
+        sessionPlayerId: index === 0 ? 'gk-1' : `home-${index}`,
+        position: index === 0 ? 'GK' : 'CM',
+        slotIndex: index
+      })),
+      events: [{
+        eventType: 'INJURY',
+        minute: 44,
+        playerId: 'home-4',
+        playerName: 'Home 4',
+        description: 'Debug Partido: lesion propia para home-4',
+        teamId: SAMPLE_HOME_TEAM_ID
+      }]
+    });
+    setVm([{
+      match: makeMatch('SCHEDULED'),
+      state,
+      isUserMatch: true,
+      userTeamId: SAMPLE_HOME_TEAM_ID
+    }]);
+
+    const result = component.debugTriggerUserPartidoInjury('home-5');
+    const vm = (component as any).vmSubject.value as RoundLiveViewModel;
+
+    expect(result.reason).toContain('Ya hay una lesion Debug Partido activa');
+    expect(vm.matches[0].state?.homeSlots?.length).toBe(11);
+    expect(vm.matches[0].state?.events?.length).toBe(1);
+  });
+
+  it('V25D99.21.13: local Partido injury debug refuses incomplete XI to avoid fake AUTO slots', () => {
+    const state = makeMatchState({
+      status: 'PAUSED',
+      currentMinute: 45,
+      homeSlots: Array.from({ length: 10 }, (_, index) => ({
+        sessionPlayerId: index === 0 ? 'gk-1' : `home-${index}`,
+        position: index === 0 ? 'GK' : 'CM',
+        slotIndex: index
+      })),
+      events: []
+    });
+    setVm([{
+      match: makeMatch('SCHEDULED'),
+      state,
+      isUserMatch: true,
+      userTeamId: SAMPLE_HOME_TEAM_ID
+    }]);
+
+    const result = component.debugTriggerUserPartidoInjury('home-5');
+    const vm = (component as any).vmSubject.value as RoundLiveViewModel;
+
+    expect(result.reason).toContain('XI del usuario ya esta incompleto');
+    expect(vm.matches[0].state?.homeSlots?.length).toBe(10);
+    expect(vm.matches[0].state?.events?.length).toBe(0);
+  });
+
+  it('V25D99.21.13: local Partido injury debug normalizes 11 players mapped to incomplete tactical slots', () => {
+    const dirtySlots = Array.from({ length: 11 }, (_, index) => ({
+      sessionPlayerId: index === 0 ? 'gk-1' : `home-${index}`,
+      position: index === 0 ? 'GK' : 'CM',
+      slotIndex: index < 8 ? index : index + 1
+    }));
+    const state = makeMatchState({
+      status: 'PAUSED',
+      currentMinute: 45,
+      homeSlots: dirtySlots,
+      events: []
+    });
+    setVm([{
+      match: makeMatch('SCHEDULED'),
+      state,
+      isUserMatch: true,
+      userTeamId: SAMPLE_HOME_TEAM_ID
+    }]);
+
+    const result = component.debugTriggerUserPartidoInjury('home-5');
+    const vm = (component as any).vmSubject.value as RoundLiveViewModel;
+    const nextSlots = vm.matches[0].state?.homeSlots ?? [];
+
+    expect(result).toEqual({ injuredPlayerId: 'home-5' });
+    expect(nextSlots.length).toBe(10);
+    expect(nextSlots.some(slot => slot.sessionPlayerId === 'home-5')).toBeFalse();
+    expect(new Set(nextSlots.map(slot => slot.slotIndex)).size).toBe(10);
+    expect(vm.matches[0].state?.events?.length).toBe(1);
+  });
+
+  it('V25D99.21.13: local Partido injury debug surfaces skipped reason in the live page notice', () => {
+    spyOn(console, 'warn');
+    const state = makeMatchState({
+      status: 'PAUSED',
+      currentMinute: 45,
+      homeSlots: Array.from({ length: 10 }, (_, index) => ({
+        sessionPlayerId: index === 0 ? 'gk-1' : `home-${index}`,
+        position: index === 0 ? 'GK' : 'CM',
+        slotIndex: index
+      })),
+      events: []
+    });
+    setVm([{
+      match: makeMatch('SCHEDULED'),
+      state,
+      isUserMatch: true,
+      userTeamId: SAMPLE_HOME_TEAM_ID
+    }]);
+
+    component.onDebugPartidoInjury();
+
+    expect(component.pendingLiveModalNotice).toContain('XI del usuario ya esta incompleto');
+  });
+
+  it('V25D99.21.1: queues rival red-card awareness behind an open Partido modal', (done) => {
+    const partidoClosed$ = new Subject<unknown>();
+    modalsSpy.openPartidoModal.and.returnValue(partidoClosed$.asObservable());
+    modalsSpy.openRivalCardInfoModal.calls.reset();
+
+    const state = makeMatchState({ status: 'RUNNING', currentMinute: 51 });
+    setVm([{
+      match: makeMatch('SCHEDULED'),
+      state,
+      isUserMatch: true,
+      userTeamId: SAMPLE_HOME_TEAM_ID
+    }]);
+
+    component.onPartidoOpen(makeMatch('SCHEDULED'), state);
+    (component as any).queueOrOpenRivalCardModal({
+      matchId: SAMPLE_MATCH_ID,
+      state,
+      playerName: 'Rival CB',
+      minute: 51
+    });
+
+    expect(modalsSpy.openPartidoModal).toHaveBeenCalledTimes(1);
+    expect(modalsSpy.openRivalCardInfoModal)
+      .withContext('rival awareness modal must wait while Partido is open')
+      .not.toHaveBeenCalled();
+    expect(component.pendingLiveModalNotice).toContain('roja rival');
+
+    partidoClosed$.complete();
+
+    setTimeout(() => {
+      expect(modalsSpy.openRivalCardInfoModal).toHaveBeenCalledTimes(1);
+      expect(modalsSpy.openRivalCardInfoModal.calls.mostRecent().args[2].playerName).toBe('Rival CB');
+      expect(component.pendingLiveModalNotice).toBeNull();
+      done();
+    }, 10);
   });
 
   it('BUG #3 (6/7): RED_CARD in a non-user match does NOT interrupt the manager', (done) => {
@@ -535,7 +1088,7 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
     (component as any).startRoundEngine(SAMPLE_GAME_ID, (component as any).vmSubject.value.matches);
 
     roundStateSubject.next(makeRoundState([makeMatchState({
-      status: 'RUNNING',
+      status: 'PAUSED',
       currentMinute: 20,
       events: [{
         eventType: 'RED_CARD',
@@ -637,7 +1190,7 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
     it('V25D82 #2: iniciarTodos is a no-op when all matches already started (no backend call)', () => {
       engineServiceSpy.startRound.calls.reset();
 
-      // All matches are RUNNING — nothing left to start.
+      // All matches are RUNNING â€” nothing left to start.
       const runningMatch: RoundMatchVM = {
         match: makeMatch('SCHEDULED'),
         state: makeMatchState({ status: 'RUNNING', currentMinute: 30 }),
@@ -687,7 +1240,7 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
       expect((component as any).vmSubject.value.anyStarted).toBeTrue();
 
       // Also true for HALF_TIME (the match has started even though the
-      // players are resting — the round is no longer NOT_STARTED).
+      // players are resting â€” the round is no longer NOT_STARTED).
       setVm([{
         match: makeMatch('SCHEDULED'),
         state: makeMatchState({ status: 'NOT_STARTED', currentMinute: 0 }),
@@ -727,7 +1280,7 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
       roundStateSubject.next(makeRoundState([makeMatchState({ status: 'CANCELLED' })], 'COMPLETED'));
       expect((component as any).vmSubject.value.anyStarted).toBeTrue();
 
-      // And FALSE for NOT_STARTED (regression — must NOT mark started).
+      // And FALSE for NOT_STARTED (regression â€” must NOT mark started).
       setVm([{
         match: makeMatch('SCHEDULED'),
         state: makeMatchState({ status: 'NOT_STARTED', currentMinute: 0 }),
@@ -762,7 +1315,7 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
    *
    * <p>Implementation note: we use {@code Subject} (not {@code BehaviorSubject})
    * for the service spies so the combineLatest chain does NOT emit during
-   * the constructor — we control the emissions from the test body and
+   * the constructor â€” we control the emissions from the test body and
    * can observe the {@code loading$} transitions in order.
    */
   describe('V25D83 sprint: loading$ (initial-load spinner)', () => {
@@ -785,7 +1338,7 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
       const sub = component.loading$.subscribe(v => emissions.push(v));
       expect(emissions[0]).toBeTrue();
 
-      // Now release the chain — all three sources emit and combineLatest fires.
+      // Now release the chain â€” all three sources emit and combineLatest fires.
       teamsSub.next([]);
       statusSub.next({
         careerPhase: 'IN_PROGRESS',
@@ -858,14 +1411,14 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
    *   <li>Auto-start is a no-op when the VM has {@code errorMsg} set
    *       (round can't be played).</li>
    *   <li>Auto-start is a no-op when all matches already started
-   *       (refresh case — backend round is RUNNING).</li>
+   *       (refresh case â€” backend round is RUNNING).</li>
    *   <li>{@code startRoundEngine} skips its own POST when
    *       {@code autoStartTriggered} is true (no duplicate POST).</li>
    *   <li>The take(1) subscription fires only once even when multiple
    *       vm$ emissions arrive (SSE updates don't re-trigger
    *       auto-start).</li>
    *   <li>The "Iniciar Todos" button fallback still works after the
-   *       auto-start fired — the manager can re-trigger if needed.</li>
+   *       auto-start fired â€” the manager can re-trigger if needed.</li>
    * </ol>
    */
   describe('V25D84 sprint: round auto-start on first vm$ emission', () => {
@@ -873,7 +1426,7 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
       // Spy on engineService.startRound calls. Note: the constructor's
       // startRoundEngine call would normally happen too, but in this
       // test the cold Subject spies for career service prevent
-      // combineLatest from emitting — so startRoundEngine never runs.
+      // combineLatest from emitting â€” so startRoundEngine never runs.
       // We just need to verify the auto-start subscription (which fires
       // when we manually push vmSubject.next via setVm) calls startRound.
       engineServiceSpy.startRound.calls.reset();
@@ -886,7 +1439,7 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
       };
       const noStateMatch: RoundMatchVM = {
         match: { ...makeMatch('SCHEDULED'), id: 'match-no-state-2' },
-        // state intentionally omitted — also a candidate for auto-start
+        // state intentionally omitted â€” also a candidate for auto-start
         isUserMatch: false
       };
       setVm([notStartedMatch, noStateMatch]);
@@ -905,7 +1458,7 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
     it('V25D84 #2: auto-start no-ops on empty matches VM (no backend POST)', () => {
       engineServiceSpy.startRound.calls.reset();
 
-      // VM has no matches at all — round can't be started.
+      // VM has no matches at all â€” round can't be started.
       setVm([]);
 
       // No POST should have fired.
@@ -930,7 +1483,7 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
       };
       (component as any).vmSubject.next(vm);
 
-      // No POST should have fired — errorMsg short-circuits the
+      // No POST should have fired â€” errorMsg short-circuits the
       // auto-start.
       expect(engineServiceSpy.startRound).not.toHaveBeenCalled();
     });
@@ -938,7 +1491,7 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
     it('V25D84 #4: auto-start no-ops when all matches already started (refresh case)', () => {
       engineServiceSpy.startRound.calls.reset();
 
-      // All matches RUNNING — backend round is already ticking. This
+      // All matches RUNNING â€” backend round is already ticking. This
       // simulates a refresh where the manager re-mounted round-live
       // after the round started.
       const runningMatch: RoundMatchVM = {
@@ -948,7 +1501,7 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
       };
       setVm([runningMatch]);
 
-      // No POST should have fired — pending list is empty.
+      // No POST should have fired â€” pending list is empty.
       expect(engineServiceSpy.startRound).not.toHaveBeenCalled();
     });
 
@@ -968,7 +1521,7 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
 
       (component as any).startRoundEngine(SAMPLE_GAME_ID, (component as any).vmSubject.value.matches);
 
-      // startRoundEngine must NOT have re-POSTed — autoStartTriggered
+      // startRoundEngine must NOT have re-POSTed â€” autoStartTriggered
       // was already true. The SSE stream still opens via switchMap.
       expect(engineServiceSpy.startRound).not.toHaveBeenCalled();
     });
@@ -976,7 +1529,7 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
     it('V25D84 #6: auto-start fires only once per component instance (take(1) guard)', () => {
       engineServiceSpy.startRound.calls.reset();
 
-      // First emission: NOT_STARTED matches — should fire auto-start.
+      // First emission: NOT_STARTED matches â€” should fire auto-start.
       const notStartedMatch: RoundMatchVM = {
         match: makeMatch('SCHEDULED'),
         state: makeMatchState({ status: 'NOT_STARTED', currentMinute: 0 }),
@@ -986,7 +1539,7 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
       expect(engineServiceSpy.startRound).toHaveBeenCalledTimes(1);
 
       // Second emission: simulate an SSE update that flips the match
-      // to RUNNING. The take(1) subscription must NOT re-fire — once
+      // to RUNNING. The take(1) subscription must NOT re-fire â€” once
       // is enough.
       engineServiceSpy.startRound.calls.reset();
       (component as any).vmSubject.next({
@@ -1005,7 +1558,7 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
         anyStarted: true
       });
 
-      // No additional POST — take(1) fired on the first emission only.
+      // No additional POST â€” take(1) fired on the first emission only.
       expect(engineServiceSpy.startRound).not.toHaveBeenCalled();
     });
 
@@ -1021,7 +1574,7 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
       // Reset so the assertion counts only the iniciarTodos call.
       engineServiceSpy.startRound.calls.reset();
 
-      // Click "Iniciar Todos" — even though auto-start already fired,
+      // Click "Iniciar Todos" â€” even though auto-start already fired,
       // the button can still re-trigger (e.g. backend rejected the
       // auto-start and manager wants to retry).
       component.iniciarTodos();
@@ -1046,7 +1599,7 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
    * UUID string parseable by {@code UUID.fromString} on the server). When
    * the frontend subscribed to {@code streamRoundState(gameId)}, the
    * SSE controller's {@code roundEngineRegistry.get(gameId)} returned
-   * {@code null} and the endpoint returned {@code Flux.empty()} — the
+   * {@code null} and the endpoint returned {@code Flux.empty()} â€” the
    * SSE went silently idle (state never updated in the UI).
    *
    * <p>Fix: capture {@code state.roundId} from the
@@ -1062,14 +1615,14 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
    *       {@code streamRoundState} with the roundId from the POST
    *       response, NOT the gameId passed to the constructor.</li>
    *   <li>The auto-start ({@code tryAutoStartRound}) pipeline captures
-   *       the roundId into the same subject so the SSE chain — which
-   *       has short-circuited its own POST — picks up the resolved
+   *       the roundId into the same subject so the SSE chain â€” which
+   *       has short-circuited its own POST â€” picks up the resolved
    *       roundId without re-POSTing.</li>
    *   <li>{@code iniciarTodos} (manual fallback) also pushes the
    *       roundId so any SSE subscription that follows uses the
    *       registry key.</li>
    *   <li>Defensive: when the POST response lacks a {@code roundId}
-   *       (e.g. the body shape is unknown), the SSE does NOT crash —
+   *       (e.g. the body shape is unknown), the SSE does NOT crash â€”
    *       the existing {@code Flux.empty()} behavior is preserved
    *       (no streamRoundState call with an empty id).</li>
    * </ol>
@@ -1099,7 +1652,7 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
 
     it('V25D86 #1: streamRoundState receives roundId from POST response, NOT gameId', () => {
       // Configure startRound to return a RoundState whose roundId is
-      // explicitly DIFFERENT from SAMPLE_GAME_ID — this is the bug
+      // explicitly DIFFERENT from SAMPLE_GAME_ID â€” this is the bug
       // scenario: frontend posts gameId, backend resolves to a real UUID,
       // frontend must use the UUID for SSE.
       const realRoundId = 'real-round-uuid-9876-fedc-3210';
@@ -1156,7 +1709,7 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
           'V25D86: iniciarTodos must publish its POST response roundId so the SSE rendezvous sees it');
     });
 
-    it('V25D86 #3: defensive — when POST returns a state with no roundId, streamRoundState is NOT called', () => {
+    it('V25D86 #3: defensive â€” when POST returns a state with no roundId, streamRoundState is NOT called', () => {
       // Backend response without roundId (e.g. malformed body, future
       // API drift). The SSE filter `id !== null` must block the empty
       // id and prevent a `streamRoundState('')` call that would 404.

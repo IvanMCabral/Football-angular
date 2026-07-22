@@ -111,17 +111,22 @@ describe('PartidoModalComponent (V25D89-FRONT-A)', () => {
   let dialogRefSpy: jasmine.SpyObj<MatDialogRef<PartidoModalComponent>>;
   let engineSpy: jasmine.SpyObj<MatchEngineService>;
   let snackBarSpy: jasmine.SpyObj<MatSnackBar>;
+  let dialogData: PartidoDialogData;
 
   beforeEach(async () => {
+    spyOn(console, 'error').and.stub();
+    window.localStorage.removeItem('manager:partido-player-coords:match-1');
     dialogRefSpy = jasmine.createSpyObj('MatDialogRef', ['close']);
-    engineSpy = jasmine.createSpyObj('MatchEngineService', ['changeFormation']);
+    engineSpy = jasmine.createSpyObj('MatchEngineService', ['changeFormation', 'substitutePlayer']);
     engineSpy.changeFormation.and.returnValue(of({ success: true, minuteApplied: 30 } as any));
+    engineSpy.substitutePlayer.and.returnValue(of({ success: true, substitutionsRemaining: 4 } as any));
     snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
+    dialogData = makeData();
 
     await TestBed.configureTestingModule({
       imports: [NoopAnimationsModule, CommonModule, PartidoModalComponent],
       providers: [
-        { provide: MAT_DIALOG_DATA, useValue: makeData() },
+        { provide: MAT_DIALOG_DATA, useValue: dialogData },
         { provide: MatDialogRef, useValue: dialogRefSpy },
         { provide: MatchEngineService, useValue: engineSpy },
         { provide: MatSnackBar, useValue: snackBarSpy }
@@ -262,13 +267,24 @@ describe('PartidoModalComponent (V25D89-FRONT-A)', () => {
     expect(dialogRefSpy.close).toHaveBeenCalledWith({ success: false, reason: 'no-change' });
   });
 
+  it('save() with visible AUTO players blocks even when there are no other pending changes', () => {
+    component.autoFilledSlots.set(8, 's12');
+
+    component.save();
+
+    expect(engineSpy.changeFormation).not.toHaveBeenCalled();
+    expect(dialogRefSpy.close).not.toHaveBeenCalled();
+    expect(component.errorMsg).toContain('jugadores AUTO');
+  });
+
   it('save() with pending formation change calls engineService.changeFormation and closes on success', (done) => {
     component.onFormationChange('4-3-3');
     component.save();
     fixture.whenStable().then(() => {
       expect(engineSpy.changeFormation).toHaveBeenCalledWith(
         'match-1',
-        jasmine.any(Array)
+        jasmine.any(Array),
+        '4-3-3'
       );
       const slots = engineSpy.changeFormation.calls.mostRecent().args[1] as any[];
       // 4-3-3 has 11 slots — 1 GK + 4 DEF + 3 MID + 3 ATT
@@ -278,6 +294,446 @@ describe('PartidoModalComponent (V25D89-FRONT-A)', () => {
       expect(dialogRefSpy.close).toHaveBeenCalledWith(
         jasmine.objectContaining({ success: true, formation: '4-3-3' })
       );
+      done();
+    });
+  });
+
+  it('changing formation keeps the same XI players and carries manual pixels with the player', () => {
+    const initialXi = Array.from(component.slotAssignments.values()).filter(Boolean);
+    component.freeSlotCoords.set(6, { x: 47.25, y: 58.75 });
+    const movedPlayerId = component.slotAssignments.get(6);
+    expect(movedPlayerId).toBeTruthy();
+
+    component.onFormationChange('4-3-3');
+
+    const nextXi = Array.from(component.slotAssignments.values()).filter(Boolean);
+    expect(nextXi).toEqual(initialXi);
+    const movedSlot = Array.from(component.slotAssignments.entries())
+      .find(([, playerId]) => playerId === movedPlayerId)?.[0];
+    expect(movedSlot).toBeDefined();
+    expect(component.freePositionLeftPercent(movedSlot!)).toBe(47.25);
+    expect(component.freePositionTopPercent(movedSlot!)).toBe(58.75);
+    expect(component.benchPlayers.some(player => nextXi.includes(player.sessionPlayerId))).toBeFalse();
+  });
+
+  it('changing formation moves the auto-filled marker with the auto-filled player', () => {
+    component.slotAssignments.set(8, 's12');
+    component.autoFilledSlots.set(8, 's12');
+    component.autoFillSourcePlayerBySlot.set(8, 's9');
+
+    component.onFormationChange('4-3-3');
+
+    const autoFilledSlot = Array.from(component.slotAssignments.entries())
+      .find(([, playerId]) => playerId === 's12')?.[0];
+    expect(autoFilledSlot).toBeDefined();
+    expect(component.isAutoFilledSlot(autoFilledSlot!)).toBeTrue();
+    const wronglyMarkedSlot = Array.from(component.autoFilledSlots.entries())
+      .find(([slotIdx, playerId]) => slotIdx !== autoFilledSlot && playerId === 's12');
+    expect(wronglyMarkedSlot).toBeUndefined();
+    expect(component.autoFillSourcePlayerBySlot.get(autoFilledSlot!)).toBe('s9');
+  });
+
+  it('save() sends free-position customX/customY when a live player was moved by pixels', (done) => {
+    component.freeSlotCoords.set(6, { x: 47.25, y: 58.75 });
+    (component as any).bumpFreePositionRevision();
+    component.save();
+    fixture.whenStable().then(() => {
+      expect(engineSpy.changeFormation).toHaveBeenCalled();
+      const slots = engineSpy.changeFormation.calls.mostRecent().args[1] as any[];
+      const moved = slots.find(s => s.slotIndex === 6);
+      expect(moved.customXPercent).toBe(47.25);
+      expect(moved.customYPercent).toBe(58.75);
+      done();
+    });
+  });
+
+  it('hydrates current custom pixels and does not treat unchanged loaded pixels as pending changes', () => {
+    dialogData.currentSlots = dialogData.currentSlots.map(slot => slot.slotIndex === 6
+      ? { ...slot, customXPercent: 47.25, customYPercent: 58.75 }
+      : slot
+    );
+    fixture = TestBed.createComponent(PartidoModalComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+
+    expect(component.isFreePositionedSlot(6)).toBeTrue();
+    expect(component.freePositionLeftPercent(6)).toBe(47.25);
+    expect(component.freePositionTopPercent(6)).toBe(58.75);
+    expect(component.hasPendingChanges()).toBeFalse();
+  });
+
+  it('hydrates remembered player pixels by sessionPlayerId over slot coordinates', () => {
+    spyOn(window.localStorage, 'getItem').and.callFake((key: string) => {
+      if (key === 'manager:partido-player-coords:match-1') {
+        return JSON.stringify({ s7: { x: 84.3, y: 60 } });
+      }
+      return null;
+    });
+    dialogData.currentSlots = dialogData.currentSlots.map(slot => slot.sessionPlayerId === 's7'
+      ? { ...slot, customXPercent: 16.6, customYPercent: 61 }
+      : slot
+    );
+
+    fixture = TestBed.createComponent(PartidoModalComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+
+    const s7Slot = Array.from(component.slotAssignments.entries())
+      .find(([, playerId]) => playerId === 's7')?.[0];
+    expect(s7Slot).toBeDefined();
+    expect(component.freePositionLeftPercent(s7Slot!)).toBe(84.3);
+    expect(component.freePositionTopPercent(s7Slot!)).toBe(60);
+  });
+
+  it('save() preserves loaded current custom pixels even when only a substitution is pending', (done) => {
+    dialogData.currentSlots = dialogData.currentSlots.map(slot => slot.slotIndex === 6
+      ? { ...slot, customXPercent: 47.25, customYPercent: 58.75 }
+      : slot
+    );
+    fixture = TestBed.createComponent(PartidoModalComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+
+    component.pendingSubstitutions = [{ playerOffId: 's2', playerOnId: 's12', slotIndex: 1 }];
+    (component as any).pendingSubstitutionRevision.update((value: number) => value + 1);
+    component.save();
+
+    fixture.whenStable().then(() => {
+      expect(engineSpy.changeFormation).toHaveBeenCalled();
+      const slots = engineSpy.changeFormation.calls.mostRecent().args[1] as any[];
+      const moved = slots.find(s => s.slotIndex === 6);
+      expect(moved.customXPercent).toBe(47.25);
+      expect(moved.customYPercent).toBe(58.75);
+      const closePayload = dialogRefSpy.close.calls.mostRecent().args[0] as any;
+      expect(closePayload.substitutions).toEqual([{ playerOffId: 's2', playerOnId: 's12' }]);
+      done();
+    });
+  });
+
+  it('save() blocks empty tactical slots instead of applying bench players invisibly', (done) => {
+    component.slotAssignments.set(10, null);
+    component.freeSlotCoords.set(6, { x: 41, y: 66.67 });
+    (component as any).bumpFreePositionRevision();
+
+    component.save();
+
+    fixture.whenStable().then(() => {
+      expect(engineSpy.changeFormation).not.toHaveBeenCalled();
+      expect(dialogRefSpy.close).not.toHaveBeenCalled();
+      expect(component.errorMsg).toContain('todos los slots visibles');
+      done();
+    });
+  });
+
+  it('save() blocks duplicate XI repair when it leaves an empty tactical slot', (done) => {
+    component.slotAssignments.set(1, 's2');
+    component.slotAssignments.set(2, 's2');
+    component.freeSlotCoords.set(2, { x: 44, y: 70 });
+    (component as any).bumpFreePositionRevision();
+
+    component.save();
+
+    fixture.whenStable().then(() => {
+      expect(engineSpy.changeFormation).not.toHaveBeenCalled();
+      expect(dialogRefSpy.close).not.toHaveBeenCalled();
+      expect(component.errorMsg).toContain('todos los slots visibles');
+      done();
+    });
+  });
+
+  it('free-positioned live markers expose real pitch left/top percentages', () => {
+    component.freeSlotCoords.set(6, { x: 47.25, y: 58.75 });
+    expect(component.isFreePositionedSlot(6)).toBeTrue();
+    expect(component.freePositionLeftPercent(6)).toBe(47.25);
+    expect(component.freePositionTopPercent(6)).toBe(58.75);
+    expect(component.freePositionLeftPercent(5)).toBeNull();
+    expect(component.freePositionTopPercent(5)).toBeNull();
+  });
+
+  it('nudge controls select a player, move by 1 percent and reset to base slot', () => {
+    spyOn(window.localStorage, 'setItem');
+    component.selectNudgeSlot(6);
+
+    expect(component.selectedNudgeSlotIdx).toBe(6);
+    expect(component.canNudgeSelectedSlot()).toBeTrue();
+
+    component.nudgeSelectedSlot(1, -1);
+
+    expect(component.isFreePositionedSlot(6)).toBeTrue();
+    expect(component.freePositionLeftPercent(6)).toBe(41);
+    expect(component.freePositionTopPercent(6)).toBe(65.67);
+    expect(component.hasPendingChanges()).toBeTrue();
+    expect(window.localStorage.setItem).toHaveBeenCalledWith(
+      'manager:last-modal-position-move',
+      jasmine.stringMatching(/partido-modal-nudge/)
+    );
+
+    component.resetSelectedSlotPosition();
+
+    expect(component.isFreePositionedSlot(6)).toBeFalse();
+  });
+
+  it('nudge harness memory uses the current visual coordinate as the before point', () => {
+    const setItemSpy = spyOn(window.localStorage, 'setItem');
+    component.freeSlotCoords.set(6, { x: 47.25, y: 58.75 });
+    component.selectNudgeSlot(6);
+
+    component.nudgeSelectedSlot(1, -1);
+
+    const rawPayload = setItemSpy.calls.mostRecent().args[1];
+    const payload = JSON.parse(rawPayload);
+    expect(payload.fromXPercent).toBe(47.25);
+    expect(payload.fromYPercent).toBe(58.75);
+    expect(payload.targetXPercent).toBe(48.25);
+    expect(payload.targetYPercent).toBe(57.75);
+  });
+
+  it('pointer drag on the live pitch stores exact pixel percentages and harness memory', () => {
+    const setItemSpy = spyOn(window.localStorage, 'setItem');
+    const dotTarget = {
+      setPointerCapture: jasmine.createSpy('setPointerCapture'),
+    };
+    const pitchTarget = {
+      getBoundingClientRect: () => ({ left: 100, top: 50, width: 1000, height: 500 }),
+    };
+
+    component.onPitchSlotPointerDown({
+      button: 0,
+      pointerId: 7,
+      currentTarget: dotTarget,
+      preventDefault: jasmine.createSpy('preventDefault'),
+      stopPropagation: jasmine.createSpy('stopPropagation'),
+    } as unknown as PointerEvent, 6);
+
+    component.onPitchPointerMove({
+      currentTarget: pitchTarget,
+      clientX: 650,
+      clientY: 250,
+      preventDefault: jasmine.createSpy('preventDefault'),
+    } as unknown as PointerEvent);
+
+    component.onPitchPointerUp({
+      currentTarget: pitchTarget,
+      clientX: 650,
+      clientY: 250,
+      preventDefault: jasmine.createSpy('preventDefault'),
+    } as unknown as PointerEvent);
+
+    expect(component.freeSlotCoords.get(6)).toEqual({ x: 55, y: 40 });
+    expect(component.selectedNudgeSlotIdx).toBe(6);
+    expect(component.activePointerDragSlotIdx).toBeNull();
+    expect(component.hasPendingChanges()).toBeTrue();
+
+    const payload = JSON.parse(
+      setItemSpy.calls.allArgs()
+        .filter(args => args[0] === 'manager:last-modal-position-move')
+        .pop()![1]
+    );
+    expect(payload.playerName).toBe('MID 2');
+    expect(payload.fromXPercent).toBeCloseTo(40, 2);
+    expect(payload.fromYPercent).toBeCloseTo(66.67, 2);
+    expect(payload.targetXPercent).toBe(55);
+    expect(payload.targetYPercent).toBe(40);
+  });
+
+  it('pointer drag keeps the goalkeeper fixed', () => {
+    component.onPitchSlotPointerDown({
+      button: 0,
+      pointerId: 7,
+      currentTarget: { setPointerCapture: jasmine.createSpy('setPointerCapture') },
+      preventDefault: jasmine.createSpy('preventDefault'),
+      stopPropagation: jasmine.createSpy('stopPropagation'),
+    } as unknown as PointerEvent, 0);
+
+    expect(component.activePointerDragSlotIdx).toBeNull();
+    expect(component.freeSlotCoords.has(0)).toBeFalse();
+  });
+
+  it('nudge controls keep the goalkeeper locked', () => {
+    component.selectNudgeSlot(0);
+
+    expect(component.selectedNudgeSlotIdx).toBeNull();
+    expect(component.canNudgeSelectedSlot()).toBeFalse();
+    expect(component.errorMsg).toContain('arquero');
+
+    component.nudgeSelectedSlot(1, 0);
+
+    expect(component.freeSlotCoords.has(0)).toBeFalse();
+  });
+
+  it('locks the goalkeeper slot from free-position drag/drop', () => {
+    expect(component.isGoalkeeperSlot(0)).toBeTrue();
+    expect(component.isGoalkeeperSlot(1)).toBeFalse();
+
+    component.dragSourceSlotIdx = 0;
+    component.dragSourceIsBench = false;
+
+    const event = {
+      preventDefault: jasmine.createSpy('preventDefault'),
+      currentTarget: {
+        getBoundingClientRect: () => ({ left: 0, top: 0, width: 1000, height: 500 })
+      },
+      clientX: 500,
+      clientY: 100
+    } as unknown as DragEvent;
+
+    component.onPitchDrop(event);
+
+    expect(component.freeSlotCoords.has(0))
+      .withContext('GK slot must not receive custom free-position coordinates')
+      .toBeFalse();
+    expect(component.dragSourceSlotIdx).toBeNull();
+  });
+
+  it('blocks any slot drop that targets the goalkeeper slot', () => {
+    component.dragSourceSlotIdx = 1;
+    component.dragSourceIsBench = false;
+
+    const event = {
+      preventDefault: jasmine.createSpy('preventDefault'),
+      dataTransfer: { getData: () => 'slot:1' }
+    } as unknown as DragEvent;
+
+    component.onSlotDrop(event, 0);
+
+    expect(component.slotAssignments.get(0)).toBe('s1');
+    expect(component.slotAssignments.get(1)).toBe('s2');
+    expect(component.dragSourceSlotIdx).toBeNull();
+  });
+
+  it('bench drop onto an occupied pitch slot prepares a real pending substitution', () => {
+    component.dragSourceSlotIdx = -1;
+    component.dragSourceIsBench = true;
+
+    const event = {
+      preventDefault: jasmine.createSpy('preventDefault'),
+      dataTransfer: { getData: () => 'bench:s12' }
+    } as unknown as DragEvent;
+
+    component.onSlotDrop(event, 1);
+
+    expect(component.pendingSubstitutions).toEqual([
+      { playerOffId: 's2', playerOnId: 's12', slotIndex: 1 }
+    ]);
+    expect(component.slotAssignments.get(1)).toBe('s12');
+    expect(component.hasPendingChanges()).toBeTrue();
+  });
+
+  it('clicking a bench player and then a pitch player prepares a substitution without drag', () => {
+    component.onBenchPlayerClick('s12');
+    expect(component.selectedBenchPlayerId).toBe('s12');
+
+    component.onPitchSlotClick(1);
+
+    expect(component.pendingSubstitutions).toEqual([
+      { playerOffId: 's2', playerOnId: 's12', slotIndex: 1 }
+    ]);
+    expect(component.slotAssignments.get(1)).toBe('s12');
+    expect(component.selectedBenchPlayerId).toBeNull();
+    expect(component.hasPendingChanges()).toBeTrue();
+  });
+
+  it('confirming an AUTO player prepares the real injured-player substitution', () => {
+    component.slotAssignments.set(8, 's13');
+    component.autoFilledSlots.set(8, 's13');
+    component.autoFillSourcePlayerBySlot.set(8, 's9');
+
+    expect(component.benchPlayers.some(player => player.sessionPlayerId === 's13'))
+      .withContext('AUTO player must remain selectable so the DT can explicitly confirm it')
+      .toBeTrue();
+
+    component.onBenchPlayerClick('s13');
+    component.onPitchSlotClick(8);
+
+    expect(component.pendingSubstitutions).toEqual([
+      { playerOffId: 's9', playerOnId: 's13', slotIndex: 8 }
+    ]);
+    expect(component.isAutoFilledSlot(8)).toBeFalse();
+    expect(component.autoFillSourcePlayerBySlot.has(8)).toBeFalse();
+  });
+
+  it('confirming an AUTO repair without a known outgoing player clears AUTO without inventing a substitution', () => {
+    component.slotAssignments.set(8, 's13');
+    component.autoFilledSlots.set(8, 's13');
+
+    component.onBenchPlayerClick('s13');
+    component.onPitchSlotClick(8);
+
+    expect(component.pendingSubstitutions).toEqual([]);
+    expect(component.slotAssignments.get(8)).toBe('s13');
+    expect(component.isAutoFilledSlot(8)).toBeFalse();
+    expect(component.errorMsg).toBe('');
+  });
+
+  it('does not allow click-to-replace on the goalkeeper slot', () => {
+    component.onBenchPlayerClick('s12');
+    component.onPitchSlotClick(0);
+
+    expect(component.pendingSubstitutions).toEqual([]);
+    expect(component.slotAssignments.get(0)).toBe('s1');
+    expect(component.selectedBenchPlayerId).toBe('s12');
+    expect(component.errorMsg).toContain('arquero');
+  });
+
+  it('renders prepared substitutions before saving them', () => {
+    component.dragSourceSlotIdx = -1;
+    component.dragSourceIsBench = true;
+
+    const event = {
+      preventDefault: jasmine.createSpy('preventDefault'),
+      dataTransfer: { getData: () => 'bench:s12' }
+    } as unknown as DragEvent;
+
+    component.onSlotDrop(event, 1);
+    fixture.detectChanges();
+
+    const panel = fixture.nativeElement.querySelector('[data-testid="pending-substitutions"]') as HTMLElement;
+    expect(panel).toBeTruthy();
+    expect(panel.textContent).toContain('DEF 1');
+    expect(panel.textContent).toContain('BENCH DEF');
+    expect(panel.querySelector('[data-testid="pending-sub-remove"]')).toBeTruthy();
+  });
+
+  it('removing a prepared substitution restores the outgoing player and bench availability', () => {
+    component.dragSourceSlotIdx = -1;
+    component.dragSourceIsBench = true;
+
+    const event = {
+      preventDefault: jasmine.createSpy('preventDefault'),
+      dataTransfer: { getData: () => 'bench:s12' }
+    } as unknown as DragEvent;
+
+    component.onSlotDrop(event, 1);
+    expect(component.slotAssignments.get(1)).toBe('s12');
+    expect(component.pendingSubstitutions.length).toBe(1);
+    expect(component.benchPlayers.some(player => player.sessionPlayerId === 's12')).toBeFalse();
+
+    component.removePendingSubstitution(0);
+
+    expect(component.pendingSubstitutions).toEqual([]);
+    expect(component.slotAssignments.get(1)).toBe('s2');
+    expect(component.benchPlayers.some(player => player.sessionPlayerId === 's12')).toBeTrue();
+  });
+
+  it('save() applies prepared substitutions before saving formation/slots', (done) => {
+    component.dragSourceSlotIdx = -1;
+    component.dragSourceIsBench = true;
+
+    const event = {
+      preventDefault: jasmine.createSpy('preventDefault'),
+      dataTransfer: { getData: () => 'bench:s12' }
+    } as unknown as DragEvent;
+
+    component.onSlotDrop(event, 1);
+    component.save();
+
+    fixture.whenStable().then(() => {
+      expect(engineSpy.substitutePlayer).toHaveBeenCalledWith('match-1', 's2', 's12');
+      expect(engineSpy.changeFormation).toHaveBeenCalled();
+      expect(dialogRefSpy.close).toHaveBeenCalledWith(jasmine.objectContaining({
+        success: true,
+        substitutionsApplied: 1
+      }));
       done();
     });
   });
@@ -335,6 +791,14 @@ describe('PartidoModalComponent (V25D89-FRONT-A)', () => {
   it('ɵcmp.styles includes the .banner-info-ai rule (after encapsulation strip)', () => {
     const src = stripEncapsulation(stylesSource());
     expect(src).toContain('.banner-info-ai');
+  });
+
+  it('ɵcmp.styles positions free live markers absolutely on the pitch', () => {
+    const src = stripEncapsulation(stylesSource());
+    const rule = src.match(/\.player-dot\.is-free-positioned\s*\{[^}]*\}/);
+    expect(rule).toBeTruthy();
+    expect(rule![0]).toContain('position: absolute');
+    expect(rule![0]).toContain('translate(-50%, -50%)');
   });
 
   // ========== V25D89.4-FRONT: full-width modal CSS source ==========
@@ -649,7 +1113,8 @@ describe('PartidoModalComponent (V25D89-FRONT-A)', () => {
       imports: [NoopAnimationsModule, CommonModule, PartidoModalComponent],
       providers: [
         { provide: MAT_DIALOG_DATA, useValue: makeData({
-            currentSlots: slotsStartingAt1
+            currentSlots: slotsStartingAt1,
+            squad: SQUAD.filter(p => p.sessionPlayerId !== 's1')
           })
         },
         { provide: MatDialogRef, useValue: dialogRefSpy },
@@ -671,6 +1136,311 @@ describe('PartidoModalComponent (V25D89-FRONT-A)', () => {
     expect(slot0HasLabel).withContext('empty slot must have .dot-label').toBeTrue();
   });
 
+  it('auto-fills an empty tactical slot on open when a compatible bench player exists', () => {
+    // V25D99.21: after injury/rebuild the live modal could open with an
+    // empty RM slot even though the bench had a compatible midfielder.
+    // The modal now repairs that immediately so the DT always sees a full XI.
+    TestBed.resetTestingModule();
+    const missingRmSlots = makeData().currentSlots
+      .filter(slot => slot.slotIndex !== 8);
+
+    TestBed.configureTestingModule({
+      imports: [NoopAnimationsModule, CommonModule, PartidoModalComponent],
+      providers: [
+        { provide: MAT_DIALOG_DATA, useValue: makeData({
+            currentSlots: missingRmSlots
+          })
+        },
+        { provide: MatDialogRef, useValue: dialogRefSpy },
+        { provide: MatchEngineService, useValue: engineSpy },
+        { provide: MatSnackBar, useValue: snackBarSpy }
+      ]
+    }).compileComponents();
+
+    const fx2 = TestBed.createComponent(PartidoModalComponent);
+    const cmp2 = fx2.componentInstance;
+    fx2.detectChanges();
+
+    expect(cmp2.playerAtSlot(8)?.sessionPlayerId)
+      .withContext('empty RM slot should be repaired with the compatible player left unassigned')
+      .toBe('s9');
+    expect(cmp2.isAutoFilledSlot(8)).toBeTrue();
+    expect(fx2.nativeElement.querySelectorAll('.player-dot.is-empty').length)
+      .withContext('4-4-2 modal should render no empty dots after auto-fill')
+      .toBe(0);
+    const badge = fx2.nativeElement.querySelector('[data-testid="auto-fill-badge"]');
+    expect(badge?.textContent?.trim()).toBe('AUTO');
+    expect(badge?.getAttribute('aria-label')).toBe('Autorrellenado por XI incompleto');
+    expect(badge?.getAttribute('title')).toBe('Autorrellenado por XI incompleto');
+  });
+
+  it('auto-fill skips injured or suspended players left unassigned', () => {
+    // If the empty slot comes from a live injury rebuild, the formerly
+    // assigned player can still be present in the squad list. Auto-fill must
+    // not silently put him back on the pitch.
+    TestBed.resetTestingModule();
+    const missingRmSlots = makeData().currentSlots
+      .filter(slot => slot.slotIndex !== 8);
+    const squadWithUnavailableRm = SQUAD.map(player =>
+      player.sessionPlayerId === 's9'
+        ? ({ ...player, injured: true } as SessionPlayer)
+        : player
+    );
+
+    TestBed.configureTestingModule({
+      imports: [NoopAnimationsModule, CommonModule, PartidoModalComponent],
+      providers: [
+        { provide: MAT_DIALOG_DATA, useValue: makeData({
+            currentSlots: missingRmSlots,
+            squad: squadWithUnavailableRm
+          })
+        },
+        { provide: MatDialogRef, useValue: dialogRefSpy },
+        { provide: MatchEngineService, useValue: engineSpy },
+        { provide: MatSnackBar, useValue: snackBarSpy }
+      ]
+    }).compileComponents();
+
+    const fx2 = TestBed.createComponent(PartidoModalComponent);
+    const cmp2 = fx2.componentInstance;
+    fx2.detectChanges();
+
+    expect(cmp2.playerAtSlot(8)?.sessionPlayerId)
+      .withContext('injured unassigned RM should be skipped in favor of healthy BENCH MID')
+      .toBe('s13');
+    expect(cmp2.isAutoFilledSlot(8)).toBeTrue();
+  });
+
+  it('auto-fill links a suggested bench player to the latest compatible injured starter', () => {
+    TestBed.resetTestingModule();
+    const missingRmSlots = makeData().currentSlots
+      .filter(slot => slot.slotIndex !== 8);
+    const squadWithUnavailableRm = SQUAD.map(player =>
+      player.sessionPlayerId === 's9'
+        ? ({ ...player, injured: true } as SessionPlayer)
+        : player
+    );
+
+    TestBed.configureTestingModule({
+      imports: [NoopAnimationsModule, CommonModule, PartidoModalComponent],
+      providers: [
+        { provide: MAT_DIALOG_DATA, useValue: makeData({
+            currentSlots: missingRmSlots,
+            squad: squadWithUnavailableRm,
+            events: [
+              {
+                eventType: 'INJURY',
+                minute: 42,
+                playerId: 's9',
+                playerName: 'MID 4',
+                description: 'MID 4 se lesionó',
+                teamId: 'team-h'
+              }
+            ]
+          })
+        },
+        { provide: MatDialogRef, useValue: dialogRefSpy },
+        { provide: MatchEngineService, useValue: engineSpy },
+        { provide: MatSnackBar, useValue: snackBarSpy }
+      ]
+    }).compileComponents();
+
+    const fx2 = TestBed.createComponent(PartidoModalComponent);
+    const cmp2 = fx2.componentInstance;
+    fx2.detectChanges();
+
+    expect(cmp2.playerAtSlot(8)?.sessionPlayerId).toBe('s13');
+    expect(cmp2.autoFillSourcePlayerBySlot.get(8)).toBe('s9');
+
+    cmp2.onBenchPlayerClick('s13');
+    cmp2.onPitchSlotClick(8);
+
+    expect(cmp2.pendingSubstitutions).toEqual([
+      { playerOffId: 's9', playerOnId: 's13', slotIndex: 8 }
+    ]);
+  });
+
+  it('auto-fill keeps the injured player as source even if that same player is used as the AUTO placeholder', () => {
+    TestBed.resetTestingModule();
+    const missingRmSlots = makeData().currentSlots
+      .filter(slot => slot.slotIndex !== 8);
+
+    TestBed.configureTestingModule({
+      imports: [NoopAnimationsModule, CommonModule, PartidoModalComponent],
+      providers: [
+        { provide: MAT_DIALOG_DATA, useValue: makeData({
+            currentSlots: missingRmSlots,
+            events: [
+              {
+                eventType: 'INJURY',
+                minute: 45,
+                playerId: 's9',
+                playerName: 'MID 4',
+                description: 'Debug Partido: lesion propia para s9',
+                teamId: 'team-h'
+              }
+            ]
+          })
+        },
+        { provide: MatDialogRef, useValue: dialogRefSpy },
+        { provide: MatchEngineService, useValue: engineSpy },
+        { provide: MatSnackBar, useValue: snackBarSpy }
+      ]
+    }).compileComponents();
+
+    const fx2 = TestBed.createComponent(PartidoModalComponent);
+    const cmp2 = fx2.componentInstance;
+    fx2.detectChanges();
+
+    expect(cmp2.playerAtSlot(8)?.sessionPlayerId)
+      .withContext('The AUTO placeholder may be the same missing player when the backend did not mark him unavailable yet')
+      .toBe('s9');
+    expect(cmp2.autoFillSourcePlayerBySlot.get(8)).toBe('s9');
+
+    cmp2.onBenchPlayerClick('s13');
+    cmp2.onPitchSlotClick(8);
+
+    expect(cmp2.pendingSubstitutions).toEqual([
+      { playerOffId: 's9', playerOnId: 's13', slotIndex: 8 }
+    ]);
+    expect(cmp2.errorMsg).toBe('');
+  });
+
+  it('local Debug Partido auto-fills only slots linked to a debug injury source', () => {
+    TestBed.resetTestingModule();
+    const dirtyDebugSlots = makeData().currentSlots
+      .filter(slot => slot.slotIndex !== 1 && slot.slotIndex !== 8);
+
+    TestBed.configureTestingModule({
+      imports: [NoopAnimationsModule, CommonModule, PartidoModalComponent],
+      providers: [
+        { provide: MAT_DIALOG_DATA, useValue: makeData({
+            currentSlots: dirtyDebugSlots,
+            events: [
+              {
+                eventType: 'INJURY',
+                minute: 45,
+                playerId: 's2',
+                playerName: 'DEF 1',
+                description: 'Debug Partido: lesion propia para s2',
+                teamId: 'team-h'
+              }
+            ]
+          })
+        },
+        { provide: MatDialogRef, useValue: dialogRefSpy },
+        { provide: MatchEngineService, useValue: engineSpy },
+        { provide: MatSnackBar, useValue: snackBarSpy }
+      ]
+    }).compileComponents();
+
+    const fx2 = TestBed.createComponent(PartidoModalComponent);
+    const cmp2 = fx2.componentInstance;
+    fx2.detectChanges();
+
+    expect(Array.from(cmp2.autoFilledSlots.keys())).toEqual([1]);
+    expect(cmp2.autoFillSourcePlayerBySlot.get(1)).toBe('s2');
+    expect(cmp2.isAutoFilledSlot(8)).toBeFalse();
+    expect(cmp2.slotAssignments.has(8)).toBeFalse();
+  });
+
+  it('auto-fill ignores rival injuries so Partido never invents a manager substitution', () => {
+    TestBed.resetTestingModule();
+    const missingRmSlots = makeData().currentSlots
+      .filter(slot => slot.slotIndex !== 8);
+    const squadWithUnavailableRm = SQUAD.map(player =>
+      player.sessionPlayerId === 's9'
+        ? ({ ...player, injured: true } as SessionPlayer)
+        : player
+    );
+
+    TestBed.configureTestingModule({
+      imports: [NoopAnimationsModule, CommonModule, PartidoModalComponent],
+      providers: [
+        { provide: MAT_DIALOG_DATA, useValue: makeData({
+            currentSlots: missingRmSlots,
+            squad: squadWithUnavailableRm,
+            events: [
+              {
+                eventType: 'INJURY',
+                minute: 42,
+                playerId: 'rival-s9',
+                playerName: 'Rival MID',
+                description: 'Rival injury should be ignored by manager Partido',
+                teamId: 'team-a'
+              }
+            ]
+          })
+        },
+        { provide: MatDialogRef, useValue: dialogRefSpy },
+        { provide: MatchEngineService, useValue: engineSpy },
+        { provide: MatSnackBar, useValue: snackBarSpy }
+      ]
+    }).compileComponents();
+
+    const fx2 = TestBed.createComponent(PartidoModalComponent);
+    const cmp2 = fx2.componentInstance;
+    fx2.detectChanges();
+
+    expect(cmp2.playerAtSlot(8)?.sessionPlayerId).toBe('s13');
+    expect(cmp2.autoFillSourcePlayerBySlot.has(8)).toBeFalse();
+
+    cmp2.onBenchPlayerClick('s13');
+    cmp2.onPitchSlotClick(8);
+
+    expect(cmp2.pendingSubstitutions).toEqual([]);
+    expect(cmp2.isAutoFilledSlot(8)).toBeFalse();
+  });
+
+  it('auto-fill links a manager injury even when the injured player natural role differs from the tactical slot', () => {
+    TestBed.resetTestingModule();
+    const missingStSlots = makeData().currentSlots
+      .filter(slot => slot.slotIndex !== 10);
+    const squadWithWingerAsInjuredSt = SQUAD.map(player =>
+      player.sessionPlayerId === 's11'
+        ? ({ ...player, position: 'WINGER', injured: true } as SessionPlayer)
+        : player
+    );
+
+    TestBed.configureTestingModule({
+      imports: [NoopAnimationsModule, CommonModule, PartidoModalComponent],
+      providers: [
+        { provide: MAT_DIALOG_DATA, useValue: makeData({
+            currentSlots: missingStSlots,
+            squad: squadWithWingerAsInjuredSt,
+            events: [
+              {
+                eventType: 'INJURY',
+                minute: 45,
+                playerId: 's11',
+                playerName: 'ATT 2',
+                description: 'ATT 2 se lesionó jugando de ST',
+                teamId: 'team-h'
+              }
+            ]
+          })
+        },
+        { provide: MatDialogRef, useValue: dialogRefSpy },
+        { provide: MatchEngineService, useValue: engineSpy },
+        { provide: MatSnackBar, useValue: snackBarSpy }
+      ]
+    }).compileComponents();
+
+    const fx2 = TestBed.createComponent(PartidoModalComponent);
+    const cmp2 = fx2.componentInstance;
+    fx2.detectChanges();
+
+    expect(cmp2.playerAtSlot(10)?.sessionPlayerId).toBe('s14');
+    expect(cmp2.autoFillSourcePlayerBySlot.get(10)).toBe('s11');
+
+    cmp2.onBenchPlayerClick('s14');
+    cmp2.onPitchSlotClick(10);
+
+    expect(cmp2.pendingSubstitutions).toEqual([
+      { playerOffId: 's11', playerOnId: 's14', slotIndex: 10 }
+    ]);
+  });
+
   // ========== F2: bigger dots + full-name render ==========
 
   it('F2: ɵcmp.styles sets .player-dot to 56px (was 30px) so full names fit without ellipsis', () => {
@@ -683,8 +1453,9 @@ describe('PartidoModalComponent (V25D89-FRONT-A)', () => {
     const playerDotRule = src.match(/\.player-dot\s*\{[^}]*\}/);
     expect(playerDotRule).toBeTruthy();
     const ruleSrc = playerDotRule![0];
-    expect(ruleSrc).toContain('width: 56px');
-    expect(ruleSrc).toContain('height: 56px');
+    expect(ruleSrc).toContain('width: clamp(58px, 4.8vw, 78px)');
+    expect(ruleSrc).toContain('height: clamp(48px, 4.1vw, 64px)');
+    expect(ruleSrc).toContain('touch-action: none');
   });
 
   it('F2: ɵcmp.styles removes the aggressive text-overflow: ellipsis on .dot-player-name (was truncating "Mbappé" → "Mb")', () => {
@@ -699,6 +1470,16 @@ describe('PartidoModalComponent (V25D89-FRONT-A)', () => {
     const ruleSrc = nameRule![0];
     expect(ruleSrc).toContain('white-space: normal');
     expect(ruleSrc).not.toContain('text-overflow: ellipsis');
+  });
+
+  it('responsive manager pitch uses fluid dimensions and mobile/tablet/desktop breakpoints', () => {
+    const src = stripEncapsulation(stylesSource());
+    expect(src).toContain('min-height: clamp(420px, 58vh, 680px)');
+    expect(src).toContain('grid-template-columns: minmax(0, 3fr) minmax(260px, 0.9fr)');
+    expect(src).toContain('@media (max-width: 600px)');
+    expect(src).toContain('@media (min-width: 601px) and (max-width: 1024px)');
+    expect(src).toContain('@media (min-width: 1600px)');
+    expect(src).toContain('min-height: min(62vh, 420px)');
   });
 
   // ========== F3: real score in header + stats row ==========

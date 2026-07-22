@@ -140,6 +140,25 @@ describe('TestHarnessPageComponent', () => {
     expect(component).toBeTruthy();
   });
 
+  it('labels Base vs modal pixels with moved players and engine impact', () => {
+    const lineup = sampleLineup('4-4-2');
+    lineup.slots[6] = {
+      ...lineup.slots[6],
+      customXPercent: 54,
+      customYPercent: 43,
+    } as any;
+    const canonical = sampleCurrentLineupSummary({ avgXgFor: 1.0, avgXgAgainst: 0.9, avgShotDiff: 1.0 });
+    const modal = sampleCurrentLineupSummary({ avgXgFor: 1.08, avgXgAgainst: 0.87, avgShotDiff: 1.5 });
+
+    const summary = (component as any).buildModalVsCanonicalSummary(lineup, canonical, modal);
+
+    expect(summary.customMovableSlotCount).toBe(1);
+    expect(summary.movedPlayers[0]).toContain('Player 7');
+    expect(summary.movedPlayers[0]).toContain('54.0%/43.0%');
+    expect(summary.engineImpactLabel).toBe('impacto visible');
+    expect(summary.engineImpactDetail).toContain('motor');
+  });
+
   it('loads the active career and matches on init', () => {
     expect(component.careerId()).toBe('career-1');
     expect(component.rounds().length).toBe(1);
@@ -153,6 +172,9 @@ describe('TestHarnessPageComponent', () => {
       '[data-testid="match-row"][data-match-id="match-1"]'
     );
     expect(row).withContext('Panel C match row should expose a stable selector').not.toBeNull();
+    expect(row?.getAttribute('role')).toBe('button');
+    expect(row?.getAttribute('tabindex')).toBe('0');
+    expect(row?.getAttribute('aria-pressed')).toBe('false');
 
     const swapButtonBefore: HTMLButtonElement | null = fixture.nativeElement.querySelector(
       '[data-testid="player-swap-full-smoke-button"]'
@@ -164,11 +186,25 @@ describe('TestHarnessPageComponent', () => {
     fixture.detectChanges();
 
     expect(component.selectedMatchId()).toBe('match-1');
+    expect(row?.getAttribute('aria-pressed')).toBe('true');
 
     const swapButtonAfter: HTMLButtonElement | null = fixture.nativeElement.querySelector(
       '[data-testid="player-swap-full-smoke-button"]'
     );
     expect(swapButtonAfter?.disabled).toBeFalse();
+  });
+
+  it('selects a Panel C match from keyboard Space for browser and accessibility flows', () => {
+    const row: HTMLElement | null = fixture.nativeElement.querySelector(
+      '[data-testid="match-row"][data-match-id="match-1"]'
+    );
+    expect(row).not.toBeNull();
+
+    row?.dispatchEvent(new KeyboardEvent('keyup', { key: ' ', code: 'Space', bubbles: true }));
+    fixture.detectChanges();
+
+    expect(component.selectedMatchId()).toBe('match-1');
+    expect(row?.getAttribute('aria-pressed')).toBe('true');
   });
 
   it('reselects a real user-team match before checklist steps when the selected match is stale', () => {
@@ -2135,6 +2171,100 @@ describe('TestHarnessPageComponent', () => {
     expect(summary.find((item) => item.label === 'Tradeoff')?.count).toBe(0);
   });
 
+  it('groups position pixel QA by tactical line and review state', () => {
+    component.positionPixelMatrixRows.set([
+      makePositionPixelRow({
+        playerPosition: 'MID',
+        fromXPercent: 50,
+        fromYPercent: 50,
+        targetXPercent: 51,
+        targetYPercent: 50,
+        signalScore: 0.01,
+      }),
+      makePositionPixelRow({
+        playerPosition: 'DEF',
+        fromXPercent: 50,
+        fromYPercent: 76,
+        targetXPercent: 50,
+        targetYPercent: 71,
+        deltaXgAgainst: -0.08,
+        deltaShotsAgainst: -1.4,
+        deltaWideXgAgainst: -0.04,
+        signalScore: 0.08,
+      }),
+      makePositionPixelRow({
+        playerPosition: 'ATT',
+        fromXPercent: 50,
+        fromYPercent: 20,
+        targetXPercent: 50,
+        targetYPercent: 28,
+        deltaXgFor: 0.28,
+        deltaShotsFor: 4.5,
+        signalScore: 0.28,
+      }),
+      makePositionPixelRow({
+        playerPosition: 'ATT',
+        fromXPercent: 50,
+        fromYPercent: 20,
+        targetXPercent: 50,
+        targetYPercent: 15,
+        deltaXgFor: -0.05,
+        deltaShotsFor: -1.0,
+        deltaWideXgFor: 0.12,
+        deltaWideShotsFor: 2.4,
+        deltaRightWideXgFor: 0.10,
+        signalScore: 0.18,
+      }),
+    ] as any);
+
+    const board = component.positionPixelQaSummaryBoard();
+    const all = board.find((row) => row.line === 'ALL');
+    const mid = board.find((row) => row.line === 'MID');
+    const def = board.find((row) => row.line === 'DEF');
+    const att = board.find((row) => row.line === 'ATT');
+
+    expect(all?.total).toBe(4);
+    expect(mid?.microOk).toBe(1);
+    expect(def?.visibleOk).toBe(1);
+    expect(att?.strongCoherent).toBe(1);
+    expect(att?.contradiction).toBe(1);
+    expect(all?.verdict).toBe('Revisar motor');
+    expect(component.trackByPositionPixelQaSummaryRow(0, all as any)).toBe('ALL');
+  });
+
+  it('accepts the substitution timing matrix as live substitution QA evidence', () => {
+    component.substitutionTimingMatrixRows.set([
+      {
+        ...makeSubstitutionWhatIfSummary({
+          playerOffName: 'Jude Bellingham',
+          playerOnName: 'Brahim Diaz',
+          minute: 45,
+          deltaXgFor: -0.15,
+          deltaShotsFor: -2.9,
+        }),
+        timingRead: 'Empeora',
+      },
+      {
+        ...makeSubstitutionWhatIfSummary({
+          playerOffName: 'Jude Bellingham',
+          playerOnName: 'Brahim Diaz',
+          minute: 80,
+          deltaXgFor: -0.03,
+          deltaShotsFor: -0.7,
+        }),
+        timingRead: 'Casi neutro',
+      },
+    ] as any);
+
+    const row = component.professionalQaChecklistRows()
+      .find((item) => item.check === 'Live substitution signal');
+
+    expect(row?.verdict).toBe('OK');
+    expect(row?.observed).toContain('Jude Bellingham');
+    expect(row?.observed).toContain("45'/80'");
+    expect(row?.observed).toContain('2/2');
+  });
+
   it('builds manual extreme position hunt candidates and meaningful presets', () => {
     const lineup = { ...sampleLineup('4-4-2'), slots: [] };
     const candidates = (component as any).pickManualExtremeCandidates(lineup);
@@ -2866,6 +2996,195 @@ describe('TestHarnessPageComponent', () => {
     expect(protecting.detail).toContain('cuidar resultado');
   });
 
+  it('combines attacking route with opponent threat when chasing', () => {
+    const cards = [
+      {
+        title: 'Atacar',
+        label: 'Canal izquierdo',
+        metrics: 'xG +0.14 / xGA +0.04 / media',
+        detail: 'gana ataque por izquierda',
+      },
+      {
+        title: 'Amenaza rival',
+        label: 'Rival: canal derecho',
+        metrics: 'xGA +0.12 / canal +0.31 / fuerte',
+        detail: 'rival amenaza por derecha',
+      },
+    ];
+
+    const decision = (component as any).scenarioBatteryDecision(cards, 'NEED_GOAL');
+    const review = (component as any).scenarioBatteryDecisionReview('NEED_GOAL', decision.label, cards);
+
+    expect(decision.label).toBe('Atacar con cuidado: Canal izquierdo vs Rival: canal derecho');
+    expect(decision.detail).toContain('via ofensiva');
+    expect(decision.detail).toContain('Amenaza: xGA +0.12');
+    expect(review.label).toBe('OK: ataque contextual');
+  });
+
+  it('combines opponent threat with protection when protecting result', () => {
+    const cards = [
+      {
+        title: 'Cuidar',
+        label: 'Bloque compacto',
+        metrics: 'xG -0.05 / xGA -0.13 / fuerte',
+        detail: 'cierra mejor el centro',
+      },
+      {
+        title: 'Amenaza rival',
+        label: 'Rival: centro',
+        metrics: 'xGA +0.10 / canal +0.22 / fuerte',
+        detail: 'rival amenaza por dentro',
+      },
+    ];
+
+    const decision = (component as any).scenarioBatteryDecision(cards, 'PROTECT_RESULT');
+    const review = (component as any).scenarioBatteryDecisionReview('PROTECT_RESULT', decision.label, cards);
+
+    expect(decision.label).toBe('Cerrar amenaza: Rival: centro + Bloque compacto');
+    expect(decision.detail).toContain('amenaza rival');
+    expect(decision.detail).toContain('Cierre: xG -0.05');
+    expect(review.label).toBe('OK');
+  });
+
+  it('keeps opponent threat visible when a double-gain plan exists', () => {
+    const cards = [
+      {
+        title: 'Doble ganancia',
+        label: 'Cerrar el centro',
+        metrics: 'xG +0.04 / xGA -0.05 / leve',
+        detail: 'mejora ataque y baja riesgo',
+      },
+      {
+        title: 'Amenaza rival',
+        label: 'Rival: bandas',
+        metrics: 'xGA +0.07 / canal +0.06 / leve',
+        detail: 'rival amenaza por fuera',
+      },
+    ];
+
+    const chasing = (component as any).scenarioBatteryDecision(cards, 'NEED_GOAL');
+    const protecting = (component as any).scenarioBatteryDecision(cards, 'PROTECT_RESULT');
+    const chasingReview = (component as any).scenarioBatteryDecisionReview('NEED_GOAL', chasing.label, cards);
+
+    expect(chasing.label).toBe('Aprovechar con cuidado: Cerrar el centro vs Rival: bandas');
+    expect(chasing.detail).toContain('doble ganancia');
+    expect(chasing.detail).toContain('Amenaza: xGA +0.07');
+    expect(chasingReview.label).toBe('OK: ataque contextual');
+    expect(protecting.label).toBe('Cerrar amenaza: Rival: bandas + Cerrar el centro');
+  });
+
+  it('builds a compact coach advice from tactical battery rows', () => {
+    component.scenarioBatteryRows.set([
+      {
+        matchId: 'm1',
+        matchLabel: 'Athletic Club vs Barcelona',
+        controlledSide: 'HOME',
+        controlledTeam: 'Athletic Club',
+        scenarioGroup: 'ALL',
+        coachObjective: 'NEED_GOAL',
+        coachContext: '0-1 min 75',
+        coachContextDetail: 'perdiendo',
+        seedStart: 12345,
+        seedCount: 5,
+        scenarioCount: 34,
+        decision: 'Aprovechar con cuidado: Canal izquierdo vs Rival: canal derecho',
+        decisionDetail: 'Necesitas gol',
+        review: 'OK: ataque contextual',
+        reviewDetail: 'combina ataque y amenaza',
+        cards: [
+          { title: 'Atacar', label: 'Canal izquierdo', metrics: 'xG +0.15 / xGA -0.11 / leve', detail: 'via ofensiva', className: 'read-visible' },
+          { title: 'Amenaza rival', label: 'Rival: canal derecho', metrics: 'xGA +0.07 / canal +0.45 / fuerte', detail: 'amenaza derecha', className: 'read-check' },
+        ],
+      } as any,
+      {
+        matchId: 'm1',
+        matchLabel: 'Athletic Club vs Barcelona',
+        controlledSide: 'AWAY',
+        controlledTeam: 'Barcelona',
+        scenarioGroup: 'ALL',
+        coachObjective: 'PROTECT_RESULT',
+        coachContext: '0-1 min 75',
+        coachContextDetail: 'ganando',
+        seedStart: 12345,
+        seedCount: 5,
+        scenarioCount: 34,
+        decision: 'Cerrar amenaza: Rival: canal derecho + Frenkie de Jong -> x18/y50',
+        decisionDetail: 'Cuidar resultado',
+        review: 'OK',
+        reviewDetail: 'coherente',
+        cards: [
+          { title: 'Cuidar', label: 'Frenkie de Jong -> x18/y50', metrics: 'xG -0.01 / xGA -0.07 / media', detail: 'cierre', className: 'read-visible' },
+          { title: 'Amenaza rival', label: 'Rival: canal derecho', metrics: 'xGA +0.15 / canal +0.25 / fuerte', detail: 'amenaza derecha', className: 'read-check' },
+        ],
+      } as any,
+    ]);
+
+    const advice = component.scenarioBatteryCoachAdvice();
+
+    expect(advice?.plan).toContain('Athletic Club: Aprovechar con cuidado');
+    expect(advice?.risk).toContain('Rival: canal derecho');
+    expect(advice?.why).toContain('2/2 lecturas coherentes');
+    expect(advice?.why).toContain('confirmar con Multi-seed');
+    expect(advice?.next).toContain('Canal izquierdo');
+    expect(advice?.next).toContain('Multi-seed');
+  });
+
+  it('confirms a tactical battery row by selecting match side and running multi-seed', () => {
+    component.rounds.set([
+      {
+        round: 1,
+        byeTeam: null,
+        matches: [
+          {
+            matchId: 'athletic-barca',
+            round: 1,
+            homeTeamId: 'athletic',
+            homeTeamName: 'Athletic Club',
+            awayTeamId: 'barcelona',
+            awayTeamName: 'Barcelona',
+            status: 'COMPLETED',
+            homeGoals: 0,
+            awayGoals: 1,
+            homeFormation: null,
+            awayFormation: null,
+          },
+        ],
+      },
+    ]);
+    harness.runScenarioMatrixSummary.calls.reset();
+    harness.runScenarioMatrixSummary.and.returnValue(of([]) as any);
+
+    component.confirmScenarioBatteryRow({
+      matchId: 'athletic-barca',
+      matchLabel: 'Athletic Club vs Barcelona',
+      controlledSide: 'HOME',
+      controlledTeam: 'Athletic Club',
+      scenarioGroup: 'ALL',
+      coachObjective: 'NEED_GOAL',
+      coachContext: '0-1 min 75',
+      coachContextDetail: 'perdiendo',
+      seedStart: 12345,
+      seedCount: 5,
+      scenarioCount: 34,
+      decision: 'Aprovechar con cuidado: Canal izquierdo vs Rival: canal derecho',
+      decisionDetail: 'confirmar',
+      review: 'OK: ataque contextual',
+      reviewDetail: 'ok',
+      cards: [],
+    } as any);
+
+    expect(component.selectedMatchId()).toBe('athletic-barca');
+    expect(component.controlledTeamSideModel).toBe('HOME');
+    expect(component.scenarioBatteryGroupModel).toBe('ALL');
+    expect(harness.runScenarioMatrixSummary).toHaveBeenCalledWith(
+      'athletic-barca',
+      12345,
+      20,
+      'ALL',
+      'HOME'
+    );
+  });
+
   it('treats formation and substitution upside as attacking plans', () => {
     const formationRows = [
       makeScenarioSummaryRow({
@@ -2927,6 +3246,25 @@ describe('TestHarnessPageComponent', () => {
     expect(decision.label).toBe('Controlar: Centro');
     expect(decision.detail).toContain('encaja con cuidar resultado');
     expect(review.label).toBe('OK');
+  });
+
+  it('labels a low 5-4-1 that loses territory and concedes more as too deep', () => {
+    const read = (component as any).lowBlockLabRead('low', -0.14, 0.05, 0.70, -1.15);
+
+    expect(read).toBe('Demasiado hundido');
+  });
+
+  it('explains real side mirror near-zero rows as case adaptation instead of direct motor failure', () => {
+    const wide = { read: 'OK: I5/C0/D5 · ancho 100%', className: 'read-strong' };
+    const noWingbacks = { read: 'Sin LWB/RWB', className: 'read-check' };
+    const lowWingbacks = { read: 'OK: bajos · sim 100%', className: 'read-visible' };
+
+    expect((component as any).sideMirrorRealRead('Revisar', '4-4-2', 0, 0, wide, noWingbacks))
+      .toContain('sin carrileros');
+    expect((component as any).sideMirrorRealRead('Revisar', '5-4-1', 0, 0, wide, lowWingbacks))
+      .toContain('carrileros bajos');
+    expect((component as any).sideMirrorRealRead('Revisar', '4-3-3', 0.03, -0.02, wide, noWingbacks))
+      .toContain('control sintético');
   });
 
   it('marks chasing teams without attacking route as no clear path', () => {
@@ -3200,6 +3538,102 @@ describe('TestHarnessPageComponent', () => {
     ]);
     expect(component.lineupDebugSnapshot()?.rows.map((row) => row.y)).toEqual([50, 32]);
   });
+
+  it('modal recommendation keeps neutral swaps natural instead of forcing an attacking striker', () => {
+    const lineup = modalRecommendationLineup([
+      { playerId: 'starter-wing', name: 'Starter Wing', position: 'WINGER', overall: 75 },
+      { playerId: 'starter-mid', name: 'Starter Mid', position: 'MID', overall: 76 },
+    ]);
+    const squad = modalRecommendationSquad([
+      { sessionPlayerId: 'starter-wing', name: 'Starter Wing', position: 'WINGER', overall: 75 },
+      { sessionPlayerId: 'starter-mid', name: 'Starter Mid', position: 'MID', overall: 76 },
+      { sessionPlayerId: 'bench-wing', name: 'Bench Wing', position: 'WINGER', overall: 73 },
+      { sessionPlayerId: 'bench-striker', name: 'Bench Striker', position: 'ATT', overall: 79 },
+    ]);
+
+    const neutral = (component as any).pickModalRecommendationSwapCandidate(lineup, squad, 'NEUTRAL');
+    const chasing = (component as any).pickModalRecommendationSwapCandidate(lineup, squad, 'NEED_GOAL');
+
+    expect(neutral.benchId).toBe('bench-wing');
+    expect(neutral.testCase).toContain('Neutral');
+    expect(chasing.benchId).toBe('bench-striker');
+    expect(chasing.testCase).toContain('Necesito gol');
+  });
+
+  it('modal recommendation protects result with a defensive profile', () => {
+    const lineup = modalRecommendationLineup([
+      { playerId: 'starter-att', name: 'Starter Att', position: 'ATT', overall: 76 },
+      { playerId: 'starter-mid', name: 'Starter Mid', position: 'MID', overall: 75 },
+    ]);
+    const squad = modalRecommendationSquad([
+      { sessionPlayerId: 'starter-att', name: 'Starter Att', position: 'ATT', overall: 76 },
+      { sessionPlayerId: 'starter-mid', name: 'Starter Mid', position: 'MID', overall: 75 },
+      { sessionPlayerId: 'bench-att', name: 'Bench Att', position: 'ATT', overall: 80 },
+      { sessionPlayerId: 'bench-def', name: 'Bench Def', position: 'DEF', overall: 80 },
+    ]);
+
+    const protecting = (component as any).pickModalRecommendationSwapCandidate(lineup, squad, 'PROTECT_RESULT');
+
+    expect(protecting.benchId).toBe('bench-def');
+    expect(protecting.testCase).toContain('Cuidar resultado');
+  });
+
+  it('modal recommendation avoids defensive reshuffles when protecting result', () => {
+    const lineup = modalRecommendationLineup([
+      { playerId: 'starter-cb', name: 'Starter CB', position: 'CB', overall: 76 },
+      { playerId: 'starter-mid', name: 'Starter Mid', position: 'MID', overall: 75 },
+    ]);
+    const squad = modalRecommendationSquad([
+      { sessionPlayerId: 'starter-cb', name: 'Starter CB', position: 'CB', overall: 76 },
+      { sessionPlayerId: 'starter-mid', name: 'Starter Mid', position: 'MID', overall: 75 },
+      { sessionPlayerId: 'bench-fullback', name: 'Bench Fullback', position: 'RB', overall: 77 },
+      { sessionPlayerId: 'bench-mid', name: 'Bench Mid', position: 'MID', overall: 79 },
+    ]);
+
+    const protecting = (component as any).pickModalRecommendationSwapCandidate(lineup, squad, 'PROTECT_RESULT');
+
+    expect(protecting.starterId).toBe('starter-mid');
+    expect(protecting.benchId).toBe('bench-mid');
+    expect(protecting.testCase).toContain('Cuidar resultado');
+  });
+
+  it('modal recommendation skips weak protect-result advice instead of forcing a bad close', () => {
+    const lineup = modalRecommendationLineup([
+      { playerId: 'starter-cb', name: 'Starter CB', position: 'CB', overall: 76 },
+      { playerId: 'starter-att', name: 'Starter Att', position: 'ATT', overall: 77 },
+    ]);
+    const squad = modalRecommendationSquad([
+      { sessionPlayerId: 'starter-cb', name: 'Starter CB', position: 'CB', overall: 76 },
+      { sessionPlayerId: 'starter-att', name: 'Starter Att', position: 'ATT', overall: 77 },
+      { sessionPlayerId: 'bench-rb', name: 'Bench RB', position: 'RB', overall: 77 },
+      { sessionPlayerId: 'bench-att', name: 'Bench Att', position: 'ATT', overall: 81 },
+    ]);
+
+    const protecting = (component as any).pickModalRecommendationSwapCandidate(lineup, squad, 'PROTECT_RESULT');
+
+    expect(protecting).toBeNull();
+  });
+
+  it('protect what-if safety accepts only real risk reduction', () => {
+    const safe = {
+      deltaXgAgainst: -0.02,
+      deltaShotsAgainst: 0.1,
+      deltaXgDiff: -0.01,
+    } as any;
+    const shotSafe = {
+      deltaXgAgainst: 0.03,
+      deltaShotsAgainst: -0.2,
+      deltaXgDiff: -0.02,
+    } as any;
+
+    expect((component as any).modalProtectWhatIfIsSafe(safe)).toBeTrue();
+    expect((component as any).modalProtectWhatIfIsSafe(shotSafe)).toBeTrue();
+    expect((component as any).modalProtectWhatIfIsSafe({
+      deltaXgAgainst: 0.03,
+      deltaShotsAgainst: 0.2,
+      deltaXgDiff: 0.01,
+    })).toBeFalse();
+  });
 });
 
 function makeMatchRow(matchId: string) {
@@ -3288,6 +3722,41 @@ function makeFormationSummary(overrides: Partial<FormationMatrixSummaryRow> = {}
   };
 }
 
+function modalRecommendationLineup(players: Array<{
+  playerId: string;
+  name: string;
+  position: string;
+  overall: number;
+}>) {
+  return {
+    formation: '4-4-2',
+    players,
+    slots: players.map((player, index) => ({
+      subdivisionId: `S${String(index + 1).padStart(2, '0')}`,
+      playerId: player.playerId,
+      customXPercent: null,
+      customYPercent: null,
+    })),
+  } as any;
+}
+
+function modalRecommendationSquad(players: Array<{
+  sessionPlayerId: string;
+  name: string;
+  position: string;
+  overall: number;
+}>) {
+  return players.map((player) => ({
+    ...player,
+    injured: false,
+    suspended: false,
+    attack: player.position === 'ATT' ? player.overall : Math.max(50, player.overall - 8),
+    defense: player.position === 'DEF' ? player.overall : Math.max(45, player.overall - 12),
+    technique: player.overall,
+    speed: player.overall,
+  })) as any;
+}
+
 function sampleSnapshot(minute: number): TimelineSnapshot {
   return {
     minute,
@@ -3316,6 +3785,92 @@ function sampleLineup(formation: string) {
       playerId: `p${i + 1}`,
       subdivisionId: i === 0 ? 'GK-1' : `S${String(i + 1).padStart(2, '0')}-1`,
     })),
+  };
+}
+
+function sampleCurrentLineupSummary(overrides: Record<string, unknown> = {}) {
+  return {
+    label: 'My Team vs Rival',
+    formation: '4-4-2',
+    style: 'BALANCED',
+    seedStart: 12345,
+    seedEnd: 12347,
+    seedCount: 3,
+    playerCount: 11,
+    starters: [],
+    avgGoalsFor: 1,
+    avgGoalsAgainst: 1,
+    avgGoalDiff: 0,
+    avgPossessionFor: 50,
+    avgShotsFor: 10,
+    avgShotsAgainst: 9,
+    avgShotDiff: 1,
+    avgXgFor: 1,
+    avgXgAgainst: 0.9,
+    avgXgDiff: 0.1,
+    avgCentralShotsFor: 5,
+    avgWideShotsFor: 3,
+    avgLongShotsFor: 2,
+    avgCentralShotsAgainst: 4,
+    avgWideShotsAgainst: 3,
+    avgLongShotsAgainst: 2,
+    timestamp: '2026-07-21T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+function makeSubstitutionWhatIfSummary(overrides: Record<string, unknown> = {}) {
+  return {
+    matchId: 'match-1',
+    formation: '4-4-2',
+    minute: 60,
+    seedStart: 12345,
+    seedEnd: 12354,
+    seedCount: 10,
+    playerOffId: 'starter-1',
+    playerOffName: 'Starter',
+    playerOffPosition: 'MID',
+    playerOffOverall: 80,
+    playerOnId: 'bench-1',
+    playerOnName: 'Bench',
+    playerOnPosition: 'MID',
+    playerOnOverall: 78,
+    baselineAvgGoalsFor: 1,
+    baselineAvgGoalsAgainst: 1,
+    baselineAvgGoalDiff: 0,
+    baselineAvgShotsFor: 10,
+    baselineAvgShotsAgainst: 8,
+    baselineAvgPossessionFor: 55,
+    baselineAvgXgFor: 1.2,
+    baselineAvgXgAgainst: 0.9,
+    baselineAvgXgDiff: 0.3,
+    substitutedAvgGoalsFor: 1,
+    substitutedAvgGoalsAgainst: 1,
+    substitutedAvgGoalDiff: 0,
+    substitutedAvgShotsFor: 10,
+    substitutedAvgShotsAgainst: 8,
+    substitutedAvgPossessionFor: 55,
+    substitutedAvgXgFor: 1.2,
+    substitutedAvgXgAgainst: 0.9,
+    substitutedAvgXgDiff: 0.3,
+    deltaGoalsFor: 0,
+    deltaGoalsAgainst: 0,
+    deltaGoalDiff: 0,
+    deltaShotsFor: 0,
+    deltaShotsAgainst: 0,
+    deltaPossessionFor: 0,
+    deltaXgFor: 0,
+    deltaXgAgainst: 0,
+    deltaXgDiff: 0,
+    deltaCentralShotsFor: 0,
+    deltaWideShotsFor: 0,
+    deltaLongShotsFor: 0,
+    deltaCentralXgFor: 0,
+    deltaWideXgFor: 0,
+    deltaLongXgFor: 0,
+    read: 'Casi neutro',
+    readClass: 'delta-neutral',
+    ...overrides,
   };
 }
 

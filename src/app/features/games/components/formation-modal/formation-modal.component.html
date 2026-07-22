@@ -11,10 +11,6 @@
       <span>{{ errorMsg }}</span>
     </div>
 
-    <!-- V25D81.1 BUG #4: warning banner shown when autoFillEmptySlots
-         could not fill at least one slot (no compatible bench). Lighter
-         styling than the error banner (orange vs red) so the manager
-         can still proceed if they accept the gap. -->
     <div *ngIf="warningMsg && !errorMsg" class="banner banner-warning" role="status" data-testid="autofill-warning">
       <mat-icon>warning</mat-icon>
       <span>{{ warningMsg }}</span>
@@ -32,14 +28,7 @@
       </mat-form-field>
     </div>
 
-    <!-- V25D81-BUG #4: 2-column visual layout — pitch (left) + bench
-         (right). Bench shows squad players NOT in the starting XI.
-         Manager can drag players between pitch slots and the bench
-         to re-arrange positions. The visual pitch renders the
-         currently assigned player name (or role label when empty)
-         inside each dot, and each dot is a drop target. -->
     <div class="formation-grid">
-      <!-- Visual pitch (manager team starting XI) -->
       <section class="col col-pitch" data-area="pitch" aria-label="Visual pitch">
         <h3>Mi XI (arrastra para re-ordenar)</h3>
         <div class="pitch" role="img"
@@ -54,23 +43,21 @@
                  [class.is-att]="lineIdx === formationLines.length - 1"
                  [class.is-empty]="!playerAtSlot(getSlotIndex(lineIdx, dotIdx))"
                  [class.is-drag-source]="dragSourceSlotIdx === getSlotIndex(lineIdx, dotIdx)"
+                 [class.is-selected]="selectedSlotIdx === getSlotIndex(lineIdx, dotIdx)"
+                 [class.is-pixel-moved]="isPixelMoved(getSlotIndex(lineIdx, dotIdx))"
                  [class.is-auto-filled]="isAutoFilledSlot(getSlotIndex(lineIdx, dotIdx))"
                  [attr.data-auto-filled]="isAutoFilledSlot(getSlotIndex(lineIdx, dotIdx)) ? 'true' : 'false'"
                  [attr.draggable]="true"
+                 (click)="selectSlot(getSlotIndex(lineIdx, dotIdx))"
                  (dragstart)="onSlotDragStart($event, getSlotIndex(lineIdx, dotIdx))"
                  (dragover)="onSlotDragOver($event)"
                  (drop)="onSlotDrop($event, getSlotIndex(lineIdx, dotIdx))"
                  (dragend)="onSlotDragEnd()">
               <ng-container *ngIf="playerAtSlot(getSlotIndex(lineIdx, dotIdx)) as p; else emptyDot">
                 <span class="dot-player-name"
-                      [title]="(isAutoFilledSlot(getSlotIndex(lineIdx, dotIdx)) ? '🔒 Auto-asignado · ' : '') + p.name + ' (' + p.position + ')'">
+                      [title]="(isAutoFilledSlot(getSlotIndex(lineIdx, dotIdx)) ? '🔒 Auto-asignado · ' : '') + p.name + ' (' + p.position + ') · x/y ' + slotCoordLabel(getSlotIndex(lineIdx, dotIdx))">
                   {{ p.name }}
                 </span>
-                <!-- V25D81.1 BUG #4: lock badge for auto-filled slots.
-                     The icon signals "system picked this player", the
-                     wrapper carries the tooltip via the parent title
-                     attribute. Manual drag overrides clear the marker
-                     and the badge disappears. -->
                 <span *ngIf="isAutoFilledSlot(getSlotIndex(lineIdx, dotIdx))"
                       class="auto-fill-badge"
                       aria-label="Auto-asignado"
@@ -85,13 +72,31 @@
             </div>
           </div>
         </div>
+
         <p class="hint">
           <mat-icon>info</mat-icon>
           Arrastra un jugador a otro slot para intercambiarlos. Arrastra al banquillo para sacarlo.
         </p>
+
+        <div class="pixel-controls" *ngIf="selectedSlotIdx !== null" data-testid="live-pixel-controls">
+          <div class="pixel-controls-header">
+            <strong>Movimiento fino</strong>
+            <span>{{ selectedSlotLabel() }}</span>
+          </div>
+          <div class="pixel-pad" aria-label="Mover jugador por píxeles tácticos">
+            <button mat-stroked-button type="button" (click)="nudgeSelectedSlot(0, -2)" [disabled]="isSelectedSlotLocked()">↑</button>
+            <button mat-stroked-button type="button" (click)="nudgeSelectedSlot(-2, 0)" [disabled]="isSelectedSlotLocked()">←</button>
+            <button mat-stroked-button type="button" (click)="resetSelectedSlotCoords()" [disabled]="isSelectedSlotLocked()">Reset</button>
+            <button mat-stroked-button type="button" (click)="nudgeSelectedSlot(2, 0)" [disabled]="isSelectedSlotLocked()">→</button>
+            <button mat-stroked-button type="button" (click)="nudgeSelectedSlot(0, 2)" [disabled]="isSelectedSlotLocked()">↓</button>
+          </div>
+          <p class="hint pixel-hint">
+            <mat-icon>sports_soccer</mat-icon>
+            El arquero queda fijo. Los demás movimientos se envían como coordenadas al motor live.
+          </p>
+        </div>
       </section>
 
-      <!-- Bench (squad players not in the XI) -->
       <section class="col col-bench" data-area="bench" aria-label="Banquillo">
         <h3>Banquillo</h3>
         <div class="bench-list">
@@ -128,7 +133,7 @@
     <button mat-flat-button
             color="primary"
             (click)="confirm()"
-            [disabled]="isSubmitting || (!slotsDifferFromInitialPublic() && selectedFormation() === data.currentFormation)">
+            [disabled]="isSubmitting || (!hasAnyChange() && selectedFormation() === data.currentFormation)">
       Confirmar
     </button>
   </mat-dialog-actions>

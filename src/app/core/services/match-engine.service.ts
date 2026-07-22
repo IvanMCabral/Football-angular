@@ -136,12 +136,37 @@ export class MatchEngineService {
    */
   changeFormation(
     matchId: string,
-    players: Array<{ sessionPlayerId: string; position: string; slotIndex: number }>
+    players: Array<{
+      sessionPlayerId: string;
+      position: string;
+      slotIndex: number;
+      customXPercent?: number | null;
+      customYPercent?: number | null;
+    }>,
+    formationCode?: string
   ): Observable<FormationChangeResult> {
+    const payloadPlayers = players.map(player => ({
+      playerId: player.sessionPlayerId,
+      position: this.normalizeFormationPosition(player.position),
+      slotIndex: player.slotIndex,
+      customXPercent: player.customXPercent ?? null,
+      customYPercent: player.customYPercent ?? null
+    }));
+
     return this.http.post<FormationChangeResult>(
       `${this.apiUrl}/matches/${matchId}/formation`,
-      { players }
+      { players: payloadPlayers, formationCode: formationCode ?? null }
     );
+  }
+
+  private normalizeFormationPosition(position: string): string {
+    const normalized = (position || '').toUpperCase();
+    if (normalized === 'GK') { return 'GK'; }
+    if (['DEF', 'CB', 'LB', 'RB', 'LWB', 'RWB'].includes(normalized)) { return 'DEF'; }
+    if (['MID', 'CM', 'CDM', 'CAM', 'LM', 'RM'].includes(normalized)) { return 'MID'; }
+    if (['WINGER', 'LW', 'RW'].includes(normalized)) { return 'WINGER'; }
+    if (['ATT', 'ST', 'CF'].includes(normalized)) { return 'ATT'; }
+    return normalized;
   }
 
   /**

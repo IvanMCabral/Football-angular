@@ -84,6 +84,18 @@
   color: white;
 }
 
+.btn-debug-freeze {
+  background: #e0f2fe;
+  color: #075985;
+  border: 1px solid #7dd3fc;
+}
+
+.btn-debug-freeze.active {
+  background: #0369a1;
+  color: white;
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.18);
+}
+
 /* V25D82 sprint 2 UX fix: green "Iniciar Todos" button mirrors btn-resume
    visually but anchors the explicit-start action. Uses a slightly darker
    green so the manager can distinguish "start fresh" from "resume from
@@ -114,6 +126,32 @@
   padding: 1rem;
   border-radius: 8px;
   margin-bottom: 1rem;
+}
+
+.banner {
+  padding: 0.85rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  font-weight: 700;
+}
+
+.banner-paused {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #9a3412;
+}
+
+.banner-debug-freeze {
+  background: #ecfeff;
+  border: 1px solid #67e8f9;
+  color: #155e75;
+}
+
+.banner-pending-event {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+  box-shadow: 0 6px 18px rgba(29, 78, 216, 0.08);
 }
 
 .matches-grid {

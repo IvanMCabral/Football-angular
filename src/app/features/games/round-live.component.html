@@ -31,6 +31,45 @@
       </button>
       <button *ngIf="!vm.allFinished && !vm.isRoundPaused" (click)="pauseAll()" class="btn btn-pause">⏸️ Pausar Todos</button>
       <button *ngIf="!vm.allFinished && vm.isRoundPaused" (click)="resumeAll()" class="btn btn-resume">▶️ Reanudar Todos</button>
+      <button
+        *ngIf="!vm.allFinished"
+        (click)="toggleDebugFreeze()"
+        class="btn btn-debug-freeze"
+        [class.active]="debugFreezeEnabled"
+        [attr.aria-pressed]="debugFreezeEnabled"
+        title="Modo prueba: pausa automáticamente la fecha viva al entrar"
+      >
+        {{ debugFreezeEnabled ? '🧊 Debug freeze ON' : '🧊 Debug freeze OFF' }}
+      </button>
+      <button
+        *ngIf="isLocalDebugHost && !vm.allFinished"
+        (click)="toggleDebugSuppressAutoInjuryModals()"
+        class="btn btn-debug-freeze"
+        [class.active]="debugSuppressAutoInjuryModals"
+        [attr.aria-pressed]="debugSuppressAutoInjuryModals"
+        data-testid="debug-suppress-auto-injury-button"
+        title="Modo prueba local: bloquea modales automaticos de lesion para probar Partido limpio"
+      >
+        {{ debugSuppressAutoInjuryModals ? 'Lesion auto OFF' : 'Lesion auto ON' }}
+      </button>
+      <button
+        *ngIf="isLocalDebugHost && !vm.allFinished"
+        (click)="onDebugDoubleInjury()"
+        class="btn btn-debug-freeze"
+        data-testid="debug-double-injury-button"
+        title="Modo prueba local: dispara dos lesiones propias para validar cola de modales"
+      >
+        Test doble lesion
+      </button>
+      <button
+        *ngIf="isLocalDebugHost && !vm.allFinished"
+        (click)="onDebugPartidoInjury()"
+        class="btn btn-debug-freeze"
+        data-testid="debug-partido-injury-button"
+        title="Modo prueba local: crea una lesion propia en el estado visual para validar Partido + AUTO"
+      >
+        Test lesion Partido
+      </button>
       <a [routerLink]="['/games', vm.gameId]" class="btn btn-back">Volver</a>
     </div>
   </div>
@@ -42,6 +81,20 @@
        in the SSE stream. -->
   <div *ngIf="vm.isRoundPaused" class="banner banner-paused" role="status" aria-live="polite">
     ⏸️ Partidos pausados
+  </div>
+
+  <div *ngIf="debugFreezeEnabled && !vm.allFinished" class="banner banner-debug-freeze" role="status" aria-live="polite">
+    🧊 Debug freeze activo: la fecha se pausa sola para pruebas visuales largas.
+  </div>
+
+  <div
+    *ngIf="pendingLiveModalNotice"
+    class="banner banner-pending-event"
+    role="status"
+    aria-live="polite"
+    data-testid="pending-live-modal-notice"
+  >
+    {{ pendingLiveModalNotice }}
   </div>
 
   <div *ngIf="vm.errorMsg" class="error">{{ vm.errorMsg }}</div>

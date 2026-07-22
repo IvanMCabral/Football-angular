@@ -187,6 +187,17 @@ describe('LiveMatchModalsService — LIVE-MATCH-F5.3 BUG-015 (pause on modal ope
     });
   });
 
+  it('openSubstitutionModal — opens without re-pausing when match is already PAUSED', (done) => {
+    const paused = { ...RUNNING_STATE, status: 'PAUSED' as const };
+    engineServiceSpy.getMatchState.and.returnValue(of(paused));
+
+    service.openSubstitutionModal('match-1', paused).subscribe(() => {
+      expect(engineServiceSpy.pauseRoundForMatch).not.toHaveBeenCalled();
+      expect(dialogSpy.open).toHaveBeenCalled();
+      done();
+    });
+  });
+
   it('openSubstitutionModal — if URL has no careerId, skip pause (warn) and skip resume', (done) => {
     routerStub.url = '/squad';
     const warn = spyOn(console, 'warn');
@@ -215,7 +226,12 @@ describe('LiveMatchModalsService — LIVE-MATCH-F5.3 BUG-015 (pause on modal ope
     });
   });
 
-  it('openSubstitutionModal applies previous live substitution to the next modal XI/bench', (done) => {
+  it('openSubstitutionModal applies backend relatedPlayer substitution to the next modal XI/bench', (done) => {
+    teamServiceSpy.getMyTeamSquad.and.returnValue(of([
+      { sessionPlayerId: 's2', name: 'Starter 2', position: 'DEF', attack: 60, defense: 75, technique: 62, speed: 65, stamina: 70, mentality: 68 },
+      { sessionPlayerId: 'b1', name: 'Bench 1', position: 'DEF', attack: 60, defense: 76, technique: 62, speed: 65, stamina: 70, mentality: 68 },
+      { sessionPlayerId: 'b2', name: 'Bench 2', position: 'ATT', attack: 82, defense: 45, technique: 76, speed: 80, stamina: 72, mentality: 70 }
+    ] as any));
     const stateAfterSub: MatchState = {
       ...RUNNING_STATE,
       substitutionsRemaining: 4,
@@ -223,8 +239,10 @@ describe('LiveMatchModalsService — LIVE-MATCH-F5.3 BUG-015 (pause on modal ope
         {
           eventType: 'SUBSTITUTION',
           minute: 23,
+          playerId: 's2',
           playerName: 'Starter 2',
-          playerOnName: 'Bench 1',
+          relatedPlayerId: 'b1',
+          relatedPlayerName: 'Bench 1',
           teamId: 'team-h',
           description: 'Starter 2 -> Bench 1'
         }
@@ -240,6 +258,9 @@ describe('LiveMatchModalsService — LIVE-MATCH-F5.3 BUG-015 (pause on modal ope
         'Starter 3'
       ]);
       expect(dataArg.bench.map((p: any) => p.displayName)).not.toContain('Bench 1');
+      expect(dataArg.bench.map((p: any) => p.displayName))
+        .withContext('a player already substituted off cannot re-enter from the bench')
+        .not.toContain('Starter 2');
       expect(dataArg.substitutionsRemaining).toBe(4);
       done();
     });
@@ -266,10 +287,28 @@ describe('LiveMatchModalsService — LIVE-MATCH-F5.3 BUG-015 (pause on modal ope
   });
 
   it('openFormationModal — dialog.afterClosed() triggers engineService.resumeRoundForMatch', (done) => {
-    service.openFormationModal('match-1', RUNNING_STATE).subscribe(() => {
-      expect(engineServiceSpy.resumeRoundForMatch).not.toHaveBeenCalled();
-      afterClosedSubject.next(undefined);
-      expect(engineServiceSpy.resumeRoundForMatch).toHaveBeenCalledWith('career-abc', 'match-1');
+    service.openFormationModal('match-1', RUNNING_STATE).subscribe({
+      next: () => {
+          expect(engineServiceSpy.resumeRoundForMatch).not.toHaveBeenCalled();
+          setTimeout(() => {
+            afterClosedSubject.next(undefined);
+            afterClosedSubject.complete();
+          }, 0);
+      },
+      complete: () => {
+        expect(engineServiceSpy.resumeRoundForMatch).toHaveBeenCalledWith('career-abc', 'match-1');
+        done();
+      }
+    });
+  });
+
+  it('openFormationModal — opens without re-pausing when match is already PAUSED', (done) => {
+    const paused = { ...RUNNING_STATE, status: 'PAUSED' as const };
+    engineServiceSpy.getMatchState.and.returnValue(of(paused));
+
+    service.openFormationModal('match-1', paused).subscribe(() => {
+      expect(engineServiceSpy.pauseRoundForMatch).not.toHaveBeenCalled();
+      expect(dialogSpy.open).toHaveBeenCalled();
       done();
     });
   });
@@ -277,12 +316,19 @@ describe('LiveMatchModalsService — LIVE-MATCH-F5.3 BUG-015 (pause on modal ope
   it('openFormationModal applies previous live substitution to current slots', (done) => {
     const stateAfterSub: MatchState = {
       ...RUNNING_STATE,
+      homeSlots: [
+        { sessionPlayerId: 's1', position: 'GK', slotIndex: 0 },
+        { sessionPlayerId: 's2', position: 'DEF', slotIndex: 1 },
+        { sessionPlayerId: 's3', position: 'MID', slotIndex: 2 }
+      ],
       events: [
         {
           eventType: 'SUBSTITUTION',
           minute: 23,
+          playerId: 's2',
           playerName: 'Starter 2',
-          playerOnName: 'Bench 1',
+          relatedPlayerId: 'b1',
+          relatedPlayerName: 'Bench 1',
           teamId: 'team-h',
           description: 'Starter 2 -> Bench 1'
         }
@@ -298,6 +344,75 @@ describe('LiveMatchModalsService — LIVE-MATCH-F5.3 BUG-015 (pause on modal ope
         's3'
       ]);
       expect(Array.from(dataArg.startingIds)).toEqual(['s1', 'b1', 's3']);
+      done();
+    });
+  });
+
+  it('openFormationModal hydrates placeholder tactical ids by player name before opening', (done) => {
+    teamServiceSpy.getMyTeamSquad.and.returnValue(of([
+      { sessionPlayerId: 'gk-real', name: 'Starter 1', position: 'GK', attack: 20, defense: 80, technique: 70, speed: 50, stamina: 70, mentality: 80 },
+      { sessionPlayerId: 'def-real', name: 'Starter 2', position: 'DEF', attack: 45, defense: 76, technique: 62, speed: 65, stamina: 70, mentality: 68 },
+      { sessionPlayerId: 'mid-real', name: 'Starter 3', position: 'MID', attack: 70, defense: 65, technique: 78, speed: 72, stamina: 75, mentality: 74 }
+    ] as any));
+    httpSpy.get.and.callFake(((url: string) => {
+      if (url.includes('/career/lineup/current')) {
+        return of({
+          players: [
+            { playerId: 'GK', name: 'Starter 1', position: 'GK', overall: 80 },
+            { playerId: 'CB', name: 'Starter 2', position: 'DEF', overall: 75 },
+            { playerId: 'CM', name: 'Starter 3', position: 'MID', overall: 78 }
+          ]
+        });
+      }
+      return of([]);
+    }) as any);
+
+    service.openFormationModal('match-1', RUNNING_STATE).subscribe(() => {
+      const dataArg = (dialogSpy.open.calls.mostRecent().args[1] as any)?.data;
+      expect(dataArg.currentSlots.map((slot: any) => slot.sessionPlayerId)).toEqual([
+        'gk-real',
+        'def-real',
+        'mid-real'
+      ]);
+      done();
+    });
+  });
+
+  it('openPartidoModal does not hydrate two same-name slots to the same player id', (done) => {
+    teamServiceSpy.getMyTeamSquad.and.returnValue(of([
+      { sessionPlayerId: 'marvin-real', name: 'Marvin Park', position: 'MID', attack: 70, defense: 62, technique: 73, speed: 75, stamina: 78, mentality: 70 },
+      { sessionPlayerId: 'alberto-real', name: 'Alberto Moleiro', position: 'MID', attack: 74, defense: 55, technique: 80, speed: 76, stamina: 74, mentality: 72 }
+    ] as any));
+    httpSpy.get.and.callFake(((url: string) => {
+      if (url.includes('/career/lineup/current')) {
+        return of({
+          players: [
+            { playerId: 'slot-lm', name: 'Marvin Park', position: 'LM', overall: 72 },
+            { playerId: 'slot-cm', name: 'Marvin Park', position: 'CM', overall: 72 },
+            { playerId: 'alberto-real', name: 'Alberto Moleiro', position: 'RM', overall: 76 }
+          ]
+        });
+      }
+      return of([]);
+    }) as any);
+
+    service.openPartidoModal('match-1', RUNNING_STATE).subscribe(() => {
+      const dataArg = (dialogSpy.open.calls.mostRecent().args[1] as any)?.data;
+      const ids = dataArg.currentSlots.map((slot: any) => slot.sessionPlayerId);
+      expect(ids).toEqual(['marvin-real', 'slot-cm', 'alberto-real']);
+      expect(new Set(ids).size).toBe(ids.length);
+      done();
+    });
+  });
+
+  it('openFormationModal includes live starters in modal squad when squad endpoint is empty', (done) => {
+    teamServiceSpy.getMyTeamSquad.and.returnValue(of([] as any));
+
+    service.openFormationModal('match-1', RUNNING_STATE).subscribe(() => {
+      const dataArg = (dialogSpy.open.calls.mostRecent().args[1] as any)?.data;
+      expect(dataArg.currentSlots.map((slot: any) => slot.sessionPlayerId)).toEqual(['s1', 's2', 's3']);
+      expect(dataArg.squad.map((player: any) => player.sessionPlayerId)).toEqual(['s1', 's2', 's3']);
+      expect(dataArg.squad.map((player: any) => player.name)).toEqual(['Starter 1', 'Starter 2', 'Starter 3']);
       done();
     });
   });
@@ -327,6 +442,27 @@ describe('LiveMatchModalsService — LIVE-MATCH-F5.3 BUG-015 (pause on modal ope
       expect(engineServiceSpy.resumeRoundForMatch).not.toHaveBeenCalled();
       afterClosedSubject.next(undefined);
       expect(engineServiceSpy.resumeRoundForMatch).toHaveBeenCalledWith('career-abc', 'match-1');
+      done();
+    });
+  });
+
+  it('openPartidoModal — does not resume after close while debug freeze is enabled', (done) => {
+    localStorage.setItem('manager.debugFreezeLiveRound', '1');
+    service.openPartidoModal('match-1', RUNNING_STATE).subscribe(() => {
+      afterClosedSubject.next(undefined);
+      expect(engineServiceSpy.resumeRoundForMatch).not.toHaveBeenCalled();
+      localStorage.removeItem('manager.debugFreezeLiveRound');
+      done();
+    });
+  });
+
+  it('openPartidoModal — opens without re-pausing when match is already PAUSED', (done) => {
+    const paused = { ...RUNNING_STATE, status: 'PAUSED' as const };
+    engineServiceSpy.getMatchState.and.returnValue(of(paused));
+
+    service.openPartidoModal('match-1', paused).subscribe(() => {
+      expect(engineServiceSpy.pauseRoundForMatch).not.toHaveBeenCalled();
+      expect(dialogSpy.open).toHaveBeenCalled();
       done();
     });
   });
@@ -363,5 +499,455 @@ describe('LiveMatchModalsService — LIVE-MATCH-F5.3 BUG-015 (pause on modal ope
       expect(dataArg.rivalFormation).toBe('4-4-2');
       done();
     });
+  });
+  it('openPartidoModal - passes live tactical slots with custom pixels to the dialog', (done) => {
+    const xi = Array.from({ length: 11 }, (_, i) => ({
+      playerId: `s${i + 1}`,
+      name: `Starter ${i + 1}`,
+      position: i === 0 ? 'GK' : i < 5 ? 'DEF' : i < 9 ? 'MID' : 'ATT',
+      overall: 75
+    }));
+    httpSpy.get.and.callFake(((url: string) => {
+      if (url.includes('/career/lineup/current')) {
+        return of({ players: xi });
+      }
+      return of([]);
+    }) as any);
+    const liveState = {
+      ...RUNNING_STATE,
+      homeSlots: xi.map((player, i) => ({
+        playerId: player.playerId,
+        position: player.position,
+        slotIndex: i,
+        customXPercent: player.playerId === 's7' ? 41 : null,
+        customYPercent: player.playerId === 's7' ? 66.7 : null
+      }))
+    };
+    engineServiceSpy.getMatchState.and.returnValue(of(liveState));
+
+    service.openPartidoModal('match-1', liveState).subscribe(() => {
+      const dataArg = (dialogSpy.open.calls.mostRecent().args[1] as any)?.data;
+      const moved = dataArg.currentSlots.find((slot: any) => slot.sessionPlayerId === 's7');
+      expect(dataArg.currentSlots.length).toBe(11);
+      expect(moved.customXPercent).toBe(41);
+      expect(moved.customYPercent).toBe(66.7);
+      done();
+    });
+  });
+
+  it('openPartidoModal remembers saved Partido pixels when the next live snapshot is stale', (done) => {
+    const xi = Array.from({ length: 11 }, (_, i) => ({
+      playerId: `s${i + 1}`,
+      name: `Starter ${i + 1}`,
+      position: i === 0 ? 'GK' : i < 5 ? 'DEF' : i < 9 ? 'MID' : 'ATT',
+      overall: 75
+    }));
+    httpSpy.get.and.callFake(((url: string) => {
+      if (url.includes('/career/lineup/current')) {
+        return of({ players: xi });
+      }
+      return of([]);
+    }) as any);
+    const staleState = {
+      ...RUNNING_STATE,
+      homeSlots: xi.map((player, i) => ({
+        playerId: player.playerId,
+        position: player.position,
+        slotIndex: i,
+        customXPercent: player.playerId === 's7' ? 22 : null,
+        customYPercent: player.playerId === 's7' ? 66.7 : null
+      }))
+    };
+    engineServiceSpy.getMatchState.and.returnValue(of(staleState));
+
+    (service as any).rememberPartidoSavedSlots('match-1', {
+      success: true,
+      result: {
+        success: true,
+        currentFormation: xi.map((player, i) => ({
+          playerId: player.playerId,
+          position: player.position,
+          slotIndex: i,
+          customXPercent: player.playerId === 's7' ? 23 : null,
+          customYPercent: player.playerId === 's7' ? 65.7 : null
+        }))
+      }
+    });
+
+    service.openPartidoModal('match-1', staleState).subscribe(() => {
+      const dataArg = (dialogSpy.open.calls.mostRecent().args[1] as any)?.data;
+      const moved = dataArg.currentSlots.find((slot: any) => slot.sessionPlayerId === 's7');
+      expect(moved.customXPercent).toBe(23);
+      expect(moved.customYPercent).toBe(65.7);
+      done();
+    });
+  });
+
+  it('openPartidoModal trusts saved Partido slots when the next live snapshot has incomplete tactical slots', (done) => {
+    const savedXi = Array.from({ length: 11 }, (_, i) => ({
+      playerId: i === 1 ? 'alex' : `s${i}`,
+      name: i === 1 ? 'Alex Suarez' : `Starter ${i}`,
+      position: i === 0 ? 'GK' : i < 5 ? 'DEF' : i < 9 ? 'MID' : 'ATT',
+      overall: 75
+    }));
+    httpSpy.get.and.callFake(((url: string) => {
+      if (url.includes('/career/lineup/current')) {
+        return of({ players: savedXi });
+      }
+      return of([]);
+    }) as any);
+    teamServiceSpy.getMyTeamSquad.and.returnValue(of(savedXi.map(player => ({
+      sessionPlayerId: player.playerId,
+      name: player.name,
+      position: player.position,
+      attack: 70,
+      defense: 70,
+      technique: 70,
+      speed: 70,
+      stamina: 70,
+      mentality: 70
+    })) as any));
+
+    (service as any).rememberPartidoSavedSlots('match-1', {
+      success: true,
+      result: { success: true },
+      savedSlots: savedXi.map((player, i) => ({
+        sessionPlayerId: player.playerId,
+        position: player.position,
+        slotIndex: i
+      }))
+    });
+
+    const staleLiveState = {
+      ...RUNNING_STATE,
+      homeSlots: savedXi
+        .filter(player => player.playerId !== 'alex')
+        .map((player, i) => ({
+          playerId: player.playerId,
+          position: player.position,
+          slotIndex: i < 1 ? i : i + 1
+        }))
+    };
+    engineServiceSpy.getMatchState.and.returnValue(of(staleLiveState as any));
+
+    service.openPartidoModal('match-1', staleLiveState as any).subscribe(() => {
+      const dataArg = (dialogSpy.open.calls.mostRecent().args[1] as any)?.data;
+      expect(dataArg.currentSlots.length).toBe(11);
+      expect(dataArg.currentSlots.find((slot: any) => slot.slotIndex === 1)?.sessionPlayerId).toBe('alex');
+      expect(dataArg.currentSlots.some((slot: any) => !slot.sessionPlayerId)).toBeFalse();
+      done();
+    });
+  });
+
+  it('openPartidoModal includes live starters in modal squad so every slot can render a player card', (done) => {
+    const xi = Array.from({ length: 11 }, (_, i) => ({
+      playerId: `live-${i + 1}`,
+      name: `Live Starter ${i + 1}`,
+      position: i === 0 ? 'GK' : i < 5 ? 'DEF' : i < 9 ? 'MID' : 'ATT',
+      overall: 75
+    }));
+    teamServiceSpy.getMyTeamSquad.and.returnValue(of([] as any));
+    httpSpy.get.and.callFake(((url: string) => {
+      if (url.includes('/career/lineup/current')) {
+        return of({ players: xi });
+      }
+      return of([]);
+    }) as any);
+    const liveState = {
+      ...RUNNING_STATE,
+      homeSlots: xi.map((player, i) => ({
+        playerId: player.playerId,
+        position: player.position,
+        slotIndex: i
+      }))
+    };
+    engineServiceSpy.getMatchState.and.returnValue(of(liveState));
+
+    service.openPartidoModal('match-1', liveState).subscribe(() => {
+      const dataArg = (dialogSpy.open.calls.mostRecent().args[1] as any)?.data;
+      expect(dataArg.currentSlots.length).toBe(11);
+      expect(dataArg.squad.map((player: any) => player.sessionPlayerId)).toEqual(
+        xi.map(player => player.playerId)
+      );
+      done();
+    });
+  });
+
+  it('openPartidoModal discounts locally confirmed substitutions while SSE remaining is stale', (done) => {
+    service.openSubstitutionModal('match-1', { ...RUNNING_STATE, substitutionsRemaining: 5 }).subscribe(() => {
+      afterClosedSubject.next({
+        success: true,
+        substitutions: [
+          { playerOffId: 's2', playerOnId: 'b1' },
+          { playerOffId: 's3', playerOnId: 'b2' }
+        ]
+      });
+
+      service.openPartidoModal('match-1', { ...RUNNING_STATE, substitutionsRemaining: 5 }).subscribe(() => {
+        const dataArg = (dialogSpy.open.calls.mostRecent().args[1] as any)?.data;
+        expect(dataArg.substitutionsRemaining)
+          .withContext('Partido should show 3/5 after two locally confirmed substitutions even before SSE catches up')
+          .toBe(3);
+        done();
+      });
+    });
+  });
+
+  it('openPartidoModal keeps manager substitutions separate from opponent substitutions', (done) => {
+    service.openSubstitutionModal('match-1', { ...RUNNING_STATE, substitutionsRemaining: 5 }).subscribe(() => {
+      afterClosedSubject.next({
+        success: true,
+        substitutions: [
+          { playerOffId: 's2', playerOnId: 'b1' }
+        ]
+      });
+
+      const stateAfterOpponentSub = {
+        ...RUNNING_STATE,
+        substitutionsRemaining: 3,
+        events: [
+          {
+            eventType: 'SUBSTITUTION',
+            minute: 1,
+            teamId: 'team-a',
+            playerId: 'opp-off',
+            relatedPlayerId: 'opp-on'
+          } as any
+        ]
+      };
+
+      service.openPartidoModal('match-1', stateAfterOpponentSub).subscribe(() => {
+        const dataArg = (dialogSpy.open.calls.mostRecent().args[1] as any)?.data;
+        expect(dataArg.substitutionsRemaining)
+          .withContext('Opponent substitutions must not reduce the manager quota shown in Partido')
+          .toBe(4);
+        done();
+      });
+    });
+  });
+
+  it('openPartidoModal remembers savedSlots when backend does not return currentFormation', (done) => {
+    const xi = Array.from({ length: 11 }, (_, i) => ({
+      playerId: `s${i + 1}`,
+      name: `Starter ${i + 1}`,
+      position: i === 0 ? 'GK' : i < 5 ? 'DEF' : i < 9 ? 'MID' : 'ATT',
+      overall: 75
+    }));
+    httpSpy.get.and.callFake(((url: string) => {
+      if (url.includes('/career/lineup/current')) {
+        return of({ players: xi });
+      }
+      return of([]);
+    }) as any);
+    const staleState = {
+      ...RUNNING_STATE,
+      homeSlots: xi.map((player, i) => ({
+        playerId: player.playerId,
+        position: player.position,
+        slotIndex: i,
+        customXPercent: player.playerId === 's7' ? 83.3 : null,
+        customYPercent: player.playerId === 's7' ? 61 : null
+      }))
+    };
+    engineServiceSpy.getMatchState.and.returnValue(of(staleState));
+
+    (service as any).rememberPartidoSavedSlots('match-1', {
+      success: true,
+      result: { success: true },
+      savedSlots: xi.map((player, i) => ({
+        sessionPlayerId: player.playerId,
+        position: player.position,
+        slotIndex: i,
+        customXPercent: player.playerId === 's7' ? 84.3 : null,
+        customYPercent: player.playerId === 's7' ? 61 : null
+      }))
+    });
+
+    service.openPartidoModal('match-1', staleState).subscribe(() => {
+      const dataArg = (dialogSpy.open.calls.mostRecent().args[1] as any)?.data;
+      const moved = dataArg.currentSlots.find((slot: any) => slot.sessionPlayerId === 's7');
+      expect(moved.customXPercent).toBe(84.3);
+      expect(moved.customYPercent).toBe(61);
+      done();
+    });
+  });
+
+  it('openPartidoModal remembers saved Partido formation while the paused live snapshot is stale', (done) => {
+    const xi = Array.from({ length: 11 }, (_, i) => ({
+      playerId: `s${i + 1}`,
+      name: `Starter ${i + 1}`,
+      position: i === 0 ? 'GK' : i < 5 ? 'DEF' : i < 9 ? 'MID' : 'ATT',
+      overall: 75
+    }));
+    httpSpy.get.and.callFake(((url: string) => {
+      if (url.includes('/career/lineup/current')) {
+        return of({ players: xi });
+      }
+      return of([]);
+    }) as any);
+    const staleState = {
+      ...RUNNING_STATE,
+      homeFormation: '4-4-2',
+      homeSlots: xi.map((player, i) => ({
+        playerId: player.playerId,
+        position: player.position,
+        slotIndex: i
+      }))
+    };
+    engineServiceSpy.getMatchState.and.returnValue(of(staleState));
+
+    (service as any).rememberPartidoSavedSlots('match-1', {
+      success: true,
+      result: { success: true },
+      formation: '4-3-3',
+      savedSlots: xi.map((player, i) => ({
+        sessionPlayerId: player.playerId,
+        position: player.position,
+        slotIndex: i
+      }))
+    });
+
+    service.openPartidoModal('match-1', staleState).subscribe(() => {
+      const dataArg = (dialogSpy.open.calls.mostRecent().args[1] as any)?.data;
+      expect(dataArg.currentFormation).toBe('4-3-3');
+      done();
+    });
+  });
+
+  it('openPartidoModal overlays saved pixels for players still on pitch even if another slot changed', (done) => {
+    const xi = Array.from({ length: 11 }, (_, i) => ({
+      playerId: `s${i + 1}`,
+      name: `Starter ${i + 1}`,
+      position: i === 0 ? 'GK' : i < 5 ? 'DEF' : i < 9 ? 'MID' : 'ATT',
+      overall: 75
+    }));
+    httpSpy.get.and.callFake(((url: string) => {
+      if (url.includes('/career/lineup/current')) {
+        return of({ players: xi });
+      }
+      return of([]);
+    }) as any);
+    const changedState = {
+      ...RUNNING_STATE,
+      homeSlots: xi.map((player, i) => ({
+        playerId: player.playerId,
+        position: player.position,
+        slotIndex: i,
+        customXPercent: player.playerId === 's7' ? 83.3 : null,
+        customYPercent: player.playerId === 's7' ? 61 : null
+      }))
+    };
+    changedState.homeSlots[5] = { playerId: 'new-mid', position: 'MID', slotIndex: 5 } as any;
+    engineServiceSpy.getMatchState.and.returnValue(of(changedState));
+
+    (service as any).rememberPartidoSavedSlots('match-1', {
+      success: true,
+      result: { success: true },
+      savedSlots: xi.map((player, i) => ({
+        sessionPlayerId: player.playerId,
+        position: player.position,
+        slotIndex: i,
+        customXPercent: player.playerId === 's7' ? 84.3 : null,
+        customYPercent: player.playerId === 's7' ? 61 : null
+      }))
+    });
+
+    service.openPartidoModal('match-1', changedState).subscribe(() => {
+      const dataArg = (dialogSpy.open.calls.mostRecent().args[1] as any)?.data;
+      const moved = dataArg.currentSlots.find((slot: any) => slot.sessionPlayerId === 's7');
+      expect(moved.customXPercent).toBe(84.3);
+      expect(moved.customYPercent).toBe(61);
+      done();
+    });
+  });
+
+  it('openPartidoModal preserves local Debug Partido injury snapshot instead of overwriting it with backend state', (done) => {
+    const xi = Array.from({ length: 11 }, (_, i) => ({
+      playerId: `s${i + 1}`,
+      name: `Starter ${i + 1}`,
+      position: i === 0 ? 'GK' : i < 5 ? 'DEF' : i < 9 ? 'MID' : 'ATT',
+      overall: 75
+    }));
+    httpSpy.get.and.callFake(((url: string) => {
+      if (url.includes('/career/lineup/current')) {
+        return of({ players: xi });
+      }
+      return of([]);
+    }) as any);
+    teamServiceSpy.getMyTeamSquad.and.returnValue(of([
+      ...xi.map(player => ({
+        sessionPlayerId: player.playerId,
+        name: player.name,
+        position: player.position,
+        attack: 70,
+        defense: 70,
+        technique: 70,
+        speed: 70,
+        stamina: 70,
+        mentality: 70
+      })),
+      { sessionPlayerId: 'bench-att', name: 'Bench Att', position: 'ATT', attack: 78, defense: 40, technique: 72, speed: 76, stamina: 70, mentality: 70 }
+    ] as any));
+    const backendState = {
+      ...RUNNING_STATE,
+      homeSlots: xi.map((player, i) => ({
+        playerId: player.playerId,
+        position: player.position,
+        slotIndex: i
+      }))
+    };
+    const localDebugState = {
+      ...backendState,
+      homeSlots: backendState.homeSlots.filter((slot: any) => slot.playerId !== 's10'),
+      events: [
+        {
+          eventType: 'INJURY',
+          minute: 73,
+          teamId: 'team-h',
+          playerId: 's10',
+          playerName: 'Starter 10',
+          description: 'Debug Partido: lesion propia para s10'
+        } as any
+      ]
+    };
+    engineServiceSpy.getMatchState.and.returnValue(of(backendState as any));
+
+    service.openPartidoModal('match-1', localDebugState as any).subscribe(() => {
+      const dataArg = (dialogSpy.open.calls.mostRecent().args[1] as any)?.data;
+      expect(dataArg.events[0].description).toContain('Debug Partido:');
+      expect(dataArg.currentSlots.length)
+        .withContext('The local debug snapshot must keep the empty tactical slot so Partido can AUTO-repair it')
+        .toBe(10);
+      expect(dataArg.currentSlots.map((slot: any) => slot.sessionPlayerId)).not.toContain('s10');
+      done();
+    });
+  });
+
+  it('ensureUniqueCurrentSlots replaces duplicate ids with an available squad player', () => {
+    const slots = Array.from({ length: 11 }, (_, i) => ({
+      sessionPlayerId: i === 6 ? 's6' : `s${i + 1}`,
+      position: i === 0 ? 'GK' : i < 5 ? 'DEF' : i < 9 ? 'MID' : 'ATT',
+      slotIndex: i
+    }));
+    const squad = [
+      ...Array.from({ length: 11 }, (_, i) => ({
+        sessionPlayerId: `s${i + 1}`,
+        name: `Starter ${i + 1}`,
+        position: i === 0 ? 'GK' : i < 5 ? 'DEF' : i < 9 ? 'MID' : 'ATT',
+        attack: 70,
+        defense: 70,
+        technique: 70,
+        speed: 70,
+        stamina: 70,
+        mentality: 70
+      })),
+      { sessionPlayerId: 'bench-mid', name: 'Bench Mid', position: 'MID', attack: 70, defense: 70, technique: 70, speed: 70, stamina: 70, mentality: 70 }
+    ];
+
+    const result = (service as any).ensureUniqueCurrentSlots(slots, squad);
+    const ids = result.map((slot: any) => slot.sessionPlayerId);
+    expect(ids.length).toBe(11);
+    expect(new Set(ids).size).toBe(11);
+    expect(ids).toContain('s7');
   });
 });

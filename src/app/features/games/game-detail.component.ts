@@ -8,7 +8,6 @@ import { CareerService } from '../../core/services/career.service';
 import { MatchService } from '../../features/matches/services/match.service';
 import { DashboardFixtureModalComponent } from '../dashboard/dashboard-fixture-modal.component';
 import { DashboardUserInfoComponent } from '../dashboard/dashboard-user-info.component';
-import { PlayRoundComponent } from './play-round.component';
 
 @Component({
   selector: 'app-game-detail',
@@ -46,18 +45,46 @@ export class GameDetailComponent implements OnInit {
   playFirstRound() {
     if (!this.game) return;
     const gameId = this.getValue(this.game.id);
-    
-    // Obtener la primera jornada y simular todos los partidos
-    this.matchService.getMatchesByGameId(gameId).subscribe(matches => {
-      if (matches && matches.length > 0) {
-        // Ordenar por round y obtener el primer round
-        const sortedMatches = matches.sort((a, b) => (a.round || 0) - (b.round || 0));
-        const firstRound = sortedMatches[0].round || 1;
-        
-        // Navegar a la vista de jornada completa en vivo
-        this.router.navigate([`/games/${gameId}/round/${firstRound}/live`]);
-      } else {
-        alert('No hay partidos disponibles. Genera un fixture primero.');
+
+    this.careerService.getCareerStatus().subscribe({
+      next: (status) => {
+        if (status?.careerPhase === 'FINISHED') {
+          this.router.navigate([`/games/${gameId}/champion`]);
+          return;
+        }
+
+        if (status?.careerPhase === 'PRE_MATCH' || status?.careerPhase === 'LIVE') {
+          const round = status.currentRound || 1;
+          this.router.navigate([`/games/${gameId}/round/${round}/live`]);
+          return;
+        }
+
+        if (status?.careerPhase === 'WAITING_USER' && status?.careerId) {
+          this.careerService.advanceToNextRound(status.careerId).subscribe({
+            next: (response) => {
+              if (response?.success && response.currentRound && response.careerPhase === 'PRE_MATCH') {
+                this.router.navigate([`/games/${gameId}/round/${response.currentRound}/live`]);
+                return;
+              }
+              if (response?.tournamentFinished) {
+                this.router.navigate([`/games/${gameId}/champion`]);
+                return;
+              }
+              this.router.navigate(['/squad']);
+            },
+            error: (err) => {
+              this.errorMsg = err.error?.message || err.message || 'No se pudo avanzar a la siguiente fecha.';
+              this.cdr.markForCheck();
+            }
+          });
+          return;
+        }
+
+        this.router.navigate(['/squad']);
+      },
+      error: (err) => {
+        this.errorMsg = err.error?.message || err.message || 'No se pudo leer el estado de la carrera.';
+        this.cdr.markForCheck();
       }
     });
   }

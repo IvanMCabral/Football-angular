@@ -25,7 +25,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
 import { MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
-import { of, throwError } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
 import { DashboardComponent } from './dashboard.component';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
@@ -132,6 +132,22 @@ describe('DashboardComponent — V25D78-C55.2 phase 4 UI (c) + (d2)', () => {
       expect(pill.className).toContain('tier-segunda');
       done();
     });
+  });
+
+  it('does not show create-career while career status is still loading', () => {
+    httpSpy.get.and.callFake(((url: string) => {
+      if (url.includes('/career/status')) return NEVER;
+      if (url.includes('/career/players/squad')) return of([]);
+      if (url.includes('/dashboard/user-stats')) return of({ matchesPlayed: 0, matchesWon: 0, matchesLost: 0, winPercentage: 0 });
+      if (url.includes('/dashboard/world-status')) return of({ clubs: 0, players: 0, matches: 0 });
+      return of({});
+    }) as any);
+
+    fixture.detectChanges();
+
+    const text = fixture.nativeElement.textContent;
+    expect(text).toContain('Cargando carrera...');
+    expect(text).not.toContain('CREAR CARRERA');
   });
 
   it('(c): hides user-division pill when careerStatus.userDivision is null', (done: DoneFn) => {
@@ -633,7 +649,7 @@ describe('DashboardComponent — V25D78-C55.7.7 BUG-M3 (season-aware Jugar Fecha
  *   <li>Backend emits displayName: it wins.</li>
  *   <li>No displayName yet: email is friendlier than username.</li>
  *   <li>Empty / whitespace displayName: treated as absent.</li>
- *   <li>Null/undefined user: safe empty string (banner shows just "!").</li>
+ *   <li>Null/undefined user: safe "manager" fallback.</li>
  * </ul>
  */
 describe('DashboardComponent — V25D78-C55.7.7 BUG-L1 (displayNameOf helper)', () => {
@@ -669,9 +685,9 @@ describe('DashboardComponent — V25D78-C55.7.7 BUG-L1 (displayNameOf helper)', 
     })).toBe('fallback@example.com');
   });
 
-  it('L1 null/undefined user: safe empty string', () => {
-    expect(component.displayNameOf(null)).toBe('');
-    expect(component.displayNameOf(undefined)).toBe('');
+  it('L1 null/undefined user: safe manager fallback', () => {
+    expect(component.displayNameOf(null)).toBe('manager');
+    expect(component.displayNameOf(undefined)).toBe('manager');
   });
 
   it('L1 fallback chain: no displayName + no email → username', () => {

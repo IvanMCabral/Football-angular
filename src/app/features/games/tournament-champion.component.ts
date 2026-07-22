@@ -155,22 +155,20 @@ export class TournamentChampionComponent implements OnInit {
   }
 
   continueToNewSeason() {
-    if (!confirm('¿Iniciar una nueva temporada con tu equipo actual?')) {
-      return;
-    }
-
     this.careerService.continueToNewSeason().subscribe({
       next: (response) => {
         if (response.success) {
           // Usar Location.reload() para forzar recarga completa de la página
           window.location.href = '/squad';
         } else {
-          alert('Error: ' + response.message);
+          this.errorMsg = response.message || 'Error al iniciar nueva temporada';
+          this.cdr.markForCheck();
         }
       },
       error: (err) => {
         console.error('[TournamentChampion] Error iniciando nueva temporada:', err);
-        alert(err.error?.message || 'Error al iniciar nueva temporada');
+        this.errorMsg = err.error?.message || 'Error al iniciar nueva temporada';
+        this.cdr.markForCheck();
       }
     });
   }

@@ -4266,6 +4266,27 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
     }
     expect(bad).toBe(0);
   });
+
+  it('micro-move coach read exposes fine pixel trace and coordinates', (done) => {
+    setTimeout(() => {
+      const midfielder = {
+        playerId: 'p-mid',
+        name: 'Pathé Ciss',
+        role: 'MID',
+        position: 'MID',
+        slotId: 'S13-2'
+      };
+
+      (component as any).setLastCoachMoveReadForDrag(midfielder, 50, 50, 50.4, 49.7, false);
+
+      expect((component as any).lastCoachMoveRead.title).toContain('microajuste');
+      expect((component as any).lastCoachMoveRead.body).toContain('Traza fina: micro');
+      expect((component as any).lastCoachMoveRead.body).toContain('coords 50.0/50.0 -> 50.4/49.7');
+      expect((component as any).lastCoachMoveRead.body).toContain('queda registrado como ajuste manual');
+      done();
+    }, 30);
+  });
+
   it('resetCustomPositions: clears last movement read so visual smokes start clean', (done) => {
     setTimeout(() => {
       const home = (component as any).homePlayers$.value.slice();

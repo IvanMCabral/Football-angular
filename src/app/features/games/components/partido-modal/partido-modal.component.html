@@ -1,9 +1,9 @@
-<div class="partido-modal-root">
-  <h2 mat-dialog-title>
+﻿<div class="partido-modal-root">
+  <h2 mat-dialog-title class="partido-modal-title">
     <span class="title-icon">⚽</span>
     Partido
     <!-- V25D90-FRONT-F3: score chip next to the minute tag. The score
-         arrives on PartidoDialogData.score (V25D89.2 wire-up) — bind it
+         arrives on PartidoDialogData.score (V25D89.2 wire-up) â€” bind it
          directly, no backend change required. Defaults to 0-0 when the
          dialog opens before the first SSE tick. -->
     <span class="score-chip" data-testid="partido-score-chip">
@@ -30,7 +30,7 @@
     </div>
 
     <!-- V25D89-FRONT-A: dual-tab shell via mat-tab-group. The "Mi
-         Formación" tab is the editable manager pitch; "Formación Rival"
+         FormaciÃ³n" tab is the editable manager pitch; "FormaciÃ³n Rival"
          is the read-only AI-managed pitch. -->
     <mat-tab-group
       class="partido-tabs"
@@ -38,7 +38,7 @@
       (selectedIndexChange)="onTabChange($event)"
       data-testid="partido-tabs">
 
-      <!-- ========== TAB 1: Mi Formación (editable) ========== -->
+      <!-- ========== TAB 1: Mi FormaciÃ³n (editable) ========== -->
       <mat-tab label="Mi Formación" data-testid="tab-mine">
         <ng-template matTabContent>
 
@@ -59,13 +59,70 @@
                 </mat-option>
               </mat-select>
             </mat-form-field>
+            <div class="nudge-panel"
+                 data-testid="partido-nudge-panel"
+                 aria-label="Ajuste fino por píxeles">
+              <div class="nudge-copy">
+                <span class="nudge-title">Ajuste fino</span>
+                <strong data-testid="nudge-selected-player">{{ selectedNudgePlayerName() }}</strong>
+                <small data-testid="nudge-coords">{{ selectedNudgeCoordsLabel() }}</small>
+              </div>
+              <div class="nudge-pad" aria-label="Mover jugador seleccionado">
+                <button mat-icon-button
+                        type="button"
+                        data-testid="nudge-up"
+                        [disabled]="!canNudgeSelectedSlot()"
+                        (click)="nudgeSelectedSlot(0, -1)"
+                        aria-label="Mover jugador seleccionado hacia arriba">
+                  <span class="nudge-arrow" aria-hidden="true">↑</span>
+                </button>
+                <div class="nudge-middle">
+                  <button mat-icon-button
+                          type="button"
+                          data-testid="nudge-left"
+                          [disabled]="!canNudgeSelectedSlot()"
+                          (click)="nudgeSelectedSlot(-1, 0)"
+                          aria-label="Mover jugador seleccionado hacia la izquierda">
+                    <span class="nudge-arrow" aria-hidden="true">←</span>
+                  </button>
+                  <button mat-stroked-button
+                          type="button"
+                          data-testid="nudge-reset"
+                          [disabled]="!canNudgeSelectedSlot()"
+                          (click)="resetSelectedSlotPosition()">
+                    Reset
+                  </button>
+                  <button mat-icon-button
+                          type="button"
+                          data-testid="nudge-right"
+                          [disabled]="!canNudgeSelectedSlot()"
+                          (click)="nudgeSelectedSlot(1, 0)"
+                          aria-label="Mover jugador seleccionado hacia la derecha">
+                    <span class="nudge-arrow" aria-hidden="true">→</span>
+                  </button>
+                </div>
+                <button mat-icon-button
+                        type="button"
+                        data-testid="nudge-down"
+                        [disabled]="!canNudgeSelectedSlot()"
+                        (click)="nudgeSelectedSlot(0, 1)"
+                        aria-label="Mover jugador seleccionado hacia abajo">
+                  <span class="nudge-arrow" aria-hidden="true">↓</span>
+                </button>
+              </div>
+            </div>
           </div>
 
           <div class="formation-grid">
             <!-- Visual pitch (manager team starting XI) -->
             <section class="col col-pitch" data-area="pitch" aria-label="Mi formación">
-              <h3>Mi XI (arrastra para re-ordenar)</h3>
+              <h3>Mi XI (arrastra libremente por la cancha)</h3>
               <div class="pitch" role="img"
+                   (dragover)="onPitchDragOver($event)"
+                   (drop)="onPitchDrop($event)"
+                   (pointermove)="onPitchPointerMove($event)"
+                   (pointerup)="onPitchPointerUp($event)"
+                   (pointercancel)="onPitchPointerCancel($event)"
                    [attr.aria-label]="'Vista previa de la formación ' + selectedFormation()">
                 <div class="pitch-line" *ngFor="let count of formationLines; let lineIdx = index">
                   <div class="player-dot"
@@ -77,12 +134,20 @@
                        [class.is-att]="lineIdx === formationLines.length - 1"
                        [class.is-empty]="!playerAtSlot(getSlotIndex(lineIdx, dotIdx))"
                        [class.is-drag-source]="dragSourceSlotIdx === getSlotIndex(lineIdx, dotIdx)"
+                       [class.is-selected-nudge]="selectedNudgeSlotIdx === getSlotIndex(lineIdx, dotIdx)"
                        [class.is-auto-filled]="isAutoFilledSlot(getSlotIndex(lineIdx, dotIdx))"
-                       [attr.draggable]="true"
+                       [class.is-free-positioned]="isFreePositionedSlot(getSlotIndex(lineIdx, dotIdx))"
+                       [class.is-locked-gk]="isGoalkeeperSlot(getSlotIndex(lineIdx, dotIdx))"
+                       [class.is-pointer-dragging]="activePointerDragSlotIdx === getSlotIndex(lineIdx, dotIdx)"
+                       [style.left.%]="freePositionLeftPercent(getSlotIndex(lineIdx, dotIdx))"
+                       [style.top.%]="freePositionTopPercent(getSlotIndex(lineIdx, dotIdx))"
+                       [attr.draggable]="!isGoalkeeperSlot(getSlotIndex(lineIdx, dotIdx))"
+                       (pointerdown)="onPitchSlotPointerDown($event, getSlotIndex(lineIdx, dotIdx))"
                        (dragstart)="onSlotDragStart($event, getSlotIndex(lineIdx, dotIdx))"
                        (dragover)="onSlotDragOver($event)"
-                       (drop)="onSlotDrop($event, getSlotIndex(lineIdx, dotIdx))"
-                       (dragend)="onSlotDragEnd()">
+                       (drop)="onSlotDrop($event, getSlotIndex(lineIdx, dotIdx)); $event.stopPropagation()"
+                       (dragend)="onSlotDragEnd()"
+                       (click)="onPitchSlotClick(getSlotIndex(lineIdx, dotIdx))">
                     <ng-container *ngIf="playerAtSlot(getSlotIndex(lineIdx, dotIdx)) as p; else emptyDot">
                       <!-- V25D90-FRONT-F1: render role label ALWAYS below the
                            player name (was: only shown in empty slots). The
@@ -90,7 +155,7 @@
                            role vocabulary stays in sync with the empty-slot
                            fallback (and with the rival tab). -->
                       <span class="dot-player-name"
-                            [title]="(isAutoFilledSlot(getSlotIndex(lineIdx, dotIdx)) ? 'Auto-asignado · ' : '') + p.name + ' (' + p.position + ')'">
+                            [title]="(isAutoFilledSlot(getSlotIndex(lineIdx, dotIdx)) ? 'Autorrellenado por XI incompleto - ' : '') + p.name + ' (' + p.position + ')'">
                         {{ p.name }}
                       </span>
                       <span class="dot-role" data-testid="dot-role">
@@ -98,9 +163,10 @@
                       </span>
                       <span *ngIf="isAutoFilledSlot(getSlotIndex(lineIdx, dotIdx))"
                             class="auto-fill-badge"
-                            aria-label="Auto-asignado"
+                            aria-label="Autorrellenado por XI incompleto"
+                            title="Autorrellenado por XI incompleto"
                             data-testid="auto-fill-badge">
-                        🔒
+                        AUTO
                       </span>
                     </ng-container>
                     <ng-template #emptyDot>
@@ -113,18 +179,20 @@
               </div>
               <p class="hint">
                 <mat-icon>info</mat-icon>
-                Arrastra un jugador a otro slot para intercambiarlos. Arrastra al banquillo para sacarlo.
+                Arrastra una ficha a cualquier píxel de la cancha para ajustar su posición. Suéltala sobre otra ficha para intercambiar.
               </p>
             </section>
 
-            <!-- Bench (manager team — squad players not in XI) -->
+            <!-- Bench (manager team â€” squad players not in XI) -->
             <section class="col col-bench" data-area="bench" aria-label="Banquillo">
               <h3>Banquillo</h3>
               <div class="bench-list">
                 <div *ngFor="let p of benchPlayers"
                      class="bench-player"
+                     [class.is-selected]="selectedBenchPlayerId === p.sessionPlayerId"
                      [attr.data-player-id]="p.sessionPlayerId"
                      [attr.draggable]="true"
+                     (click)="onBenchPlayerClick(p.sessionPlayerId)"
                      (dragstart)="onBenchDragStart($event, p.sessionPlayerId)"
                      (dragend)="onSlotDragEnd()"
                      [title]="p.name + ' (' + p.position + ')'">
@@ -133,15 +201,34 @@
                 </div>
                 <div *ngIf="benchPlayers.length === 0" class="bench-empty">
                   <mat-icon>info</mat-icon>
-                  <span>Todos los jugadores están en el XI.</span>
+                  <span>Todos los jugadores estan en el XI.</span>
                 </div>
               </div>
               <p class="hint">
                 <mat-icon>info</mat-icon>
-                Arrastra desde aquí al campo para sumar al XI.
+                Arrastra desde aqui al campo para sumar al XI, o click en suplente y luego click en el jugador a reemplazar.
               </p>
             </section>
           </div>
+
+          <section *ngIf="pendingSubstitutionRows().length > 0"
+                   class="pending-substitutions"
+                   data-testid="pending-substitutions">
+            <h3>Cambios preparados</h3>
+            <div class="pending-sub-row" *ngFor="let sub of pendingSubstitutionRows(); let idx = index">
+              <span class="pending-sub-off">Sale: {{ sub.playerOffName }}</span>
+              <span class="pending-sub-arrow">→</span>
+              <span class="pending-sub-on">Entra: {{ sub.playerOnName }}</span>
+              <span class="pending-sub-slot">Slot {{ sub.slotIndex + 1 }}</span>
+              <button mat-stroked-button
+                      type="button"
+                      class="pending-sub-remove"
+                      data-testid="pending-sub-remove"
+                      (click)="removePendingSubstitution(idx)">
+                Quitar
+              </button>
+            </div>
+          </section>
 
           <!-- ========== V25D89.2: stats grid (full-width under pitch + bench) ========== -->
           <section class="partido-stats" data-testid="partido-stats" aria-label="Estadísticas del partido">
@@ -197,7 +284,7 @@
         </ng-template>
       </mat-tab>
 
-      <!-- ========== TAB 2: Formación Rival (read-only) ========== -->
+      <!-- ========== TAB 2: FormaciÃ³n Rival (read-only) ========== -->
       <mat-tab label="Formación Rival" data-testid="tab-rival">
         <ng-template matTabContent>
 
@@ -235,7 +322,7 @@
 
             <p class="hint">
               <mat-icon>info</mat-icon>
-              Vista read-only — los nombres de los jugadores rivales no están disponibles en el feed en vivo.
+              Vista read-only — los nombres de los jugadores rivales no estan disponibles en el feed en vivo.
             </p>
           </div>
 
@@ -251,7 +338,7 @@
             <div class="stats-header-row">
               <!-- V25D90-FRONT-F3: same F3 fix mirrored on the rival tab
                    (the rival stats section shows match-level data, not
-                   per-side data — so the score belongs there too). -->
+                   per-side data â€” so the score belongs there too). -->
               <span class="stat-label score-cell" data-testid="stats-score-cell-rival">
                 {{ homeScore() }} - {{ awayScore() }}
               </span>
@@ -294,7 +381,7 @@
 
     <div *ngIf="isSubmitting" class="submit-overlay">
       <mat-spinner diameter="36"></mat-spinner>
-      <span>Enviando cambio…</span>
+      <span>Enviando cambio...</span>
     </div>
   </mat-dialog-content>
 

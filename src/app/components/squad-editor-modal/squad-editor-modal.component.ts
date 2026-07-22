@@ -4056,6 +4056,36 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     return 'centro';
   }
 
+  private describeCoachMoveFineTrace(
+    fromX: number,
+    fromY: number,
+    toX: number,
+    toY: number
+  ): string {
+    const dx = toX - fromX;
+    const dy = toY - fromY;
+    const distance = Math.hypot(dx, dy);
+    const horizontal = Math.abs(dx) < 0.2
+      ? 'mismo carril'
+      : dx < 0
+      ? `${Math.abs(dx).toFixed(1)}% hacia izquierda`
+      : `${Math.abs(dx).toFixed(1)}% hacia derecha`;
+    const vertical = Math.abs(dy) < 0.2
+      ? 'misma altura'
+      : dy < 0
+      ? `${Math.abs(dy).toFixed(1)}% mas alto`
+      : `${Math.abs(dy).toFixed(1)}% mas bajo`;
+    const scale = distance < 1
+      ? 'micro'
+      : distance < 4
+      ? 'fino'
+      : distance < 10
+      ? 'medio'
+      : 'grande';
+
+    return ` Traza fina: ${scale}, ${distance.toFixed(1)} pts de cancha (${horizontal}, ${vertical}); coords ${fromX.toFixed(1)}/${fromY.toFixed(1)} -> ${toX.toFixed(1)}/${toY.toFixed(1)}.`;
+  }
+
   private setLastCoachMoveReadForDrag(
     player: PlayerOnFieldDto,
     fromX: number,
@@ -4067,10 +4097,11 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     const dx = toX - fromX;
     const dy = toY - fromY;
     const distance = Math.hypot(dx, dy);
+    const fineTrace = this.describeCoachMoveFineTrace(fromX, fromY, toX, toY);
     if (snappedToNative) {
       this.lastCoachMoveRead = {
         title: `${player.name} vuelve a base`,
-        body: 'Volvio cerca de su punto natural: se limpia el ajuste manual y se recupera la referencia de la formacion.',
+        body: `Volvio cerca de su punto natural: se limpia el ajuste manual y se recupera la referencia de la formacion.${fineTrace}`,
         level: 'info',
       };
       return;
@@ -4078,7 +4109,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     if (distance < 1.0) {
       this.lastCoachMoveRead = {
         title: `${player.name} microajuste`,
-        body: 'Movimiento muy chico: deberia ser estable y no provocar saltos fuertes.',
+        body: `Movimiento muy chico: deberia ser estable y no provocar saltos fuertes, pero queda registrado como ajuste manual.${fineTrace}`,
         level: 'info',
       };
       return;
@@ -4094,7 +4125,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     const movedInside = Math.abs(toX - 50) < Math.abs(fromX - 50) - 2.5;
     const naturalFamily = this.getRoleFamily(player.role);
     const forcedRole = naturalFamily && naturalFamily !== toLine;
-    const spatialRead = this.describeCoachMoveSpatialRead(fromX, fromY, toX, toY);
+    const spatialRead = `${this.describeCoachMoveSpatialRead(fromX, fromY, toX, toY)}${fineTrace}`;
     const lateralTradeoff = movedWide
       ? ' Ademas se abre: gana amplitud, pero puede aislarse o abrir espalda en ese costado.'
       : movedInside

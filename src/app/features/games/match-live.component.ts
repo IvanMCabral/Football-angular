@@ -8,6 +8,7 @@ import {
 import { CommonModule, AsyncPipe } from '@angular/common';
 import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { BehaviorSubject, Subject } from 'rxjs';
 import { map, pairwise, startWith, switchMap, takeUntil } from 'rxjs/operators';
 import { MatchEngineService } from '../../core/services/match-engine.service';
@@ -16,6 +17,7 @@ import { CareerService } from '../../core/services/career.service';
 import { environment } from '../../environments/environment';
 import { LiveTimelineComponent } from './components/live-timeline/live-timeline.component';
 import { LiveMatchModalsService } from '../../core/services/live-match-modals.service';
+import { ConfirmActionDialogComponent } from '../../shared/components/confirm-action-dialog/confirm-action-dialog.component';
 
 /**
  * LIVE-MATCH-F3-UI-LIVE FE2 (partial): live match view.
@@ -43,7 +45,7 @@ import { LiveMatchModalsService } from '../../core/services/live-match-modals.se
 @Component({
   selector: 'app-match-live',
   standalone: true,
-  imports: [CommonModule, AsyncPipe, RouterLink, LiveTimelineComponent],
+  imports: [CommonModule, AsyncPipe, RouterLink, MatDialogModule, LiveTimelineComponent],
   templateUrl: './match-live.component.html',
   styleUrls: ['./match-live.component.css'],
   // LIVE-MATCH-F3-UI-LIVE FE2: OnPush + async pipe
@@ -57,6 +59,7 @@ export class MatchLiveComponent implements OnInit, OnDestroy {
   private router = inject(Router);
   private snackBar = inject(MatSnackBar);
   private modals = inject(LiveMatchModalsService);
+  private dialog = inject(MatDialog);
 
   matchId: string = '';
   gameId: string = '';
@@ -226,11 +229,26 @@ export class MatchLiveComponent implements OnInit, OnDestroy {
   }
 
   stopMatch() {
-    if (confirm('¿Estás seguro de que quieres cancelar el partido?')) {
+    const ref = this.dialog.open<ConfirmActionDialogComponent, any, boolean>(ConfirmActionDialogComponent, {
+      data: {
+        title: 'Cancelar partido',
+        message: 'El partido se detendrá ahora. Usalo sólo si querés cortar esta simulación.',
+        confirmLabel: 'Cancelar partido',
+        cancelLabel: 'Seguir jugando',
+        tone: 'warning'
+      },
+      maxWidth: '92vw',
+      panelClass: 'confirm-action-dialog-pane'
+    });
+
+    ref.afterClosed().pipe(takeUntil(this.destroy$)).subscribe(confirmed => {
+      if (!confirmed) {
+        return;
+      }
       this.engineService.stopEngine(this.matchId)
         .pipe(takeUntil(this.destroy$))
         .subscribe(s => this.matchStateSubject.next(s));
-    }
+    });
   }
 
   /**

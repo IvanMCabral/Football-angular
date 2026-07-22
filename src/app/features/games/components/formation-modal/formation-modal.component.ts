@@ -15,12 +15,10 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { FormsModule } from '@angular/forms';
-import { HttpClient } from '@angular/common/http';
 import { Subject, takeUntil } from 'rxjs';
 import { MatchEngineService } from '../../../../core/services/match-engine.service';
 import { ALL_FORMATIONS, FormationCode } from '../../../../shared/constants/formations';
 import { SessionPlayer } from '../../../../shared/models/player.model';
-import { environment } from '../../../../environments/environment';
 
 export interface FormationDialogData {
   matchId: string;
@@ -270,6 +268,13 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
     .player-dot.is-auto-filled {
       box-shadow: 0 0 0 2px #f57c00, 0 1px 3px rgba(0, 0, 0, 0.3);
     }
+    .player-dot.is-selected {
+      box-shadow: 0 0 0 3px #00acc1, 0 1px 4px rgba(0, 0, 0, 0.35);
+      transform: scale(1.08);
+    }
+    .player-dot.is-pixel-moved {
+      border-color: #7b1fa2;
+    }
     .auto-fill-badge {
       position: absolute;
       top: -6px;
@@ -478,6 +483,39 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       height: 1rem;
     }
 
+    .pixel-controls {
+      margin-top: 0.65rem;
+      padding: 0.65rem;
+      border: 1px solid #d8eafd;
+      border-radius: 8px;
+      background: #f7fbff;
+    }
+
+    .pixel-controls-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.75rem;
+      margin-bottom: 0.5rem;
+      font-size: 0.82rem;
+      color: #1e3c72;
+    }
+
+    .pixel-pad {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(44px, 1fr));
+      gap: 0.35rem;
+    }
+
+    .pixel-pad button {
+      min-width: 0;
+      padding: 0 0.45rem;
+    }
+
+    .pixel-hint {
+      margin-top: 0.5rem;
+      margin-bottom: 0;
+    }
+
     .submit-overlay {
       position: absolute;
       inset: 0;
@@ -602,8 +640,6 @@ export class FormationModalComponent {
   private dialogRef = inject(MatDialogRef<FormationModalComponent>);
   private engineService = inject(MatchEngineService);
   private snackBar = inject(MatSnackBar);
-  private http = inject(HttpClient);
-
   readonly formations: readonly string[] = FORMATIONS;
 
   /** Currently selected formation (signal-based for OnPush compatibility). */
@@ -622,6 +658,10 @@ export class FormationModalComponent {
    * a formation change widens the pitch.
    */
   slotAssignments: Map<number, string | null> = new Map();
+
+  selectedSlotIdx: number | null = null;
+
+  private slotCoords: Map<number, { x: number; y: number }> = new Map();
 
   /**
    * V25D81-BUG #4: id of the slot currently being dragged (or null
@@ -690,6 +730,7 @@ export class FormationModalComponent {
     for (const s of this.data.currentSlots ?? []) {
       this.slotAssignments.set(s.slotIndex, s.sessionPlayerId || null);
     }
+    this.resetAllSlotCoords();
   }
 
   onFormationChange(value: string): void {
@@ -700,15 +741,23 @@ export class FormationModalComponent {
     // more dots than the current one) start as `null` so the dot
     // shows the role label with no player name. Existing slots
     // preserve their assignment when the index is still in range.
-    const oldAssignments = new Map(this.slotAssignments);
+    const currentXi = Array.from(this.slotAssignments.values()).filter((playerId): playerId is string => !!playerId);
     const newLineCount = (FORMATION_LINES_BY_FORMATION[newFormation] ?? []).reduce(
       (sum, line) => sum + line.length, 0
     );
     this.slotAssignments = new Map();
     for (let i = 0; i < newLineCount; i++) {
-      this.slotAssignments.set(i, oldAssignments.get(i) ?? null);
+      this.slotAssignments.set(i, currentXi[i] ?? null);
     }
+    this.selectedSlotIdx = null;
+    this.resetAllSlotCoords();
     this.errorMsg = '';
+    // V25D99.20.3.3: live formation change preserves the current XI.
+    // Do NOT call /career/lineup/auto-select here: auto-select may choose
+    // better bench players for the new shape, which is useful pre-match but
+    // wrong during play. Substitutes enter only by explicit manager action.
+    return;
+    /*
 
     // V25D99.20.3-FRONT BUG-1: re-flow the local slotAssignments above is
     // a UI-only change. Without a backend call, the squad page would
@@ -736,19 +785,16 @@ export class FormationModalComponent {
         // pitch doesn't go blank. The chem readout will be refreshed
         // separately on the next /career/lineup/current call from
         // the squad page anyway.
-        if (resp && Array.isArray(resp.slots) && resp.slots.length > 0) {
+        if (resp && Array.isArray(resp.slots) && resp.slots.length >= newLineCount) {
           const refreshed = new Map<number, string | null>();
           for (const s of resp.slots) {
             if (s && s.subdivisionId && s.playerId) {
               refreshed.set(refreshed.size, s.playerId);
             }
           }
-          // Pad with nulls up to the new line count so the visual
-          // pitch template has a stable iteration range.
-          while (refreshed.size < newLineCount) {
-            refreshed.set(refreshed.size, null);
+          if (refreshed.size >= newLineCount) {
+            this.slotAssignments = refreshed;
           }
-          this.slotAssignments = refreshed;
         }
         this.errorMsg = '';
       },
@@ -762,6 +808,7 @@ export class FormationModalComponent {
         this.errorMsg = 'No se pudo actualizar la formación en el backend. Chem puede estar desactualizado.';
       }
     });
+    */
   }
 
   // ========== V25D81-BUG #4: HTML5 drag-and-drop handlers ==========
@@ -779,6 +826,7 @@ export class FormationModalComponent {
       return;
     }
     this.dragSourceSlotIdx = slotIdx;
+    this.selectedSlotIdx = slotIdx;
     this.dragSourceIsBench = false;
     event.dataTransfer.setData('text/plain', `slot:${slotIdx}`);
     event.dataTransfer.effectAllowed = 'move';
@@ -858,6 +906,10 @@ export class FormationModalComponent {
       const targetPlayer = this.slotAssignments.get(targetSlotIdx) ?? null;
       this.slotAssignments.set(targetSlotIdx, sourcePlayer);
       this.slotAssignments.set(sourceSlot, targetPlayer);
+      const sourceCoords = this.slotCoords.get(sourceSlot) ?? this.defaultCoordForSlot(sourceSlot);
+      const targetCoords = this.slotCoords.get(targetSlotIdx) ?? this.defaultCoordForSlot(targetSlotIdx);
+      this.slotCoords.set(targetSlotIdx, sourceCoords);
+      this.slotCoords.set(sourceSlot, targetCoords);
       // V25D81.1 BUG #4: clear auto-fill markers on BOTH slots after
       // a swap so the lock badge only remains for still-auto-filled
       // slots (a manually-modified slot is no longer "auto").
@@ -866,6 +918,7 @@ export class FormationModalComponent {
     }
     this.dragSourceSlotIdx = null;
     this.dragSourceIsBench = false;
+    this.selectedSlotIdx = targetSlotIdx;
     // Force a re-render since we mutated a Map in place (signals
     // don't track Map mutations). With OnPush + signal-based
     // selectedFormation, bumping a no-op signal is the cleanest
@@ -1040,6 +1093,61 @@ export class FormationModalComponent {
     return this.slotsDifferFromInitial();
   }
 
+  hasAnyChange(): boolean {
+    return this.slotsDifferFromInitial() || this.coordsDifferFromDefault();
+  }
+
+  selectSlot(slotIdx: number): void {
+    this.selectedSlotIdx = slotIdx;
+    if (!this.slotCoords.has(slotIdx)) {
+      this.slotCoords.set(slotIdx, this.defaultCoordForSlot(slotIdx));
+    }
+  }
+
+  selectedSlotLabel(): string {
+    if (this.selectedSlotIdx === null) {
+      return 'Sin jugador seleccionado';
+    }
+    const player = this.playerAtSlot(this.selectedSlotIdx);
+    const role = this.roleForSlot(this.selectedSlotIdx);
+    return `${player?.name ?? role} · ${role} · ${this.slotCoordLabel(this.selectedSlotIdx)}`;
+  }
+
+  isSelectedSlotLocked(): boolean {
+    return this.selectedSlotIdx === null || this.selectedSlotIdx === 0;
+  }
+
+  nudgeSelectedSlot(deltaX: number, deltaY: number): void {
+    if (this.selectedSlotIdx === null || this.selectedSlotIdx === 0) {
+      return;
+    }
+    const current = this.slotCoords.get(this.selectedSlotIdx) ?? this.defaultCoordForSlot(this.selectedSlotIdx);
+    this.slotCoords.set(this.selectedSlotIdx, {
+      x: this.clampPercent(current.x + deltaX, 4, 96),
+      y: this.clampPercent(current.y + deltaY, 8, 92),
+    });
+    this.selectedFormation.set(this.selectedFormation());
+  }
+
+  resetSelectedSlotCoords(): void {
+    if (this.selectedSlotIdx === null || this.selectedSlotIdx === 0) {
+      return;
+    }
+    this.slotCoords.set(this.selectedSlotIdx, this.defaultCoordForSlot(this.selectedSlotIdx));
+    this.selectedFormation.set(this.selectedFormation());
+  }
+
+  isPixelMoved(slotIdx: number): boolean {
+    const current = this.slotCoords.get(slotIdx) ?? this.defaultCoordForSlot(slotIdx);
+    const base = this.defaultCoordForSlot(slotIdx);
+    return Math.abs(current.x - base.x) >= 0.5 || Math.abs(current.y - base.y) >= 0.5;
+  }
+
+  slotCoordLabel(slotIdx: number): string {
+    const coord = this.slotCoords.get(slotIdx) ?? this.defaultCoordForSlot(slotIdx);
+    return `${coord.x.toFixed(0)} / ${coord.y.toFixed(0)}`;
+  }
+
   /**
    * V25D81-BUG #4: returns the bench list — squad players not
    * currently in the starting XI. The bench list is reactive to
@@ -1094,7 +1202,8 @@ export class FormationModalComponent {
     // would re-derive the same lineup).
     const formationChanged = this.selectedFormation() !== this.data.currentFormation;
     const slotsChanged = this.slotsDifferFromInitial();
-    if (!formationChanged && !slotsChanged) {
+    const coordsChanged = this.coordsDifferFromDefault();
+    if (!formationChanged && !slotsChanged && !coordsChanged) {
       this.dialogRef.close({ success: false, reason: 'no-change' });
       return;
     }
@@ -1106,16 +1215,19 @@ export class FormationModalComponent {
     // modal. Doing it client-side gives the manager immediate visual
     // feedback (lock icon + tooltip) and lets them undo by dragging a
     // different player into the slot before re-confirming.
-    this.autoFillEmptySlots();
     this.isSubmitting = true;
     this.errorMsg = '';
     // V25D81-BUG #4: build the slot list from the current
-    // slotAssignments (post-drag + post-auto-fill state), with the
-    // position derived from FORMATION_LINES_BY_FORMATION for the
-    // selected formation. After autoFillEmptySlots every slot has a
-    // sessionPlayerId so the slot list never carries empty entries.
+    // slotAssignments (post-drag state), with the position derived from
+    // FORMATION_LINES_BY_FORMATION for the selected formation.
     const slots = this.buildSlotListForBackend();
-    this.engineService.changeFormation(this.data.matchId, slots)
+    const openedWithFullXi = (this.data.currentSlots?.length ?? 0) >= 10;
+    if (openedWithFullXi && slots.some(slot => !slot.sessionPlayerId)) {
+      this.isSubmitting = false;
+      this.errorMsg = 'No se puede confirmar: todos los slots visibles deben tener un jugador real. Cerrá y reabrí el modal si ves sólo roles.';
+      return;
+    }
+    this.engineService.changeFormation(this.data.matchId, slots, this.selectedFormation())
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (result) => {
@@ -1134,7 +1246,7 @@ export class FormationModalComponent {
         error: (err) => {
           this.isSubmitting = false;
           this.errorMsg = 'Error de red al intentar cambiar la formación';
-          console.error('[FORMATION-MODAL] error', err);
+          console.error('[FORMATION-MODAL] error', JSON.stringify(err?.error ?? err));
         }
       });
   }
@@ -1143,29 +1255,94 @@ export class FormationModalComponent {
    * V25D81-BUG #4: returns the current slot assignments as the
    * backend-shaped list of `{ sessionPlayerId, position, slotIndex }`.
    * Position is derived from the formation's role label at the
-   * matching line/dot. Empty slots (null playerId) are emitted with
-   * empty sessionPlayerId so the backend can auto-fill.
+   * matching line/dot. In live play, empty slots are invalid because
+   * substitutes must enter only by an explicit manager action.
    */
   private buildSlotListForBackend(): Array<{
     sessionPlayerId: string;
     position: string;
     slotIndex: number;
+    customXPercent: number | null;
+    customYPercent: number | null;
   }> {
     const lines = FORMATION_LINES_BY_FORMATION[this.selectedFormation()] ?? [];
-    const slots: Array<{ sessionPlayerId: string; position: string; slotIndex: number }> = [];
+    const slots: Array<{
+      sessionPlayerId: string;
+      position: string;
+      slotIndex: number;
+      customXPercent: number | null;
+      customYPercent: number | null;
+    }> = [];
     let slotIdx = 0;
     for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
       const line = lines[lineIdx];
       for (let dotIdx = 0; dotIdx < line.length; dotIdx++) {
+        const coord = this.slotCoords.get(slotIdx) ?? this.defaultCoordForSlot(slotIdx);
         slots.push({
           sessionPlayerId: this.slotAssignments.get(slotIdx) ?? '',
           position: line[dotIdx],
-          slotIndex: slotIdx
+          slotIndex: slotIdx,
+          customXPercent: coord.x,
+          customYPercent: coord.y
         });
         slotIdx++;
       }
     }
     return slots;
+  }
+
+  private resetAllSlotCoords(): void {
+    this.slotCoords = new Map();
+    const count = this.formationLines.reduce((sum, lineCount) => sum + lineCount, 0);
+    for (let slotIdx = 0; slotIdx < count; slotIdx++) {
+      this.slotCoords.set(slotIdx, this.defaultCoordForSlot(slotIdx));
+    }
+  }
+
+  private coordsDifferFromDefault(): boolean {
+    for (const [slotIdx, coord] of this.slotCoords) {
+      const base = this.defaultCoordForSlot(slotIdx);
+      if (Math.abs(coord.x - base.x) >= 0.5 || Math.abs(coord.y - base.y) >= 0.5) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private defaultCoordForSlot(slotIdx: number): { x: number; y: number } {
+    const lines = FORMATION_LINES_BY_FORMATION[this.selectedFormation()] ?? [];
+    let cursor = 0;
+    for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+      const line = lines[lineIdx];
+      for (let dotIdx = 0; dotIdx < line.length; dotIdx++) {
+        if (cursor === slotIdx) {
+          return {
+            x: ((dotIdx + 1) / (line.length + 1)) * 100,
+            y: ((lineIdx + 1) / (lines.length + 1)) * 100,
+          };
+        }
+        cursor++;
+      }
+    }
+    return { x: 50, y: 50 };
+  }
+
+  private roleForSlot(slotIdx: number): string {
+    const lines = FORMATION_LINES_BY_FORMATION[this.selectedFormation()] ?? [];
+    let cursor = 0;
+    for (const line of lines) {
+      for (const role of line) {
+        if (cursor === slotIdx) {
+          return role;
+        }
+        cursor++;
+      }
+    }
+    return '?';
+  }
+
+  private clampPercent(value: number, min: number, max: number): number {
+    return Math.max(min, Math.min(max, value));
   }
 
   /**

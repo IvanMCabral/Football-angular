@@ -844,9 +844,13 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
 
       // Selector: el botón in-page vive dentro de .lineup-actions (NO dentro
       // de .sticky-confirm-bar, ese es otro botón cubierto por C20 P1).
-      const btn = fixture.nativeElement.querySelector('.lineup-actions .btn-confirm-lineup');
+      const inPageBtn = fixture.nativeElement.querySelector('.lineup-actions .btn-confirm-lineup');
+      const btn = fixture.nativeElement.querySelector('.sticky-confirm-bar .btn-confirm-lineup');
+      expect(inPageBtn)
+        .withContext('in-page duplicate Confirm button should not render')
+        .toBeNull();
       expect(btn)
-        .not.toBeNull('in-page Confirm button should exist inside .lineup-actions');
+        .not.toBeNull('sticky Confirm button should exist inside .sticky-confirm-bar');
       expect(btn.disabled)
         .withContext('in-page Confirm button must be ENABLED when lineupSlotsCount=11 ' +
                      '(slots truth), even though players.length=5 < 7 ' +
@@ -887,11 +891,6 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
       // porque jsdom hace reload non-writable — spyOn(window.location, 'reload')
       // tira "reload is not declared writable or has no setter".
       const reloadSpy = spyOn(component as any, 'reloadPage');
-      // Auto-accept el confirm() inicial
-      spyOn(window, 'confirm').and.returnValue(true);
-      // Stub alert() (jsdom lo permite sin pop-up nativo; explícito por defensa)
-      spyOn(window, 'alert');
-
       // Override el http.post del beforeEach para devolver success en /career/continue
       const httpClientSpy = TestBed.inject(HttpClient) as jasmine.SpyObj<HttpClient>;
       httpClientSpy.post.and.callFake((url: string) => {
@@ -910,22 +909,20 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
       expect(reloadSpy).toHaveBeenCalledTimes(1);
     });
 
-    it('should NOT call reloadPage() when user cancels the confirm() dialog', () => {
-      // V25D78-C55.13 BUG-1 negative case: si el usuario cancela el confirm,
-      // no se llama al endpoint ni se recarga la página. Es solo el branch
-      // de "no quiero iniciar nueva temporada".
+    it('should show a visual error and not reload when /career/continue returns failure', () => {
       const reloadSpy = spyOn(component as any, 'reloadPage');
-      spyOn(window, 'confirm').and.returnValue(false);
-
       const httpClientSpy = TestBed.inject(HttpClient) as jasmine.SpyObj<HttpClient>;
-      // Asegurar que post NO se llama — spy por defecto no devuelve nada y
-      // tiraríamos error si se invocara
-      httpClientSpy.post.calls.reset();
+      httpClientSpy.post.and.callFake((url: string) => {
+        if (String(url).includes('/career/continue')) {
+          return of({ success: false, message: 'No se pudo iniciar temporada' } as any);
+        }
+        return of(null as any);
+      });
 
       component.continueToNewSeason();
 
       expect(reloadSpy).not.toHaveBeenCalled();
-      expect(httpClientSpy.post).not.toHaveBeenCalled();
+      expect(component.lineupError$.value).toBe('No se pudo iniciar temporada');
     });
   });
 
@@ -1173,14 +1170,14 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
    * "header says 4-4-2, editor opens with 3-5-2" and read it as random.
    *
    * <p>Post-fix: onFormationChange also POSTs /career/lineup/manual-select
-   * with the current lineup's playerIds + slots, then GETs
-   * /career/lineup/current and emits the result into lineupSubject$.
+   * with the current lineup's playerIds reflowed into the new formation slots,
+   * then GETs /career/lineup/current and emits the result into lineupSubject$.
    * Why /manual-select instead of /auto-select: auto-select rewrites the
-   * 11 player assignments; /manual-select with the current playerIds is
-   * a label-only formation change that triggers chem recompute.
+   * 11 player assignments; /manual-select with the current playerIds preserves
+   * the XI while changing tactical positions.
    */
   describe('V25D99.20-BUG-4b: onFormationChange persists + refreshes lineup', () => {
-    it('POSTs /manual-select with current playerIds+slots+new formation, then GETs /current and updates lineupSubject$', () => {
+    it('POSTs /manual-select with current XI reflowed into new formation slots, then GETs /current and updates lineupSubject$', () => {
       const httpSpy = TestBed.inject(HttpClient) as jasmine.SpyObj<HttpClient>;
       const initialLineup: LineupDTO = {
         formation: '4-4-2',
@@ -1215,6 +1212,26 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
         return of(null);
       }) as any);
       httpSpy.get.and.callFake(((url: string) => {
+        if (String(url).includes('/editor/formations')) {
+          return of([
+            {
+              name: '3-5-2',
+              description: 'test',
+              defenders: 3,
+              midfielders: 5,
+              attackers: 2,
+              outfieldPlayers: 10,
+              positions: ELEVEN_PLAYERS.map((_, i) => ({
+                index: i,
+                role: i === 0 ? 'GK' : i <= 3 ? 'CB' : i <= 8 ? 'MID' : 'ST',
+                xPercent: 50,
+                yPercent: 50,
+                actionRangePercent: 10,
+                subdivisionId: 'NEW-' + i,
+              })),
+            },
+          ]);
+        }
         if (String(url).includes('/career/lineup/current')) {
           getCurrentCalls++;
           return of(updatedLineup);
@@ -1224,7 +1241,7 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
 
       component.onFormationChange('3-5-2');
 
-      // POST was called exactly once with formation + current playerIds + slots.
+      // POST was called exactly once with formation + same playerIds + target formation slots.
       expect(postCalls).withContext('POST /manual-select must be called').toBe(1);
       expect(postBody.formation).toBe('3-5-2');
       expect(Array.isArray(postBody.playerIds)).toBe(true);
@@ -1233,7 +1250,9 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
       expect(Array.isArray(postBody.slots)).toBe(true);
       expect(postBody.slots.length).toBe(11);
       expect(postBody.slots[0].playerId).toBe('p0');
-      expect(postBody.slots[0].subdivisionId).toBe('S0-1');
+      expect(postBody.slots[0].subdivisionId).toBe('NEW-0');
+      expect(postBody.slots[10].playerId).toBe('p10');
+      expect(postBody.slots[10].subdivisionId).toBe('NEW-10');
 
       // GET /career/lineup/current was called exactly once (post-fix: refetch after POST).
       expect(getCurrentCalls).withContext('GET /career/lineup/current must be called').toBe(1);

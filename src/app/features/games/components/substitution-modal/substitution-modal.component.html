@@ -1,16 +1,13 @@
 <div class="sub-modal-root">
   <h2 mat-dialog-title>
-    <span class="title-icon">🔄</span>
+    <span class="title-icon">SUB</span>
     Sustitución
     <span class="minute-tag">Minuto {{ data.currentMinute }}'</span>
-    <!-- V25D81-BUG #3: surface why the modal auto-opened. The
-         INJURY_FORCED_SUBSTITUTION reason gets a small banner so the
-         manager knows they didn't click "Sustituir" themselves. -->
     <span *ngIf="data.reason === 'INJURY_FORCED_SUBSTITUTION'"
           class="reason-badge"
           data-reason="injury"
           aria-label="Sustitución forzada por lesión">
-      🚑 Sustitución por lesión
+      LES Sustitución por lesión
     </span>
   </h2>
 
@@ -25,17 +22,82 @@
       <span>{{ errorMsg }}</span>
     </div>
 
-    <!-- V25D79: 2-column layout — visual pitch (left) + bench list (right).
-         Replaces the pre-V25D79 3-column starter-list layout. Starter list
-         is rendered as a click-only visual pitch with per-player stats
-         chips sourced from data.playerRatings. Bench stays as a simple
-         list (no canvas, no chips) so the swap-in column stays scannable.
-    -->
+    <div class="sub-flow-guide" data-testid="sub-flow-guide">
+      <span class="flow-step" [class.done]="!!playerOff" [class.active]="!playerOff">
+        1. Elegí quién sale
+      </span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-step" [class.done]="!!playerOn" [class.active]="!!playerOff && !playerOn">
+        2. Elegí quién entra
+      </span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-step" [class.active]="canConfirm">
+        3. Confirmá el cambio
+      </span>
+    </div>
+
+    <section class="coach-objective-card"
+             [ngClass]="coachObjectiveClass"
+             data-testid="coach-objective-card">
+      <div>
+        <span class="coach-objective-kicker">Objetivo DT</span>
+        <strong>{{ coachObjectiveLabel }}</strong>
+      </div>
+      <p>{{ coachObjectiveText }}</p>
+    </section>
+
+    <section class="coach-recommendation-card"
+             [class.is-medical]="rec.kind === 'medical'"
+             *ngIf="recommendedSubstitution as rec"
+             data-testid="coach-recommendation-card">
+      <div>
+        <span class="coach-objective-kicker">
+          {{ rec.kind === 'medical' ? 'Prioridad médica' : 'Recomendación' }}
+        </span>
+        <strong>{{ rec.playerOff.displayName }} → {{ rec.playerOn.displayName }}</strong>
+        <p>{{ rec.reason }}</p>
+      </div>
+      <button mat-stroked-button
+              type="button"
+              class="apply-recommendation-btn"
+              (click)="applyRecommendedSubstitution()">
+        {{ rec.kind === 'medical' ? 'Sacar lesionado' : 'Usar recomendación' }}
+      </button>
+    </section>
+
+    <section class="coach-recommendation-card is-alternative"
+             *ngIf="tacticalAlternativeSubstitution as alt"
+             data-testid="coach-alternative-card">
+      <div>
+        <span class="coach-objective-kicker">Si lo mantenés en cancha</span>
+        <strong>{{ alt.playerOff.displayName }} → {{ alt.playerOn.displayName }}</strong>
+        <p>{{ alt.reason }}</p>
+      </div>
+      <button mat-stroked-button
+              type="button"
+              class="apply-recommendation-btn"
+              (click)="selectOff(alt.playerOff); selectOn(alt.playerOn)">
+        Usar alternativa
+      </button>
+    </section>
+
+    <div *ngIf="data.reason === 'INJURY_FORCED_SUBSTITUTION'"
+         class="banner banner-injury-context"
+         role="status"
+         data-testid="injury-context">
+      <span class="injury-pill">LES</span>
+      <span>
+        El jugador lesionado ya queda preseleccionado si sigue en cancha.
+        Podés cambiarlo por otro titular si querés tomar otra decisión táctica.
+      </span>
+    </div>
+
     <div class="substitution-modal-grid">
-      <!-- Visual pitch (manager team starting XI + stats chips) -->
-      <section class="col col-starter" data-area="starting" aria-label="Visual pitch">
-        <h3>Selecciona el jugador que sale (click)</h3>
-        <div class="v25d79-pitch" role="img" [attr.aria-label]="'Visual pitch formation ' + (data.formation || '4-4-2')">
+      <section class="col col-starter" data-area="starting" aria-label="Cancha del XI">
+        <h3>Jugador que sale</h3>
+        <div class="v25d79-pitch"
+             role="img"
+             [attr.aria-label]="'Cancha visual formación ' + (data.formation || '4-4-2')">
           <div class="v25d79-pitch-line"
                *ngFor="let line of pitchLines; trackBy: trackByLine"
                [attr.data-category]="line.category">
@@ -46,13 +108,16 @@
                  [class.eff-good]="getEffClass(p.sessionPlayerId) === 'eff-good'"
                  [class.eff-warning]="getEffClass(p.sessionPlayerId) === 'eff-warning'"
                  [class.eff-bad]="getEffClass(p.sessionPlayerId) === 'eff-bad'"
+                 [class.is-injury-target]="isInjuryTarget(p.sessionPlayerId)"
                  [class.is-disabled]="isOutOfSubs"
+                 [style.--nudge-x.px]="getFineTuneX(p.sessionPlayerId)"
+                 [style.--nudge-y.px]="getFineTuneY(p.sessionPlayerId)"
                  role="button"
                  tabindex="0"
                  [attr.aria-pressed]="playerOffId === p.sessionPlayerId"
                  [attr.aria-label]="p.position + ' ' + p.displayName + ', rating ' + p.rating"
-                 (click)="selectOff(p)"
-                 (keydown.enter)="selectOff(p)">
+                 (click)="handlePitchPlayerClick(p)"
+                 (keydown.enter)="handlePitchPlayerClick(p)">
               <div class="v25d79-dot-chips" *ngIf="hasAnyChip(p.sessionPlayerId)">
                 <span class="v25d79-chip v25d79-chip-goals"
                       *ngIf="getRating(p.sessionPlayerId) as r"
@@ -77,11 +142,6 @@
               </div>
               <span class="v25d79-dot-pos">{{ p.position }}</span>
               <span class="v25d79-dot-name">{{ p.displayName }}</span>
-              <!-- V25D79: keep the V25D63 effectiveness badge inside the dot
-                   so the regression tests / REVISOR smoke continue to read
-                   the eff percentage from the data-flow. Color via the
-                   eff-good / eff-warning / eff-bad class on the parent dot.
-              -->
               <span class="eff-badge"
                     *ngIf="getEffBadge(p.sessionPlayerId) as effBadge"
                     [attr.data-testid]="'eff-badge-' + p.sessionPlayerId">{{ effBadge }}</span>
@@ -89,23 +149,45 @@
             </div>
           </div>
         </div>
-        <!-- Selection summary (manager can see what they picked at a glance) -->
+
         <div class="v25d79-actions-summary" *ngIf="playerOff">
           <span class="label">Sale:</span>
           <span class="name">{{ playerOff.displayName }}</span>
           <span class="arrow">→</span>
           <span class="name" *ngIf="playerOn; else noOnYet">{{ playerOn.displayName }}</span>
           <ng-template #noOnYet>
-            <span class="label">Selecciona un suplente →</span>
+            <span class="label">Seleccioná un suplente →</span>
           </ng-template>
+        </div>
+        <button mat-stroked-button
+                type="button"
+                class="queue-change-btn"
+                data-testid="queue-change-btn"
+                (click)="addPendingChange()"
+                [disabled]="!canAddPendingChange">
+          Agregar cambio pendiente
+        </button>
+
+        <div class="fine-tune-panel" data-testid="fine-tune-panel">
+          <div class="fine-tune-title">Ajuste fino de posición</div>
+          <div class="fine-tune-text">{{ getFineTuneLabel() }}</div>
+          <div class="fine-tune-controls" aria-label="Mover jugador por píxeles">
+            <button mat-stroked-button class="up" type="button" (click)="nudgeSelectedPlayer(0, -1)" [disabled]="!canFineTuneSelectedPlayer()">↑</button>
+            <button mat-stroked-button class="left" type="button" (click)="nudgeSelectedPlayer(-1, 0)" [disabled]="!canFineTuneSelectedPlayer()">←</button>
+            <button mat-stroked-button class="reset" type="button" (click)="resetSelectedPlayerPosition()" [disabled]="!canFineTuneSelectedPlayer()">Base</button>
+            <button mat-stroked-button class="right" type="button" (click)="nudgeSelectedPlayer(1, 0)" [disabled]="!canFineTuneSelectedPlayer()">→</button>
+            <button mat-stroked-button class="down" type="button" (click)="nudgeSelectedPlayer(0, 1)" [disabled]="!canFineTuneSelectedPlayer()">↓</button>
+          </div>
+          <div class="fine-tune-coords" *ngIf="selectedFineTunePlayerId">
+            X {{ getFineTuneX(selectedFineTunePlayerId) }}px · Y {{ getFineTuneY(selectedFineTunePlayerId) }}px
+          </div>
         </div>
       </section>
 
-      <!-- Bench (right) — simple list, no canvas / no chips -->
       <section class="col col-bench" data-area="bench">
-        <h3>Selecciona el suplente que entra</h3>
-        <ul class="player-list" role="listbox" aria-label="Bench">
-          <li *ngFor="let p of data.bench; trackBy: trackByPlayer"
+        <h3>Suplente que entra</h3>
+        <ul class="player-list" role="listbox" aria-label="Banco">
+          <li *ngFor="let p of availableBench; trackBy: trackByPlayer"
               role="option"
               [class.selected]="playerOnId === p.sessionPlayerId"
               [class.eff-good]="getEffClass(p.sessionPlayerId) === 'eff-good'"
@@ -132,9 +214,29 @@
       </section>
     </div>
 
+    <section class="pending-sub-list"
+             *ngIf="pendingChanges.length > 0"
+             data-testid="pending-sub-list">
+      <h3>Cambios preparados</h3>
+      <div class="pending-sub-row"
+           *ngFor="let change of pendingChanges; let idx = index">
+        <span class="pending-index">{{ idx + 1 }}</span>
+        <span class="pending-name off">{{ change.playerOffName }}</span>
+        <span class="pending-arrow">→</span>
+        <span class="pending-name on">{{ change.playerOnName }}</span>
+        <button mat-button
+                type="button"
+                class="pending-remove"
+                (click)="removePendingChange(idx)"
+                [disabled]="isSubmitting">
+          Quitar
+        </button>
+      </div>
+    </section>
+
     <div *ngIf="isSubmitting" class="submit-overlay">
       <mat-spinner diameter="36"></mat-spinner>
-      <span>Enviando sustitución…</span>
+      <span>Enviando sustitución{{ pendingChanges.length > 1 ? 'es' : '' }}…</span>
     </div>
   </mat-dialog-content>
 
@@ -145,6 +247,7 @@
             (click)="confirm()"
             [disabled]="!canConfirm">
       Confirmar
+      <span *ngIf="pendingChanges.length > 1"> ({{ pendingChanges.length }})</span>
     </button>
   </mat-dialog-actions>
 </div>

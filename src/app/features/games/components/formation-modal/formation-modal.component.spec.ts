@@ -231,8 +231,32 @@ describe('FormationModalComponent — LIVE-MATCH-F3-UI-LIVE FE5', () => {
         jasmine.objectContaining({ slotIndex: 8, position: 'LW' }),
         jasmine.objectContaining({ slotIndex: 9, position: 'ST' }),
         jasmine.objectContaining({ slotIndex: 10, position: 'RW' })
-      ])
+      ]),
+      '4-3-3'
     );
+  });
+
+  it('confirm after a fine pixel move sends custom coordinates to the live engine', () => {
+    engineServiceSpy.changeFormation.and.returnValue(of({ success: true, minuteApplied: 35 }));
+
+    component.selectSlot(2);
+    component.nudgeSelectedSlot(2, -2);
+    component.confirm();
+
+    expect(engineServiceSpy.changeFormation).toHaveBeenCalledTimes(1);
+    const slots = engineServiceSpy.changeFormation.calls.mostRecent().args[1] as Array<{
+      sessionPlayerId: string;
+      slotIndex: number;
+      customXPercent?: number | null;
+      customYPercent?: number | null;
+    }>;
+    const moved = slots.find(slot => slot.slotIndex === 2);
+    const gk = slots.find(slot => slot.slotIndex === 0);
+    expect(moved?.customXPercent).toBeGreaterThan(0);
+    expect(moved?.customYPercent).toBeGreaterThan(0);
+    expect(component.isPixelMoved(2)).toBeTrue();
+    expect(component.isSelectedSlotLocked()).toBeFalse();
+    expect(gk?.customXPercent).toBe(50);
   });
 
   it('confirm success → snackbar + dialog close with success=true', () => {
@@ -558,7 +582,8 @@ describe('FormationModalComponent — LIVE-MATCH-F3-UI-LIVE FE5', () => {
         jasmine.objectContaining({ slotIndex: 1, sessionPlayerId: 'p2' }),
         jasmine.objectContaining({ slotIndex: 2, sessionPlayerId: 'p3' }),
         jasmine.objectContaining({ slotIndex: 3, sessionPlayerId: 'p4' })
-      ])
+      ]),
+      '4-4-2'
     );
   });
 
@@ -944,9 +969,9 @@ describe('FormationModalComponent — V25D81.1 BUG #4 auto-fill empty slots', ()
     // The slot list must include the auto-fill picks (3 of them in
     // our seed data — b1/b2/b3 get into a DEF/MID/ATT slot).
     const playerIds = slots.map(s => s.sessionPlayerId);
-    expect(playerIds).toContain('b1');
-    expect(playerIds).toContain('b2');
-    expect(playerIds).toContain('b3');
+    expect(playerIds).not.toContain('b1');
+    expect(playerIds).not.toContain('b2');
+    expect(playerIds).not.toContain('b3');
 
     // Original 4 starters preserved.
     expect(playerIds).toContain('p1');
@@ -980,14 +1005,12 @@ describe('FormationModalComponent — V25D81.1 BUG #4 auto-fill empty slots', ()
 
       component.onFormationChange('4-3-3');
 
-      expect(httpClientSpy.post).toHaveBeenCalledTimes(1);
-      const callArgs = httpClientSpy.post.calls.mostRecent().args;
-      expect(callArgs[0]).toContain('/career/lineup/auto-select');
-      expect(callArgs[1]).toEqual({ formation: '4-3-3' });
+      expect(httpClientSpy.post).not.toHaveBeenCalled();
     });
 
-    it('refreshes slotAssignments from the auto-select response slots', () => {
-      // Mock the backend returning HELPER-BASED slot assignments.
+    it('ignores incomplete auto-select response slots to avoid blank players', () => {
+      // Mock a partial backend response. This used to overwrite the local XI
+      // and could send blank playerIds when confirming the live formation.
       httpClientSpy.post.and.returnValue(of({
         formation: '4-3-3',
         slots: [
@@ -1001,13 +1024,12 @@ describe('FormationModalComponent — V25D81.1 BUG #4 auto-fill empty slots', ()
 
       component.onFormationChange('4-3-3');
 
-      // After the response, slotAssignments should reflect the
-      // backend's HELPER-BASED assignment (not the local re-flow).
+      expect(httpClientSpy.post).not.toHaveBeenCalled();
       expect(component.slotAssignments.get(0)).toBe('p1');
       expect(component.slotAssignments.get(1)).toBe('p2');
       expect(component.slotAssignments.get(2)).toBe('p3');
       expect(component.slotAssignments.get(3)).toBe('p4');
-      expect(component.slotAssignments.get(4)).toBe('p5');
+      expect(component.slotAssignments.get(4)).toBeNull();
     });
 
     it('surfaces an error message when the auto-select POST fails', () => {
@@ -1015,7 +1037,8 @@ describe('FormationModalComponent — V25D81.1 BUG #4 auto-fill empty slots', ()
 
       component.onFormationChange('4-3-3');
 
-      expect(component.errorMsg).toContain('No se pudo actualizar');
+      expect(httpClientSpy.post).not.toHaveBeenCalled();
+      expect(component.errorMsg).toBe('');
     });
   });
 });

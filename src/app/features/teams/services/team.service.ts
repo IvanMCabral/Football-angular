@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, BehaviorSubject, tap } from 'rxjs';
+import { Observable, BehaviorSubject, catchError, of, switchMap, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { Team, CreateTeamRequest, SessionTeam, CreateSessionTeamRequest, RandomTeamsRequest, RandomTeamsResponse } from '../../../shared/models/team.model';
 import { Player, SessionPlayer } from '../../../shared/models/player.model';
@@ -99,8 +99,18 @@ export class TeamService {
    * and `/api/v1/career/teams/me/squad`. The modal only needs the manager's
    * own squad, so we use the `me/squad` shortcut and drop the unused
    * sessionTeamId parameter (server resolves it from the JWT).
+   *
+   * V25D99.23: live match modals must never lose the bench because one
+   * squad read path returns an empty list. `/career/players/squad` is the
+   * canonical "my current career squad" endpoint already used by /squad and
+   * the harness, so it is a safe fallback when `teams/me/squad` is empty or
+   * unavailable.
    */
   getMyTeamSquad(): Observable<SessionPlayer[]> {
-    return this.http.get<SessionPlayer[]>(`${this.careerApiUrl}/teams/me/squad`);
+    const fallback$ = () => this.http.get<SessionPlayer[]>(`${this.careerApiUrl}/players/squad`);
+    return this.http.get<SessionPlayer[]>(`${this.careerApiUrl}/teams/me/squad`).pipe(
+      switchMap(players => players?.length ? of(players) : fallback$()),
+      catchError(() => fallback$())
+    );
   }
 }

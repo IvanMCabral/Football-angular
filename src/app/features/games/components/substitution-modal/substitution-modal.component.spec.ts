@@ -41,7 +41,8 @@ describe('SubstitutionModalComponent — LIVE-MATCH-F3-UI-LIVE FE4', () => {
   let snackBarSpy: jasmine.SpyObj<MatSnackBar>;
 
   beforeEach(async () => {
-    engineServiceSpy = jasmine.createSpyObj('MatchEngineService', ['substitutePlayer']);
+    spyOn(console, 'error').and.stub();
+    engineServiceSpy = jasmine.createSpyObj('MatchEngineService', ['substitutePlayer', 'changeFormation']);
     dialogRefSpy = jasmine.createSpyObj('MatDialogRef', ['close']);
     snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
 
@@ -91,7 +92,7 @@ describe('SubstitutionModalComponent — LIVE-MATCH-F3-UI-LIVE FE4', () => {
     expect(component.playerOffId).toBeNull();
   });
 
-  it('confirm calls substitutePlayer with the right ids + current minute', () => {
+  it('confirm calls substitutePlayer with ids and lets backend use the live minute', () => {
     engineServiceSpy.substitutePlayer.and.returnValue(of({
       success: true, minuteApplied: 35, substitutionsRemaining: 2
     }));
@@ -99,7 +100,7 @@ describe('SubstitutionModalComponent — LIVE-MATCH-F3-UI-LIVE FE4', () => {
     component.selectOn(SAMPLE_PLAYERS[4]);
     component.confirm();
     expect(engineServiceSpy.substitutePlayer).toHaveBeenCalledOnceWith(
-      'm1', 'p1', 'b1', 35
+      'm1', 'p1', 'b1'
     );
   });
 
@@ -116,7 +117,146 @@ describe('SubstitutionModalComponent — LIVE-MATCH-F3-UI-LIVE FE4', () => {
     );
   });
 
-  it('confirm backend success=false → inline error, no close', () => {
+  it('addPendingChange queues a selected swap and clears current selection', () => {
+    component.selectOff(SAMPLE_PLAYERS[0]);
+    component.selectOn(SAMPLE_PLAYERS[4]);
+    component.addPendingChange();
+
+    expect(component.pendingChanges.length).toBe(1);
+    expect(component.pendingChanges[0]).toEqual(jasmine.objectContaining({
+      playerOffId: 'p1',
+      playerOnId: 'b1',
+      playerOffName: 'Starter 1',
+      playerOnName: 'Bench 1'
+    }));
+    expect(component.playerOffId).toBeNull();
+    expect(component.playerOnId).toBeNull();
+    expect(component.canConfirm).toBeTrue();
+  });
+
+  it('confirm applies multiple pending substitutions in order', () => {
+    engineServiceSpy.substitutePlayer.and.returnValues(
+      of({ success: true, minuteApplied: 35, substitutionsRemaining: 2 }),
+      of({ success: true, minuteApplied: 35, substitutionsRemaining: 1 })
+    );
+
+    component.selectOff(SAMPLE_PLAYERS[0]);
+    component.selectOn(SAMPLE_PLAYERS[4]);
+    component.addPendingChange();
+    component.selectOff(SAMPLE_PLAYERS[1]);
+    component.selectOn(SAMPLE_PLAYERS[5]);
+    component.addPendingChange();
+    component.confirm();
+
+    expect(engineServiceSpy.substitutePlayer.calls.count()).toBe(2);
+    expect(engineServiceSpy.substitutePlayer.calls.argsFor(0)).toEqual(['m1', 'p1', 'b1']);
+    expect(engineServiceSpy.substitutePlayer.calls.argsFor(1)).toEqual(['m1', 'p2', 'b2']);
+    expect(dialogRefSpy.close).toHaveBeenCalledWith(jasmine.objectContaining({
+      success: true,
+      substitutionsApplied: 2,
+      playerOffId: 'p1',
+      playerOnId: 'b1'
+    }));
+    const closePayload = dialogRefSpy.close.calls.mostRecent().args[0] as any;
+    expect(closePayload.substitutions.length).toBe(2);
+  });
+
+  it('confirm treats an already-applied multi substitution response as idempotent', () => {
+    engineServiceSpy.substitutePlayer.and.returnValues(
+      of({ success: true, minuteApplied: 35, substitutionsRemaining: 2 }),
+      of({
+        success: false,
+        minuteApplied: 0,
+        substitutionsRemaining: 2,
+        error: 'Player p2 has already been substituted off'
+      })
+    );
+
+    component.selectOff(SAMPLE_PLAYERS[0]);
+    component.selectOn(SAMPLE_PLAYERS[4]);
+    component.addPendingChange();
+    component.selectOff(SAMPLE_PLAYERS[1]);
+    component.selectOn(SAMPLE_PLAYERS[5]);
+    component.addPendingChange();
+    component.confirm();
+
+    expect(engineServiceSpy.substitutePlayer.calls.count()).toBe(2);
+    expect(component.errorMsg).toBe('');
+    expect(dialogRefSpy.close).toHaveBeenCalledWith(jasmine.objectContaining({
+      success: true,
+      substitutionsApplied: 2,
+      playerOffId: 'p1',
+      playerOnId: 'b1'
+    }));
+    const closePayload = dialogRefSpy.close.calls.mostRecent().args[0] as any;
+    expect(closePayload.substitutions.length).toBe(2);
+  });
+
+  it('confirm sends fine-tuned pixel positions after substitutions', () => {
+    engineServiceSpy.substitutePlayer.and.returnValue(of({
+      success: true, minuteApplied: 35, substitutionsRemaining: 2
+    }));
+    engineServiceSpy.changeFormation.and.returnValue(of({ success: true } as any));
+
+    component.selectOff(SAMPLE_PLAYERS[2]);
+    component.selectOn(SAMPLE_PLAYERS[5]);
+    component.nudgeSelectedPlayer(1, -1);
+    component.confirm();
+
+    expect(engineServiceSpy.substitutePlayer).toHaveBeenCalledOnceWith('m1', 'p3', 'b2');
+    expect(engineServiceSpy.changeFormation).toHaveBeenCalled();
+    const formationArgs = engineServiceSpy.changeFormation.calls.mostRecent().args;
+    expect(formationArgs[0]).toBe('m1');
+    expect(formationArgs[2]).toBe('4-4-2');
+    const slots = formationArgs[1] as any[];
+    const tunedSlot = slots.find(slot => slot.sessionPlayerId === 'b2');
+    expect(tunedSlot.customXPercent).not.toBeNull();
+    expect(tunedSlot.customYPercent).not.toBeNull();
+    expect(dialogRefSpy.close).toHaveBeenCalledWith(jasmine.objectContaining({
+      success: true,
+      formationResult: jasmine.objectContaining({ success: true })
+    }));
+  });
+
+  it('selecting a bench player makes the incoming preview the fine-tune target without changing the off player', () => {
+    component.selectOff(SAMPLE_PLAYERS[2]);
+    component.selectOn(SAMPLE_PLAYERS[5]);
+
+    expect(component.playerOffId).toBe('p3');
+    expect(component.playerOnId).toBe('b2');
+    expect(component.selectedFineTunePlayerId).toBe('b2');
+
+    component.handlePitchPlayerClick({ ...SAMPLE_PLAYERS[5], isStarter: true });
+
+    expect(component.playerOffId).toBe('p3');
+    expect(component.playerOnId).toBe('b2');
+    expect(component.selectedFineTunePlayerId).toBe('b2');
+  });
+
+  it('hides bench players that are already prepared to come on', () => {
+    component.selectOff(SAMPLE_PLAYERS[0]);
+    component.selectOn(SAMPLE_PLAYERS[4]);
+    component.addPendingChange();
+
+    expect(component.availableBench.map(p => p.sessionPlayerId)).toEqual(['b2', 'b3']);
+  });
+
+  it('previews the current selected swap together with existing pending swaps', () => {
+    component.selectOff(SAMPLE_PLAYERS[0]);
+    component.selectOn(SAMPLE_PLAYERS[4]);
+    component.addPendingChange();
+
+    component.selectOff(SAMPLE_PLAYERS[1]);
+    component.selectOn(SAMPLE_PLAYERS[5]);
+
+    expect(component.effectiveStartingXi.map(p => p.sessionPlayerId)).toEqual([
+      'b1', 'b2', 'p3', 'p4'
+    ]);
+    expect(component.canFineTuneSelectedPlayer()).toBeTrue();
+    expect(component.selectedFineTunePlayerId).toBe('b2');
+  });
+
+  it('confirm backend success=false keeps the modal open with inline error', () => {
     engineServiceSpy.substitutePlayer.and.returnValue(of({
       success: false, minuteApplied: 0, substitutionsRemaining: 3,
       error: 'Player not on bench'
@@ -145,6 +285,206 @@ describe('SubstitutionModalComponent — LIVE-MATCH-F3-UI-LIVE FE4', () => {
     // Selections should not register when out of subs.
     component.selectOff(SAMPLE_PLAYERS[0]);
     expect(component.playerOffId).toBeNull();
+  });
+
+  it('reads coach objective as need goal when the manager is losing', () => {
+    (component as any).data = {
+      ...SAMPLE_DATA,
+      currentMinute: 62,
+      score: { home: 0, away: 1 },
+      managerSide: 'HOME'
+    };
+    expect(component.coachObjective).toBe('NEED_GOAL');
+    expect(component.coachObjectiveLabel).toBe('Necesito gol');
+    expect(component.coachObjectiveText).toContain('Vas 1 abajo');
+  });
+
+  it('reads coach objective as protect result when the manager is winning late', () => {
+    (component as any).data = {
+      ...SAMPLE_DATA,
+      currentMinute: 75,
+      score: { home: 2, away: 1 },
+      managerSide: 'HOME'
+    };
+    expect(component.coachObjective).toBe('PROTECT_RESULT');
+    expect(component.coachObjectiveLabel).toBe('Cuidar resultado');
+    expect(component.coachObjectiveText).toContain('Vas 1 arriba');
+  });
+
+  it('renders the coach objective card in the substitution modal', () => {
+    const card = fixture.nativeElement.querySelector('[data-testid="coach-objective-card"]') as HTMLElement;
+    expect(card).not.toBeNull();
+    expect(card.textContent).toContain('Objetivo DT');
+  });
+
+  it('recommends an attacking bench player when the manager needs a goal', () => {
+    (component as any).data = {
+      ...SAMPLE_DATA,
+      currentMinute: 70,
+      score: { home: 0, away: 1 },
+      managerSide: 'HOME'
+    };
+    const rec = component.recommendedSubstitution;
+    expect(rec).not.toBeNull();
+    expect(rec?.playerOn.position).toBe('ATT');
+    expect(component.recommendedSubstitutionText).toContain('Prioriza amenaza ofensiva');
+  });
+
+  it('prioritizes an active injured starter and keeps a tactical alternative visible', () => {
+    (component as any).data = {
+      ...SAMPLE_DATA,
+      currentMinute: 55,
+      score: { home: 0, away: 1 },
+      managerSide: 'HOME',
+      playerRatings: [
+        {
+          playerId: 'p4',
+          playerName: 'Starter 4',
+          teamId: 'team-1',
+          position: 'ATT',
+          rating: 5.9,
+          goals: 0,
+          assists: 0,
+          keyPasses: 0,
+          shots: 1,
+          yellowCards: 0,
+          redCards: 0,
+          injuries: 1,
+          fouls: 0,
+          substitutedIn: false,
+          substitutedOut: false
+        }
+      ]
+    };
+
+    const rec = component.recommendedSubstitution;
+    const alt = component.tacticalAlternativeSubstitution;
+
+    expect(rec).not.toBeNull();
+    expect(rec?.kind).toBe('medical');
+    expect(rec?.playerOff.sessionPlayerId).toBe('p4');
+    expect(rec?.playerOn.position).toBe('ATT');
+    expect(component.recommendedSubstitutionText).toContain('Prioridad médica');
+    expect(alt).not.toBeNull();
+    expect(alt?.kind).toBe('tactical');
+    expect(alt?.playerOff.sessionPlayerId).not.toBe('p4');
+    expect(alt?.reason).toContain('Prioriza amenaza ofensiva');
+  });
+
+  it('uses an attacking wide player before a central mid when replacing an injured striker without bench strikers', () => {
+    (component as any).data = {
+      ...SAMPLE_DATA,
+      currentMinute: 55,
+      score: { home: 0, away: 1 },
+      managerSide: 'HOME',
+      bench: [
+        { sessionPlayerId: 'mid-higher', displayName: 'Higher Mid', position: 'MID', rating: 76, isStarter: false },
+        { sessionPlayerId: 'wide-cover', displayName: 'Wide Cover', position: 'WINGER', rating: 73, isStarter: false }
+      ],
+      playerRatings: [
+        {
+          playerId: 'p4',
+          playerName: 'Starter 4',
+          teamId: 'team-1',
+          position: 'ATT',
+          rating: 5.9,
+          goals: 0,
+          assists: 0,
+          keyPasses: 0,
+          shots: 1,
+          yellowCards: 0,
+          redCards: 0,
+          injuries: 1,
+          fouls: 0,
+          substitutedIn: false,
+          substitutedOut: false
+        }
+      ]
+    };
+
+    const rec = component.recommendedSubstitution;
+
+    expect(rec?.kind).toBe('medical');
+    expect(rec?.playerOff.sessionPlayerId).toBe('p4');
+    expect(rec?.playerOn.sessionPlayerId).toBe('wide-cover');
+  });
+
+  it('recommends a protective bench player when the manager is winning late', () => {
+    (component as any).data = {
+      ...SAMPLE_DATA,
+      currentMinute: 78,
+      score: { home: 2, away: 1 },
+      managerSide: 'HOME',
+      bench: [
+        { ...SAMPLE_PLAYERS[4], rating: 86 },
+        SAMPLE_PLAYERS[5],
+        SAMPLE_PLAYERS[6]
+      ]
+    };
+    const rec = component.recommendedSubstitution;
+    expect(rec).not.toBeNull();
+    expect(rec?.playerOn.position).toBe('DEF');
+    expect(component.recommendedSubstitutionText).toContain('Prioriza estructura');
+  });
+
+  it('avoids a defensive reshuffle as the best protect-result recommendation', () => {
+    (component as any).data = {
+      ...SAMPLE_DATA,
+      currentMinute: 78,
+      score: { home: 2, away: 1 },
+      managerSide: 'HOME',
+      startingXi: [
+        { sessionPlayerId: 'gk', displayName: 'GK', position: 'GK', rating: 80, isStarter: true },
+        { sessionPlayerId: 'cb', displayName: 'Center Back', position: 'CB', rating: 76, isStarter: true },
+        { sessionPlayerId: 'mid', displayName: 'Midfielder', position: 'MID', rating: 75, isStarter: true },
+      ],
+      bench: [
+        { sessionPlayerId: 'rb', displayName: 'Fullback', position: 'RB', rating: 77, isStarter: false },
+        { sessionPlayerId: 'mid2', displayName: 'Fresh Midfielder', position: 'MID', rating: 79, isStarter: false },
+      ],
+    };
+
+    const rec = component.recommendedSubstitution;
+
+    expect(rec).not.toBeNull();
+    expect(rec?.playerOff.sessionPlayerId).toBe('mid');
+    expect(rec?.playerOn.sessionPlayerId).toBe('mid2');
+  });
+
+  it('does not force a weak protect-result recommendation', () => {
+    (component as any).data = {
+      ...SAMPLE_DATA,
+      currentMinute: 78,
+      score: { home: 2, away: 1 },
+      managerSide: 'HOME',
+      startingXi: [
+        { sessionPlayerId: 'gk', displayName: 'GK', position: 'GK', rating: 80, isStarter: true },
+        { sessionPlayerId: 'cb', displayName: 'Center Back', position: 'CB', rating: 76, isStarter: true },
+        { sessionPlayerId: 'att', displayName: 'Forward', position: 'ATT', rating: 77, isStarter: true },
+      ],
+      bench: [
+        { sessionPlayerId: 'rb', displayName: 'Fullback', position: 'RB', rating: 77, isStarter: false },
+        { sessionPlayerId: 'att2', displayName: 'Better Forward', position: 'ATT', rating: 81, isStarter: false },
+      ],
+    };
+
+    expect(component.recommendedSubstitution).toBeNull();
+    expect(component.recommendedSubstitutionText).toContain('Sin recomendación clara');
+  });
+
+  it('applyRecommendedSubstitution selects the suggested off and on players', () => {
+    (component as any).data = {
+      ...SAMPLE_DATA,
+      currentMinute: 70,
+      score: { home: 0, away: 1 },
+      managerSide: 'HOME'
+    };
+    const rec = component.recommendedSubstitution;
+    expect(rec).not.toBeNull();
+    component.applyRecommendedSubstitution();
+    expect(component.playerOffId).toBe(rec!.playerOff.sessionPlayerId);
+    expect(component.playerOnId).toBe(rec!.playerOn.sessionPlayerId);
+    expect(component.canConfirm).toBeTrue();
   });
 
   it('cancel closes the dialog with success=false', () => {
@@ -619,5 +959,40 @@ describe('V25D79: visual pitch + stats chips + substitutionsRemaining', () => {
     expect(reasonBadge)
       .withContext('manual open must not render the INJURY reason badge')
       .toBeNull();
+  });
+
+  it('injury flow renders the coach guide, context banner and injured pitch dot', () => {
+    TestBed.resetTestingModule();
+    const data: SubstitutionDialogData = {
+      ...SAMPLE_DATA,
+      preSelectedPlayerId: 'p2',
+      reason: 'INJURY_FORCED_SUBSTITUTION'
+    };
+    TestBed.configureTestingModule({
+      imports: [SubstitutionModalComponent, NoopAnimationsModule],
+      providers: [
+        { provide: MAT_DIALOG_DATA, useValue: data },
+        { provide: MatDialogRef, useValue: dialogRefSpy },
+        { provide: MatSnackBar, useValue: snackBarSpy },
+        { provide: MatchEngineService, useValue: engineServiceSpy },
+        { provide: HttpClient, useValue: jasmine.createSpyObj('HttpClient', ['get', 'post']) }
+      ]
+    });
+    const f = TestBed.createComponent(SubstitutionModalComponent);
+    f.detectChanges();
+
+    const guide = f.nativeElement.querySelector('[data-testid="sub-flow-guide"]') as HTMLElement;
+    expect(guide).not.toBeNull();
+    expect(guide.textContent).toContain('1. Elegí quién sale');
+    expect(guide.textContent).toContain('2. Elegí quién entra');
+    expect(guide.textContent).toContain('3. Confirmá el cambio');
+
+    const context = f.nativeElement.querySelector('[data-testid="injury-context"]') as HTMLElement;
+    expect(context).not.toBeNull();
+    expect(context.textContent).toContain('jugador lesionado');
+
+    const injuredDot = f.nativeElement.querySelector('.v25d79-pitch-dot.is-injury-target') as HTMLElement;
+    expect(injuredDot).not.toBeNull();
+    expect(injuredDot.textContent).toContain('Starter 2');
   });
 });

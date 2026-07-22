@@ -24,6 +24,15 @@ export interface V24LivePlayerRating {
   substitutedOut: boolean;
 }
 
+export interface LiveFormationSlot {
+  playerId?: string;
+  sessionPlayerId?: string;
+  position: string;
+  slotIndex?: number | null;
+  customXPercent?: number | null;
+  customYPercent?: number | null;
+}
+
 /**
  * MatchState - Estado del partido en tiempo real
  */
@@ -58,6 +67,8 @@ export interface MatchState {
    */
   homeFormation?: string;
   awayFormation?: string;
+  homeSlots?: LiveFormationSlot[];
+  awaySlots?: LiveFormationSlot[];
   /** Legacy tactics field (ATTACK/DEFEND/BALANCED) — pre-F3 UI used it for buttons. */
   homeTactic?: string;
   awayTactic?: string;
@@ -125,6 +136,12 @@ export interface MatchEvent {
    * Undefined for non-SUBSTITUTION events.
    */
   playerOnName?: string;
+  /**
+   * Backend V24 event field for the secondary player. For SUBSTITUTION,
+   * this is the player entering the pitch.
+   */
+  relatedPlayerId?: string;
+  relatedPlayerName?: string;
 }
 
 /**
@@ -202,6 +219,7 @@ export type StreamHealth = 'HEALTHY' | 'RECONNECTING' | 'DEGRADED' | 'CLOSED';
 export interface FormationChangeResult {
   success: boolean;
   minuteApplied?: number;
+  currentFormation?: LiveFormationSlot[];
   error?: string;
 }
 

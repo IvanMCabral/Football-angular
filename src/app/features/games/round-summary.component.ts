@@ -342,26 +342,23 @@ export class RoundSummaryComponent implements OnInit, OnDestroy {
   }
 
   continueToNewSeason() {
-    if (!confirm('¿Iniciar una nueva temporada con tu equipo actual?')) {
-      return;
-    }
-
     this.careerService.continueToNewSeason().subscribe({
       next: (response) => {
         if (response.success) {
-          // V25D75-C40 B2: backend ContinueSeasonUseCase.ContinueResult
-          // serializes the season as `newSeason` (NOT `season`). Reading
-          // response.season produced the literal "undefined" in the alert.
-          const newSeason = response.newSeason ?? response.season ?? '?';
-          alert('¡Nueva temporada ' + newSeason + ' iniciada!');
           this.router.navigate(['/squad']);
         } else {
-          alert('Error: ' + response.message);
+          this.vmSubject.next({
+            ...this.vmSubject.value,
+            errorMsg: response.message || 'Error al iniciar nueva temporada'
+          });
         }
       },
       error: (err) => {
         console.error('[SUMMARY] Error iniciando nueva temporada:', err);
-        alert(err.error?.message || 'Error al iniciar nueva temporada');
+        this.vmSubject.next({
+          ...this.vmSubject.value,
+          errorMsg: err.error?.message || 'Error al iniciar nueva temporada'
+        });
       }
     });
   }

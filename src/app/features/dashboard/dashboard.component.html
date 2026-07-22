@@ -12,6 +12,11 @@
     <!-- No Career: Single Button -->
     <!-- TEST: el contenido dentro de este ng-container debería verse si careerStatus$ emite cualquier valor -->
 <!-- Si NO hay carrera, mostrar botón para crear -->
+<div *ngIf="(careerStatus$ | async) === undefined">
+  <div class="play-card play-loading" aria-live="polite">
+    <span class="play-label">Cargando carrera...</span>
+  </div>
+</div>
 <div *ngIf="(careerStatus$ | async) === null">
   <div class="play-card play-new">
     <button class="play-button" (click)="onPlayNow()">CREAR CARRERA</button>

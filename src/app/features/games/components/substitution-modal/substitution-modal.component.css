@@ -2,7 +2,7 @@
    Responsive: en mobile (< 768px) las 3 columnas colapsan a 1 vertical. */
 
 .sub-modal-root {
-  min-width: 720px;
+  min-width: 860px;
   max-width: 960px;
   font-family: 'Segoe UI', system-ui, sans-serif;
 }
@@ -55,11 +55,120 @@
   border: 1px solid #ffcdd2;
 }
 
+.coach-objective-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0 0 0.85rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 10px;
+  border: 1px solid #d7e6d9;
+  background: #f5fbf6;
+  color: #12361f;
+}
+
+.coach-objective-card strong {
+  display: block;
+  margin-top: 0.12rem;
+  font-size: 1rem;
+}
+
+.coach-objective-card p {
+  margin: 0;
+  max-width: 520px;
+  font-size: 0.84rem;
+  line-height: 1.35;
+  color: #2f4f3a;
+}
+
+.coach-objective-kicker {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #4f6f57;
+}
+
+.coach-objective-card.objective-attack {
+  border-color: #fecaca;
+  background: #fff7ed;
+  color: #7c2d12;
+}
+
+.coach-objective-card.objective-attack .coach-objective-kicker,
+.coach-objective-card.objective-attack p {
+  color: #9a3412;
+}
+
+.coach-objective-card.objective-protect {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #1e3a8a;
+}
+
+.coach-objective-card.objective-protect .coach-objective-kicker,
+.coach-objective-card.objective-protect p {
+  color: #1d4ed8;
+}
+
+.coach-recommendation-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  margin: 0 0 0.85rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 10px;
+  border: 1px solid #bbf7d0;
+  background: #ecfdf5;
+  color: #14532d;
+}
+
+.coach-recommendation-card.is-medical {
+  border-color: #fecaca;
+  background: linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%);
+  color: #7f1d1d;
+  box-shadow: 0 10px 26px rgba(127, 29, 29, 0.1);
+}
+
+.coach-recommendation-card.is-medical p {
+  color: #991b1b;
+}
+
+.coach-recommendation-card.is-alternative {
+  border-color: #bfdbfe;
+  background: linear-gradient(135deg, #eff6ff 0%, #eef2ff 100%);
+  color: #1e3a8a;
+}
+
+.coach-recommendation-card.is-alternative p {
+  color: #1d4ed8;
+}
+
+.coach-recommendation-card strong {
+  display: block;
+  margin-top: 0.12rem;
+  font-size: 0.95rem;
+}
+
+.coach-recommendation-card p {
+  margin: 0.2rem 0 0;
+  font-size: 0.82rem;
+  color: #166534;
+}
+
+.apply-recommendation-btn {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
 /* ========== 3-column grid (desktop) ========== */
 .substitution-modal-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  grid-template-areas: "starting bench actions";
+  grid-template-columns: minmax(430px, 1.35fr) minmax(260px, 0.85fr);
+  grid-template-areas: "starting bench";
   gap: 16px;
   align-items: start;
 }
@@ -246,8 +355,7 @@
     grid-template-columns: 1fr;
     grid-template-areas:
       "starting"
-      "bench"
-      "actions";
+      "bench";
   }
 
   .player-list {
