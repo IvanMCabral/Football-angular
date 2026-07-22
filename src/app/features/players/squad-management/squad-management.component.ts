@@ -393,19 +393,19 @@ this.squad$ = combineLatest([
 
      const parts: string[] = [];
      if (suspended.length > 0) {
-       parts.push(`${suspended.length} suspended player${suspended.length > 1 ? 's' : ''}`);
+       parts.push(`${suspended.length} ${suspended.length > 1 ? 'jugadores suspendidos' : 'jugador suspendido'}`);
      }
      if (injured.length > 0) {
-       parts.push(`${injured.length} injured player${injured.length > 1 ? 's' : ''}`);
+       parts.push(`${injured.length} ${injured.length > 1 ? 'jugadores lesionados' : 'jugador lesionado'}`);
      }
      if (exhausted.length > 0) {
-       parts.push(`${exhausted.length} exhausted player${exhausted.length > 1 ? 's' : ''}`);
+       parts.push(`${exhausted.length} ${exhausted.length > 1 ? 'jugadores agotados' : 'jugador agotado'}`);
      }
      if (veryTired.length > 0) {
-       parts.push(`${veryTired.length} very tired player${veryTired.length > 1 ? 's' : ''}`);
+       parts.push(`${veryTired.length} ${veryTired.length > 1 ? 'jugadores muy cansados' : 'jugador muy cansado'}`);
      }
 
-     return `Warning: ${parts.join(', ')} ${parts.length > 1 ? 'are' : 'is'} in the lineup. This may affect performance. Click "Confirmar y Jugar" again to continue.`;
+     return `Atenci?n: ${parts.join(', ')} en el once. Esto puede afectar el rendimiento. Toc? "Confirmar y jugar" otra vez para continuar.`;
    }
 
    private resetLineupWarning(): void {

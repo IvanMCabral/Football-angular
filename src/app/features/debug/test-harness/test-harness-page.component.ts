@@ -912,7 +912,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
       <header class="page-header">
         <h1 class="page-title">Banco de Pruebas</h1>
         <p class="page-subtitle">
-          Superficie de prueba: cambiar formacion, repetir partidos e inspeccionar el detalle.
+          Superficie de prueba: cambiar formaci&oacute;n, repetir partidos e inspeccionar el detalle.
         </p>
         <a routerLink="/dashboard" class="link link-back" aria-label="Volver al dashboard">
           &larr; Volver al dashboard
@@ -994,7 +994,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
           <div class="compare-workflow-card" data-testid="compare-workflow-card">
             <div class="compare-workflow-header">
               <span class="context-label">Flujo profesional</span>
-              <strong>Modal DT -> Banco -> Motor -> Comparador</strong>
+              <strong>Modal DT &rarr; Banco &rarr; Motor &rarr; Comparador</strong>
             </div>
             <ol class="compare-workflow-steps">
               <li
@@ -1013,7 +1013,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
           </div>
           <div class="control-group">
             <mat-form-field appearance="outline" class="formation-field">
-              <mat-label>Formacion</mat-label>
+              <mat-label>Formaci&oacute;n</mat-label>
               <mat-select
                 [(ngModel)]="selectedFormationModel"
                 (selectionChange)="onFormationChange($event.value)"
@@ -1030,9 +1030,9 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 color="primary"
                 (click)="applyFormation()"
                 [disabled]="mutationInFlight() || !selectedFormationModel"
-                aria-label="Aplicar formacion seleccionada"
+                aria-label="Aplicar formaci&oacute;n seleccionada"
               >
-                Aplicar formacion
+                Aplicar formaci&oacute;n
               </button>
               <button
                 mat-stroked-button
@@ -1139,27 +1139,27 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 <mat-hint>Para comparar cambio temprano/tardío</mat-hint>
               </mat-form-field>
               <mat-form-field appearance="outline" class="swap-field">
-                <mat-label>Precision bateria</mat-label>
+                <mat-label>Precisi&oacute;n bater&iacute;a</mat-label>
                 <mat-select
                   [(ngModel)]="playerSwapBatteryPrecisionModel"
                   (ngModelChange)="onPlayerSwapBatteryPrecisionChange($event)"
                   aria-label="Select player swap battery precision"
                 >
-                  <mat-option value="quick">Rapida</mat-option>
+                  <mat-option value="quick">R&aacute;pida</mat-option>
                   <mat-option value="balanced">Balanceado</mat-option>
                   <mat-option value="reliable">Reliable</mat-option>
                 </mat-select>
                 <mat-hint>{{ playerSwapBatteryPrecisionHint() }}</mat-hint>
               </mat-form-field>
               <mat-form-field appearance="outline" class="swap-field">
-                <mat-label>Modo bateria</mat-label>
+                <mat-label>Modo bater&iacute;a</mat-label>
                 <mat-select
                   [(ngModel)]="playerSwapBatteryModeModel"
                   aria-label="Select player swap battery mode"
                 >
                   <mat-option value="natural">Solo natural</mat-option>
-                  <mat-option value="mixed">Include experiments</mat-option>
-                  <mat-option value="stress">Estres test</mat-option>
+                  <mat-option value="mixed">Incluir experimentos</mat-option>
+                  <mat-option value="stress">Prueba de estr&eacute;s</mat-option>
                 </mat-select>
                 <mat-hint>{{ playerSwapBatteryModeHint() }}</mat-hint>
               </mat-form-field>
@@ -1191,7 +1191,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 <mat-hint>{{ roleSlotImpactSlotHint() }}</mat-hint>
               </mat-form-field>
               <mat-form-field appearance="outline" class="swap-field">
-                <mat-label>Tablero bateria</mat-label>
+                <mat-label>Tablero bater&iacute;a</mat-label>
                 <mat-select
                   [(ngModel)]="scenarioBatteryGroupModel"
                   aria-label="Select tactical battery group"
@@ -1666,7 +1666,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 [disabled]="mutationInFlight() || scenarioBatteryCandidateMatches().length === 0"
                 aria-label="Run quick tactical battery board across several matches and both sides"
               >
-                Tablero bateria
+                Tablero bater&iacute;a
               </button>
               <span *ngIf="scenarioBatteryProgress()" class="inline-progress" aria-live="polite">
                 {{ scenarioBatteryProgress() }}
@@ -4173,7 +4173,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
           </div>
           <div *ngIf="scenarioBatteryRows().length > 0" class="formation-matrix analysis-matrix scenario-battery">
             <div class="matrix-header">
-              <strong>Tablero bateria tactico</strong>
+              <strong>Tablero bater&iacute;a tactico</strong>
               <span>
                 {{ scenarioBatteryRows().length }} lecturas - seeds {{ summarySeedStart() }}..{{ summarySeedStart() + scenarioMatrixSmokeSeedCount() - 1 }}
                 - {{ scenarioBatteryGroupLabel(scenarioBatteryRows()[0]?.scenarioGroup || scenarioBatteryGroupModel) }}
@@ -4549,11 +4549,24 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
     .seed-field, .round-field { width: 100%; }
     .swap-selector-row {
       display: grid;
-      grid-template-columns: 1fr 1fr minmax(110px, 0.45fr);
-      gap: 0.5rem;
-      margin-bottom: 0.5rem;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      column-gap: 0.75rem;
+      row-gap: 2.25rem;
+      align-items: start;
+      margin-bottom: 0.75rem;
     }
-    .swap-field, .swap-seed-count-field { width: 100%; }
+    .swap-field, .swap-seed-count-field {
+      width: 100%;
+      min-width: 0;
+    }
+    .swap-selector-row .mat-mdc-form-field {
+      min-width: 0;
+      margin-bottom: 0.8rem;
+    }
+    .swap-selector-row .mat-mdc-form-field-hint {
+      line-height: 1.2;
+      white-space: normal;
+    }
     @media (max-width: 767px) {
       .swap-selector-row { grid-template-columns: 1fr; }
     }

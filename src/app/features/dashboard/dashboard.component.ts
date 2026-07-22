@@ -362,16 +362,16 @@ export class DashboardComponent implements OnInit {
     const veryTired = this.veryTiredCount();
 
     if (suspended > 0) {
-      parts.push(`${suspended} suspended player${suspended > 1 ? 's' : ''}`);
+      parts.push(`${suspended} ${suspended > 1 ? 'jugadores suspendidos' : 'jugador suspendido'}`);
     }
     if (injured > 0) {
-      parts.push(`${injured} injured player${injured > 1 ? 's' : ''}`);
+      parts.push(`${injured} ${injured > 1 ? 'jugadores lesionados' : 'jugador lesionado'}`);
     }
     if (exhausted > 0) {
-      parts.push(`${exhausted} exhausted player${exhausted > 1 ? 's' : ''}`);
+      parts.push(`${exhausted} ${exhausted > 1 ? 'jugadores agotados' : 'jugador agotado'}`);
     }
     if (veryTired > 0) {
-      parts.push(`${veryTired} very tired player${veryTired > 1 ? 's' : ''}`);
+      parts.push(`${veryTired} ${veryTired > 1 ? 'jugadores muy cansados' : 'jugador muy cansado'}`);
     }
 
     return parts.join(' · ');
@@ -503,8 +503,8 @@ export class DashboardComponent implements OnInit {
    * Verifica si el usuario puede jugar la próxima fecha
    */
   canPlayNextRound(status: CareerStatus | null): boolean {
-    return status !== null && 
-           status.careerPhase === 'WAITING_USER' && 
+    return status !== null &&
+           status.careerPhase === 'WAITING_USER' &&
            !status.isFinished;
   }
 
