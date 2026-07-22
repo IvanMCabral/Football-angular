@@ -138,7 +138,7 @@
         </div>
 
         <div *ngIf="(squad$ | async)?.length === 0" class="empty-state">
-          Tu plantilla está vacía. Ve a "Gestionar" para agregar jugadores.
+          Tu plantilla est? vac?a. Ve a "Gestionar" para agregar jugadores.
         </div>
 
         <div class="players-grid">
@@ -219,7 +219,7 @@
                       [class.chemistry-high]="lineup.chemistryScore >= 80"
                       [class.chemistry-mid]="lineup.chemistryScore >= 60 && lineup.chemistryScore < 80"
                       [class.chemistry-low]="lineup.chemistryScore < 60"
-                      title="Quimica: promedio de nivel, habilidades y cobertura del equipo.">
+                      title="Qu?mica: promedio de nivel, habilidades y cobertura del equipo.">
                   ⚗ {{lineup.chemistryScore}}/99
                 </span>
                 <span class="lineup-count"
@@ -234,7 +234,7 @@
 
             <div *ngIf="lineup.chemistryBreakdown as bd" class="chemistry-breakdown">
               <div class="breakdown-header">
-                Detalle de qu?mica
+                Detalle de química
                 <span class="breakdown-coverage">({{ bd.coveragePercentage }}% cobertura)</span>
               </div>
               <div class="breakdown-row"
@@ -288,7 +288,7 @@
                 <span *ngSwitchDefault>⚠</span>
               </ng-container>
             </span>
-            <span class="banner-text">{{w.message}}</span>
+            <span class="banner-text">{{displayLineupWarningMessage(w)}}</span>
             <button class="banner-close" (click)="lineupWarning$.next(null)" title="Cerrar">×</button>
           </div>
 

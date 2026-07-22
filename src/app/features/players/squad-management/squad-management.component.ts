@@ -428,6 +428,23 @@ this.squad$ = combineLatest([
       return warnings[0];
     }
 
+    displayLineupWarningMessage(warning: LineupWarningDTO): string {
+      const availableMatch = warning.message?.match(/Only\s+(\d+)\s+available players/i);
+      if (availableMatch) {
+        return `Solo hay ${availableMatch[1]} jugadores disponibles. El equipo jugará con uno menos.`;
+      }
+      if (/short-handed/i.test(warning.message || '')) {
+        return 'El equipo jugará con menos de 11 jugadores disponibles.';
+      }
+      if (warning.code === 'LINEUP_NO_GOALKEEPER') {
+        return 'La alineación necesita un arquero.';
+      }
+      if (warning.code === 'LINEUP_MINIMUM_PLAYERS_NOT_MET') {
+        return 'Necesitás al menos 7 jugadores para jugar.';
+      }
+      return warning.message;
+    }
+
     // ========== V25D44 (Sprint C9): chemistry breakdown interactivity ==========
 
     /**
