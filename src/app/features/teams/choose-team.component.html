@@ -1,9 +1,9 @@
-<!-- Debug info removido -->
+
 <div class="choose-team-container">
-  <h1>Elegir Equipo</h1>
+  <h1>Elegir equipo</h1>
   <div *ngIf="loading">Cargando equipos...</div>
   <div *ngIf="errorMessage" class="error-message">{{ errorMessage }}</div>
-  <!-- Debug JSON removido -->
+
   <ul *ngIf="teams && teams.length">
     <li *ngFor="let team of teams" (click)="chooseTeam(team)" [class.selected]="selectedTeam && selectedTeam.id === team.id">
       <strong>ID: {{ team.id }}</strong>
