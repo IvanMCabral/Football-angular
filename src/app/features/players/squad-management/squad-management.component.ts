@@ -433,6 +433,10 @@ this.squad$ = combineLatest([
       if (availableMatch) {
         return `Solo hay ${availableMatch[1]} jugadores disponibles. El equipo jugará con uno menos.`;
       }
+      const offPositionMatch = warning.message?.match(/(\d+)\s+([A-Z]+)\s+slot filled by off-position players/i);
+      if (offPositionMatch) {
+        return `${offPositionMatch[1]} slot ${offPositionMatch[2]} está cubierto por jugadores fuera de posición. Se aplica penalización de efectividad.`;
+      }
       if (/short-handed/i.test(warning.message || '')) {
         return 'El equipo jugará con menos de 11 jugadores disponibles.';
       }
