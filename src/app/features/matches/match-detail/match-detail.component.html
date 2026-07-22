@@ -1,23 +1,32 @@
 <div class="match-detail-container">
-  <h1>Match Progress</h1>
-  <div *ngIf="loading">Loading match progress...</div>
+  <h1>Progreso del partido</h1>
+
+  <div *ngIf="loading">Cargando progreso del partido...</div>
   <div *ngIf="error">{{ error }}</div>
+
   <div *ngIf="!loading && !error && currentState">
-    <h2>Minute: {{ currentState.minute }}</h2>
+    <h2>Minuto: {{ currentState.minute }}</h2>
+
     <div class="score">
-      <span>Home: {{ currentState.homeGoals }}</span>
-      <span>Away: {{ currentState.awayGoals }}</span>
+      <span>Local: {{ currentState.homeGoals }}</span>
+      <span>Visitante: {{ currentState.awayGoals }}</span>
     </div>
-    <div class="status">Status: {{ currentState.status }}</div>
+
+    <div class="status">Estado: {{ currentState.status }}</div>
+
     <div class="events">
-      <h3>Events</h3>
+      <h3>Eventos</h3>
       <ul>
         <li *ngFor="let event of currentState.events">
-          <strong>{{ event.minute }}'</strong> - {{ event.type }} - {{ event.playerName }}: {{ event.description }}
+          <strong>{{ event.minute }}'</strong>
+          - {{ formatEventType(event.type) }}
+          - {{ event.playerName }}: {{ displayEventDescription(event) }}
         </li>
       </ul>
     </div>
-    <div *ngIf="isFinished" class="finished">Match finished!</div>
+
+    <div *ngIf="isFinished" class="finished">Partido finalizado.</div>
   </div>
-  <a routerLink="/matches" class="back-link">← Back to matches</a>
+
+  <a routerLink="/matches" class="back-link">← Volver a partidos</a>
 </div>

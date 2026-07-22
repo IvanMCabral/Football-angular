@@ -1,10 +1,5 @@
 <div class="container">
-  <!-- V25D83.1 sprint 2 ajuste (pre-push): full-screen spinner overlay
-       mientras el squad data está (re-)cargándose. Se dispara en initial
-       mount y después de un refetch (lineup-confirm, squad-editor close,
-       continue-to-new-season). Cubre toda la grid con un backdrop
-       semi-transparente para evitar que el usuario vea la grid vacía
-       durante el HTTP in-flight. -->
+
   <div *ngIf="squadLoading$ | async" class="squad-loading-overlay" data-testid="squad-loading-overlay" role="status" aria-live="polite">
     <div class="squad-loading-content">
       <div class="spinner spinner-lg"></div>
@@ -12,14 +7,14 @@
     </div>
   </div>
 
-  <!-- HEADER: Título y estadísticas en una fila -->
+
   <div class="page-header">
     <div class="header-left">
-      <h1>⚽ Squad Management</h1>
+      <h1>⚽ Mi equipo</h1>
       <a routerLink="/dashboard" class="btn-back">← Volver</a>
     </div>
-    
-    <!-- BARRA DE ESTADO DE CARRERA -->
+
+
     <app-career-status-bar
       *ngIf="careerStatus$ | async as careerStatus"
       [careerStatus]="careerStatus"
@@ -30,21 +25,21 @@
     </app-career-status-bar>
   </div>
 
-  <!-- Loading State -->
+
   <div *ngIf="loading$ | async" class="loading-state">
     <div class="spinner"></div>
     <p>Cargando datos...</p>
   </div>
 
-  <!-- No Career Warning -->
+
   <div *ngIf="!(loading$ | async) && !(careerStatus$ | async)" class="warning">
-    ⚠️ No active career found. Create a game first!
-    <a routerLink="/dashboard" class="btn-link">Go to Dashboard</a>
+    ⚠️ No hay una carrera activa. Primero crea una carrera.
+    <a routerLink="/dashboard" class="btn-link">Ir al inicio</a>
   </div>
 
-  <!-- SQUAD SECTION -->
+
   <div class="squad-section" *ngIf="careerStatus$ | async as careerStatus">
-    <!-- FIN DE TEMPORADA: Botones de acción -->
+
     <div *ngIf="careerStatus.careerPhase === 'FINISHED'" class="section tournament-ended">
       <div class="section-header">
         <h3>🏆 Temporada Finalizada</h3>
@@ -53,14 +48,14 @@
         <button class="action-button primary" (click)="viewFinalStandings()">
           <span class="action-icon">📊</span>
           <span class="action-text">
-            <span class="action-label">Ver Tabla Final</span>
+            <span class="action-label">Ver tabla final</span>
             <span class="action-subtitle">Clasificación definitiva</span>
           </span>
         </button>
         <button class="action-button success" (click)="continueToNewSeason()">
           <span class="action-icon">🚀</span>
           <span class="action-text">
-            <span class="action-label">Continuar Carrera</span>
+            <span class="action-label">Continuar carrera</span>
             <span class="action-subtitle">Iniciar nueva temporada</span>
           </span>
         </button>
@@ -74,7 +69,7 @@
       </div>
     </div>
 
-    <!-- TEAM CARD (si hay datos del equipo) -->
+
     <div class="team-card" *ngIf="team$ | async as team">
       <div class="team-header">
         <h2>🏆 {{ team.name }}</h2>
@@ -87,7 +82,7 @@
     </div>
 
     <div class="section" *ngIf="careerStatus.careerPhase !== 'FINISHED'">
-      <!-- Squad / Stats tab bar -->
+
       <div class="tab-bar">
         <button
           class="tab-btn"
@@ -99,30 +94,26 @@
           class="tab-btn"
           [class.active]="(activeTab$ | async) === 'stats'"
           (click)="setActiveTab('stats')">
-          📊 Stats
+          📊 Estad?sticas
         </button>
       </div>
 
-      <!-- Squad tab -->
+
       <div *ngIf="(activeTab$ | async) === 'squad'">
         <div class="section-header">
-          <h3>👥 Tu Plantilla ({{availableSquadCount(squad$ | async)}} / {{(squad$ | async)?.length || 0}} disponibles)</h3>
+          <h3>👥 Tu plantilla ({{availableSquadCount(squad$ | async)}} / {{(squad$ | async)?.length || 0}} disponibles)</h3>
           <a routerLink="/players/manage" class="btn-create" title="Ir a gestion de jugadores">⚙️ Gestionar</a>
         </div>
 
-        <!-- V25D59-C19 P1: mini-CTA en el header del squad con conteo de lineup armado.
-             El counter refleja los subdivision slots persistidos (no players.length),
-             que era la fuente de la mentira "11/11" cuando auto-select devolvía <11
-             players por el bug C18b. Tras el fix back (C19 P0) auto-select garantiza
-             11 slots; para lineups manuales/legacy el counter muestra el número real. -->
+
         <div *ngIf="lineup$ | async"
              [class.lineup-incomplete]="lineupSlotsCount < 11"
              [class.lineup-complete]="lineupSlotsCount === 11"
              class="lineup-mini-cta">
-          ⚽ Lineup armado: <strong>{{ lineupSlotsCount }} / 11</strong> — <a href="#">Ir a confirmar</a>
+          ⚽ Alineaci?n armada: <strong>{{ lineupSlotsCount }} / 11</strong> — <a href="#">Ir a confirmar</a>
         </div>
 
-        <!-- V24D6T2 (bug #6): dedicated short-handed warning when available < 11 -->
+
         <div *ngIf="(squad$ | async) as s"
              [hidden]="availableSquadCount(s) >= 11"
              class="squad-short-handed-banner"
@@ -131,18 +122,12 @@
           <span class="banner-text">
             <ng-container *ngIf="availableSquadCount(s) < 7; else shortHanded">
               Plantilla muy corta: {{ availableSquadCount(s) }} disponibles.
-              <!-- V25D78-C55.7.7 BUG-L4: clarify that 7 is a minimum, not exact.
-                   Pre-fix wording suggested "exactly 7 is the minimum" which
-                   left users wondering if 8 or 9 was OK. -->
+
               Mínimo 7 jugadores para jugar (puedes tener más).
               <a routerLink="/players/manage" class="banner-link">Gestionar plantilla</a>
             </ng-container>
             <ng-template #shortHanded>
-              <!-- V25D78-C55.7.7 BUG-L2: replace alarmist "(short-handed)" with
-                   a neutral informative message that frames the same data
-                   positively (healthy / recommended) instead of implying a
-                   deficit. Pre-fix wording suggested an error state even with
-                   a healthy 18-player squad (C55.7.4 recorrido screenshot 08). -->
+
               <span [title]="'Tienes ' + availableSquadCount(s) + ' jugadores sanos en tu plantilla. El mínimo recomendado para jugar es 11 (idealmente 25). Andá a Gestionar para agregar más jugadores a tu plantilla.'">
                 Tienes {{ availableSquadCount(s) }} jugadores sanos
                 (mínimo recomendado 11).
@@ -166,7 +151,7 @@
         </div>
       </div>
 
-      <!-- Stats tab -->
+
       <div *ngIf="(activeTab$ | async) === 'stats'">
         <app-season-stats-tab
           [careerId]="(careerStatus$ | async)?.careerId ?? ''"
@@ -177,7 +162,7 @@
       </div>
     </div>
 
-    <!-- LINEUP SECTION -->
+
     <div class="section lineup-section" *ngIf="careerStatus$ | async as careerStatus">
       <div class="section-header">
         <h3>⚽ Alineación Titular</h3>
@@ -199,9 +184,9 @@
           [disabled]="lineupLoading$ | async"
           class="btn-auto-select"
           title="Auto-seleccionar alineacion segun formacion">
-          🤖 Auto Seleccionar
+          🤖 Auto seleccionar
         </button>
-        <!-- MVP1-lineup-cancha-1: abre modal con cancha visual y 82 slots. -->
+
         <button
           (click)="openVisualEditor()"
           class="btn-visual-editor"
@@ -228,16 +213,13 @@
             <div class="lineup-info">
               <span class="lineup-formation">{{lineup.formation}}</span>
               <div class="lineup-info-right">
-                <!-- V25D42 (Sprint C7): team chemistry badge (optional, nullable for
-                     backward compat con lineups pre-V25D41). Color coding:
-                     >=80 verde (elite), 60-79 amarillo (regular), <60 rojo (bajo).
-                     Tooltip explica la fórmula. -->
+
                 <span *ngIf="lineup.chemistryScore != null"
                       class="chemistry-badge"
                       [class.chemistry-high]="lineup.chemistryScore >= 80"
                       [class.chemistry-mid]="lineup.chemistryScore >= 60 && lineup.chemistryScore < 80"
                       [class.chemistry-low]="lineup.chemistryScore < 60"
-                      [title]="'Team chemistry: AVG de overalls + skill bonus (team-level MAX) + coverage bonus. Calculado por TeamChemistryCalculator (V25D41).'">
+                      title="Quimica: promedio de nivel, habilidades y cobertura del equipo.">
                   ⚗ {{lineup.chemistryScore}}/99
                 </span>
                 <span class="lineup-count"
@@ -249,17 +231,11 @@
               </div>
             </div>
 
-            <!-- V25D43 (Sprint C8): chemistry breakdown — per position group (GK/DEF/MID/ATT)
-                 chips with skill name + maxLevel. Color coding por maxLevel:
-                 >=80 verde (elite), 50-79 amarillo (regular), <50 rojo (bajo).
-                 Optional: solo se renderiza si el back popula chemistryBreakdown
-                 (lineups pre-V25D43 no lo traen → null/undefined → no render).
-                 V25D44 (Sprint C9): chips son clickables — onSkillChipClick abre el
-                 popover del contributor. Visual feedback: chip-selected class. -->
+
             <div *ngIf="lineup.chemistryBreakdown as bd" class="chemistry-breakdown">
               <div class="breakdown-header">
-                Chemistry Breakdown
-                <span class="breakdown-coverage">({{ bd.coveragePercentage }}% coverage)</span>
+                Detalle de qu?mica
+                <span class="breakdown-coverage">({{ bd.coveragePercentage }}% cobertura)</span>
               </div>
               <div class="breakdown-row"
                    *ngFor="let group of positionGroupOrder">
@@ -271,23 +247,21 @@
                         [class.chip-mid]="sc.maxLevel >= 50 && sc.maxLevel < 80"
                         [class.chip-low]="sc.maxLevel < 50"
                         [class.chip-selected]="isSelectedContributor(sc.contributorId)"
-                        [title]="sc.skill + ' ' + sc.maxLevel + ' (carrier: ' + sc.contributorId + ')'"
+                        [title]="sc.skill + ' ' + sc.maxLevel + ' (jugador: ' + sc.contributorId + ')'"
                         (click)="onSkillChipClick(sc.contributorId)">
                     {{ sc.skill }} {{ sc.maxLevel }}
                   </span>
                 </ng-container>
                 <ng-template #emptyGroup>
-                  <span class="group-empty">(sin skills mapeados a {{ group }})</span>
+                  <span class="group-empty">(sin habilidades mapeadas a {{ group }})</span>
                 </ng-template>
               </div>
 
-              <!-- V25D44 (Sprint C9): contributor popover — inline below the chips.
-                   Shows name + position + overall del player con max level para el skill.
-                   Cierra con X button o click outside (HostListener en el component). -->
+
               <div *ngIf="selectedContributor$ | async as sc"
                    class="contributor-popover"
                    role="dialog"
-                   aria-label="Contributor details">
+                   aria-label="Detalle del jugador">
                 <span class="contributor-name">{{ sc.name }}</span>
                 <span class="contributor-meta">
                   <span class="contributor-position">{{ sc.position }}</span>
@@ -296,12 +270,12 @@
                 <button type="button"
                         class="contributor-close"
                         (click)="closeContributorPopover()"
-                        title="Close"
-                        aria-label="Close contributor details">×</button>
+                        title="Cerrar"
+                        aria-label="Cerrar detalle del jugador">×</button>
               </div>
             </div>
 
-          <!-- V24D6U3: server-issued warning banner (LINEUP_SHORT_HANDED / LINEUP_NO_GOALKEEPER) -->
+
           <div *ngIf="lineupWarning$ | async as w"
                class="lineup-warning-banner"
                [class.warning-error]="w.severity === 'ERROR'"
@@ -339,13 +313,13 @@
                           ? 'Máximo 11 jugadores (ideal para 4-4-2/3-5-2/4-3-3)'
                           : 'Confirmar')"
               class="btn-confirm-lineup">
-              ✅ Confirmar y Jugar
+              ✅ Confirmar y jugar
             </button>
           </div>
         </div>
 
         <div *ngIf="!lineup.players || lineup.players.length === 0" class="empty-lineup">
-          <p>Selecciona una formación y haz clic en "Auto Seleccionar"</p>
+          <p>Selecciona una formación y haz clic en "Auto seleccionar"</p>
         </div>
       </div>
     </div>
@@ -353,14 +327,8 @@
 
   <div *ngIf="error$ | async as error" class="error">{{error}}</div>
 
-  <!-- V24D11 UX-3: sticky CTA bar visible cuando hay lineup armado -->
-  <!-- V25D78-C55.13 BUG-2 (BUG_V25D78_CONFIRMAR_YUGAR_FOOTER_PERSIST_FINISHED):
-       Iván pidió que el footer "0/11 jugadores + Confirmar y Jugar disabled"
-       NO aparezca en careerPhase=FINISHED — en ese estado el único botón
-       visible debe ser el verde "Continuar Carrera" (dentro del bloque
-       tournament-ended arriba). Sin este guard, los usuarios veían dos CTAs
-       contradictorios: el verde "Continuar Carrera" arriba y el deshabilitado
-       "Confirmar y Jugar" abajo. -->
+
+
   <div *ngIf="(careerStatus$ | async)?.careerPhase !== 'FINISHED'">
     <div *ngIf="(lineup$ | async) as lineup"
          [hidden]="!lineup?.players?.length"
@@ -373,9 +341,9 @@
         [disabled]="(lineupLoading$ | async) || lineupSlotsCount < 11"
         [title]="lineupSlotsCount < 11
                  ? 'Necesitás armar 11/11'
-                 : 'Confirmar y Jugar'"
+                 : 'Confirmar y jugar'"
         class="btn-confirm-lineup">
-        ✅ Confirmar y Jugar
+        ✅ Confirmar y jugar
       </button>
     </div>
   </div>
