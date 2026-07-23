@@ -1,4 +1,8 @@
-import { PositionPixelMatrixSummaryRow } from '../models/test-harness.model';
+import {
+  PositionPixelMatrixSummary,
+  PositionPixelMatrixSummaryRow,
+  PositionPixelReadLevel,
+} from '../models/test-harness.model';
 
 type PositionPixelSignalRead = Pick<
   PositionPixelMatrixSummaryRow,
@@ -34,6 +38,106 @@ type PositionPixelSignalRead = Pick<
 
 export function positionPixelDistance(row: Pick<PositionPixelSignalRead, 'fromXPercent' | 'fromYPercent' | 'targetXPercent' | 'targetYPercent'>): number {
   return Math.hypot(row.targetXPercent - row.fromXPercent, row.targetYPercent - row.fromYPercent);
+}
+
+export function positionPixelDecisionScore(row: PositionPixelMatrixSummary): number {
+  const shotDiff = row.deltaShotsFor - row.deltaShotsAgainst;
+  return row.deltaXgDiff
+    + shotDiff * 0.015
+    + row.deltaPossessionFor * 0.0015
+    + positionPixelDefensiveGainScore(row) * 0.020
+    - positionPixelDefensiveRiskScore(row) * 0.020;
+}
+
+export function positionPixelReadLevel(
+  row: PositionPixelMatrixSummary,
+  tacticalRead = '',
+): PositionPixelReadLevel {
+  const distance = positionPixelDistance(row);
+  const xg = Math.max(Math.abs(row.deltaXgFor), Math.abs(row.deltaXgAgainst), Math.abs(row.deltaXgDiff));
+  const shots = Math.max(Math.abs(row.deltaShotsFor), Math.abs(row.deltaShotsAgainst));
+  const poss = Math.abs(row.deltaPossessionFor);
+  const zoneShots = Math.max(
+    Math.abs(row.deltaCentralShotsFor) + Math.abs(row.deltaWideShotsFor) + Math.abs(row.deltaLongShotsFor),
+    Math.abs(row.deltaCentralShotsAgainst) + Math.abs(row.deltaWideShotsAgainst) + Math.abs(row.deltaLongShotsAgainst),
+  );
+  const sideXg = Math.max(
+    Math.abs(row.deltaLeftWideXgFor),
+    Math.abs(row.deltaRightWideXgFor),
+    Math.abs(row.deltaLeftWideXgAgainst),
+    Math.abs(row.deltaRightWideXgAgainst),
+  );
+  if (distance <= 1.25) {
+    return row.signalScore >= 0.050 ? 'check' : 'stable';
+  }
+  if (distance <= 6.0) {
+    if (tacticalRead.startsWith('Visible') && tacticalRead !== 'Visible small') return 'visible';
+    if (xg > 0.22 || sideXg > 0.12 || shots > 4.0 || poss > 4.0 || zoneShots > 5.0) return 'check';
+    if (xg > 0.06 || sideXg > 0.035 || shots > 1.0 || poss > 1.0 || zoneShots > 1.5) return 'visible';
+    return 'stable';
+  }
+  if (xg > 0.22 || sideXg > 0.12 || shots > 4.0 || poss > 4.0 || zoneShots > 5.0) return 'strong';
+  if (xg > 0.06 || sideXg > 0.035 || shots > 1.0 || poss > 1.0 || zoneShots > 1.5) return 'visible';
+  return 'stable';
+}
+
+export function positionPixelReadSeverity(row: PositionPixelMatrixSummary, tacticalRead = ''): number {
+  switch (positionPixelReadLevel(row, tacticalRead)) {
+    case 'check':
+      return 4;
+    case 'strong':
+      return 3;
+    case 'visible':
+      return 2;
+    default:
+      return 1;
+  }
+}
+
+export function positionPixelImpactScore(row: PositionPixelMatrixSummary): number {
+  return (
+    Math.abs(row.deltaXgFor) * 10 +
+    Math.abs(row.deltaXgAgainst) * 10 +
+    Math.abs(row.deltaXgDiff) * 8 +
+    Math.abs(row.deltaShotsFor) +
+    Math.abs(row.deltaShotsAgainst) +
+    Math.abs(row.deltaPossessionFor) * 0.4 +
+    (Math.abs(row.deltaCentralShotsFor) + Math.abs(row.deltaWideShotsFor) + Math.abs(row.deltaLongShotsFor)) * 0.5 +
+    (Math.abs(row.deltaCentralShotsAgainst) + Math.abs(row.deltaWideShotsAgainst) + Math.abs(row.deltaLongShotsAgainst)) * 0.5 +
+    (Math.abs(row.deltaLeftWideXgFor) + Math.abs(row.deltaRightWideXgFor)
+      + Math.abs(row.deltaLeftWideXgAgainst) + Math.abs(row.deltaRightWideXgAgainst)) * 8
+  );
+}
+
+export function positionPixelAttackGainScore(row: PositionPixelMatrixSummary): number {
+  return Math.max(0, row.deltaXgFor) * 10
+    + Math.max(0, row.deltaShotsFor) * 0.75
+    + Math.max(0, row.deltaPossessionFor) * 0.25
+    + Math.max(0, row.deltaCentralShotsFor + row.deltaWideShotsFor + row.deltaLongShotsFor) * 0.35
+    + Math.max(0, row.deltaLeftWideXgFor + row.deltaRightWideXgFor) * 8;
+}
+
+export function positionPixelAttackLossScore(row: PositionPixelMatrixSummary): number {
+  return Math.max(0, -row.deltaXgFor) * 10
+    + Math.max(0, -row.deltaShotsFor) * 0.75
+    + Math.max(0, -row.deltaPossessionFor) * 0.25
+    + Math.max(0, -(row.deltaCentralShotsFor + row.deltaWideShotsFor + row.deltaLongShotsFor)) * 0.35
+    + Math.max(0, -(row.deltaLeftWideXgFor + row.deltaRightWideXgFor)) * 8;
+}
+
+export function positionPixelDefensiveRiskScore(row: PositionPixelMatrixSummary): number {
+  return Math.max(0, row.deltaXgAgainst) * 12
+    + Math.max(0, row.deltaShotsAgainst) * 0.85
+    + Math.max(0, row.deltaCentralShotsAgainst + row.deltaWideShotsAgainst + row.deltaLongShotsAgainst) * 0.45
+    + Math.max(0, row.deltaCentralXgAgainst + row.deltaWideXgAgainst + row.deltaLongXgAgainst) * 8
+    + Math.max(0, row.deltaLeftWideXgAgainst + row.deltaRightWideXgAgainst) * 8;
+}
+
+export function positionPixelDefensiveGainScore(row: PositionPixelMatrixSummary): number {
+  return Math.max(0, -row.deltaXgAgainst) * 12
+    + Math.max(0, -row.deltaShotsAgainst) * 0.85
+    + Math.max(0, -(row.deltaCentralShotsAgainst + row.deltaWideShotsAgainst + row.deltaLongShotsAgainst)) * 0.45
+    + Math.max(0, -(row.deltaLeftWideXgAgainst + row.deltaRightWideXgAgainst)) * 8;
 }
 
 export function positionPixelMovementConfidence(distance: number): number {

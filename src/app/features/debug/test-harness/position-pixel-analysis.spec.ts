@@ -1,6 +1,14 @@
 import {
+  positionPixelAttackGainScore,
+  positionPixelAttackLossScore,
+  positionPixelDecisionScore,
+  positionPixelDefensiveGainScore,
+  positionPixelDefensiveRiskScore,
   positionPixelDistance,
+  positionPixelImpactScore,
   positionPixelMovementConfidence,
+  positionPixelReadLevel,
+  positionPixelReadSeverity,
   positionPixelSignalClass,
   positionPixelSignalDetail,
   positionPixelSignalRead,
@@ -37,6 +45,7 @@ describe('position-pixel-analysis', () => {
     deltaPossessionFor: 0,
     deltaPlayerEffectiveness: 0,
     deltaPlayerCollective: 0,
+    signalScore: 0,
   };
 
   const formatDelta = (value: number): string => (value >= 0 ? `+${value}` : `${value}`);
@@ -97,5 +106,92 @@ describe('position-pixel-analysis', () => {
     expect(detail).toContain('xG for/ag/diff +0.040/+0.020/+0.020');
     expect(detail).toContain('shots for/ag +1/+2');
     expect(detail).toContain('dist 6.00px');
+  });
+
+  it('separates attacking gains from attacking losses', () => {
+    const attackingMove = {
+      ...baseRow,
+      deltaXgFor: 0.14,
+      deltaShotsFor: 2,
+      deltaPossessionFor: 3,
+      deltaCentralShotsFor: 1,
+      deltaWideShotsFor: 1,
+      deltaLeftWideXgFor: 0.03,
+    } as any;
+    const attackLoss = {
+      ...attackingMove,
+      deltaXgFor: -0.14,
+      deltaShotsFor: -2,
+      deltaPossessionFor: -3,
+      deltaCentralShotsFor: -1,
+      deltaWideShotsFor: -1,
+      deltaLeftWideXgFor: -0.03,
+    } as any;
+
+    expect(positionPixelAttackGainScore(attackingMove)).toBeGreaterThan(0);
+    expect(positionPixelAttackLossScore(attackingMove)).toBe(0);
+    expect(positionPixelAttackGainScore(attackLoss)).toBe(0);
+    expect(positionPixelAttackLossScore(attackLoss)).toBeGreaterThan(0);
+  });
+
+  it('separates defensive risk from defensive gain', () => {
+    const riskyMove = {
+      ...baseRow,
+      deltaXgAgainst: 0.12,
+      deltaShotsAgainst: 2,
+      deltaCentralShotsAgainst: 1,
+      deltaWideShotsAgainst: 1,
+      deltaCentralXgAgainst: 0.04,
+      deltaWideXgAgainst: 0.03,
+      deltaLeftWideXgAgainst: 0.02,
+    } as any;
+    const defensiveMove = {
+      ...riskyMove,
+      deltaXgAgainst: -0.12,
+      deltaShotsAgainst: -2,
+      deltaCentralShotsAgainst: -1,
+      deltaWideShotsAgainst: -1,
+      deltaCentralXgAgainst: -0.04,
+      deltaWideXgAgainst: -0.03,
+      deltaLeftWideXgAgainst: -0.02,
+    } as any;
+
+    expect(positionPixelDefensiveRiskScore(riskyMove)).toBeGreaterThan(0);
+    expect(positionPixelDefensiveGainScore(riskyMove)).toBe(0);
+    expect(positionPixelDefensiveRiskScore(defensiveMove)).toBe(0);
+    expect(positionPixelDefensiveGainScore(defensiveMove)).toBeGreaterThan(0);
+  });
+
+  it('keeps read level thresholds consistent with movement size', () => {
+    expect(positionPixelReadLevel({ ...baseRow, targetXPercent: 51, signalScore: 0.06 } as any)).toBe('check');
+    expect(positionPixelReadSeverity({ ...baseRow, targetXPercent: 51, signalScore: 0.06 } as any)).toBe(4);
+    expect(positionPixelReadLevel({ ...baseRow, targetXPercent: 56, deltaShotsFor: 2 } as any)).toBe('visible');
+    expect(positionPixelReadLevel({ ...baseRow, targetXPercent: 60, deltaXgAgainst: 0.30 } as any)).toBe('strong');
+  });
+
+  it('scores overall impact and decision direction from the same row', () => {
+    const goodMove = {
+      ...baseRow,
+      targetXPercent: 58,
+      deltaXgFor: 0.10,
+      deltaXgAgainst: -0.05,
+      deltaXgDiff: 0.15,
+      deltaShotsFor: 2,
+      deltaShotsAgainst: -1,
+      deltaPossessionFor: 3,
+    } as any;
+    const badMove = {
+      ...goodMove,
+      deltaXgFor: -0.10,
+      deltaXgAgainst: 0.05,
+      deltaXgDiff: -0.15,
+      deltaShotsFor: -2,
+      deltaShotsAgainst: 1,
+      deltaPossessionFor: -3,
+    } as any;
+
+    expect(positionPixelImpactScore(goodMove)).toBeGreaterThan(0);
+    expect(positionPixelDecisionScore(goodMove)).toBeGreaterThan(0);
+    expect(positionPixelDecisionScore(badMove)).toBeLessThan(0);
   });
 });
