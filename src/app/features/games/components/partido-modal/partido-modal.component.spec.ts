@@ -385,6 +385,44 @@ describe('PartidoModalComponent (V25D89-FRONT-A)', () => {
     expect(component.freePositionTopPercent(s7Slot!)).toBe(60);
   });
 
+  it('does not mark the modal dirty when remembered player pixels are only restored on open', () => {
+    spyOn(window.localStorage, 'getItem').and.callFake((key: string) => {
+      if (key === 'manager:partido-player-coords:match-1') {
+        return JSON.stringify({ s7: { x: 84.3, y: 60 } });
+      }
+      return null;
+    });
+
+    fixture = TestBed.createComponent(PartidoModalComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+
+    expect(component.freePositionLeftPercent(6)).toBe(84.3);
+    expect(component.freePositionTopPercent(6)).toBe(60);
+    expect(component.hasPendingChanges()).toBeFalse();
+  });
+
+  it('does not mark the modal dirty when a full remembered XI is restored on open', () => {
+    spyOn(window.localStorage, 'getItem').and.callFake((key: string) => {
+      if (key === 'manager:partido-player-coords:match-1') {
+        return JSON.stringify(Object.fromEntries(
+          Array.from({ length: 11 }, (_item, index) => [
+            `s${index + 1}`,
+            { x: 10 + index * 4, y: 20 + index * 3 }
+          ])
+        ));
+      }
+      return null;
+    });
+
+    fixture = TestBed.createComponent(PartidoModalComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+
+    expect(component.freeSlotCoords.size).toBe(11);
+    expect(component.hasPendingChanges()).toBeFalse();
+  });
+
   it('save() preserves loaded current custom pixels even when only a substitution is pending', (done) => {
     dialogData.currentSlots = dialogData.currentSlots.map(slot => slot.slotIndex === 6
       ? { ...slot, customXPercent: 47.25, customYPercent: 58.75 }

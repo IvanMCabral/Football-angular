@@ -1625,6 +1625,8 @@ export class PartidoModalComponent {
   selectedBenchPlayerId: string | null = null;
   selectedNudgeSlotIdx: number | null = null;
   private activeSaveToken: symbol | null = null;
+  private initialSlotAssignments: Map<number, string | null> = new Map();
+  private initialFreeSlotCoords: Map<number, { x: number; y: number }> = new Map();
 
   /** id of the slot currently being dragged (or null when idle). */
   dragSourceSlotIdx: number | null = null;
@@ -1687,7 +1689,11 @@ export class PartidoModalComponent {
     }
     this.sanitizeDuplicateSlotAssignments();
     this.hydrateRememberedPlayerCoords();
+    this.captureInitialSlotSnapshot();
     this.autoFillEmptySlots();
+    if (this.autoFilledSlots.size === 0) {
+      this.captureInitialSlotSnapshot();
+    }
     this.focusPreSelectedPlayerIfPresent();
   }
 
@@ -2467,31 +2473,20 @@ export class PartidoModalComponent {
   // ========== : diff + save ==========
 
   private slotsDifferFromInitial(): boolean {
-    const initial = new Map<number, string>();
-    const initialCoords = new Map<number, { x: number; y: number }>();
-    for (const s of this.data.currentSlots ?? []) {
-      initial.set(s.slotIndex, s.sessionPlayerId || '');
-      if (this.isFinitePercent(s.customXPercent) && this.isFinitePercent(s.customYPercent)) {
-        initialCoords.set(s.slotIndex, {
-          x: this.clampPercent(s.customXPercent),
-          y: this.clampPercent(s.customYPercent)
-        });
-      }
-    }
-    if (this.slotAssignments.size !== initial.size) {
+    if (this.slotAssignments.size !== this.initialSlotAssignments.size) {
       return true;
     }
     for (const [idx, pid] of this.slotAssignments) {
-      const initialPid = initial.get(idx) ?? '';
+      const initialPid = this.initialSlotAssignments.get(idx) ?? '';
       if ((pid ?? '') !== initialPid) {
         return true;
       }
     }
-    if (this.freeSlotCoords.size !== initialCoords.size) {
+    if (this.freeSlotCoords.size !== this.initialFreeSlotCoords.size) {
       return true;
     }
     for (const [idx, coords] of this.freeSlotCoords) {
-      const initialSlotCoords = initialCoords.get(idx);
+      const initialSlotCoords = this.initialFreeSlotCoords.get(idx);
       if (!initialSlotCoords) {
         return true;
       }
@@ -2501,6 +2496,17 @@ export class PartidoModalComponent {
       }
     }
     return false;
+  }
+
+  private captureInitialSlotSnapshot(): void {
+    this.initialSlotAssignments = new Map(this.slotAssignments);
+    this.initialFreeSlotCoords = new Map(
+      Array.from(this.freeSlotCoords.entries()).map(([slotIdx, coords]) => [
+        slotIdx,
+        { x: this.clampPercent(coords.x), y: this.clampPercent(coords.y) }
+      ])
+    );
+    this.bumpFreePositionRevision();
   }
 
   private buildSlotListForBackend(): Array<{
