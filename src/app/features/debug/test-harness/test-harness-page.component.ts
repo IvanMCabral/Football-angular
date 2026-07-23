@@ -34,6 +34,7 @@ import { FormationDTO } from '../../../shared/models/lineup/formation.dto';
 import {
   FORMATION_CODES,
   BackFiveTransitionLabRow,
+  ControlledTeamSide,
   CustomFixture,
   CurrentLineupMultiSeedSummary,
   CurrentLineupReplayResult,
@@ -51,11 +52,21 @@ import {
   MatchPreviewSummary,
   ModalVsCanonicalSummary,
   PlayerSwapMatrixSummaryRow,
+  PositionPixelQaLine,
+  PositionPixelReadFilter,
+  PositionPixelReadLevel,
   PositionPixelMatrixSummaryRow,
+  PositionPixelSmokeScope,
+  PositionPixelSortMode,
   RoleSlotImpactSummaryRow,
   RoundGroup,
+  ScenarioBatteryCoachObjective,
+  ScenarioBatteryCoachObjectiveModel,
   ScenarioMatrixRow,
   ScenarioMatrixSummaryRow,
+  ScenarioSummaryReadFilter,
+  ScenarioSummaryReadLevel,
+  ScenarioSummarySortMode,
   SideMirrorSyntheticLabRow,
   SubstitutionWhatIfSummaryRow,
   TestHarnessMatchRow,
@@ -411,7 +422,6 @@ interface AllFormationRoleSlotSmokeRow {
   verdict: string;
   className: string;
 }
-type PositionPixelSmokeScope = 'ALL' | 'DEF' | 'MID' | 'ATT';
 interface PositionPixelSmokeRunSummary extends PositionPixelMatchSmokeSummary {
   scope: PositionPixelSmokeScope;
   label: string;
@@ -441,26 +451,6 @@ interface PositionPixelLineBreakSummary {
   best: PositionPixelMatrixSummary | null;
   worst: PositionPixelMatrixSummary | null;
 }
-type PositionPixelReadLevel = 'stable' | 'visible' | 'strong' | 'check';
-type PositionPixelReadFilter =
-  | 'all'
-  | 'diagonal'
-  | 'diagonal-mismatch'
-  | 'diagonal-micro'
-  | 'diagonal-review'
-  | 'visual-mismatch'
-  | 'visual-micro'
-  | 'visual-review'
-  | 'big-move'
-  | 'line-break'
-  | PositionPixelReadLevel;
-type PositionPixelSortMode = 'default' | 'read-desc' | 'impact-desc' | 'distance-desc';
-type ScenarioSummaryReadLevel = 'noise' | 'small' | 'visible' | 'strong' | 'review';
-type ScenarioSummaryReadFilter = 'all' | ScenarioSummaryReadLevel | 'actionable';
-type ScenarioSummarySortMode = 'default' | 'read-desc' | 'impact-desc' | 'xg-desc';
-type ControlledTeamSide = 'USER' | 'HOME' | 'AWAY';
-type ScenarioBatteryCoachObjective = 'NEUTRAL' | 'NEED_GOAL' | 'PROTECT_RESULT';
-type ScenarioBatteryCoachObjectiveModel = ScenarioBatteryCoachObjective | 'AUTO';
 interface ScenarioScoutingNote {
   title: string;
   body: string;
@@ -580,7 +570,6 @@ interface ScenarioBatteryCoachAdvice {
   why: string;
   next: string;
 }
-type PositionPixelQaLine = 'ALL' | 'DEF' | 'MID' | 'ATT';
 interface PositionPixelQaSummaryRow {
   line: PositionPixelQaLine;
   total: number;

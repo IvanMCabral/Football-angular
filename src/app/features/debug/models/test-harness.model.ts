@@ -313,6 +313,31 @@ export interface ModalVsCanonicalSummary {
   timestamp: string;
 }
 
+export type PositionPixelSmokeScope = 'ALL' | 'DEF' | 'MID' | 'ATT';
+export type PositionPixelReadLevel = 'stable' | 'visible' | 'strong' | 'check';
+export type PositionPixelReadFilter =
+  | 'all'
+  | 'diagonal'
+  | 'diagonal-mismatch'
+  | 'diagonal-micro'
+  | 'diagonal-review'
+  | 'visual-mismatch'
+  | 'visual-micro'
+  | 'visual-review'
+  | 'big-move'
+  | 'line-break'
+  | PositionPixelReadLevel;
+export type PositionPixelSortMode = 'default' | 'read-desc' | 'impact-desc' | 'distance-desc';
+
+export type ScenarioSummaryReadLevel = 'noise' | 'small' | 'visible' | 'strong' | 'review';
+export type ScenarioSummaryReadFilter = 'all' | ScenarioSummaryReadLevel | 'actionable';
+export type ScenarioSummarySortMode = 'default' | 'read-desc' | 'impact-desc' | 'xg-desc';
+
+export type ControlledTeamSide = 'USER' | 'HOME' | 'AWAY';
+export type ScenarioBatteryCoachObjective = 'NEUTRAL' | 'NEED_GOAL' | 'PROTECT_RESULT';
+export type ScenarioBatteryCoachObjectiveModel = ScenarioBatteryCoachObjective | 'AUTO';
+export type PositionPixelQaLine = 'ALL' | 'DEF' | 'MID' | 'ATT';
+
 /**
  * V24D24.2 — wire type for the body of
  * {@code POST /api/v1/test-harness/career/match/{matchId}/replay}.
