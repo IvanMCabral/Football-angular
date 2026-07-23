@@ -476,6 +476,12 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       min-height: 64px;
     }
 
+    .manager-pitch {
+      /* El XI propio se lee como el editor principal: arco propio abajo,
+         ataque arriba. No cambia slotIndex ni motor; sólo la presentación. */
+      flex-direction: column-reverse;
+    }
+
     .player-dot {
       /* : 30px  ->  56px so the full player name (e.g.
          "Bellingham", "Vinicius", "Mbappe") fits without aggressive

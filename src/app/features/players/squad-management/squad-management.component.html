@@ -110,7 +110,8 @@
              [class.lineup-incomplete]="lineupSlotsCount < 11"
              [class.lineup-complete]="lineupSlotsCount === 11"
              class="lineup-mini-cta">
-          ⚽ Alineación armada: <strong>{{ lineupSlotsCount }} / 11</strong> — <a href="#">Ir a confirmar</a>
+          ⚽ Alineación armada: <strong>{{ lineupSlotsCount }} / 11</strong> —
+          <button type="button" class="lineup-mini-link" (click)="openVisualEditor()">Ir a confirmar</button>
         </div>
 
 
