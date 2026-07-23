@@ -1,4 +1,4 @@
-import { PlayerSwapMatrixSummaryRow } from '../models/test-harness.model';
+import { PlayerSwapMatrixSummary, PlayerSwapMatrixSummaryRow } from '../models/test-harness.model';
 
 type PlayerSwapOverallRead = Pick<PlayerSwapMatrixSummaryRow, 'baselinePlayerOverall' | 'swapPlayerOverall'>;
 type PlayerSwapSignalRead = Pick<
@@ -13,6 +13,27 @@ type PlayerSwapSignalRead = Pick<
   | 'deltaShotsAgainst'
   | 'deltaPossessionFor'
 >;
+type PlayerSwapTacticalBreakdownRead = PlayerSwapSignalRead & Pick<
+  PlayerSwapMatrixSummaryRow,
+  | 'deltaCentralShotsFor'
+  | 'deltaWideShotsFor'
+  | 'deltaLongShotsFor'
+  | 'deltaCentralShotsAgainst'
+  | 'deltaWideShotsAgainst'
+  | 'deltaLongShotsAgainst'
+>;
+type PlayerSwapTacticalBreakdown = Pick<
+  PlayerSwapMatrixSummary,
+  | 'tacticalAttackRead'
+  | 'tacticalAttackClass'
+  | 'tacticalCentralControlRead'
+  | 'tacticalCentralControlClass'
+  | 'tacticalProtectionRead'
+  | 'tacticalProtectionClass'
+  | 'tacticalChannelsRead'
+  | 'tacticalChannelsClass'
+  | 'tacticalBreakdownDetail'
+>;
 
 export type PlayerSwapCoachReadLevel = 'upgrade' | 'downgrade' | 'tradeoff' | 'neutral' | 'review';
 
@@ -20,6 +41,7 @@ export interface PlayerSwapRoleRiskRead {
   attack: number;
   control: number;
   protection: number;
+  detail?: string;
 }
 
 export function playerSwapOverallDelta(row: PlayerSwapOverallRead): number | null {
@@ -135,4 +157,57 @@ export function playerSwapCoachReadLevel(
   if (attack >= 0.12 && risk >= 0.12) return 'tradeoff';
   if (signal >= 0.18 || Math.abs(net) >= 0.06) return 'review';
   return 'neutral';
+}
+
+export function playerSwapTacticalLabel(score: number, dimension: string): { label: string; cssClass: string } {
+  if (score >= 0.10) return { label: `${dimension} ++`, cssClass: 'delta-positive' };
+  if (score >= 0.035) return { label: `${dimension} +`, cssClass: 'delta-positive' };
+  if (score <= -0.10) return { label: `${dimension} --`, cssClass: 'delta-negative' };
+  if (score <= -0.035) return { label: `${dimension} -`, cssClass: 'delta-negative' };
+  return { label: `${dimension} =`, cssClass: 'delta-neutral' };
+}
+
+export function playerSwapTacticalBreakdown(
+  row: PlayerSwapTacticalBreakdownRead,
+  roleRisk: PlayerSwapRoleRiskRead,
+  formatDeltaNumber: (value: number) => string,
+): PlayerSwapTacticalBreakdown {
+  const attackScore =
+    row.deltaXgFor
+    + (row.preAutoSubDeltaXgFor || 0) * 0.55
+    + row.deltaShotsFor * 0.020
+    + roleRisk.attack;
+  const centralControlScore =
+    row.deltaPossessionFor * 0.010
+    + row.deltaCentralShotsFor * 0.030
+    - row.deltaCentralShotsAgainst * 0.035
+    + roleRisk.control;
+  const protectionScore =
+    -row.deltaXgAgainst
+    - (row.preAutoSubDeltaXgAgainst || 0) * 0.55
+    - row.deltaShotsAgainst * 0.018
+    + roleRisk.protection;
+  const channelScore =
+    (row.deltaWideShotsFor - row.deltaWideShotsAgainst) * 0.028
+    + (row.deltaLongShotsFor - row.deltaLongShotsAgainst) * 0.010;
+  const attack = playerSwapTacticalLabel(attackScore, 'Ataque');
+  const control = playerSwapTacticalLabel(centralControlScore, 'Control');
+  const protection = playerSwapTacticalLabel(protectionScore, 'Protección');
+  const channels = playerSwapTacticalLabel(channelScore, 'Canales');
+  return {
+    tacticalAttackRead: attack.label,
+    tacticalAttackClass: attack.cssClass,
+    tacticalCentralControlRead: control.label,
+    tacticalCentralControlClass: control.cssClass,
+    tacticalProtectionRead: protection.label,
+    tacticalProtectionClass: protection.cssClass,
+    tacticalChannelsRead: channels.label,
+    tacticalChannelsClass: channels.cssClass,
+    tacticalBreakdownDetail:
+      `Ataque ${formatDeltaNumber(attackScore)} · Control ${formatDeltaNumber(centralControlScore)} · `
+      + `Protección ${formatDeltaNumber(protectionScore)} · Canales ${formatDeltaNumber(channelScore)}. `
+      + (roleRisk.detail ? `${roleRisk.detail}. ` : '')
+      + `Zonas for C/W/L ${formatDeltaNumber(row.deltaCentralShotsFor)}/${formatDeltaNumber(row.deltaWideShotsFor)}/${formatDeltaNumber(row.deltaLongShotsFor)}; `
+      + `against C/W/L ${formatDeltaNumber(row.deltaCentralShotsAgainst)}/${formatDeltaNumber(row.deltaWideShotsAgainst)}/${formatDeltaNumber(row.deltaLongShotsAgainst)}.`,
+  };
 }

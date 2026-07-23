@@ -7,6 +7,8 @@ import {
   playerSwapSignalClass,
   playerSwapSignalRead,
   playerSwapSignalScore,
+  playerSwapTacticalBreakdown,
+  playerSwapTacticalLabel,
 } from './player-swap-analysis';
 
 describe('player-swap-analysis', () => {
@@ -23,6 +25,15 @@ describe('player-swap-analysis', () => {
     deltaShotsFor: 0,
     deltaShotsAgainst: 0,
     deltaPossessionFor: 0,
+  };
+  const baseTacticalRow = {
+    ...baseDecisionRow,
+    deltaCentralShotsFor: 0,
+    deltaWideShotsFor: 0,
+    deltaLongShotsFor: 0,
+    deltaCentralShotsAgainst: 0,
+    deltaWideShotsAgainst: 0,
+    deltaLongShotsAgainst: 0,
   };
 
   it('calculates the individual quality delta for a player swap', () => {
@@ -138,5 +149,43 @@ describe('player-swap-analysis', () => {
       },
       { attack: 0, control: 0, protection: 0 },
     )).toBe('neutral');
+  });
+
+  it('labels tactical scores with stable thresholds', () => {
+    expect(playerSwapTacticalLabel(0.11, 'Ataque')).toEqual({ label: 'Ataque ++', cssClass: 'delta-positive' });
+    expect(playerSwapTacticalLabel(0.04, 'Ataque')).toEqual({ label: 'Ataque +', cssClass: 'delta-positive' });
+    expect(playerSwapTacticalLabel(-0.11, 'Ataque')).toEqual({ label: 'Ataque --', cssClass: 'delta-negative' });
+    expect(playerSwapTacticalLabel(-0.04, 'Ataque')).toEqual({ label: 'Ataque -', cssClass: 'delta-negative' });
+    expect(playerSwapTacticalLabel(0.01, 'Ataque')).toEqual({ label: 'Ataque =', cssClass: 'delta-neutral' });
+  });
+
+  it('builds a tactical breakdown that can praise attack while warning protection', () => {
+    const breakdown = playerSwapTacticalBreakdown(
+      {
+        ...baseTacticalRow,
+        deltaXgFor: 0.08,
+        preAutoSubDeltaXgFor: 0.04,
+        deltaShotsFor: 2,
+        deltaXgAgainst: 0.09,
+        preAutoSubDeltaXgAgainst: 0.03,
+        deltaShotsAgainst: 2,
+        deltaWideShotsFor: 3,
+        deltaWideShotsAgainst: 1,
+      },
+      {
+        attack: 0.015,
+        control: -0.010,
+        protection: -0.020,
+        detail: 'Alerta de rol: prueba',
+      },
+      (value) => (value >= 0 ? `+${value.toFixed(3)}` : value.toFixed(3)),
+    );
+
+    expect(breakdown.tacticalAttackRead).toBe('Ataque ++');
+    expect(breakdown.tacticalAttackClass).toBe('delta-positive');
+    expect(breakdown.tacticalProtectionRead).toBe('Protección --');
+    expect(breakdown.tacticalProtectionClass).toBe('delta-negative');
+    expect(breakdown.tacticalChannelsRead).toBe('Canales +');
+    expect(breakdown.tacticalBreakdownDetail).toContain('Alerta de rol: prueba');
   });
 });

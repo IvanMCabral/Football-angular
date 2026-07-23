@@ -143,6 +143,8 @@ import {
   playerSwapSignalClass as getPlayerSwapSignalClass,
   playerSwapSignalRead as getPlayerSwapSignalRead,
   playerSwapSignalScore as getPlayerSwapSignalScore,
+  playerSwapTacticalBreakdown as getPlayerSwapTacticalBreakdown,
+  playerSwapTacticalLabel as getPlayerSwapTacticalLabel,
 } from './player-swap-analysis';
 /**
  * V24D24: Test-Harness UI page (4-panel layout).
@@ -7415,45 +7417,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     | 'tacticalChannelsClass'
     | 'tacticalBreakdownDetail'
   > {
-    const roleRisk = this.playerSwapRoleRisk(candidate);
-    const attackScore =
-      row.deltaXgFor
-      + (row.preAutoSubDeltaXgFor || 0) * 0.55
-      + row.deltaShotsFor * 0.020
-      + roleRisk.attack;
-    const centralControlScore =
-      row.deltaPossessionFor * 0.010
-      + row.deltaCentralShotsFor * 0.030
-      - row.deltaCentralShotsAgainst * 0.035
-      + roleRisk.control;
-    const protectionScore =
-      -row.deltaXgAgainst
-      - (row.preAutoSubDeltaXgAgainst || 0) * 0.55
-      - row.deltaShotsAgainst * 0.018
-      + roleRisk.protection;
-    const channelScore =
-      (row.deltaWideShotsFor - row.deltaWideShotsAgainst) * 0.028
-      + (row.deltaLongShotsFor - row.deltaLongShotsAgainst) * 0.010;
-    const attack = this.playerSwapTacticalLabel(attackScore, 'Ataque');
-    const control = this.playerSwapTacticalLabel(centralControlScore, 'Control');
-    const protection = this.playerSwapTacticalLabel(protectionScore, 'Protección');
-    const channels = this.playerSwapTacticalLabel(channelScore, 'Canales');
-    return {
-      tacticalAttackRead: attack.label,
-      tacticalAttackClass: attack.cssClass,
-      tacticalCentralControlRead: control.label,
-      tacticalCentralControlClass: control.cssClass,
-      tacticalProtectionRead: protection.label,
-      tacticalProtectionClass: protection.cssClass,
-      tacticalChannelsRead: channels.label,
-      tacticalChannelsClass: channels.cssClass,
-      tacticalBreakdownDetail:
-        `Ataque ${this.fmtDeltaNumber(attackScore)} ? Control ${this.fmtDeltaNumber(centralControlScore)} ? `
-        + `Protección ${this.fmtDeltaNumber(protectionScore)} ? Canales ${this.fmtDeltaNumber(channelScore)}. `
-        + (roleRisk.detail ? `${roleRisk.detail}. ` : '')
-        + `Zonas for C/W/L ${this.fmtDeltaNumber(row.deltaCentralShotsFor)}/${this.fmtDeltaNumber(row.deltaWideShotsFor)}/${this.fmtDeltaNumber(row.deltaLongShotsFor)}; `
-        + `against C/W/L ${this.fmtDeltaNumber(row.deltaCentralShotsAgainst)}/${this.fmtDeltaNumber(row.deltaWideShotsAgainst)}/${this.fmtDeltaNumber(row.deltaLongShotsAgainst)}.`,
-    };
+    return getPlayerSwapTacticalBreakdown(row, this.playerSwapRoleRisk(candidate), (value) => this.fmtDeltaNumber(value));
   }
   private playerSwapRoleRisk(candidate: PlayerSwapCandidate | null): { attack: number; control: number; protection: number; detail: string } {
     if (!candidate || this.playerSwapFitLevel(candidate) !== 'out') {
@@ -7496,11 +7460,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return { attack: 0, control: 0, protection: 0, detail: '' };
   }
   private playerSwapTacticalLabel(score: number, dimension: string): { label: string; cssClass: string } {
-    if (score >= 0.10) return { label: `${dimension} ++`, cssClass: 'delta-positive' };
-    if (score >= 0.035) return { label: `${dimension} +`, cssClass: 'delta-positive' };
-    if (score <= -0.10) return { label: `${dimension} --`, cssClass: 'delta-negative' };
-    if (score <= -0.035) return { label: `${dimension} -`, cssClass: 'delta-negative' };
-    return { label: `${dimension} =`, cssClass: 'delta-neutral' };
+    return getPlayerSwapTacticalLabel(score, dimension);
   }
   private playerSwapDecisionScore(
     row: PlayerSwapMatrixSummary,
