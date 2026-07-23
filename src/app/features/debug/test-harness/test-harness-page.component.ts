@@ -155,6 +155,21 @@ import {
   professionalSmokeVerdictClass as getProfessionalSmokeVerdictClass,
 } from './test-harness-professional-qa-utils';
 import {
+  scenarioActionLabel as getScenarioActionLabel,
+  scenarioBatteryCoachAdvice as getScenarioBatteryCoachAdvice,
+  scenarioBatteryCoachObjectiveLabel as getScenarioBatteryCoachObjectiveLabel,
+  scenarioBatteryGroupLabel as getScenarioBatteryGroupLabel,
+  scenarioBatteryReviewCount as getScenarioBatteryReviewCount,
+  scenarioBatteryReviewHint as getScenarioBatteryReviewHint,
+  scenarioBatteryReviewItems as getScenarioBatteryReviewItems,
+  scenarioShapeActionLabel as getScenarioShapeActionLabel,
+  scenarioSummaryActionLabel as getScenarioSummaryActionLabel,
+  scenarioSummaryFormationHint as getScenarioSummaryFormationHint,
+  scenarioSummaryFormationLabel as getScenarioSummaryFormationLabel,
+  scenarioSummaryIsFormationNoop as getScenarioSummaryIsFormationNoop,
+  styleLabelFromActionDetail as getStyleLabelFromActionDetail,
+} from './test-harness-scenario-battery-utils';
+import {
   playerSwapHasLargeQualityDrop as hasLargePlayerSwapQualityDrop,
   playerSwapOverallDelta as getPlayerSwapOverallDelta,
   playerSwapOverallDeltaText as getPlayerSwapOverallDeltaText,
@@ -12287,14 +12302,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return String(match.status).toUpperCase() === 'COMPLETED' ? 75 : 45;
   }
   scenarioBatteryCoachObjectiveLabel(objective: ScenarioBatteryCoachObjective): string {
-    switch (objective) {
-      case 'NEED_GOAL':
-        return 'Necesito gol';
-      case 'PROTECT_RESULT':
-        return 'Cuidar resultado';
-      default:
-        return 'Neutral';
-    }
+    return getScenarioBatteryCoachObjectiveLabel(objective);
   }
   scenarioBatteryGroupHint(): string {
     switch (this.scenarioBatteryGroupModel) {
@@ -12322,52 +12330,16 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       : `Cobertura smoke: ${coverage}; usar para detectar señales, no para cerrar balance.`;
   }
   scenarioBatteryReviewCount(): number {
-    return this.scenarioBatteryRows().filter((row) => row.review.startsWith('Revisar')).length;
+    return getScenarioBatteryReviewCount(this.scenarioBatteryRows());
   }
   scenarioBatteryReviewHint(): string {
-    const rows = this.scenarioBatteryRows();
-    if (rows.length === 0) {
-      return 'Revisión pendiente: corre Tablero batería.';
-    }
-    const reviewCount = this.scenarioBatteryReviewCount();
-    if (reviewCount === 0) {
-      return `Revisión OK: ${rows.length}/${rows.length} lecturas coherentes.`;
-    }
-    const labels = Array.from(new Set(rows
-      .filter((row) => row.review.startsWith('Revisar'))
-      .map((row) => row.review)
-    ));
-    const sample = labels.slice(0, 2).join(' + ');
-    const suffix = labels.length > 2 ? ` +${labels.length - 2}` : '';
-    return `Revisión: ${reviewCount}/${rows.length} para mirar (${sample}${suffix}).`;
+    return getScenarioBatteryReviewHint(this.scenarioBatteryRows());
   }
   scenarioBatteryReviewItems(): ScenarioBatteryReviewItem[] {
-    return this.scenarioBatteryRows()
-      .filter((row) => row.review.startsWith('Revisar'))
-      .slice(0, 5)
-      .map((row) => ({
-        key: `${row.matchId}-${row.controlledSide}-${row.review}`,
-        summary: `${row.review}: ${row.controlledTeam} vs ${row.matchLabel}`,
-        detail: `${row.coachContext} · ${row.decision} · ${row.reviewDetail}`,
-      }));
+    return getScenarioBatteryReviewItems(this.scenarioBatteryRows());
   }
   scenarioBatteryCoachAdvice(): ScenarioBatteryCoachAdvice | null {
-    const rows = this.scenarioBatteryRows();
-    if (rows.length === 0) {
-      return null;
-    }
-    const okRows = rows.filter((row) => !row.review.startsWith('Revisar'));
-    const planRow = okRows[0] || rows[0];
-    const riskCard = rows
-      .flatMap((row) => row.cards || [])
-      .find((card) => card.title.toLowerCase().includes('amenaza'));
-    const nextCard = planRow.cards?.[0];
-    return {
-      plan: `${planRow.controlledTeam}: ${planRow.decision}`,
-      risk: riskCard ? riskCard.label : 'Sin riesgo principal claro',
-      why: `${okRows.length}/${rows.length} lecturas coherentes; confirmar con Multi-seed antes de tocar motor.`,
-      next: `${nextCard?.label || planRow.decision}. Confirmar con Multi-seed.`,
-    };
+    return getScenarioBatteryCoachAdvice(this.scenarioBatteryRows());
   }
   confirmScenarioBatteryRow(row: ScenarioBatteryRow): void {
     this.selectedMatchId.set(row.matchId);
@@ -12395,61 +12367,19 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return item.key;
   }
   scenarioBatteryGroupLabel(group: 'ALL' | 'OFFENSE' | 'DEFENSE' | 'OPPONENT'): string {
-    switch (group) {
-      case 'ALL':
-        return 'Todo';
-      case 'DEFENSE':
-        return 'Defensa';
-      case 'OPPONENT':
-        return 'Rival';
-      default:
-        return 'Ataque';
-    }
+    return getScenarioBatteryGroupLabel(group);
   }
   scenarioBatteryMatchLimit(): number {
     return this.scenarioBatteryScopeModel === 'balanced' ? 4 : 2;
   }
   private styleLabelFromActionDetail(actionDetail: string | null | undefined): string | null {
-    if (!actionDetail) {
-      return null;
-    }
-    const normalized = actionDetail.trim().toUpperCase();
-    const option = this.teamStyleOptions.find((o) => o.value === normalized);
-    return option?.label ?? null;
+    return getStyleLabelFromActionDetail(actionDetail, this.teamStyleOptions);
   }
   private scenarioActionLabel(actionDetail: string | null | undefined): string | null {
-    if (!actionDetail) {
-      return null;
-    }
-    const detail = actionDetail.trim();
-    const normalized = detail.toUpperCase();
-    if (normalized.startsWith('OPPONENT ')) {
-      const opponentStyle = normalized.replace(/^OPPONENT\s+/, '');
-      const label = this.styleLabelFromActionDetail(opponentStyle);
-      return label ? `Rival: ${label.toLowerCase()}` : `Rival: ${detail.replace(/^Opponent\s+/i, '')}`;
-    }
-    const ownStyle = this.styleLabelFromActionDetail(detail);
-    if (ownStyle) {
-      return ownStyle;
-    }
-    const shapeLabel = this.scenarioShapeActionLabel(detail);
-    if (shapeLabel) {
-      return shapeLabel;
-    }
-    return detail;
+    return getScenarioActionLabel(actionDetail, this.teamStyleOptions);
   }
   private scenarioShapeActionLabel(actionDetail: string): string | null {
-    const normalized = actionDetail.trim().toLowerCase();
-    if (normalized.startsWith('right-overload')) return 'Sobrecarga derecha';
-    if (normalized.startsWith('left-overload')) return 'Sobrecarga izquierda';
-    if (normalized.startsWith('wide-overload')) return 'Amplitud ofensiva';
-    if (normalized.startsWith('compact-center')) return 'Cerrar el centro';
-    if (normalized.startsWith('attacking-high')) return 'Ataque alto';
-    if (normalized.startsWith('attacking-step')) return 'Paso ofensivo';
-    if (normalized.startsWith('defensive-step')) return 'Paso defensivo';
-    if (normalized.startsWith('defensive-low')) return 'Bloque bajo';
-    if (normalized.startsWith('central-compact')) return 'Bloque compacto';
-    return null;
+    return getScenarioShapeActionLabel(actionDetail);
   }
   actionLabel(row: ScenarioMatrixRow): string {
     if (row.actionType === 'STYLE') {
@@ -12470,13 +12400,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return 'Base';
   }
   summaryActionLabel(row: ScenarioMatrixSummaryRow): string {
-    if (row.actionType === 'NONE') {
-      return 'Base';
-    }
-    if (row.actionType === 'STYLE') {
-      return this.scenarioActionLabel(row.actionDetail) ?? 'Estilo';
-    }
-    return this.scenarioActionLabel(row.actionDetail) ?? (row.actionDetail || row.actionType);
+    return getScenarioSummaryActionLabel(row, this.teamStyleOptions);
   }
   scenarioSummaryBaseFormation(): string {
     const row = this.scenarioMatrixSummaryResults()
@@ -12484,25 +12408,13 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return row?.baselineFormation || '';
   }
   scenarioSummaryIsFormationNoop(row: ScenarioMatrixSummaryRow): boolean {
-    return row.actionType === 'FORMATION' && !!row.sameFormationAsBaseline;
+    return getScenarioSummaryIsFormationNoop(row);
   }
   scenarioSummaryFormationLabel(row: ScenarioMatrixSummaryRow): string {
-    const base = row.baselineFormation || '';
-    const changed = row.changedFormation || (row.actionType === 'FORMATION' ? row.actionDetail : '');
-    if (row.actionType !== 'FORMATION') return base || '-';
-    if (this.scenarioSummaryIsFormationNoop(row)) return `${base} = ${changed || base}`;
-    return `${base || 'base'} -> ${changed || row.actionDetail || 'sin dato'}`;
+    return getScenarioSummaryFormationLabel(row);
   }
   scenarioSummaryFormationHint(row: ScenarioMatrixSummaryRow): string {
-    if (this.scenarioSummaryIsFormationNoop(row)) {
-      return 'La formación del escenario coincide con la formación base; se interpreta como control/no-op, no como fallo del motor.';
-    }
-    if (row.actionType === 'FORMATION') {
-      return `Cambio de formación: ${row.baselineFormation || 'base'} -> ${row.changedFormation || row.actionDetail || 'sin dato'}`;
-    }
-    return row.baselineFormation
-      ? `Formación base: ${row.baselineFormation}`
-      : 'Sin cambio de formación en este escenario.';
+    return getScenarioSummaryFormationHint(row);
   }
   scenarioSummaryRead(row: ScenarioMatrixSummaryRow): string {
     if (this.scenarioSummaryIsFormationNoop(row)) return 'Baseline/no-op';
