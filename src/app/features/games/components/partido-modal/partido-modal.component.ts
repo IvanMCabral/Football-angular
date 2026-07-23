@@ -242,6 +242,49 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       box-shadow: 0 28px 80px rgba(2, 6, 23, 0.35);
     }
 
+    .coach-brief {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+      margin: 0.55rem 0.6rem 0.4rem;
+      padding: 0.65rem 0.8rem;
+      border-radius: 16px;
+      color: #ecfdf5;
+      background:
+        radial-gradient(circle at 0% 0%, rgba(34, 197, 94, 0.28), transparent 34%),
+        linear-gradient(135deg, #052e16 0%, #14532d 58%, #0f172a 100%);
+      border: 1px solid rgba(187, 247, 208, 0.18);
+      box-shadow: 0 14px 34px rgba(15, 23, 42, 0.18);
+    }
+    .coach-brief strong {
+      display: block;
+      font-size: 0.95rem;
+      letter-spacing: 0.01em;
+    }
+    .coach-brief span {
+      display: block;
+      color: #bbf7d0;
+      font-size: 0.78rem;
+      margin-top: 0.12rem;
+    }
+    .coach-brief-chips {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 0.35rem;
+      flex-shrink: 0;
+    }
+    .coach-brief-chips span {
+      margin: 0;
+      padding: 0.22rem 0.55rem;
+      border-radius: 999px;
+      color: #f8fafc;
+      background: rgba(255, 255, 255, 0.13);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      font-weight: 800;
+    }
+
     /* Status banners. */
     .banner {
       display: flex;
@@ -347,6 +390,21 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       pointer-events: none;
       z-index: 0;
     }
+    .pitch-zone-label {
+      position: absolute;
+      right: 0.8rem;
+      z-index: 1;
+      color: rgba(236, 253, 245, 0.76);
+      font-size: 0.68rem;
+      font-weight: 900;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+      pointer-events: none;
+    }
+    .pitch-zone-attack { top: 0.8rem; }
+    .pitch-zone-mid { top: 48%; }
+    .pitch-zone-defense { bottom: 0.8rem; }
     /* Lift pitch lines above the pseudo-element lines so dots are visible. */
     .pitch > .pitch-line {
       position: relative;
@@ -874,10 +932,22 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
     }
     .col-pitch h3,
     .col-bench h3 {
-      margin: 0 0 0.25rem 0;
-      font-size: 0.82rem;
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 0.5rem;
+      margin: 0 0 0.35rem 0;
+      font-size: 0.88rem;
       font-weight: 700;
       color: #1e3c72;
+    }
+    .col-pitch h3 small,
+    .col-bench h3 small {
+      color: #64748b;
+      font-size: 0.7rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
     }
 
     .bench-list {
@@ -889,16 +959,19 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       padding: 0.3rem;
       background: #f9fafb;
       border: 1px solid #e5e7eb;
-      border-radius: 6px;
+      border-radius: 12px;
     }
 
     .bench-player {
       display: flex;
-      flex-direction: column;
-      padding: 0.35rem 0.5rem;
+      flex-direction: row;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.45rem 0.55rem;
       background: #fff;
       border: 1px solid #d1d5db;
-      border-radius: 4px;
+      border-radius: 10px;
       cursor: grab;
       transition: background 0.1s ease, transform 0.1s ease;
       user-select: none;
@@ -920,7 +993,10 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       font-size: 0.65rem;
       font-weight: 500;
       color: #5a6473;
-      margin-top: 0.15rem;
+      margin-top: 0;
+      padding: 0.12rem 0.35rem;
+      border-radius: 999px;
+      background: #eef2ff;
     }
 
     .bench-empty {
@@ -948,7 +1024,7 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       margin: 0;
       padding: 0.18rem 0.35rem;
       background: #f5f7fa;
-      border-radius: 4px;
+      border-radius: 10px;
       line-height: 1.3;
     }
     .hint mat-icon {
@@ -1072,6 +1148,18 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       .formation-row {
         margin: 0.4rem 0.35rem 0.45rem;
         align-items: stretch;
+      }
+      .coach-brief {
+        margin: 0.45rem 0.35rem 0.35rem;
+        align-items: flex-start;
+        flex-direction: column;
+      }
+      .coach-brief-chips {
+        justify-content: flex-start;
+      }
+      .pitch-zone-label {
+        right: 0.45rem;
+        font-size: 0.56rem;
       }
       .formation-grid { padding: 0 0.35rem; }
       .col-pitch,
@@ -1471,6 +1559,30 @@ export class PartidoModalComponent {
 
     if (description === 'Goal') {
       return 'Gol';
+    }
+
+    if (description === 'Shot blocked') {
+      return 'Remate bloqueado';
+    }
+
+    const yellowCardMatch = description.match(/^(.+?) received a yellow card$/i);
+    if (yellowCardMatch) {
+      return `${yellowCardMatch[1]} recibió amarilla`;
+    }
+
+    const redCardMatch = description.match(/^(.+?) received a red card$/i);
+    if (redCardMatch) {
+      return `${redCardMatch[1]} recibió roja`;
+    }
+
+    const foulMatch = description.match(/^(.+?) committed a foul$/i);
+    if (foulMatch) {
+      return `${foulMatch[1]} cometió una falta`;
+    }
+
+    const chanceMatch = description.match(/^Chance created for (.+)$/i);
+    if (chanceMatch) {
+      return `Chance creada para ${chanceMatch[1]}`;
     }
 
     const formationMatch = description.match(/^Formation changed from (.+?) to (.+?)(?: \| pixels: (.*))?$/i);

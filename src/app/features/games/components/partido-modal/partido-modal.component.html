@@ -1,7 +1,7 @@
 ﻿<div class="partido-modal-root">
   <h2 mat-dialog-title class="partido-modal-title">
     <span class="title-icon">⚽</span>
-    Partido
+    DT en vivo
 
     <span class="score-chip" data-testid="partido-score-chip">
       {{ homeScore() }} - {{ awayScore() }}
@@ -31,6 +31,17 @@
 
       <mat-tab label="Mi Formación" data-testid="tab-mine">
         <ng-template matTabContent>
+
+          <div class="coach-brief" data-testid="partido-coach-brief">
+            <div>
+              <strong>Tu banco táctico</strong>
+              <span>Ajustá formación, cambios y píxeles antes de volver al partido.</span>
+            </div>
+            <div class="coach-brief-chips">
+              <span>Subs {{ substitutionsRemaining() }}/5</span>
+              <span>{{ selectedFormation() }}</span>
+            </div>
+          </div>
 
           <div class="formation-row">
             <mat-form-field appearance="outline" class="formation-select">
@@ -102,7 +113,10 @@
           <div class="formation-grid">
 
             <section class="col col-pitch" data-area="pitch" aria-label="Mi formación">
-              <h3>Mi XI (arrastra libremente por la cancha)</h3>
+              <h3>
+                <span>Mi XI</span>
+                <small>Cancha editable por píxeles</small>
+              </h3>
               <div class="pitch manager-pitch" role="img"
                    (dragover)="onPitchDragOver($event)"
                    (drop)="onPitchDrop($event)"
@@ -110,6 +124,9 @@
                    (pointerup)="onPitchPointerUp($event)"
                    (pointercancel)="onPitchPointerCancel($event)"
                    [attr.aria-label]="'Vista previa de la formación ' + selectedFormation()">
+                <div class="pitch-zone-label pitch-zone-attack">Ataque</div>
+                <div class="pitch-zone-label pitch-zone-mid">Medio</div>
+                <div class="pitch-zone-label pitch-zone-defense">Defensa</div>
                 <div class="pitch-line" *ngFor="let count of formationLines; let lineIdx = index">
                   <div class="player-dot"
                        *ngFor="let _ of [].constructor(count); let dotIdx = index"
@@ -160,13 +177,16 @@
               </div>
               <p class="hint">
                 <mat-icon>info</mat-icon>
-                Arrastra una ficha a cualquier píxel de la cancha para ajustar su posición. Suéltala sobre otra ficha para intercambiar.
+                Arrastrá una ficha a cualquier punto de la cancha. Soltala sobre otra ficha para intercambiar jugadores.
               </p>
             </section>
 
 
             <section class="col col-bench" data-area="bench" aria-label="Banquillo">
-              <h3>Banquillo</h3>
+              <h3>
+                <span>Banquillo</span>
+                <small>{{ benchPlayers.length }} disponibles</small>
+              </h3>
               <div class="bench-list">
                 <div *ngFor="let p of benchPlayers"
                      class="bench-player"
@@ -182,12 +202,12 @@
                 </div>
                 <div *ngIf="benchPlayers.length === 0" class="bench-empty">
                   <mat-icon>info</mat-icon>
-                  <span>Todos los jugadores estan en el XI.</span>
+                  <span>Todos los jugadores están en el XI.</span>
                 </div>
               </div>
               <p class="hint">
                 <mat-icon>info</mat-icon>
-                Arrastra desde aqui al campo para sumar al XI, o click en suplente y luego click en el jugador a reemplazar.
+                Arrastrá desde aquí al campo, o tocá suplente y después el jugador a reemplazar.
               </p>
             </section>
           </div>
@@ -299,7 +319,7 @@
 
             <p class="hint">
               <mat-icon>info</mat-icon>
-              Vista no editable — los nombres de los jugadores rivales no estan disponibles en el feed en vivo.
+              Vista no editable — los nombres de los jugadores rivales no están disponibles en el feed en vivo.
             </p>
           </div>
 
