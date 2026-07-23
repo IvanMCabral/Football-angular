@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, OnDestroy } from '@angular/core';
+import { Component, inject, isDevMode, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 import { MatchEngineService } from '../../core/services/match-engine.service';
@@ -41,6 +41,18 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
   private router = inject(Router);
 
   private destroy$ = new Subject<void>();
+
+  private logDevWarn(message: string, ...args: unknown[]): void {
+    if (isDevMode()) {
+      console.warn(message, ...args);
+    }
+  }
+
+  private logDevError(message: string, ...args: unknown[]): void {
+    if (isDevMode()) {
+      console.error(message, ...args);
+    }
+  }
 
   /**
    * #3: track INJURY events that have already auto-opened
@@ -349,7 +361,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
         this.startRoundEngine(params.gameId, matches);
       }),
       catchError(err => {
-        console.error('[ROUND] Error:', err);
+        this.logDevError('[ROUND] Error:', err);
         // : clear the spinner even on error so the empty/error
         // state becomes visible instead of a stuck spinner. The existing
         // vm.errorMsg / router.navigate fallbacks render the actual error
@@ -577,18 +589,18 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
   onDeDoubleInjury(): void {
     const result = this.debugTriggerUserInjuryModals();
     if (result.reason) {
-      console.warn('[ROUND-LIVE] dedouble injury skipped:', result.reason);
+      this.logDevWarn('[ROUND-LIVE] double injury skipped:', result.reason);
     }
   }
 
   onDebugPartidoInjury(): void {
     const result = this.debugTriggerUserPartidoInjury();
     if (result.reason) {
-      console.warn('[ROUND-LIVE] debugPartido injury skipped:', result.reason);
+      this.logDevWarn('[ROUND-LIVE] Partido injury skipped:', result.reason);
       this.pendingLiveModalNotice = result.reason;
       return;
     }
-    this.pendingLiveModalNotice = 'Lesion debug de partido creada. Abrí Partido para validar AUTO + cambio manual.';
+    this.pendingLiveModalNotice = 'Lesión de prueba creada. Abrí Partido para validar AUTO + cambio manual.';
   }
 
   private startRoundEngine(gameId: string, matches: RoundMatchVM[]) {
@@ -726,7 +738,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
         this.maybeOpenRivalCardInfoModal(updatedMatches);
       },
       error: (err) => {
-        console.error('[ROUND] Error in SSE stream:', err);
+        this.logDevError('[ROUND] Error in SSE stream:', err);
       },
       complete: () => {
       }
@@ -956,7 +968,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
           }
         },
         error: (err) => {
-          console.error('[ROUND-LIVE] rival card awareness modal error', err);
+          this.logDevError('[ROUND-LIVE] rival card awareness modal error', err);
           this.isRivalCardModalOpen = false;
           this.queuedRivalCardModal = null;
           this.updatePendingLiveModalNotice();
@@ -1039,7 +1051,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
           this.releaseCriticalLiveModalGate();
         },
         error: (err) => {
-          console.error('[ROUND-LIVE] injury auto-modal error', err);
+          this.logDevError('[ROUND-LIVE] injury auto-modal error', err);
           this.isAutoModalOpen = false;
           this.isCriticalLiveModalOpen = false;
           this.activeInjuryAutoModal = null;
@@ -1062,7 +1074,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
         this.updateVm({ ...this.vmSubject.value, isRoundPaused: true });
         this.drainQueuedLiveModals();
       },
-      error: (err) => console.error('[ROUND-LIVE] pauseAll failed', err)
+      error: (err) => this.logDevError('[ROUND-LIVE] pauseAll failed', err)
     });
   }
 
@@ -1151,7 +1163,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
         this.debugFreezePausedRoundKeys.add(roundKey);
         this.updateVm({ ...this.vmSubject.value, isRoundPaused: true });
       },
-      error: (err) => console.error('[ROUND-LIVE] debug freeze pause failed', err),
+      error: (err) => this.logDevError('[ROUND-LIVE] debug freeze pause failed', err),
       complete: () => {
         this.debugFreezePauseInFlight = false;
       }
@@ -1171,7 +1183,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
 
     this.engineService.resumeRoundForMatch(vm.gameId, String(anchorMatch.match.id)).subscribe({
       next: () => this.updateVm({ ...this.vmSubject.value, isRoundPaused: false }),
-      error: (err) => console.error('[ROUND-LIVE] resumeAll failed', err)
+      error: (err) => this.logDevError('[ROUND-LIVE] resumeAll failed', err)
     });
   }
 
@@ -1266,7 +1278,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
         }
       },
       error: (err) => {
-        console.error('[ROUND-LIVE] Iniciar Todos failed', err);
+        this.logDevError('[ROUND-LIVE] Iniciar Todos failed', err);
       }
     });
   }
@@ -1347,7 +1359,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
         // : a failed auto-start leaves the round stuck on
         // NOT_STARTED. The "Iniciar Todos" button stays visible (no
         // anyStarted flip) and the manager can re-trigger manually.
-        console.error('[ROUND-LIVE] Auto-start failed; user can retry with Iniciar Todos', err);
+        this.logDevError('[ROUND-LIVE] Auto-start failed; user can retry with Iniciar Todos', err);
       }
     });
   }
@@ -1391,7 +1403,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
         complete: () => this.releaseCriticalLiveModalGate(),
         error: (err) => {
           this.releaseCriticalLiveModalGate();
-          console.error('[ROUND-LIVE] openSubstitutionModal error', err);
+          this.logDevError('[ROUND-LIVE] openSubstitutionModal error', err);
         }
       });
   }
@@ -1419,7 +1431,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
         complete: () => this.releaseCriticalLiveModalGate(),
         error: (err) => {
           this.releaseCriticalLiveModalGate();
-          console.error('[ROUND-LIVE] openFormationModal error', err);
+          this.logDevError('[ROUND-LIVE] openFormationModal error', err);
         }
       });
   }
@@ -1636,7 +1648,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
         complete: () => this.releaseCriticalLiveModalGate(),
         error: (err) => {
           this.releaseCriticalLiveModalGate();
-          console.error('[ROUND-LIVE] openPartidoModal error', err);
+          this.logDevError('[ROUND-LIVE] openPartidoModal error', err);
         }
       });
   }
