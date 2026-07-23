@@ -1026,6 +1026,132 @@ export interface SubstitutionWhatIfSummaryRow {
   read: string;
 }
 
+export interface PlayerSwapMatrixSummary {
+  testCase: string;
+  slotId: string;
+  formation: string;
+  seedStart: number;
+  seedEnd: number;
+  seedCount: number;
+  baselinePlayer: string;
+  swapPlayer: string;
+  baselinePlayerPosition: string;
+  swapPlayerPosition: string;
+  baselinePlayerOverall: number | null;
+  swapPlayerOverall: number | null;
+  deltaPlayerOverall: number | null;
+  baseline: CurrentLineupMultiSeedSummary;
+  swapped: CurrentLineupMultiSeedSummary;
+  deltaGoalsFor: number;
+  deltaGoalsAgainst: number;
+  deltaGoalDiff: number;
+  deltaShotsFor: number;
+  deltaShotsAgainst: number;
+  deltaPossessionFor: number;
+  deltaXgFor: number;
+  deltaXgAgainst: number;
+  deltaXgDiff: number;
+  deltaCentralShotsFor: number;
+  deltaWideShotsFor: number;
+  deltaLongShotsFor: number;
+  deltaCentralShotsAgainst: number;
+  deltaWideShotsAgainst: number;
+  deltaLongShotsAgainst: number;
+  preAutoSubDeltaShotsFor?: number;
+  preAutoSubDeltaShotsAgainst?: number;
+  preAutoSubDeltaXgFor?: number;
+  preAutoSubDeltaXgAgainst?: number;
+  preAutoSubDeltaXgDiff?: number;
+  swapRead: string;
+  swapReadDetail: string;
+  swapReadClass: string;
+  swapFit: string;
+  swapFitDetail: string;
+  swapFitClass: string;
+  tacticalAttackRead: string;
+  tacticalAttackClass: string;
+  tacticalCentralControlRead: string;
+  tacticalCentralControlClass: string;
+  tacticalProtectionRead: string;
+  tacticalProtectionClass: string;
+  tacticalChannelsRead: string;
+  tacticalChannelsClass: string;
+  tacticalBreakdownDetail: string;
+  signalScore: number;
+  signalRead: string;
+  signalClass: string;
+  signalDetail: string;
+  timestamp: string;
+}
+
+export interface PlayerSwapSlotOption {
+  playerId: string;
+  playerName: string;
+  position: string;
+  slotId: string;
+  label: string;
+}
+
+export interface PlayerSwapBenchOption {
+  playerId: string;
+  playerName: string;
+  position: string;
+  score: number;
+  label: string;
+}
+
+export interface PlayerSwapCandidate {
+  starterId: string;
+  starterName: string;
+  starterPosition: string;
+  benchId: string;
+  benchName: string;
+  benchPosition: string;
+  slotId: string;
+  testCase?: string;
+}
+
+export interface SubstitutionWhatIfSummary extends SubstitutionWhatIfSummaryRow {
+  readClass: string;
+}
+
+export interface ModalRecommendationCandidateAttempt {
+  candidate: PlayerSwapCandidate;
+  row: SubstitutionWhatIfSummaryRow | null;
+  safe: boolean;
+  score: number;
+  status: 'RUNNING' | 'SAFE' | 'REJECTED' | 'NO_SAMPLE';
+}
+
+export interface SubstitutionTimingMatrixRow extends SubstitutionWhatIfSummary {
+  timingRead: string;
+}
+
+export interface PlayerSwapBatterySummary {
+  total: number;
+  mode: string;
+  precision: string;
+  confidence: string;
+  best: PlayerSwapMatrixSummary | null;
+  bestAttack: PlayerSwapMatrixSummary | null;
+  bestProtect: PlayerSwapMatrixSummary | null;
+  worst: PlayerSwapMatrixSummary | null;
+  reads: Record<string, number>;
+  fits: Record<string, number>;
+}
+
+export interface PlayerSwapPrecisionComparisonRow {
+  candidateKey: string;
+  starter: string;
+  bench: string;
+  slotId: string;
+  fit: string;
+  quick: PlayerSwapMatrixSummary;
+  balanced: PlayerSwapMatrixSummary;
+  stability: string;
+  stabilityClass: string;
+}
+
 export interface PositionPixelMatrixSummaryRequest {
   playerId: string;
   targetXPercent: number;

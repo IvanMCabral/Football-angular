@@ -60,7 +60,14 @@ import {
   MatchFixture,
   MatchPreviewSummary,
   ModalVsCanonicalSummary,
+  ModalRecommendationCandidateAttempt,
+  PlayerSwapBatterySummary,
+  PlayerSwapBenchOption,
+  PlayerSwapCandidate,
   PlayerSwapMatrixSummaryRow,
+  PlayerSwapMatrixSummary,
+  PlayerSwapPrecisionComparisonRow,
+  PlayerSwapSlotOption,
   PositionPixelQaLine,
   PositionPixelQaSummaryRow,
   PositionPixelReadFilter,
@@ -86,6 +93,8 @@ import {
   ScenarioSummarySortMode,
   SideMirrorSyntheticLabRow,
   SubstitutionWhatIfSummaryRow,
+  SubstitutionWhatIfSummary,
+  SubstitutionTimingMatrixRow,
   TestHarnessMatchRow,
   TestHarnessSquadHealthSummary,
   TestHarnessSnapshotFixture,
@@ -107,123 +116,6 @@ interface CurrentLineupReplaySample {
   fixture: MatchFixture;
   detail: MatchDetail | null;
   seed: number;
-}
-interface PlayerSwapMatrixSummary {
-  testCase: string;
-  slotId: string;
-  formation: string;
-  seedStart: number;
-  seedEnd: number;
-  seedCount: number;
-  baselinePlayer: string;
-  swapPlayer: string;
-  baselinePlayerPosition: string;
-  swapPlayerPosition: string;
-  baselinePlayerOverall: number | null;
-  swapPlayerOverall: number | null;
-  deltaPlayerOverall: number | null;
-  baseline: CurrentLineupMultiSeedSummary;
-  swapped: CurrentLineupMultiSeedSummary;
-  deltaGoalsFor: number;
-  deltaGoalsAgainst: number;
-  deltaGoalDiff: number;
-  deltaShotsFor: number;
-  deltaShotsAgainst: number;
-  deltaPossessionFor: number;
-  deltaXgFor: number;
-  deltaXgAgainst: number;
-  deltaXgDiff: number;
-  deltaCentralShotsFor: number;
-  deltaWideShotsFor: number;
-  deltaLongShotsFor: number;
-  deltaCentralShotsAgainst: number;
-  deltaWideShotsAgainst: number;
-  deltaLongShotsAgainst: number;
-  preAutoSubDeltaShotsFor?: number;
-  preAutoSubDeltaShotsAgainst?: number;
-  preAutoSubDeltaXgFor?: number;
-  preAutoSubDeltaXgAgainst?: number;
-  preAutoSubDeltaXgDiff?: number;
-  swapRead: string;
-  swapReadDetail: string;
-  swapReadClass: string;
-  swapFit: string;
-  swapFitDetail: string;
-  swapFitClass: string;
-  tacticalAttackRead: string;
-  tacticalAttackClass: string;
-  tacticalCentralControlRead: string;
-  tacticalCentralControlClass: string;
-  tacticalProtectionRead: string;
-  tacticalProtectionClass: string;
-  tacticalChannelsRead: string;
-  tacticalChannelsClass: string;
-  tacticalBreakdownDetail: string;
-  signalScore: number;
-  signalRead: string;
-  signalClass: string;
-  signalDetail: string;
-  timestamp: string;
-}
-interface PlayerSwapSlotOption {
-  playerId: string;
-  playerName: string;
-  position: string;
-  slotId: string;
-  label: string;
-}
-interface PlayerSwapBenchOption {
-  playerId: string;
-  playerName: string;
-  position: string;
-  score: number;
-  label: string;
-}
-interface PlayerSwapCandidate {
-  starterId: string;
-  starterName: string;
-  starterPosition: string;
-  benchId: string;
-  benchName: string;
-  benchPosition: string;
-  slotId: string;
-  testCase?: string;
-}
-interface SubstitutionWhatIfSummary extends SubstitutionWhatIfSummaryRow {
-  readClass: string;
-}
-interface ModalRecommendationCandidateAttempt {
-  candidate: PlayerSwapCandidate;
-  row: SubstitutionWhatIfSummaryRow | null;
-  safe: boolean;
-  score: number;
-  status: 'RUNNING' | 'SAFE' | 'REJECTED' | 'NO_SAMPLE';
-}
-interface SubstitutionTimingMatrixRow extends SubstitutionWhatIfSummary {
-  timingRead: string;
-}
-interface PlayerSwapBatterySummary {
-  total: number;
-  mode: string;
-  precision: string;
-  confidence: string;
-  best: PlayerSwapMatrixSummary | null;
-  bestAttack: PlayerSwapMatrixSummary | null;
-  bestProtect: PlayerSwapMatrixSummary | null;
-  worst: PlayerSwapMatrixSummary | null;
-  reads: Record<string, number>;
-  fits: Record<string, number>;
-}
-interface PlayerSwapPrecisionComparisonRow {
-  candidateKey: string;
-  starter: string;
-  bench: string;
-  slotId: string;
-  fit: string;
-  quick: PlayerSwapMatrixSummary;
-  balanced: PlayerSwapMatrixSummary;
-  stability: string;
-  stabilityClass: string;
 }
 interface PositionPixelMatrixSummary {
   label: string;
