@@ -1405,6 +1405,137 @@ export interface LastModalPositionMoveCase {
   coachReadBody: string | null;
 }
 
+export interface ScenarioScoutingNote {
+  title: string;
+  body: string;
+  className: string;
+}
+
+export interface SideMirrorSmokeRow {
+  formation: string;
+  seedStart: number;
+  seedEnd: number;
+  seedCount: number;
+  weakLeftWideXgL: number;
+  weakLeftWideXgR: number;
+  weakRightWideXgL: number;
+  weakRightWideXgR: number;
+  weakLeftWideShotsL: number;
+  weakLeftWideShotsR: number;
+  weakRightWideShotsL: number;
+  weakRightWideShotsR: number;
+  weakLeftRightEdge: number;
+  weakRightLeftEdge: number;
+  verdict: 'OK' | 'Parcial' | 'Revisar';
+  widthRead: string;
+  widthClass: string;
+  wingbackRead: string;
+  wingbackClass: string;
+  read: string;
+}
+
+export interface SideMirrorSmokeSummary {
+  total: number;
+  ok: number;
+  partial: number;
+  review: number;
+  partialFormations: string;
+  reviewFormations: string;
+  avgWeakLeftExpectedEdge: number;
+  avgWeakRightExpectedEdge: number;
+  mirrorGap: number;
+  read: string;
+  nextAction: string;
+  className: string;
+}
+
+export interface SideMirrorDecisionRow {
+  formation: string;
+  syntheticVerdict: SideMirrorSmokeRow['verdict'];
+  realVerdict: SideMirrorSmokeRow['verdict'];
+  syntheticEdges: string;
+  realEdges: string;
+  widthRead: string;
+  widthClass: string;
+  decision: string;
+  className: string;
+}
+
+export interface SideMirrorDecisionSummary {
+  total: number;
+  engineHealthyRealBiased: number;
+  engineReview: number;
+  fullyHealthy: number;
+  read: string;
+  focus: string;
+  className: string;
+}
+
+export interface FormationWidthRead {
+  verdict: 'OK' | 'Parcial' | 'Estrecha' | 'Revisar lado' | 'Revisar ancho';
+  className: string;
+  read: string;
+}
+
+export interface FormationWingbackRead {
+  verdict: 'OK' | 'Sin carrileros' | 'Revisar lado' | 'Revisar altura';
+  className: string;
+  read: string;
+}
+
+export interface WingbackLabRow {
+  formation: string;
+  wingbackRead: string;
+  wingbackClass: string;
+  verdict: SideMirrorSmokeRow['verdict'];
+  expectedEdgeAvg: number;
+  expectedEdgeMin: number;
+  sideGap: number;
+  attackRead: string;
+  diagnosis: string;
+  className: string;
+}
+
+export interface ScenarioDecisionCard {
+  title: string;
+  label: string;
+  metrics: string;
+  detail: string;
+  className: string;
+}
+
+export interface ScenarioBatteryRow {
+  matchId: string;
+  matchLabel: string;
+  controlledSide: Exclude<ControlledTeamSide, 'USER'>;
+  controlledTeam: string;
+  scenarioGroup: 'ALL' | 'OFFENSE' | 'DEFENSE' | 'OPPONENT';
+  coachObjective: ScenarioBatteryCoachObjective;
+  coachContext: string;
+  coachContextDetail: string;
+  seedStart: number;
+  seedCount: number;
+  scenarioCount: number;
+  decision: string;
+  decisionDetail: string;
+  review: string;
+  reviewDetail: string;
+  cards: ScenarioDecisionCard[];
+}
+
+export interface ScenarioBatteryReviewItem {
+  key: string;
+  summary: string;
+  detail: string;
+}
+
+export interface ScenarioBatteryCoachAdvice {
+  plan: string;
+  risk: string;
+  why: string;
+  next: string;
+}
+
 export interface ScenarioMatrixSummaryRow {
   scenario: string;
   actionType: 'NONE' | 'STYLE' | 'FORMATION' | 'SUBSTITUTION' | string;
