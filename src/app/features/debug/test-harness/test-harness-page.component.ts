@@ -179,6 +179,11 @@ import {
   positionPixelTacticalReadClass as getPositionPixelTacticalReadClass,
   positionPixelTacticalReadReason as getPositionPixelTacticalReadReason,
   positionPixelUsesContextualCoverage as getPositionPixelUsesContextualCoverage,
+  positionPixelVisualExpectationClass as getPositionPixelVisualExpectationClass,
+  positionPixelVisualExpectationDetail as getPositionPixelVisualExpectationDetail,
+  positionPixelVisualExpectationMismatches as getPositionPixelVisualExpectationMismatches,
+  positionPixelVisualExpectationRead as getPositionPixelVisualExpectationRead,
+  positionPixelIsMicroVisualMismatch as getPositionPixelIsMicroVisualMismatch,
   positionPixelWideChannelReason as getPositionPixelWideChannelReason,
 } from './position-pixel-analysis';
 /**
@@ -13400,24 +13405,21 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     );
   }
   positionPixelVisualExpectationRead(row: PositionPixelMatrixSummary): string {
-    if (this.positionPixelVisualExpectationMismatches(row).length === 0) return 'Visual OK';
-    return this.positionPixelIsMicroVisualMismatch(row) ? 'Visual micro' : 'Visual review';
+    return getPositionPixelVisualExpectationRead(row, this.positionPixelSourceLine(row));
   }
   positionPixelVisualExpectationClass(row: PositionPixelMatrixSummary): string {
-    const read = this.positionPixelVisualExpectationRead(row);
-    if (read === 'Visual review') return 'read-check';
-    if (read === 'Visual micro') return 'read-stable';
-    return 'read-stable';
+    return getPositionPixelVisualExpectationClass(this.positionPixelVisualExpectationRead(row));
   }
   positionPixelVisualExpectationDetail(row: PositionPixelMatrixSummary): string {
-    const mismatches = this.positionPixelVisualExpectationMismatches(row);
-    if (mismatches.length > 0) {
-      return mismatches.join(' · ');
-    }
-    return `coherente: ${this.positionPixelShapeMove(row)} ? ${this.positionPixelChannelBreakdownRead(row)}`;
+    return getPositionPixelVisualExpectationDetail(
+      row,
+      this.positionPixelSourceLine(row),
+      this.positionPixelShapeMove(row),
+      this.positionPixelChannelBreakdownRead(row)
+    );
   }
   private positionPixelIsMicroVisualMismatch(row: PositionPixelMatrixSummary): boolean {
-    return this.positionPixelReadLevel(row) === 'stable' && row.signalScore < 0.05;
+    return getPositionPixelIsMicroVisualMismatch(row);
   }
   positionPixelVisualEngineTensionRead(row: PositionPixelMatrixSummary): string {
     const tension = this.positionPixelVisualEngineTensions(row);
@@ -13502,84 +13504,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return result;
   }
   private positionPixelVisualExpectationMismatches(row: PositionPixelMatrixSummary): string[] {
-    const breakdown = this.positionPixelChannelBreakdown(row);
-    const line = this.strictPositionPixelLine(row.playerPosition) ?? this.positionPixelVisualLine(row.fromYPercent);
-    const movedUp = row.targetYPercent <= row.fromYPercent - 3.5;
-    const movedDown = row.targetYPercent >= row.fromYPercent + 3.5;
-    const movedInside = Math.abs(row.targetXPercent - 50) < Math.abs(row.fromXPercent - 50) - 2.5;
-    const movedWide = Math.abs(row.targetXPercent - 50) > Math.abs(row.fromXPercent - 50) + 2.5;
-    const targetCentralish = Math.abs(row.targetXPercent - 50) <= 18;
-    const fromWideish = Math.abs(row.fromXPercent - 50) >= 18;
-    const targetWideish = Math.abs(row.targetXPercent - 50) >= 18;
-    const mismatches: string[] = [];
-    const attackGainScore = this.positionPixelAttackGainScore(row);
-    const attackLossScore = this.positionPixelAttackLossScore(row);
-    const defensiveGainScore = this.positionPixelDefensiveGainScore(row);
-    const defensiveRiskScore = this.positionPixelDefensiveRiskScore(row);
-    const isBigTacticalMove = this.positionPixelDistance(row) >= 6;
-    const visualBenefit = breakdown.threat > 0.20 || breakdown.connection > 0.20 || breakdown.coverage > 0.20;
-    const visualCost = breakdown.threat < -0.20 || breakdown.connection < -0.20 || breakdown.coverage < -0.20;
-    const engineBenefit = attackGainScore >= 0.55 || defensiveGainScore >= 0.55;
-    const engineCost = attackLossScore >= 0.55 || defensiveRiskScore >= 0.55;
-    if (isBigTacticalMove && !movedWide && visualCost && engineCost) return mismatches;
-    if (isBigTacticalMove && !movedWide && visualBenefit && visualCost && (engineBenefit || engineCost)) return mismatches;
-    const distance = this.positionPixelDistance(row);
-    const ownThreatSignal = Math.max(
-      row.deltaXgFor,
-      row.deltaCentralXgFor,
-      row.deltaWideXgFor,
-      row.deltaLeftWideXgFor,
-      row.deltaRightWideXgFor,
-      row.deltaShotsFor * 0.025
-    );
-    const centralThreatSignal = Math.max(
-      row.deltaCentralXgFor,
-      row.deltaXgFor,
-      row.deltaCentralShotsFor * 0.025
-    );
-    const coverageSignal = Math.max(
-      -row.deltaXgAgainst,
-      -row.deltaCentralXgAgainst,
-      -row.deltaWideXgAgainst,
-      -row.deltaShotsAgainst * 0.020
-    );
-    if (line === 'ATT' && movedUp && breakdown.threat < 0.20 && ownThreatSignal < 0.010) {
-      mismatches.push('ATT sube: se esperaba algo de amenaza/profundidad');
-    }
-    if (line === 'DEF' && movedDown && !movedWide && breakdown.coverage < 0.20 && coverageSignal < 0.010) {
-      mismatches.push('DEF baja: se esperaba mas cobertura');
-    }
-    if (line === 'DEF'
-        && movedUp
-        && breakdown.threat < 0.20
-        && breakdown.connection < 0.20
-        && breakdown.coverage < 0.35
-        && defensiveRiskScore < 0.6
-        && attackLossScore < 0.6) {
-      mismatches.push('DEF sube: se esperaba aporte ofensivo o conexión');
-    }
-    if (movedInside
-        && targetCentralish
-        && breakdown.connection < -0.20
-        && breakdown.threat < 0.20
-        && centralThreatSignal < (distance <= 6.0 ? 0.006 : 0.018)
-        && attackGainScore < 0.75) {
-      mismatches.push('se cierra: se esperaba más conexión o amenaza central');
-    }
-    const wideXgSignal = Math.max(Math.abs(row.deltaWideXgFor), Math.abs(row.deltaWideXgAgainst));
-    const wideShotSignal = Math.max(Math.abs(row.deltaWideShotsFor), Math.abs(row.deltaWideShotsAgainst));
-    const requiredWideXgSignal = distance <= 6.0 ? 0.005 : 0.010;
-    const requiredWideShotSignal = distance <= 6.0 ? 0.10 : 0.25;
-    if (movedWide
-        && (fromWideish || targetWideish)
-        && wideXgSignal < requiredWideXgSignal
-        && wideShotSignal < requiredWideShotSignal
-        && breakdown.threat < 0.35
-        && breakdown.connection < 0.35
-        && attackGainScore < 0.75) {
-      mismatches.push('se abre: se esperaba alguna señal de banda');
-    }
-    return mismatches;
+    return getPositionPixelVisualExpectationMismatches(row, this.positionPixelSourceLine(row));
   }
   positionPixelChannelBreakdown(row: PositionPixelMatrixSummary): PositionPixelChannelBreakdown {
     return getPositionPixelChannelBreakdown(row);

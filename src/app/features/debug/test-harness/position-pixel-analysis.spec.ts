@@ -13,6 +13,7 @@ import {
   positionPixelDefensiveRiskScore,
   positionPixelDistance,
   positionPixelImpactScore,
+  positionPixelIsMicroVisualMismatch,
   positionPixelMovementConfidence,
   positionPixelReadLevel,
   positionPixelReadSeverity,
@@ -24,6 +25,10 @@ import {
   positionPixelTacticalReadClass,
   positionPixelTacticalReadReason,
   positionPixelUsesContextualCoverage,
+  positionPixelVisualExpectationClass,
+  positionPixelVisualExpectationDetail,
+  positionPixelVisualExpectationMismatches,
+  positionPixelVisualExpectationRead,
   positionPixelWideChannelReason,
 } from './position-pixel-analysis';
 
@@ -294,5 +299,56 @@ describe('position-pixel-analysis', () => {
     expect(positionPixelCoverageChannelLabel(true, 0.40)).toBe('Cobertura ctx +');
     expect(positionPixelContextualCoverageNote(row, 'ATT', 0.40)).toContain('riesgo defensivo sube');
     expect(positionPixelUsesContextualCoverage(row, 'MID', 0.40)).toBeFalse();
+  });
+
+  it('flags visual expectation when an attacker moves up without threat', () => {
+    const row = {
+      ...baseRow,
+      fromYPercent: 30,
+      targetYPercent: 24,
+    } as any;
+
+    expect(positionPixelVisualExpectationMismatches(row, 'ATT')).toContain('ATT sube: se esperaba algo de amenaza/profundidad');
+    expect(positionPixelVisualExpectationRead(row, 'ATT')).toBe('Visual micro');
+    expect(positionPixelVisualExpectationClass('Visual micro')).toBe('read-stable');
+    expect(positionPixelIsMicroVisualMismatch(row)).toBeTrue();
+  });
+
+  it('flags visual expectation when a defender drops without coverage', () => {
+    const row = {
+      ...baseRow,
+      fromYPercent: 72,
+      targetYPercent: 78,
+    } as any;
+
+    expect(positionPixelVisualExpectationMismatches(row, 'DEF')).toContain('DEF baja: se esperaba mas cobertura');
+    expect(positionPixelVisualExpectationRead({ ...row, signalScore: 0.10 }, 'DEF')).toBe('Visual review');
+    expect(positionPixelVisualExpectationClass('Visual review')).toBe('read-check');
+  });
+
+  it('flags visual expectation when opening wide has no wide signal', () => {
+    const row = {
+      ...baseRow,
+      fromXPercent: 70,
+      targetXPercent: 78,
+      fromYPercent: 50,
+      targetYPercent: 50,
+    } as any;
+
+    expect(positionPixelVisualExpectationMismatches(row, 'MID')).toContain('se abre: se esperaba alguna señal de banda');
+  });
+
+  it('keeps visual expectation detail coherent when there are no mismatches', () => {
+    const row = {
+      ...baseRow,
+      targetXPercent: 58,
+      deltaXgFor: 0.10,
+      deltaShotsFor: 1,
+    } as any;
+
+    expect(positionPixelVisualExpectationMismatches(row, 'MID')).toEqual([]);
+    expect(positionPixelVisualExpectationRead(row, 'MID')).toBe('Visual OK');
+    expect(positionPixelVisualExpectationDetail(row, 'MID', 'MID C: mas derecho', 'Amenaza + · Conex. = · Cobertura ='))
+      .toContain('coherente');
   });
 });

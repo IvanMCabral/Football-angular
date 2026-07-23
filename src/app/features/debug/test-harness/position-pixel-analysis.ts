@@ -327,6 +327,120 @@ export function positionPixelClampBreakdownScore(value: number): number {
   return Math.max(-9.99, Math.min(9.99, value));
 }
 
+export function positionPixelVisualExpectationRead(
+  row: PositionPixelMatrixSummary,
+  sourceLine: 'ATT' | 'MID' | 'DEF',
+): string {
+  if (positionPixelVisualExpectationMismatches(row, sourceLine).length === 0) return 'Visual OK';
+  return positionPixelIsMicroVisualMismatch(row) ? 'Visual micro' : 'Visual review';
+}
+
+export function positionPixelVisualExpectationClass(read: string): string {
+  if (read === 'Visual review') return 'read-check';
+  if (read === 'Visual micro') return 'read-stable';
+  return 'read-stable';
+}
+
+export function positionPixelVisualExpectationDetail(
+  row: PositionPixelMatrixSummary,
+  sourceLine: 'ATT' | 'MID' | 'DEF',
+  shapeMove: string,
+  channelBreakdownRead: string,
+): string {
+  const mismatches = positionPixelVisualExpectationMismatches(row, sourceLine);
+  if (mismatches.length > 0) {
+    return mismatches.join(' · ');
+  }
+  return `coherente: ${shapeMove} ? ${channelBreakdownRead}`;
+}
+
+export function positionPixelIsMicroVisualMismatch(row: PositionPixelMatrixSummary): boolean {
+  return positionPixelReadLevel(row, positionPixelTacticalRead(row)) === 'stable' && row.signalScore < 0.05;
+}
+
+export function positionPixelVisualExpectationMismatches(
+  row: PositionPixelMatrixSummary,
+  sourceLine: 'ATT' | 'MID' | 'DEF',
+): string[] {
+  const breakdown = positionPixelChannelBreakdown(row);
+  const movedUp = row.targetYPercent <= row.fromYPercent - 3.5;
+  const movedDown = row.targetYPercent >= row.fromYPercent + 3.5;
+  const movedInside = Math.abs(row.targetXPercent - 50) < Math.abs(row.fromXPercent - 50) - 2.5;
+  const movedWide = Math.abs(row.targetXPercent - 50) > Math.abs(row.fromXPercent - 50) + 2.5;
+  const targetCentralish = Math.abs(row.targetXPercent - 50) <= 18;
+  const fromWideish = Math.abs(row.fromXPercent - 50) >= 18;
+  const targetWideish = Math.abs(row.targetXPercent - 50) >= 18;
+  const mismatches: string[] = [];
+  const attackGainScore = positionPixelAttackGainScore(row);
+  const attackLossScore = positionPixelAttackLossScore(row);
+  const defensiveGainScore = positionPixelDefensiveGainScore(row);
+  const defensiveRiskScore = positionPixelDefensiveRiskScore(row);
+  const distance = positionPixelDistance(row);
+  const isBigTacticalMove = distance >= 6;
+  const visualBenefit = breakdown.threat > 0.20 || breakdown.connection > 0.20 || breakdown.coverage > 0.20;
+  const visualCost = breakdown.threat < -0.20 || breakdown.connection < -0.20 || breakdown.coverage < -0.20;
+  const engineBenefit = attackGainScore >= 0.55 || defensiveGainScore >= 0.55;
+  const engineCost = attackLossScore >= 0.55 || defensiveRiskScore >= 0.55;
+  if (isBigTacticalMove && !movedWide && visualCost && engineCost) return mismatches;
+  if (isBigTacticalMove && !movedWide && visualBenefit && visualCost && (engineBenefit || engineCost)) return mismatches;
+  const ownThreatSignal = Math.max(
+    row.deltaXgFor,
+    row.deltaCentralXgFor,
+    row.deltaWideXgFor,
+    row.deltaLeftWideXgFor,
+    row.deltaRightWideXgFor,
+    row.deltaShotsFor * 0.025
+  );
+  const centralThreatSignal = Math.max(
+    row.deltaCentralXgFor,
+    row.deltaXgFor,
+    row.deltaCentralShotsFor * 0.025
+  );
+  const coverageSignal = Math.max(
+    -row.deltaXgAgainst,
+    -row.deltaCentralXgAgainst,
+    -row.deltaWideXgAgainst,
+    -row.deltaShotsAgainst * 0.020
+  );
+  if (sourceLine === 'ATT' && movedUp && breakdown.threat < 0.20 && ownThreatSignal < 0.010) {
+    mismatches.push('ATT sube: se esperaba algo de amenaza/profundidad');
+  }
+  if (sourceLine === 'DEF' && movedDown && !movedWide && breakdown.coverage < 0.20 && coverageSignal < 0.010) {
+    mismatches.push('DEF baja: se esperaba mas cobertura');
+  }
+  if (sourceLine === 'DEF'
+      && movedUp
+      && breakdown.threat < 0.20
+      && breakdown.connection < 0.20
+      && breakdown.coverage < 0.35
+      && defensiveRiskScore < 0.6
+      && attackLossScore < 0.6) {
+    mismatches.push('DEF sube: se esperaba aporte ofensivo o conexión');
+  }
+  if (movedInside
+      && targetCentralish
+      && breakdown.connection < -0.20
+      && breakdown.threat < 0.20
+      && centralThreatSignal < (distance <= 6.0 ? 0.006 : 0.018)
+      && attackGainScore < 0.75) {
+    mismatches.push('se cierra: se esperaba más conexión o amenaza central');
+  }
+  const wideXgSignal = Math.max(Math.abs(row.deltaWideXgFor), Math.abs(row.deltaWideXgAgainst));
+  const wideShotSignal = Math.max(Math.abs(row.deltaWideShotsFor), Math.abs(row.deltaWideShotsAgainst));
+  const requiredWideXgSignal = distance <= 6.0 ? 0.005 : 0.010;
+  const requiredWideShotSignal = distance <= 6.0 ? 0.10 : 0.25;
+  if (movedWide
+      && (fromWideish || targetWideish)
+      && wideXgSignal < requiredWideXgSignal
+      && wideShotSignal < requiredWideShotSignal
+      && breakdown.threat < 0.35
+      && breakdown.connection < 0.35
+      && attackGainScore < 0.75) {
+    mismatches.push('se abre: se esperaba alguna señal de banda');
+  }
+  return mismatches;
+}
+
 export function positionPixelMovementConfidence(distance: number): number {
   if (!Number.isFinite(distance)) return 1;
   if (distance <= 1.25) return 0.35;
