@@ -13,6 +13,10 @@ import {
   positionPixelSignalDetail,
   positionPixelSignalRead,
   positionPixelSignalScore,
+  positionPixelTacticalRead,
+  positionPixelTacticalReadClass,
+  positionPixelTacticalReadReason,
+  positionPixelWideChannelReason,
 } from './position-pixel-analysis';
 
 describe('position-pixel-analysis', () => {
@@ -193,5 +197,34 @@ describe('position-pixel-analysis', () => {
     expect(positionPixelImpactScore(goodMove)).toBeGreaterThan(0);
     expect(positionPixelDecisionScore(goodMove)).toBeGreaterThan(0);
     expect(positionPixelDecisionScore(badMove)).toBeLessThan(0);
+  });
+
+  it('reads tactical impact for micro, visible, and larger moves', () => {
+    expect(positionPixelTacticalRead({ ...baseRow, targetXPercent: 51, signalScore: 0.06 } as any)).toBe('Micro review');
+    expect(positionPixelTacticalRead({ ...baseRow, targetXPercent: 55, deltaXgAgainst: 0.12 } as any)).toBe('Visible risk');
+    expect(positionPixelTacticalRead({ ...baseRow, targetXPercent: 60, deltaXgFor: 0.20 } as any)).toBe('Attack gain');
+  });
+
+  it('maps tactical reads to stable UI classes', () => {
+    expect(positionPixelTacticalReadClass('Micro review')).toBe('read-check');
+    expect(positionPixelTacticalReadClass('Visible attack gain')).toBe('read-visible');
+    expect(positionPixelTacticalReadClass('Bad tradeoff')).toBe('read-strong');
+    expect(positionPixelTacticalReadClass('Neutral')).toBe('delta-neutral');
+  });
+
+  it('explains tactical read with score and wide-channel context', () => {
+    const row = {
+      ...baseRow,
+      deltaXgFor: 0.10,
+      deltaShotsFor: 1,
+      deltaLeftWideXgFor: 0.04,
+      deltaRightWideXgAgainst: 0.03,
+    } as any;
+    const formatMicro = (value: number): string => (value >= 0 ? `+${value.toFixed(3)}` : value.toFixed(3));
+
+    expect(positionPixelWideChannelReason(row, formatMicro)).toContain('own L +0.040');
+    expect(positionPixelTacticalReadReason(row, 'coach note', formatMicro)).toContain('coach note');
+    expect(positionPixelTacticalReadReason(row, 'coach note', formatMicro)).toContain('attack gain');
+    expect(positionPixelTacticalReadReason(row, 'coach note', formatMicro)).toContain('wide channel');
   });
 });

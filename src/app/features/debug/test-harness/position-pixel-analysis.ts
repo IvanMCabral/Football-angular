@@ -140,6 +140,88 @@ export function positionPixelDefensiveGainScore(row: PositionPixelMatrixSummary)
     + Math.max(0, -(row.deltaLeftWideXgAgainst + row.deltaRightWideXgAgainst)) * 8;
 }
 
+export function positionPixelTacticalRead(row: PositionPixelMatrixSummary): string {
+  const attackGain = positionPixelAttackGainScore(row);
+  const attackLoss = positionPixelAttackLossScore(row);
+  const defensiveRisk = positionPixelDefensiveRiskScore(row);
+  const defensiveGain = positionPixelDefensiveGainScore(row);
+  const distance = positionPixelDistance(row);
+  if (distance <= 1.25) {
+    return row.signalScore >= 0.050 ? 'Micro review' : 'Micro stable';
+  }
+  if (distance <= 6.0) {
+    if (attackLoss >= 1.0 && defensiveRisk >= 1.0) return 'Visible risk';
+    if (attackGain >= 1.0 && defensiveRisk >= 1.0) return 'Visible trade-off';
+    if (attackLoss >= 1.0 && defensiveGain >= 0.8) return 'Visible def+ / att-';
+    if (attackGain >= 1.0 && defensiveGain >= 0.8) return 'Visible double gain';
+    if (defensiveRisk >= 1.0) return 'Visible risk';
+    if (attackLoss >= 1.0) return 'Visible attack loss';
+    if (attackGain >= 1.0) return 'Visible attack gain';
+    if (defensiveGain >= 1.0) return 'Visible def. gain';
+    if (attackGain >= 0.6 || attackLoss >= 0.6 || defensiveRisk >= 0.6 || defensiveGain >= 0.6) return 'Visible small';
+    return 'Neutral';
+  }
+  if (attackLoss >= 1.2 && defensiveGain >= 1.0) return 'Tradeoff: def+ / att-';
+  if (attackGain >= 1.2 && defensiveRisk >= 1.0) return 'Tradeoff: att+ / risk+';
+  if (attackLoss >= 1.0 && defensiveRisk >= 1.0) return 'Bad tradeoff';
+  if (attackGain >= 1.0 && defensiveGain >= 1.0) return 'Double gain';
+  if (defensiveRisk >= 1.6 && attackGain < 1.2) return 'Risk';
+  if (attackGain >= 1.6 && defensiveRisk >= 1.2) return 'Trade-off';
+  if (attackLoss >= 1.6 && defensiveGain < 1.0) return 'Attack loss';
+  if (attackGain >= 1.4 && defensiveRisk < 0.8) return 'Attack gain';
+  if (defensiveGain >= 1.4 && attackGain < 1.0) return 'Def. gain';
+  if (defensiveRisk >= 1.0 && defensiveGain >= 0.8) return 'Compensated';
+  if (attackGain >= 0.8 || attackLoss >= 0.8 || defensiveRisk >= 0.8 || defensiveGain >= 0.8) return 'Small signal';
+  return 'Neutral';
+}
+
+export function positionPixelTacticalReadClass(read: string): string {
+  if (read === 'Micro review') return 'read-check';
+  if (read === 'Micro stable') return 'read-stable';
+  if (read.startsWith('Visible risk') || read === 'Visible attack loss') return 'read-check';
+  if (read.startsWith('Visible')) return 'read-visible';
+  if (read === 'Risk') return 'read-check';
+  if (read === 'Trade-off' || read === 'Tradeoff: att+ / risk+' || read === 'Bad tradeoff') return 'read-strong';
+  if (read === 'Tradeoff: def+ / att-') return 'read-visible';
+  if (read === 'Double gain') return 'read-visible';
+  if (read === 'Attack loss') return 'read-check';
+  if (read === 'Attack gain' || read === 'Def. gain') return 'read-visible';
+  if (read === 'Compensated' || read === 'Small signal') return 'read-stable';
+  return 'delta-neutral';
+}
+
+export function positionPixelWideChannelReason(
+  row: PositionPixelMatrixSummary,
+  formatDeltaMicro: (value: number) => string,
+): string {
+  const ownLeft = row.deltaLeftWideXgFor;
+  const ownRight = row.deltaRightWideXgFor;
+  const agLeft = row.deltaLeftWideXgAgainst;
+  const agRight = row.deltaRightWideXgAgainst;
+  const ownSide = Math.abs(ownLeft) >= Math.abs(ownRight)
+    ? `own L ${formatDeltaMicro(ownLeft)}`
+    : `own R ${formatDeltaMicro(ownRight)}`;
+  const agSide = Math.abs(agLeft) >= Math.abs(agRight)
+    ? `ag L ${formatDeltaMicro(agLeft)}`
+    : `ag R ${formatDeltaMicro(agRight)}`;
+  return `wide channel ${ownSide} / ${agSide}`;
+}
+
+export function positionPixelTacticalReadReason(
+  row: PositionPixelMatrixSummary,
+  coachRead: string,
+  formatDeltaMicro: (value: number) => string,
+): string {
+  return [
+    coachRead,
+    `attack gain ${positionPixelAttackGainScore(row).toFixed(2)}`,
+    `attack loss ${positionPixelAttackLossScore(row).toFixed(2)}`,
+    `defensive risk ${positionPixelDefensiveRiskScore(row).toFixed(2)}`,
+    `defensive gain ${positionPixelDefensiveGainScore(row).toFixed(2)}`,
+    positionPixelWideChannelReason(row, formatDeltaMicro)
+  ].join(' ? ');
+}
+
 export function positionPixelMovementConfidence(distance: number): number {
   if (!Number.isFinite(distance)) return 1;
   if (distance <= 1.25) return 0.35;

@@ -167,6 +167,10 @@ import {
   positionPixelSignalDetail as getPositionPixelSignalDetail,
   positionPixelSignalRead as getPositionPixelSignalRead,
   positionPixelSignalScore as getPositionPixelSignalScore,
+  positionPixelTacticalRead as getPositionPixelTacticalRead,
+  positionPixelTacticalReadClass as getPositionPixelTacticalReadClass,
+  positionPixelTacticalReadReason as getPositionPixelTacticalReadReason,
+  positionPixelWideChannelReason as getPositionPixelWideChannelReason,
 } from './position-pixel-analysis';
 /**
  * V24D24: Test-Harness UI page (4-panel layout).
@@ -13361,67 +13365,13 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return getPositionPixelMovementConfidence(distance);
   }
   positionPixelTacticalRead(row: PositionPixelMatrixSummary): string {
-    const attackGain = this.positionPixelAttackGainScore(row);
-    const attackLoss = this.positionPixelAttackLossScore(row);
-    const defensiveRisk = this.positionPixelDefensiveRiskScore(row);
-    const defensiveGain = this.positionPixelDefensiveGainScore(row);
-    const distance = this.positionPixelDistance(row);
-    if (distance <= 1.25) {
-      return row.signalScore >= 0.050 ? 'Micro review' : 'Micro stable';
-    }
-    if (distance <= 6.0) {
-      if (attackLoss >= 1.0 && defensiveRisk >= 1.0) return 'Visible risk';
-      if (attackGain >= 1.0 && defensiveRisk >= 1.0) return 'Visible trade-off';
-      if (attackLoss >= 1.0 && defensiveGain >= 0.8) return 'Visible def+ / att-';
-      if (attackGain >= 1.0 && defensiveGain >= 0.8) return 'Visible double gain';
-      if (defensiveRisk >= 1.0) return 'Visible risk';
-      if (attackLoss >= 1.0) return 'Visible attack loss';
-      if (attackGain >= 1.0) return 'Visible attack gain';
-      if (defensiveGain >= 1.0) return 'Visible def. gain';
-      if (attackGain >= 0.6 || attackLoss >= 0.6 || defensiveRisk >= 0.6 || defensiveGain >= 0.6) return 'Visible small';
-      return 'Neutral';
-    }
-    if (attackLoss >= 1.2 && defensiveGain >= 1.0) return 'Tradeoff: def+ / att-';
-    if (attackGain >= 1.2 && defensiveRisk >= 1.0) return 'Tradeoff: att+ / risk+';
-    if (attackLoss >= 1.0 && defensiveRisk >= 1.0) return 'Bad tradeoff';
-    if (attackGain >= 1.0 && defensiveGain >= 1.0) return 'Double gain';
-    if (defensiveRisk >= 1.6 && attackGain < 1.2) return 'Risk';
-    if (attackGain >= 1.6 && defensiveRisk >= 1.2) return 'Trade-off';
-    if (attackLoss >= 1.6 && defensiveGain < 1.0) return 'Attack loss';
-    if (attackGain >= 1.4 && defensiveRisk < 0.8) return 'Attack gain';
-    if (defensiveGain >= 1.4 && attackGain < 1.0) return 'Def. gain';
-    if (defensiveRisk >= 1.0 && defensiveGain >= 0.8) return 'Compensated';
-    if (attackGain >= 0.8 || attackLoss >= 0.8 || defensiveRisk >= 0.8 || defensiveGain >= 0.8) return 'Small signal';
-    return 'Neutral';
+    return getPositionPixelTacticalRead(row);
   }
   positionPixelTacticalReadClass(row: PositionPixelMatrixSummary): string {
-    const read = this.positionPixelTacticalRead(row);
-    if (read === 'Micro review') return 'read-check';
-    if (read === 'Micro stable') return 'read-stable';
-    if (read.startsWith('Visible risk') || read === 'Visible attack loss') return 'read-check';
-    if (read.startsWith('Visible')) return 'read-visible';
-    if (read === 'Risk') return 'read-check';
-    if (read === 'Trade-off' || read === 'Tradeoff: att+ / risk+' || read === 'Bad tradeoff') return 'read-strong';
-    if (read === 'Tradeoff: def+ / att-') return 'read-visible';
-    if (read === 'Double gain') return 'read-visible';
-    if (read === 'Attack loss') return 'read-check';
-    if (read === 'Attack gain' || read === 'Def. gain') return 'read-visible';
-    if (read === 'Compensated' || read === 'Small signal') return 'read-stable';
-    return 'delta-neutral';
+    return getPositionPixelTacticalReadClass(this.positionPixelTacticalRead(row));
   }
   positionPixelTacticalReadReason(row: PositionPixelMatrixSummary): string {
-    const attackGain = this.positionPixelAttackGainScore(row);
-    const attackLoss = this.positionPixelAttackLossScore(row);
-    const defensiveRisk = this.positionPixelDefensiveRiskScore(row);
-    const defensiveGain = this.positionPixelDefensiveGainScore(row);
-    return [
-      this.positionPixelCoachRead(row),
-      `attack gain ${attackGain.toFixed(2)}`,
-      `attack loss ${attackLoss.toFixed(2)}`,
-      `defensive risk ${defensiveRisk.toFixed(2)}`,
-      `defensive gain ${defensiveGain.toFixed(2)}`,
-      this.positionPixelWideChannelReason(row)
-    ].join(' ? ');
+    return getPositionPixelTacticalReadReason(row, this.positionPixelCoachRead(row), (value) => this.fmtDeltaMicro(value));
   }
   positionPixelChannelBreakdownRead(row: PositionPixelMatrixSummary): string {
     const breakdown = this.positionPixelChannelBreakdown(row);
@@ -13803,17 +13753,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return 'Cambio leve: señal baja, sin lectura táctica dominante.';
   }
   private positionPixelWideChannelReason(row: PositionPixelMatrixSummary): string {
-    const ownLeft = row.deltaLeftWideXgFor;
-    const ownRight = row.deltaRightWideXgFor;
-    const agLeft = row.deltaLeftWideXgAgainst;
-    const agRight = row.deltaRightWideXgAgainst;
-    const ownSide = Math.abs(ownLeft) >= Math.abs(ownRight)
-      ? `own L ${this.fmtDeltaMicro(ownLeft)}`
-      : `own R ${this.fmtDeltaMicro(ownRight)}`;
-    const agSide = Math.abs(agLeft) >= Math.abs(agRight)
-      ? `ag L ${this.fmtDeltaMicro(agLeft)}`
-      : `ag R ${this.fmtDeltaMicro(agRight)}`;
-    return `wide channel ${ownSide} / ${agSide}`;
+    return getPositionPixelWideChannelReason(row, (value) => this.fmtDeltaMicro(value));
   }
   positionPixelShapeMove(row: PositionPixelMatrixSummary): string {
     const fromLine = this.positionPixelVisualLine(row.fromYPercent);
