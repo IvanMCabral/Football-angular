@@ -1,4 +1,4 @@
-import { Component, OnInit, HostListener } from '@angular/core';
+import { Component, OnInit, HostListener, isDevMode } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink, Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
@@ -405,7 +405,7 @@ this.squad$ = combineLatest([
        parts.push(`${veryTired.length} ${veryTired.length > 1 ? 'jugadores muy cansados' : 'jugador muy cansado'}`);
      }
 
-     return `Atenci?n: ${parts.join(', ')} en el once. Esto puede afectar el rendimiento. Toc? "Confirmar y jugar" otra vez para continuar.`;
+     return `Atención: ${parts.join(', ')} en el once. Esto puede afectar el rendimiento. Tocá "Confirmar y jugar" otra vez para continuar.`;
    }
 
    private resetLineupWarning(): void {
@@ -800,7 +800,7 @@ this.http.post(`${environment.apiUrl}/career/lineup/confirm`, {}).subscribe({
                  }
                },
                error: (err) => {
-                 console.error('[SQUAD] Error en next-round:', err);
+                 this.logDevError('[SQUAD] Error en next-round:', err);
                  this.lineupLoading$.next(false);
                  this.lineupError$.next(err.error?.message || 'Error al avanzar de fecha');
                  this.resetLineupWarning();
@@ -815,14 +815,14 @@ this.http.post(`${environment.apiUrl}/career/lineup/confirm`, {}).subscribe({
            }
          },
          error: (err) => {
-           console.error('[SQUAD] Error confirmando lineup:', err);
+           this.logDevError('[SQUAD] Error confirmando lineup:', err);
            this.lineupLoading$.next(false);
            this.lineupError$.next(err.error?.message || 'Error al confirmar lineup');
            this.resetLineupWarning();
          }
        });
      }).catch(err => {
-       console.error('[SQUAD] Error obteniendo career status:', err);
+       this.logDevError('[SQUAD] Error obteniendo career status:', err);
        this.lineupLoading$.next(false);
        this.lineupError$.next('Error al obtener estado de carrera');
        this.resetLineupWarning();
@@ -857,7 +857,7 @@ this.http.post(`${environment.apiUrl}/career/lineup/confirm`, {}).subscribe({
           }
         },
         error: (err) => {
-          console.error('[SQUAD] Error iniciando nueva temporada:', err);
+          this.logDevError('[SQUAD] Error iniciando nueva temporada:', err);
           this.lineupError$.next(err.error?.message || 'Error al iniciar nueva temporada');
         }
       });
@@ -890,7 +890,7 @@ this.http.post(`${environment.apiUrl}/career/lineup/confirm`, {}).subscribe({
           });
         },
         error: (err) => {
-          console.error('[PALMARES-FRONT] Error obteniendo datos:', err);
+          this.logDevError('[PALMARES-FRONT] Error obteniendo datos:', err);
           this.lineupError$.next('Error al obtener datos del palmarés');
         }
       });
@@ -906,7 +906,7 @@ this.http.post(`${environment.apiUrl}/career/lineup/confirm`, {}).subscribe({
           });
         },
         error: (err) => {
-          console.error('[SQUAD] Error obteniendo promociones:', err);
+          this.logDevError('[SQUAD] Error obteniendo promociones:', err);
           this.lineupError$.next('Error al obtener promociones');
         }
       });
@@ -939,6 +939,12 @@ this.http.post(`${environment.apiUrl}/career/lineup/confirm`, {}).subscribe({
      */
     refreshSquad(): void {
       this.refetchSquadTrigger$.next();
+    }
+
+    private logDevError(message: string, error: unknown): void {
+      if (isDevMode()) {
+        console.error(message, error);
+      }
     }
 
 }
