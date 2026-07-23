@@ -40,6 +40,7 @@ import {
   BackFiveTransitionLabRow,
   ControlledTeamSide,
   CustomFixture,
+  CurrentLineupReplaySample,
   CurrentLineupMultiSeedSummary,
   CurrentLineupReplayResult,
   FocusedWideBatteryRow,
@@ -129,12 +130,6 @@ import {
   TIMELINE_MAX_MINUTE,
   TIMELINE_STEP,
 } from './test-harness.constants';
-interface CurrentLineupReplaySample {
-  lineup: LineupDTO;
-  fixture: MatchFixture;
-  detail: MatchDetail | null;
-  seed: number;
-}
 /**
  * V24D24: Test-Harness UI page (4-panel layout).
  *

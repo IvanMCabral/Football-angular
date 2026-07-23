@@ -11,6 +11,7 @@
 
 import { MatchDetail } from '../../match-detail/models/match-detail.model';
 import { ALL_FORMATIONS, FormationCode } from '../../../shared/constants/formations';
+import { LineupDTO } from '../../../shared/models/lineup/lineup.dto';
 
 /**
  * V25D55-C16 P0.1: re-export the shared {@link FormationCode} type from
@@ -227,6 +228,13 @@ export interface CurrentLineupMultiSeedSummary {
   avgWideShotsAgainst: number;
   avgLongShotsAgainst: number;
   timestamp: string;
+}
+
+export interface CurrentLineupReplaySample {
+  lineup: LineupDTO;
+  fixture: MatchFixture;
+  detail: MatchDetail | null;
+  seed: number;
 }
 
 export interface LowBlockLabRow {
