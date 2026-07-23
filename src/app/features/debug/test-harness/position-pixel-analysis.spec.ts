@@ -1,6 +1,13 @@
 import {
   positionPixelAttackGainScore,
   positionPixelAttackLossScore,
+  positionPixelChannelBreakdown,
+  positionPixelChannelBreakdownClass,
+  positionPixelChannelBreakdownDetail,
+  positionPixelChannelBreakdownRead,
+  positionPixelChannelSign,
+  positionPixelContextualCoverageNote,
+  positionPixelCoverageChannelLabel,
   positionPixelDecisionScore,
   positionPixelDefensiveGainScore,
   positionPixelDefensiveRiskScore,
@@ -16,6 +23,7 @@ import {
   positionPixelTacticalRead,
   positionPixelTacticalReadClass,
   positionPixelTacticalReadReason,
+  positionPixelUsesContextualCoverage,
   positionPixelWideChannelReason,
 } from './position-pixel-analysis';
 
@@ -226,5 +234,65 @@ describe('position-pixel-analysis', () => {
     expect(positionPixelTacticalReadReason(row, 'coach note', formatMicro)).toContain('coach note');
     expect(positionPixelTacticalReadReason(row, 'coach note', formatMicro)).toContain('attack gain');
     expect(positionPixelTacticalReadReason(row, 'coach note', formatMicro)).toContain('wide channel');
+  });
+
+  it('calculates channel breakdown for threat, connection, and coverage', () => {
+    const row = {
+      ...baseRow,
+      deltaXgFor: 0.10,
+      deltaShotsFor: 1,
+      deltaWideXgFor: 0.03,
+      deltaPossessionFor: 4,
+      deltaCentralXgFor: 0.04,
+      deltaXgAgainst: -0.08,
+      deltaShotsAgainst: -1,
+    } as any;
+    const breakdown = positionPixelChannelBreakdown(row);
+
+    expect(breakdown.threat).toBeGreaterThan(0.35);
+    expect(breakdown.connection).toBeGreaterThan(0.35);
+    expect(breakdown.coverage).toBeGreaterThan(0.35);
+    expect(positionPixelChannelBreakdownClass(breakdown)).toBe('read-visible');
+    expect(positionPixelChannelSign(breakdown.threat)).toBe('+');
+  });
+
+  it('formats channel breakdown read and detail', () => {
+    const row = {
+      ...baseRow,
+      deltaXgFor: 0.10,
+      deltaShotsFor: 1,
+      deltaWideXgFor: 0.03,
+      deltaWideShotsFor: 1,
+      deltaPossessionFor: 2,
+      deltaCentralXgFor: 0.02,
+      deltaCentralShotsFor: 1,
+      deltaXgAgainst: -0.05,
+      deltaShotsAgainst: -1,
+      deltaWideXgAgainst: -0.02,
+      deltaWideShotsAgainst: -1,
+    } as any;
+    const breakdown = positionPixelChannelBreakdown(row);
+    const label = positionPixelCoverageChannelLabel(false, breakdown.coverage);
+    const detail = positionPixelChannelBreakdownDetail(row, breakdown, formatMicro, formatDelta, null);
+
+    expect(positionPixelChannelBreakdownRead(breakdown, label)).toContain('Amenaza');
+    expect(positionPixelChannelBreakdownRead(breakdown, label)).toContain('Cobertura');
+    expect(detail).toContain('amenaza');
+    expect(detail).toContain('conexion');
+    expect(detail).toContain('cobertura');
+  });
+
+  it('detects contextual coverage when an attacker drops into coverage', () => {
+    const row = {
+      ...baseRow,
+      fromYPercent: 25,
+      targetYPercent: 35,
+      deltaXgAgainst: 0.10,
+    } as any;
+
+    expect(positionPixelUsesContextualCoverage(row, 'ATT', 0.40)).toBeTrue();
+    expect(positionPixelCoverageChannelLabel(true, 0.40)).toBe('Cobertura ctx +');
+    expect(positionPixelContextualCoverageNote(row, 'ATT', 0.40)).toContain('riesgo defensivo sube');
+    expect(positionPixelUsesContextualCoverage(row, 'MID', 0.40)).toBeFalse();
   });
 });

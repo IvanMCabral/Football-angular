@@ -155,6 +155,14 @@ import {
 import {
   positionPixelAttackGainScore as getPositionPixelAttackGainScore,
   positionPixelAttackLossScore as getPositionPixelAttackLossScore,
+  positionPixelChannelBreakdown as getPositionPixelChannelBreakdown,
+  positionPixelChannelBreakdownClass as getPositionPixelChannelBreakdownClass,
+  positionPixelChannelBreakdownDetail as getPositionPixelChannelBreakdownDetail,
+  positionPixelChannelBreakdownRead as getPositionPixelChannelBreakdownRead,
+  PositionPixelChannelBreakdown,
+  positionPixelChannelSign as getPositionPixelChannelSign,
+  positionPixelContextualCoverageNote as getPositionPixelContextualCoverageNote,
+  positionPixelCoverageChannelLabel as getPositionPixelCoverageChannelLabel,
   positionPixelDecisionScore as getPositionPixelDecisionScore,
   positionPixelDefensiveGainScore as getPositionPixelDefensiveGainScore,
   positionPixelDefensiveRiskScore as getPositionPixelDefensiveRiskScore,
@@ -170,6 +178,7 @@ import {
   positionPixelTacticalRead as getPositionPixelTacticalRead,
   positionPixelTacticalReadClass as getPositionPixelTacticalReadClass,
   positionPixelTacticalReadReason as getPositionPixelTacticalReadReason,
+  positionPixelUsesContextualCoverage as getPositionPixelUsesContextualCoverage,
   positionPixelWideChannelReason as getPositionPixelWideChannelReason,
 } from './position-pixel-analysis';
 /**
@@ -13375,30 +13384,20 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   }
   positionPixelChannelBreakdownRead(row: PositionPixelMatrixSummary): string {
     const breakdown = this.positionPixelChannelBreakdown(row);
-    return `Amenaza ${this.positionPixelChannelSign(breakdown.threat)} · Conex. ${this.positionPixelChannelSign(breakdown.connection)} · ${this.positionPixelCoverageChannelLabel(row, breakdown.coverage)}`;
+    return getPositionPixelChannelBreakdownRead(breakdown, this.positionPixelCoverageChannelLabel(row, breakdown.coverage));
   }
   positionPixelChannelBreakdownClass(row: PositionPixelMatrixSummary): string {
-    const breakdown = this.positionPixelChannelBreakdown(row);
-    const positive = [breakdown.threat, breakdown.connection, breakdown.coverage].filter((value) => value >= 0.35).length;
-    const negative = [breakdown.threat, breakdown.connection, breakdown.coverage].filter((value) => value <= -0.35).length;
-    if (positive > 0 && negative > 0) return 'read-strong';
-    if (positive >= 2 && negative === 0) return 'read-visible';
-    if (negative >= 2) return 'read-check';
-    if (positive > 0 || negative > 0) return 'read-stable';
-    return 'delta-neutral';
+    return getPositionPixelChannelBreakdownClass(this.positionPixelChannelBreakdown(row));
   }
   positionPixelChannelBreakdownDetail(row: PositionPixelMatrixSummary): string {
     const breakdown = this.positionPixelChannelBreakdown(row);
-    const parts = [
-      `amenaza ${breakdown.threat.toFixed(2)}: xG ${this.fmtDeltaMicro(row.deltaXgFor)}, shots ${this.fmtDeltaNumber(row.deltaShotsFor)}, banda ${this.fmtDeltaMicro(row.deltaWideXgFor)}/${this.fmtDeltaNumber(row.deltaWideShotsFor)}`,
-      `conexion ${breakdown.connection.toFixed(2)}: posesion ${this.fmtDeltaNumber(row.deltaPossessionFor)}%, centro ${this.fmtDeltaMicro(row.deltaCentralXgFor)}/${this.fmtDeltaNumber(row.deltaCentralShotsFor)}`,
-      `cobertura ${breakdown.coverage.toFixed(2)}: xGA ${this.fmtDeltaMicro(-row.deltaXgAgainst)}, shots ag ${this.fmtDeltaNumber(-row.deltaShotsAgainst)}, banda ag ${this.fmtDeltaMicro(-row.deltaWideXgAgainst)}/${this.fmtDeltaNumber(-row.deltaWideShotsAgainst)}`
-    ];
-    const contextualCoverage = this.positionPixelContextualCoverageNote(row, breakdown.coverage);
-    if (contextualCoverage) {
-      parts.push(contextualCoverage);
-    }
-    return parts.join(' ? ');
+    return getPositionPixelChannelBreakdownDetail(
+      row,
+      breakdown,
+      (value) => this.fmtDeltaMicro(value),
+      (value) => this.fmtDeltaNumber(value),
+      this.positionPixelContextualCoverageNote(row, breakdown.coverage)
+    );
   }
   positionPixelVisualExpectationRead(row: PositionPixelMatrixSummary): string {
     if (this.positionPixelVisualExpectationMismatches(row).length === 0) return 'Visual OK';
@@ -13582,55 +13581,23 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     }
     return mismatches;
   }
-  positionPixelChannelBreakdown(row: PositionPixelMatrixSummary): { threat: number; connection: number; coverage: number } {
-    const threat = (row.deltaXgFor * 8)
-      + (row.deltaShotsFor * 0.35)
-      + (row.deltaWideXgFor * 10)
-      + (row.deltaWideShotsFor * 0.20)
-      + (Math.max(row.deltaLeftWideXgFor, row.deltaRightWideXgFor, 0) * 8);
-    const connection = (row.deltaPossessionFor * 0.12)
-      + (row.deltaCentralXgFor * 10)
-      + (row.deltaCentralShotsFor * 0.25)
-      - (Math.max(0, row.deltaLongShotsFor) * 0.08)
-      - (Math.max(0, row.deltaLongXgFor) * 3);
-    const coverage = (-row.deltaXgAgainst * 8)
-      + (-row.deltaShotsAgainst * 0.30)
-      + (-row.deltaWideXgAgainst * 9)
-      + (-row.deltaWideShotsAgainst * 0.18)
-      + (-row.deltaCentralXgAgainst * 7)
-      + (-row.deltaCentralShotsAgainst * 0.18);
-    return {
-      threat: this.positionPixelClampBreakdownScore(threat),
-      connection: this.positionPixelClampBreakdownScore(connection),
-      coverage: this.positionPixelClampBreakdownScore(coverage),
-    };
+  positionPixelChannelBreakdown(row: PositionPixelMatrixSummary): PositionPixelChannelBreakdown {
+    return getPositionPixelChannelBreakdown(row);
   }
   private positionPixelChannelSign(value: number): '+' | '-' | '=' {
-    if (value >= 0.35) return '+';
-    if (value <= -0.35) return '-';
-    return '=';
+    return getPositionPixelChannelSign(value);
   }
   private positionPixelCoverageChannelLabel(row: PositionPixelMatrixSummary, coverage: number): string {
-    const sign = this.positionPixelChannelSign(coverage);
-    if (this.positionPixelUsesContextualCoverage(row, coverage)) {
-      return `Cobertura ctx ${sign}`;
-    }
-    return `Cobertura ${sign}`;
+    return getPositionPixelCoverageChannelLabel(this.positionPixelUsesContextualCoverage(row, coverage), coverage);
   }
   private positionPixelContextualCoverageNote(row: PositionPixelMatrixSummary, coverage: number): string | null {
-    if (!this.positionPixelUsesContextualCoverage(row, coverage)) {
-      return null;
-    }
-    const defensiveRisk = this.positionPixelDefensiveRiskScore(row);
-    if (defensiveRisk >= 0.8) {
-      return `cobertura contextual: ATT baj? pero el riesgo defensivo sube (${defensiveRisk.toFixed(2)}); tratar como alerta, no como mejora limpia`;
-    }
-    return 'cobertura contextual: ATT baj?; validar si realmente protege o solo cambia el dibujo';
+    return getPositionPixelContextualCoverageNote(row, this.positionPixelSourceLine(row), coverage);
   }
   private positionPixelUsesContextualCoverage(row: PositionPixelMatrixSummary, coverage: number): boolean {
-    const line = this.strictPositionPixelLine(row.playerPosition) ?? this.positionPixelVisualLine(row.fromYPercent);
-    const movedDown = row.targetYPercent >= row.fromYPercent + 3.5;
-    return line === 'ATT' && movedDown && coverage >= 0.35;
+    return getPositionPixelUsesContextualCoverage(row, this.positionPixelSourceLine(row), coverage);
+  }
+  private positionPixelSourceLine(row: PositionPixelMatrixSummary): 'ATT' | 'MID' | 'DEF' {
+    return this.strictPositionPixelLine(row.playerPosition) ?? this.positionPixelVisualLine(row.fromYPercent);
   }
   private positionPixelHasContextualCoverageConflict(
     row: PositionPixelMatrixSummary,
@@ -13645,8 +13612,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         || (this.positionPixelUsesContextualCoverage(row, coverage) && defensiveRisk >= 0.65));
   }
   private positionPixelClampBreakdownScore(value: number): number {
-    if (!Number.isFinite(value)) return 0;
-    return Math.max(-9.99, Math.min(9.99, value));
+    return Math.max(-9.99, Math.min(9.99, Number.isFinite(value) ? value : 0));
   }
   positionPixelCoachRead(row: PositionPixelMatrixSummary): string {
     const vertical = row.targetYPercent - row.fromYPercent;

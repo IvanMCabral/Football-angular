@@ -36,6 +36,12 @@ type PositionPixelSignalRead = Pick<
   | 'deltaPlayerCollective'
 >;
 
+export interface PositionPixelChannelBreakdown {
+  threat: number;
+  connection: number;
+  coverage: number;
+}
+
 export function positionPixelDistance(row: Pick<PositionPixelSignalRead, 'fromXPercent' | 'fromYPercent' | 'targetXPercent' | 'targetYPercent'>): number {
   return Math.hypot(row.targetXPercent - row.fromXPercent, row.targetYPercent - row.fromYPercent);
 }
@@ -220,6 +226,105 @@ export function positionPixelTacticalReadReason(
     `defensive gain ${positionPixelDefensiveGainScore(row).toFixed(2)}`,
     positionPixelWideChannelReason(row, formatDeltaMicro)
   ].join(' ? ');
+}
+
+export function positionPixelChannelBreakdown(row: PositionPixelMatrixSummary): PositionPixelChannelBreakdown {
+  const threat = (row.deltaXgFor * 8)
+    + (row.deltaShotsFor * 0.35)
+    + (row.deltaWideXgFor * 10)
+    + (row.deltaWideShotsFor * 0.20)
+    + (Math.max(row.deltaLeftWideXgFor, row.deltaRightWideXgFor, 0) * 8);
+  const connection = (row.deltaPossessionFor * 0.12)
+    + (row.deltaCentralXgFor * 10)
+    + (row.deltaCentralShotsFor * 0.25)
+    - (Math.max(0, row.deltaLongShotsFor) * 0.08)
+    - (Math.max(0, row.deltaLongXgFor) * 3);
+  const coverage = (-row.deltaXgAgainst * 8)
+    + (-row.deltaShotsAgainst * 0.30)
+    + (-row.deltaWideXgAgainst * 9)
+    + (-row.deltaWideShotsAgainst * 0.18)
+    + (-row.deltaCentralXgAgainst * 7)
+    + (-row.deltaCentralShotsAgainst * 0.18);
+  return {
+    threat: positionPixelClampBreakdownScore(threat),
+    connection: positionPixelClampBreakdownScore(connection),
+    coverage: positionPixelClampBreakdownScore(coverage),
+  };
+}
+
+export function positionPixelChannelSign(value: number): '+' | '-' | '=' {
+  if (value >= 0.35) return '+';
+  if (value <= -0.35) return '-';
+  return '=';
+}
+
+export function positionPixelChannelBreakdownClass(breakdown: PositionPixelChannelBreakdown): string {
+  const positive = [breakdown.threat, breakdown.connection, breakdown.coverage].filter((value) => value >= 0.35).length;
+  const negative = [breakdown.threat, breakdown.connection, breakdown.coverage].filter((value) => value <= -0.35).length;
+  if (positive > 0 && negative > 0) return 'read-strong';
+  if (positive >= 2 && negative === 0) return 'read-visible';
+  if (negative >= 2) return 'read-check';
+  if (positive > 0 || negative > 0) return 'read-stable';
+  return 'delta-neutral';
+}
+
+export function positionPixelCoverageChannelLabel(isContextualCoverage: boolean, coverage: number): string {
+  const sign = positionPixelChannelSign(coverage);
+  return isContextualCoverage ? `Cobertura ctx ${sign}` : `Cobertura ${sign}`;
+}
+
+export function positionPixelChannelBreakdownRead(
+  breakdown: PositionPixelChannelBreakdown,
+  coverageLabel: string,
+): string {
+  return `Amenaza ${positionPixelChannelSign(breakdown.threat)} · Conex. ${positionPixelChannelSign(breakdown.connection)} · ${coverageLabel}`;
+}
+
+export function positionPixelChannelBreakdownDetail(
+  row: PositionPixelMatrixSummary,
+  breakdown: PositionPixelChannelBreakdown,
+  formatDeltaMicro: (value: number) => string,
+  formatDeltaNumber: (value: number) => string,
+  contextualCoverageNote: string | null,
+): string {
+  const parts = [
+    `amenaza ${breakdown.threat.toFixed(2)}: xG ${formatDeltaMicro(row.deltaXgFor)}, shots ${formatDeltaNumber(row.deltaShotsFor)}, banda ${formatDeltaMicro(row.deltaWideXgFor)}/${formatDeltaNumber(row.deltaWideShotsFor)}`,
+    `conexion ${breakdown.connection.toFixed(2)}: posesion ${formatDeltaNumber(row.deltaPossessionFor)}%, centro ${formatDeltaMicro(row.deltaCentralXgFor)}/${formatDeltaNumber(row.deltaCentralShotsFor)}`,
+    `cobertura ${breakdown.coverage.toFixed(2)}: xGA ${formatDeltaMicro(-row.deltaXgAgainst)}, shots ag ${formatDeltaNumber(-row.deltaShotsAgainst)}, banda ag ${formatDeltaMicro(-row.deltaWideXgAgainst)}/${formatDeltaNumber(-row.deltaWideShotsAgainst)}`
+  ];
+  if (contextualCoverageNote) {
+    parts.push(contextualCoverageNote);
+  }
+  return parts.join(' ? ');
+}
+
+export function positionPixelUsesContextualCoverage(
+  row: PositionPixelMatrixSummary,
+  line: 'ATT' | 'MID' | 'DEF',
+  coverage: number,
+): boolean {
+  const movedDown = row.targetYPercent >= row.fromYPercent + 3.5;
+  return line === 'ATT' && movedDown && coverage >= 0.35;
+}
+
+export function positionPixelContextualCoverageNote(
+  row: PositionPixelMatrixSummary,
+  line: 'ATT' | 'MID' | 'DEF',
+  coverage: number,
+): string | null {
+  if (!positionPixelUsesContextualCoverage(row, line, coverage)) {
+    return null;
+  }
+  const defensiveRisk = positionPixelDefensiveRiskScore(row);
+  if (defensiveRisk >= 0.8) {
+    return `cobertura contextual: ATT baj? pero el riesgo defensivo sube (${defensiveRisk.toFixed(2)}); tratar como alerta, no como mejora limpia`;
+  }
+  return 'cobertura contextual: ATT baj?; validar si realmente protege o solo cambia el dibujo';
+}
+
+export function positionPixelClampBreakdownScore(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(-9.99, Math.min(9.99, value));
 }
 
 export function positionPixelMovementConfidence(distance: number): number {
