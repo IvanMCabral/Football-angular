@@ -1218,26 +1218,31 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
 
     @media (max-height: 760px) and (min-width: 601px) {
       :host ::ng-deep .mat-mdc-dialog-container .mat-mdc-dialog-content {
-        max-height: calc(100vh - 118px);
+        max-height: calc(100vh - 160px);
+      }
+      .coach-brief {
+        margin: 0.35rem 0.5rem 0.25rem;
+        padding: 0.48rem 0.65rem;
+        border-radius: 13px;
       }
       .formation-row {
-        margin: 0.35rem 0.5rem 0.4rem;
-        padding: 0.35rem 0.55rem;
+        margin: 0.25rem 0.5rem 0.35rem;
+        padding: 0.3rem 0.5rem;
       }
       .pitch {
-        min-height: 205px;
-        padding-top: 0.35rem;
-        padding-bottom: 0.35rem;
+        min-height: 180px;
+        padding-top: 0.28rem;
+        padding-bottom: 0.28rem;
       }
       .manager-pitch {
-        padding-bottom: 0.65rem;
+        padding-bottom: 0.55rem;
       }
       .pitch-line {
-        min-height: 36px;
+        min-height: 32px;
       }
       .player-dot {
-        width: 50px;
-        height: 36px;
+        width: 46px;
+        height: 34px;
         font-size: 0.56rem;
       }
       .dot-player-name {
@@ -1251,7 +1256,7 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
         display: none;
       }
       .bench-list {
-        max-height: 250px;
+        max-height: 180px;
       }
     }
 
