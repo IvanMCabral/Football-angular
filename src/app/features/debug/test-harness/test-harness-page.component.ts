@@ -43,11 +43,16 @@ import {
   CurrentLineupMultiSeedSummary,
   CurrentLineupReplayResult,
   FocusedWideBatteryRow,
+  FormationCoachPick,
+  FormationCoachSummary,
   FormationCode,
+  FormationLineSmokeRow,
   FormationMatrixRow,
   FormationMatrixSummaryRow,
   FormationReplayResult,
   LabMutationResult,
+  LineupDebugRow,
+  LineupDebugSnapshot,
   LineupDiagnostic,
   LineupDiagnosticPlayer,
   LineupDiagnosticTeam,
@@ -66,6 +71,8 @@ import {
   PositionPixelSmokeRunSummary,
   PositionPixelSmokeScope,
   PositionPixelSortMode,
+  ProfessionalQaActionStatus,
+  ProfessionalQaChecklistRow,
   ProfessionalSmokeSummary,
   RoleSlotImpactSmokeRow,
   RoleSlotImpactSummaryRow,
@@ -84,6 +91,7 @@ import {
   TestHarnessSnapshotFixture,
   TestHarnessSnapshotResponse,
   TeamStyle,
+  TeamStyleOption,
 } from '../models/test-harness.model';
 import { TestHarnessService } from '../services/test-harness.service';
 import {
@@ -94,20 +102,6 @@ import {
   TIMELINE_MAX_MINUTE,
   TIMELINE_STEP,
 } from './test-harness.constants';
-interface FormationCoachPick {
-  label: string;
-  formation: string;
-  read: string;
-  detail: string;
-  identity: string;
-  cssClass: string;
-}
-interface FormationCoachSummary {
-  bestBalance: FormationCoachPick;
-  bestAttack: FormationCoachPick;
-  safest: FormationCoachPick;
-  avoid: FormationCoachPick;
-}
 interface CurrentLineupReplaySample {
   lineup: LineupDTO;
   fixture: MatchFixture;
@@ -477,56 +471,6 @@ interface LastModalPositionMoveCase {
   deltaYPercent: number;
   coachReadTitle: string | null;
   coachReadBody: string | null;
-}
-interface LineupDebugRow {
-  index: number;
-  playerId: string;
-  name: string;
-  position: string;
-  slotId: string;
-  x: number | null;
-  y: number | null;
-  visualLine: 'GK' | 'DEF' | 'MID' | 'ATT' | 'UNKNOWN';
-  source: 'persisted' | 'canonical' | 'missing';
-}
-interface LineupDebugSnapshot {
-  label: string;
-  formation: string;
-  selectedFormation: string;
-  playerCount: number;
-  nonGkCount: number;
-  persistedSlotCount: number;
-  effectiveSlotCount: number;
-  candidatesCount: number;
-  visualLineFilter: string;
-  rows: LineupDebugRow[];
-  warnings: string[];
-}
-interface FormationLineSmokeRow {
-  formation: string;
-  line: 'DEF' | 'MID' | 'ATT';
-  candidates: number;
-  expectedRows: number;
-  players: string;
-  slotRoles: string;
-  verdict: string;
-  warnings: string;
-}
-interface ProfessionalQaChecklistRow {
-  check: string;
-  expected: string;
-  observed: string;
-  verdict: 'OK' | 'Fallback' | 'Review' | 'Pending';
-  next: string;
-}
-interface ProfessionalQaActionStatus {
-  state: 'running' | 'done' | 'error';
-  message: string;
-}
-interface TeamStyleOption {
-  value: TeamStyle;
-  label: string;
-  hint: string;
 }
 /**
  * V24D24: Test-Harness UI page (4-panel layout).

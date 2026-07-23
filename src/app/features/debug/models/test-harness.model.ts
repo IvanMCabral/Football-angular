@@ -508,6 +508,78 @@ export interface PositionPixelQaSummaryRow {
   verdictClass: string;
 }
 
+export interface FormationCoachPick {
+  label: string;
+  formation: string;
+  read: string;
+  detail: string;
+  identity: string;
+  cssClass: string;
+}
+
+export interface FormationCoachSummary {
+  bestBalance: FormationCoachPick;
+  bestAttack: FormationCoachPick;
+  safest: FormationCoachPick;
+  avoid: FormationCoachPick;
+}
+
+export interface LineupDebugRow {
+  index: number;
+  playerId: string;
+  name: string;
+  position: string;
+  slotId: string;
+  x: number | null;
+  y: number | null;
+  visualLine: 'GK' | 'DEF' | 'MID' | 'ATT' | 'UNKNOWN';
+  source: 'persisted' | 'canonical' | 'missing';
+}
+
+export interface LineupDebugSnapshot {
+  label: string;
+  formation: string;
+  selectedFormation: string;
+  playerCount: number;
+  nonGkCount: number;
+  persistedSlotCount: number;
+  effectiveSlotCount: number;
+  candidatesCount: number;
+  visualLineFilter: string;
+  rows: LineupDebugRow[];
+  warnings: string[];
+}
+
+export interface FormationLineSmokeRow {
+  formation: string;
+  line: 'DEF' | 'MID' | 'ATT';
+  candidates: number;
+  expectedRows: number;
+  players: string;
+  slotRoles: string;
+  verdict: string;
+  warnings: string;
+}
+
+export interface ProfessionalQaChecklistRow {
+  check: string;
+  expected: string;
+  observed: string;
+  verdict: 'OK' | 'Fallback' | 'Review' | 'Pending';
+  next: string;
+}
+
+export interface ProfessionalQaActionStatus {
+  state: 'running' | 'done' | 'error';
+  message: string;
+}
+
+export interface TeamStyleOption {
+  value: TeamStyle;
+  label: string;
+  hint: string;
+}
+
 /**
  * V24D24.2 — wire type for the body of
  * {@code POST /api/v1/test-harness/career/match/{matchId}/replay}.
