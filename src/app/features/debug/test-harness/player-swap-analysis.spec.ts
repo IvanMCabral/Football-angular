@@ -2,6 +2,7 @@ import {
   playerSwapHasLargeQualityDrop,
   playerSwapCoachReadLevel,
   playerSwapDecisionScore,
+  playerSwapIsActionableRecommendation,
   playerSwapOverallDelta,
   playerSwapOverallDeltaText,
   playerSwapProtectSpecialistScore,
@@ -263,5 +264,34 @@ describe('player-swap-analysis', () => {
     };
 
     expect(playerSwapProtectSpecialistScore(defensiveSwap)).toBeGreaterThan(playerSwapProtectSpecialistScore(riskyAttacker));
+  });
+
+  it('accepts only clear upgrade rows as actionable recommendations', () => {
+    expect(playerSwapIsActionableRecommendation({
+      ...baseSummaryRow,
+      swapRead: 'Trade-off',
+      deltaXgDiff: 0.30,
+    })).toBeFalse();
+    expect(playerSwapIsActionableRecommendation({
+      ...baseSummaryRow,
+      swapRead: 'Clear upgrade',
+      deltaXgDiff: 0.04,
+    })).toBeTrue();
+  });
+
+  it('blocks large quality drops unless the evidence is strong and stable', () => {
+    const qualityDropUpgrade = {
+      ...baseSummaryRow,
+      swapRead: 'Clear upgrade',
+      baselinePlayerOverall: 82,
+      swapPlayerOverall: 75,
+      deltaXgDiff: 0.13,
+      preAutoSubDeltaXgDiff: 0.07,
+      deltaXgAgainst: 0.07,
+    };
+
+    expect(playerSwapIsActionableRecommendation({ ...qualityDropUpgrade, seedCount: 10 })).toBeFalse();
+    expect(playerSwapIsActionableRecommendation({ ...qualityDropUpgrade, seedCount: 30 })).toBeTrue();
+    expect(playerSwapIsActionableRecommendation({ ...qualityDropUpgrade, seedCount: 30, deltaXgAgainst: 0.09 })).toBeFalse();
   });
 });

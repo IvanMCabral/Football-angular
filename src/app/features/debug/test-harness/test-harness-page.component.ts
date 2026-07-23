@@ -140,6 +140,7 @@ import {
   playerSwapCoachReadLevel as getPlayerSwapCoachReadLevel,
   playerSwapCoachRiskScore as getPlayerSwapCoachRiskScore,
   playerSwapDecisionScore as getPlayerSwapDecisionScore,
+  playerSwapIsActionableRecommendation as getPlayerSwapIsActionableRecommendation,
   playerSwapProtectSpecialistScore as getPlayerSwapProtectSpecialistScore,
   playerSwapRoleTradeoff as getPlayerSwapRoleTradeoff,
   playerSwapSignalClass as getPlayerSwapSignalClass,
@@ -7489,12 +7490,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return getPlayerSwapProtectSpecialistScore(row);
   }
   private playerSwapIsActionableRecommendation(row: PlayerSwapMatrixSummary): boolean {
-    if (row.swapRead !== 'Clear upgrade') return false;
-    if (!this.playerSwapHasLargeQualityDrop(row)) return true;
-    return row.deltaXgDiff >= 0.12
-      && (row.preAutoSubDeltaXgDiff || 0) >= 0.06
-      && row.deltaXgAgainst <= 0.08
-      && row.seedCount >= 30;
+    return getPlayerSwapIsActionableRecommendation(row);
   }
   playerSwapFit(candidate: PlayerSwapCandidate | null): string {
     const level = this.playerSwapFitLevel(candidate);

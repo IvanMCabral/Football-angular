@@ -272,3 +272,12 @@ export function playerSwapProtectSpecialistScore(row: PlayerSwapMatrixSummary): 
     + attackInsurance
     - (row.swapFit === 'Out of role' ? 0.14 : 0);
 }
+
+export function playerSwapIsActionableRecommendation(row: PlayerSwapMatrixSummary): boolean {
+  if (row.swapRead !== 'Clear upgrade') return false;
+  if (!playerSwapHasLargeQualityDrop(row)) return true;
+  return row.deltaXgDiff >= 0.12
+    && (row.preAutoSubDeltaXgDiff || 0) >= 0.06
+    && row.deltaXgAgainst <= 0.08
+    && row.seedCount >= 30;
+}
