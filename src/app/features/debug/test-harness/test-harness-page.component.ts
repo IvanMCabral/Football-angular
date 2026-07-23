@@ -1265,7 +1265,7 @@ import {
           class="panel panel-e"
           aria-labelledby="panel-e-heading"
         >
-          <h2 id="panel-e-heading" class="panel-title">Panel E - Analisis de repeticion</h2>
+          <h2 id="panel-e-heading" class="panel-title">Panel E - Análisis de repetición</h2>
           <p class="panel-hint">
             Compara el mismo partido y seed con formaciones, tácticas en vivo y sustituciones.
           </p>
@@ -1305,8 +1305,8 @@ import {
           <div class="formation-matrix analysis-matrix current-lineup-replay">
             <div class="matrix-header">
               <div>
-                <strong>Professional QA checklist</strong>
-                <span>Expected vs observed read for modal -> lineup -> engine contracts</span>
+                <strong>Checklist QA profesional</strong>
+                <span>Lectura esperada vs observada para contratos Modal DT → alineación → motor</span>
               </div>
               <button
                 type="button"
@@ -1324,7 +1324,7 @@ import {
                 [attr.data-testid]="professionalQaChecklistTestId(row.check)"
               >
                 <div class="qa-check-card-header">
-                  <strong>{{ row.check }}</strong>
+                  <strong>{{ professionalQaCheckLabel(row.check) }}</strong>
                   <span class="qa-verdict-badge" [class]="professionalQaVerdictClass(row.verdict)">
                     {{ professionalQaVerdictLabel(row.verdict) }}
                   </span>
@@ -1332,15 +1332,15 @@ import {
                 <dl>
                   <div>
                     <dt>Esperado</dt>
-                    <dd>{{ row.expected }}</dd>
+                    <dd>{{ professionalQaTextLabel(row.expected) }}</dd>
                   </div>
                   <div>
                     <dt>Observado</dt>
-                    <dd>{{ row.observed }}</dd>
+                    <dd>{{ professionalQaTextLabel(row.observed) }}</dd>
                   </div>
                   <div>
                     <dt>Siguiente</dt>
-                    <dd>{{ row.next }}</dd>
+                    <dd>{{ professionalQaTextLabel(row.next) }}</dd>
                   </div>
                 </dl>
                 <button
@@ -1492,7 +1492,7 @@ import {
                 · seed {{ replay.seed ?? 'auto' }} · {{ selectedStyleLabel() }}
               </span>
               <button type="button" class="matrix-export" (click)="copyCurrentLineupReplayJson()">
-                Copy JSON
+                Copiar JSON
               </button>
             </div>
             <div class="current-replay-grid" role="group" aria-label="Current lineup replay summary">
@@ -1533,7 +1533,7 @@ import {
                 · seeds {{ summary.seedStart }}..{{ summary.seedEnd }} · {{ selectedStyleLabel() }}
               </span>
               <button type="button" class="matrix-export" (click)="copyCurrentLineupMultiSeedJson()">
-                Copy JSON
+                Copiar JSON
               </button>
             </div>
             <div
@@ -1543,38 +1543,38 @@ import {
             >
               <span>{{ currentLineupMultiSeedReadable(summary) }}</span>
               <span [class]="deltaClass(summary.avgXgDiff)">xG {{ fmtDeltaNumber(summary.avgXgDiff) }}</span>
-              <span [class]="deltaClass(summary.avgShotDiff)">Shots {{ fmtDeltaNumber(summary.avgShotDiff) }}</span>
+              <span [class]="deltaClass(summary.avgShotDiff)">Tiros {{ fmtDeltaNumber(summary.avgShotDiff) }}</span>
               <span>{{ currentLineupMultiSeedSignal(summary) }}</span>
             </div>
             <div class="current-replay-grid" role="group" aria-label="XI actual multi-seed summary">
               <div class="metric-card">
-                <span class="metric-label">Avg Score</span>
+                <span class="metric-label">Prom. marcador</span>
                 <span class="metric-value">{{ fmtXg(summary.avgGoalsFor) }}-{{ fmtXg(summary.avgGoalsAgainst) }}</span>
               </div>
               <div class="metric-card">
-                <span class="metric-label">Avg GD</span>
+                <span class="metric-label">Prom. dif. gol</span>
                 <span class="metric-value" [class]="deltaClass(summary.avgGoalDiff)">{{ fmtDeltaNumber(summary.avgGoalDiff) }}</span>
               </div>
               <div class="metric-card">
-                <span class="metric-label">Avg Poss</span>
+                <span class="metric-label">Prom. posesión</span>
                 <span class="metric-value">{{ fmtPct(summary.avgPossessionFor) }}</span>
               </div>
               <div class="metric-card">
-                <span class="metric-label">Avg Shots</span>
+                <span class="metric-label">Prom. tiros</span>
                 <span class="metric-value">
                   {{ fmtXg(summary.avgShotsFor) }} / {{ fmtXg(summary.avgShotsAgainst) }}
                   <span [class]="deltaClass(summary.avgShotDiff)">({{ fmtDeltaNumber(summary.avgShotDiff) }})</span>
                 </span>
               </div>
               <div class="metric-card">
-                <span class="metric-label">Avg xG</span>
+                <span class="metric-label">Prom. xG</span>
                 <span class="metric-value">
                   {{ fmtXg(summary.avgXgFor) }} / {{ fmtXg(summary.avgXgAgainst) }}
                   <span [class]="deltaClass(summary.avgXgDiff)">({{ fmtDeltaNumber(summary.avgXgDiff) }})</span>
                 </span>
               </div>
               <div class="metric-card">
-                <span class="metric-label">Avg zones C/W/L</span>
+                <span class="metric-label">Prom. zonas centro/banda/lejos</span>
                 <span class="metric-value">
                   {{ fmtXg(summary.avgCentralShotsFor) }}/{{ fmtXg(summary.avgWideShotsFor) }}/{{ fmtXg(summary.avgLongShotsFor) }}
                   /
@@ -1583,7 +1583,7 @@ import {
               </div>
             </div>
             <p class="panel-hint current-replay-starters">
-              Titulares {{ summary.playerCount }}/11 ? {{ summary.starters.join(' ? ') }}
+              Titulares {{ summary.playerCount }}/11 · {{ summary.starters.join(' · ') }}
             </p>
           </div>
           <div *ngIf="modalVsCanonicalSummary() as summary" class="formation-matrix analysis-matrix current-lineup-replay">
@@ -1594,7 +1594,7 @@ import {
                 · seeds {{ summary.seedStart }}..{{ summary.seedEnd }} · jugadores movidos {{ summary.customMovableSlotCount }}/{{ summary.customSlotCount }}
               </span>
               <button type="button" class="matrix-export" (click)="copyModalVsCanonicalJson()">
-                Copy JSON
+                Copiar JSON
               </button>
             </div>
             <p class="panel-hint">
@@ -1604,27 +1604,27 @@ import {
             </p>
             <div class="current-replay-grid" role="group" aria-label="Base vs píxeles del modal summary">
               <div class="metric-card">
-                <span class="metric-label">Coach read</span>
+                <span class="metric-label">Lectura DT</span>
                 <span class="metric-value" [class]="summary.coachReadClass">{{ summary.coachRead }}</span>
               </div>
               <div class="metric-card">
-                <span class="metric-label">Delta xG For</span>
+                <span class="metric-label">Δ xG a favor</span>
                 <span class="metric-value" [class]="deltaClass(summary.deltaXgFor)">{{ fmtDeltaNumber(summary.deltaXgFor) }}</span>
               </div>
               <div class="metric-card">
-                <span class="metric-label">Delta xG Ag.</span>
+                <span class="metric-label">Δ xG en contra</span>
                 <span class="metric-value" [class]="deltaClass(-summary.deltaXgAgainst)">{{ fmtDeltaNumber(summary.deltaXgAgainst) }}</span>
               </div>
               <div class="metric-card">
-                <span class="metric-label">Delta Shots</span>
+                <span class="metric-label">Δ tiros</span>
                 <span class="metric-value" [class]="deltaClass(summary.deltaShotDiff)">{{ fmtDeltaNumber(summary.deltaShotDiff) }}</span>
               </div>
               <div class="metric-card">
-                <span class="metric-label">Delta Poss</span>
+                <span class="metric-label">Δ posesión</span>
                 <span class="metric-value" [class]="deltaClass(summary.deltaPossessionFor)">{{ fmtDeltaNumber(summary.deltaPossessionFor) }}</span>
               </div>
               <div class="metric-card">
-                <span class="metric-label">Delta Zones C/W/L</span>
+                <span class="metric-label">Δ zonas centro/banda/lejos</span>
                 <span class="metric-value">
                   {{ fmtDeltaNumber(summary.deltaCentralShotsFor) }}/{{ fmtDeltaNumber(summary.deltaWideShotsFor) }}/{{ fmtDeltaNumber(summary.deltaLongShotsFor) }}
                 </span>
@@ -1668,7 +1668,7 @@ import {
                 · slot {{ swap.slotId }} · seeds {{ swap.seedStart }}..{{ swap.seedEnd }}
               </span>
               <button type="button" class="matrix-export" (click)="copyPlayerSwapMatrixJson()">
-                Copy JSON
+                Copiar JSON
               </button>
               <button type="button" class="matrix-export" (click)="downloadPlayerSwapMatrixCsv()">
                 CSV
@@ -1883,7 +1883,7 @@ import {
               <strong>Batería cambio jugador</strong>
               <span>{{ playerSwapBatterySummaries().length }} swaps · seeds {{ playerSwapBatterySummaries()[0].seedStart }}..{{ playerSwapBatterySummaries()[0].seedEnd }}</span>
               <button type="button" class="matrix-export" (click)="copyPlayerSwapBatteryJson()">
-                Copy JSON
+                Copiar JSON
               </button>
               <button type="button" class="matrix-export" (click)="copyPlayerSwapBatteryReport()">
                 Copy report
@@ -2077,7 +2077,7 @@ import {
             <div class="matrix-header">
               <strong>Smoke todos los roles-slot</strong>
               <button type="button" class="matrix-export" (click)="copyRoleSlotImpactSmokeJson()">
-                Copy JSON
+                Copiar JSON
               </button>
               <button type="button" class="matrix-export" (click)="copyRoleSlotImpactSmokeReport()">
                 Copy MD
@@ -2121,7 +2121,7 @@ import {
               <strong>Smoke roles-slot por formacion</strong>
               <span>{{ allFormationRoleSlotSmokeRows().length }} formaciones ? roles por slot real</span>
               <button type="button" class="matrix-export" (click)="copyAllFormationsRoleSlotSmokeJson()">
-                Copy JSON
+                Copiar JSON
               </button>
               <button type="button" class="matrix-export" (click)="copyAllFormationsRoleSlotSmokeReport()">
                 Copy MD
@@ -2716,26 +2716,26 @@ import {
               <strong>Matriz formaciones</strong>
               <span>Mismo partido + seed {{ seedInputModel ?? 'auto' }} + {{ selectedStyleLabel() }}</span>
               <button type="button" class="matrix-export" (click)="copyFormationMatrixJson()">
-                Copy JSON
+                Copiar JSON
               </button>
               <button type="button" class="matrix-export" (click)="downloadFormationMatrixCsv()">
                 CSV
               </button>
             </div>
             <div class="matrix-scroll">
-              <div class="matrix-table formation-matrix-table" role="table" aria-label="Formation replay comparison">
+              <div class="matrix-table formation-matrix-table" role="table" aria-label="Comparación de formaciones">
                 <div class="matrix-row formation-matrix-row matrix-row-head" role="row">
                   <span role="columnheader">Form.</span>
-                  <span role="columnheader">Score For/Ag.</span>
-                  <span role="columnheader">Delta Score</span>
-                  <span role="columnheader">Poss For/Ag.</span>
-                  <span role="columnheader">Delta Poss</span>
-                  <span role="columnheader">Shots For/Ag.</span>
-                  <span role="columnheader">Delta Shots</span>
-                  <span role="columnheader">xG For/Ag.</span>
-                  <span role="columnheader">Delta xG</span>
-                  <span role="columnheader">Zones For C/W/L</span>
-                  <span role="columnheader">Delta Zones</span>
+                  <span role="columnheader">Marcador favor/contra</span>
+                  <span role="columnheader">Δ marcador</span>
+                  <span role="columnheader">Posesión favor/contra</span>
+                  <span role="columnheader">Δ posesión</span>
+                  <span role="columnheader">Tiros favor/contra</span>
+                  <span role="columnheader">Δ tiros</span>
+                  <span role="columnheader">xG favor/contra</span>
+                  <span role="columnheader">Δ xG</span>
+                  <span role="columnheader">Zonas favor C/B/L</span>
+                  <span role="columnheader">Δ zonas</span>
                 </div>
                 <div
                   *ngFor="let row of formationReplayResults(); trackBy: trackByFormationReplay"
@@ -3275,7 +3275,7 @@ import {
               <strong>Matriz escenarios</strong>
               <span>Mismo partido + seed {{ seedInputModel ?? 'auto' }} ? cambios tacticos en vivo</span>
               <button type="button" class="matrix-export" (click)="copyScenarioMatrixJson()">
-                Copy JSON
+                Copiar JSON
               </button>
             </div>
             <div class="matrix-scroll">
@@ -3527,7 +3527,7 @@ import {
                 - {{ scenarioBatteryCandidateMatches().length }}/{{ scenarioBatteryMatchLimit() }} partidos disponibles
               </span>
               <button type="button" class="matrix-export" (click)="copyScenarioBatteryJson()">
-                Copy JSON
+                Copiar JSON
               </button>
               <button type="button" class="matrix-export" (click)="downloadScenarioBatteryCsv()">
                 CSV
@@ -3640,7 +3640,7 @@ import {
                   tabindex="0"
                   role="button"
                   [attr.aria-pressed]="m.matchId === selectedMatchId()"
-                  [attr.aria-label]="'Match ' + m.homeTeamName + ' vs ' + m.awayTeamName + ', status ' + m.status"
+                  [attr.aria-label]="'Partido ' + m.homeTeamName + ' vs ' + m.awayTeamName + ', estado ' + m.status"
                 >
                   <span class="match-teams">
                     <span class="team-home">{{ m.homeTeamName }}</span>
@@ -3653,7 +3653,7 @@ import {
                     </ng-container>
                     <ng-template #pendingScore>vs</ng-template>
                   </span>
-                  <span class="match-status" [attr.data-status]="m.status">{{ m.status }}</span>
+                  <span class="match-status" [attr.data-status]="m.status">{{ matchStatusLabel(m.status) }}</span>
                 </li>
               </ul>
             </li>
@@ -3713,26 +3713,26 @@ import {
               </div>
               <div class="metric-grid">
                 <div class="metric-card">
-                  <span class="metric-label">Home xG</span>
+                  <span class="metric-label">xG local</span>
                   <span class="metric-value">{{ snap.homeXg | number:'1.2-2' }}</span>
                 </div>
                 <div class="metric-card">
-                  <span class="metric-label">Away xG</span>
+                  <span class="metric-label">xG visitante</span>
                   <span class="metric-value">{{ snap.awayXg | number:'1.2-2' }}</span>
                 </div>
                 <div class="metric-card">
-                  <span class="metric-label">Home Shots</span>
+                  <span class="metric-label">Tiros local</span>
                   <span class="metric-value">{{ snap.homeShots }}</span>
                 </div>
                 <div class="metric-card">
-                  <span class="metric-label">Away Shots</span>
+                  <span class="metric-label">Tiros visitante</span>
                   <span class="metric-value">{{ snap.awayShots }}</span>
                 </div>
               </div>
             </ng-container>
             <!-- Empty / error state -->
             <div *ngIf="!timelineLoading() && !timelineSnapshot() && !timelineError()" class="empty-snapshot">
-              <p>Timeline not available for this match (feature off, or no V24 detail persisted).</p>
+              <p>La línea de tiempo no está disponible para este partido.</p>
             </div>
             <div *ngIf="!timelineLoading() && timelineError()" class="error-snapshot" role="alert">
               <p>{{ timelineError() }}</p>
@@ -11120,6 +11120,14 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   trackByMatchId(_index: number, m: TestHarnessMatchRow): string {
     return m.matchId;
   }
+  matchStatusLabel(status: string | null | undefined): string {
+    const normalized = String(status ?? '').toUpperCase();
+    if (normalized === 'COMPLETED') return 'Completado';
+    if (normalized === 'PENDING') return 'Pendiente';
+    if (normalized === 'IN_PROGRESS') return 'En juego';
+    if (normalized === 'PAUSED') return 'Pausado';
+    return status ?? '';
+  }
   trackByFormationReplay(_index: number, row: FormationReplayResult): string {
     return row.formation;
   }
@@ -11546,7 +11554,61 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     }
   }
   professionalQaVerdictLabel(verdict: ProfessionalQaChecklistRow['verdict']): string {
+    if (verdict === 'Pending') return 'Pendiente';
+    if (verdict === 'Review') return 'Revisar';
     return verdict === 'Fallback' ? 'OK con avisos' : verdict;
+  }
+  professionalQaCheckLabel(check: string): string {
+    const labels: Record<string, string> = {
+      'All formations audit': 'Auditoría de todas las formaciones',
+      'Defensive side mapping': 'Lados defensivos',
+      '3-4-1-2 spine': 'Columna 3-4-1-2',
+      'Wide-role scarcity': 'Escasez de roles de banda',
+      'Pixel movement signal': 'Señal de movimiento por píxeles',
+      'Pixel no-cliff rule': 'Regla sin saltos bruscos',
+      'Señal cambio jugador': 'Señal cambio jugador',
+      'Live substitution signal': 'Señal de sustitución en vivo'
+    };
+    return labels[check] ?? check;
+  }
+  professionalQaTextLabel(text: string | null | undefined): string {
+    if (!text) return '';
+    return text
+      .replace(/Not run yet/g, 'Todavía no corrido')
+      .replace(/Pending/g, 'Pendiente')
+      .replace(/Review/g, 'Revisar')
+      .replace(/Fallback/g, 'Fallback')
+      .replace(/OK/g, 'OK')
+      .replace(/line checks after running all/g, 'chequeos de línea después de correr las')
+      .replace(/formations/g, 'formaciones')
+      .replace(/formation/g, 'formación')
+      .replace(/rows/g, 'filas')
+      .replace(/row\(s\)/g, 'fila(s)')
+      .replace(/match summaries/g, 'resúmenes de partido')
+      .replace(/player summaries/g, 'resúmenes de jugador')
+      .replace(/visible\/non-stable/g, 'visibles/no estables')
+      .replace(/measurable smooth/g, 'suaves medibles')
+      .replace(/defensive lines clean/g, 'líneas defensivas limpias')
+      .replace(/LB\/RB and LWB\/RWB stay on their tactical side; no crossing\./g, 'LB/RB y LWB/RWB se mantienen en su lado táctico; no se cruzan.')
+      .replace(/CAM natural in CAM and two CF\/ST preserved for both ST slots\./g, 'CAM natural en CAM y dos CF/ST preservados para los dos slots ST.')
+      .replace(/Missing natural wingers\/LM\/RM becomes Fallback, not silent OK\./g, 'Si faltan extremos/LM/RM naturales, aparece Fallback; no queda como OK silencioso.')
+      .replace(/Manual x\/y movement creates a measurable multi-seed signal\./g, 'Mover x/y manualmente genera una señal multi-seed medible.')
+      .replace(/1px moves should be smooth, not strong cliff jumps\./g, 'Mover 1px debe ser suave, no un salto brusco.')
+      .replace(/Changing players should affect role quality and match averages\./g, 'Cambiar jugadores debe afectar calidad de rol y promedios del partido.')
+      .replace(/Same seed baseline vs minute substitution should alter match averages in the selected coach objective direction\./g, 'Mismo seed base vs sustitución por minuto debe cambiar los promedios según el objetivo DT.')
+      .replace(/Run Auditoría todas las formaciones\./g, 'Corré Auditoría todas las formaciones.')
+      .replace(/Run the all-formations audit, not only current formación\./g, 'Corré la auditoría de todas las formaciones, no solo la actual.')
+      .replace(/Run formation audit\./g, 'Corré auditoría de formación.')
+      .replace(/Run formación audit\./g, 'Corré auditoría de formación.')
+      .replace(/Run Batería cambio jugador or Comparar precisión\./g, 'Corré Batería cambio jugador o Comparar precisión.')
+      .replace(/Run Matriz presets posicion or line smokes\./g, 'Corré Matriz presets posición o smokes de líneas.')
+      .replace(/Run Chequeo sensibilidad\./g, 'Corré Chequeo sensibilidad.')
+      .replace(/Run Simular sustitución or Smoke profesional full\./g, 'Corré Simular sustitución o Smoke profesional full.')
+      .replace(/Keep as contract\./g, 'Mantener como contrato.')
+      .replace(/No fallback detected for this squad\./g, 'No se detectó fallback en este plantel.')
+      .replace(/Check side mapping \/ persisted slots\./g, 'Revisar mapeo de lados / slots guardados.')
+      .replace(/Inspect/g, 'Revisar')
+      .replace(/Use rows to calibrate direction\./g, 'Usar las filas para calibrar dirección.');
   }
   professionalSmokeVerdictClass(verdict: ProfessionalSmokeSummary['verdict']): string {
     if (verdict === 'OK') return 'qa-verdict-ok';
@@ -11557,15 +11619,15 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   professionalQaActionLabel(check: string): string {
     switch (check) {
       case 'All formations audit':
-        return 'Correr all formations audit';
+        return 'Correr auditoría completa';
       case 'Defensive side mapping':
       case '3-4-1-2 spine':
       case 'Wide-role scarcity':
-        return 'Correr formation audit';
+        return 'Correr auditoría formación';
       case 'Pixel movement signal':
-        return 'Correr full position smoke';
+        return 'Correr smoke posición completo';
       case 'Pixel no-cliff rule':
-        return 'Correr sensitivity check';
+        return 'Correr chequeo sensibilidad';
       case 'Señal cambio jugador':
         return 'Correr bateria de cambio jugador';
       default:

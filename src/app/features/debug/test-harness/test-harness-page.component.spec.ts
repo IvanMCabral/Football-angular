@@ -259,7 +259,7 @@ describe('TestHarnessPageComponent', () => {
 
     expect(fullSmokeSpy).toHaveBeenCalled();
     expect(presetSpy).not.toHaveBeenCalled();
-    expect(component.professionalQaActionLabel('Pixel movement signal')).toContain('full position smoke');
+    expect(component.professionalQaActionLabel('Pixel movement signal')).toContain('smoke posición completo');
   });
 
   it('builds the Match Compare route for the selected match', () => {
