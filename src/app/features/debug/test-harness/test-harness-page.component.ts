@@ -137,6 +137,14 @@ import {
   downloadTextFile as saveTextFile,
 } from './test-harness-export-utils';
 import {
+  deltaClassName,
+  formatDeltaInt,
+  formatDeltaMicro,
+  formatDeltaNumber,
+  formatPercent,
+  formatXg,
+} from './test-harness-format-utils';
+import {
   playerSwapHasLargeQualityDrop as hasLargePlayerSwapQualityDrop,
   playerSwapOverallDelta as getPlayerSwapOverallDelta,
   playerSwapOverallDeltaText as getPlayerSwapOverallDeltaText,
@@ -6212,10 +6220,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     });
   }
   fmtXg(value: number | null): string {
-    if (value === null || value === undefined || !Number.isFinite(value)) {
-      return '-';
-    }
-    return value.toFixed(2);
+    return formatXg(value);
   }
   copyFormationMatrixJson(): void {
     const payload = JSON.stringify(this.formationReplayResults(), null, 2);
@@ -13435,16 +13440,10 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return { central: row.homeCentralShots, wide: row.homeWideShots, long: row.homeLongShots };
   }
   fmtDeltaInt(value: number): string {
-    if (!Number.isFinite(value) || value === 0) {
-      return '0';
-    }
-    return value > 0 ? `+${Math.round(value)}` : `${Math.round(value)}`;
+    return formatDeltaInt(value);
   }
   fmtDeltaNumber(value: number): string {
-    if (!Number.isFinite(value) || Math.abs(value) < 0.005) {
-      return '0.00';
-    }
-    return value > 0 ? `+${value.toFixed(2)}` : value.toFixed(2);
+    return formatDeltaNumber(value);
   }
   private roundTo(value: number, decimals: number): number {
     if (!Number.isFinite(value)) return 0;
@@ -13452,16 +13451,10 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return Math.round(value * factor) / factor;
   }
   fmtDeltaMicro(value: number): string {
-    if (!Number.isFinite(value) || Math.abs(value) < 0.0005) {
-      return '\u00b10.000';
-    }
-    return value > 0 ? `+${value.toFixed(3)}` : value.toFixed(3);
+    return formatDeltaMicro(value);
   }
   deltaClass(value: number): string {
-    if (!Number.isFinite(value) || Math.abs(value) < 0.005) {
-      return 'delta-neutral';
-    }
-    return value > 0 ? 'delta-positive' : 'delta-negative';
+    return deltaClassName(value);
   }
   positionPixelRead(row: PositionPixelMatrixSummary): string {
     const level = this.positionPixelReadLevel(row);
@@ -14178,10 +14171,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return !!match && !!userTeam && match.homeTeamName === userTeam;
   }
   fmtPct(value: number | null): string {
-    if (value === null || value === undefined || !Number.isFinite(value)) {
-      return '?';
-    }
-    return `${Math.round(value)}%`;
+    return formatPercent(value);
   }
   formationMatrixDisabledReason(): string {
     if (this.mutationInFlight()) {
