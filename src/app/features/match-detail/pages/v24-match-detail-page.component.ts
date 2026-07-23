@@ -36,34 +36,34 @@ import {
       <!-- P1a: role="status" + aria-live="polite" so screen readers announce "Loading..." -->
       <div *ngIf="loading" class="state-container" role="status" aria-live="polite">
         <div class="state-spinner" aria-hidden="true"></div>
-        <p class="loading-text">Loading match detail...</p>
+        <p class="loading-text">Cargando detalle del partido...</p>
       </div>
 
       <!-- Error state -->
       <!-- P1a: role="alert" so screen readers announce errors immediately -->
       <div *ngIf="!loading && error" class="state-container" role="alert">
         <div class="state-icon error-icon" aria-hidden="true">!</div>
-        <p class="error-text">Failed to load match detail.</p>
+        <p class="error-text">No se pudo cargar el detalle del partido.</p>
         <button (click)="retry()" class="btn btn-primary"
-                aria-label="Retry loading match detail">Retry</button>
+                aria-label="Reintentar carga del detalle del partido">Reintentar</button>
         <a routerLink="/matches" class="link"
-           aria-label="Back to matches list">Back to matches</a>
+           aria-label="Volver a la lista de partidos">Volver a partidos</a>
       </div>
 
       <!-- Detail unavailable state (404 / null) -->
       <div *ngIf="!loading && !error && detail === null" class="state-container">
         <div class="state-icon info-icon">?</div>
-        <h2 class="state-title">Match Detail</h2>
-        <p class="unavailable-text">Detailed match data is not available for this match.</p>
+        <h2 class="state-title">Detalle del partido</h2>
+        <p class="unavailable-text">El detalle completo no está disponible para este partido.</p>
         <div class="info-box">
-          <p class="info-box-title">Possible reasons:</p>
+          <p class="info-box-title">Posibles motivos:</p>
           <ul class="info-list">
-            <li>Match was played before V24 detail persistence was enabled</li>
-            <li>Detail persistence was disabled during simulation</li>
-            <li>Endpoint is currently disabled</li>
+            <li>El partido se jugó antes de guardar detalle V24</li>
+            <li>El guardado de detalle estaba desactivado durante la simulación</li>
+            <li>El endpoint de detalle está desactivado temporalmente</li>
           </ul>
         </div>
-        <a routerLink="/matches" class="link">Back to matches</a>
+        <a routerLink="/matches" class="link">Volver a partidos</a>
       </div>
 
       <!-- Detail success state -->
@@ -72,7 +72,7 @@ import {
         <!-- Header -->
         <div class="match-header">
           <a routerLink="/matches" class="link link-back"
-             aria-label="Back to matches list">&#8592; Back to matches</a>
+             aria-label="Volver a la lista de partidos">&#8592; Volver a partidos</a>
           <!-- V24D15-CLEANUP BUG_BREADCRUMB_PLACEHOLDER: the previous template
                rendered the Round span with a literal placeholder in the title
                attribute ('Round summary route requires gameId (not in MatchDetail
@@ -82,17 +82,17 @@ import {
                Removed the placeholder text — the link now navigates to the
                round summary page where the manager can see the full round recap. -->
           <nav class="breadcrumb" aria-label="Breadcrumb">
-            <a routerLink="/dashboard" class="breadcrumb-link" title="Go to dashboard">Home</a>
+            <a routerLink="/dashboard" class="breadcrumb-link" title="Ir al dashboard">Dashboard</a>
             <span class="breadcrumb-sep">›</span>
-            <a routerLink="/dashboard" class="breadcrumb-link" title="Career overview (linked to dashboard until dedicated career route exists)">Career</a>
+            <a routerLink="/dashboard" class="breadcrumb-link" title="Vista general de carrera">Carrera</a>
             <span class="breadcrumb-sep">›</span>
             <a [routerLink]="['/games', careerId, 'round', detail.round, 'summary']"
                class="breadcrumb-link"
-               [attr.title]="'Round ' + detail.round + ' summary'">
-              Round {{ detail.round }}
+               [attr.title]="'Resumen de fecha ' + detail.round">
+              Fecha {{ detail.round }}
             </a>
             <span class="breadcrumb-sep">›</span>
-            <span class="breadcrumb-current">Match</span>
+            <span class="breadcrumb-current">Partido</span>
           </nav>
           <div class="scoreboard">
             <div class="team home-team">
@@ -108,17 +108,17 @@ import {
             </div>
           </div>
           <div class="match-meta">
-            <span class="meta-item">Round {{ detail.round }}</span>
+            <span class="meta-item">Fecha {{ detail.round }}</span>
             <span class="meta-dot">·</span>
-            <span class="meta-item">Season {{ detail.seasonNumber }}</span>
+            <span class="meta-item">Temporada {{ detail.seasonNumber }}</span>
             <span class="meta-dot">·</span>
             <span class="badge badge-v24">V24 Engine</span>
           </div>
           <!-- P1a: Prev/Next match navigation (placeholders, disabled until P1a.1 wires to backend) -->
           <div class="match-nav">
             <button type="button" class="btn-nav btn-nav-prev" disabled
-                    aria-label="Previous match (not available yet)"
-                    title="Coming soon (P1a.1)">← Previous match</button>
+                    aria-label="Partido anterior no disponible todavía"
+                    title="Próximamente">← Partido anterior</button>
             <!-- LIVE-MATCH: manual substitution entry point with real data only -->
             <button type="button" class="btn-nav btn-nav-substitute"
                     (click)="openSubstitutionDialog()"
@@ -134,8 +134,8 @@ import {
               🔄 Comparar
             </a>
             <button type="button" class="btn-nav btn-nav-next" disabled
-                    aria-label="Next match (not available yet)"
-                    title="Coming soon (P1a.1)">Next match →</button>
+                    aria-label="Partido siguiente no disponible todavía"
+                    title="Próximamente">Partido siguiente →</button>
           </div>
         </div>
 
@@ -143,7 +143,7 @@ import {
         <!-- P1a: each stat card has role="group" with a descriptive aria-label -->
         <div class="summary-cards">
           <div class="stat-card" role="group"
-               [attr.aria-label]="'Expected goals: ' + detail.homeXg.toFixed(2) + ' home, ' + detail.awayXg.toFixed(2) + ' away'">
+               [attr.aria-label]="'Goles esperados: ' + detail.homeXg.toFixed(2) + ' local, ' + detail.awayXg.toFixed(2) + ' visitante'">
             <span class="stat-card-label">xG</span>
             <div class="stat-card-values">
               <span class="stat-home">{{ detail.homeXg.toFixed(2) }}</span>
@@ -152,8 +152,8 @@ import {
             </div>
           </div>
           <div class="stat-card" role="group"
-               [attr.aria-label]="'Shots: ' + detail.homeShots + ' home, ' + detail.awayShots + ' away'">
-            <span class="stat-card-label">Shots</span>
+               [attr.aria-label]="'Tiros: ' + detail.homeShots + ' local, ' + detail.awayShots + ' visitante'">
+            <span class="stat-card-label">Tiros</span>
             <div class="stat-card-values">
               <span class="stat-home">{{ detail.homeShots }}</span>
               <span class="stat-divider">–</span>
@@ -161,8 +161,8 @@ import {
             </div>
           </div>
           <div class="stat-card" role="group"
-               [attr.aria-label]="'Possession: ' + detail.homePossession + ' percent home, ' + detail.awayPossession + ' percent away'">
-            <span class="stat-card-label">Possession</span>
+               [attr.aria-label]="'Posesión: ' + detail.homePossession + ' por ciento local, ' + detail.awayPossession + ' por ciento visitante'">
+            <span class="stat-card-label">Posesión</span>
             <div class="stat-card-values">
               <span class="stat-home">{{ detail.homePossession }}%</span>
               <span class="stat-divider">–</span>
@@ -170,8 +170,8 @@ import {
             </div>
           </div>
           <div class="stat-card" role="group"
-               [attr.aria-label]="'Goals: ' + detail.homeGoals + ' home, ' + detail.awayGoals + ' away'">
-            <span class="stat-card-label">Goals</span>
+               [attr.aria-label]="'Goles: ' + detail.homeGoals + ' local, ' + detail.awayGoals + ' visitante'">
+            <span class="stat-card-label">Goles</span>
             <div class="stat-card-values">
               <span class="stat-home">{{ detail.homeGoals }}</span>
               <span class="stat-divider">–</span>
@@ -182,7 +182,7 @@ import {
 
         <!-- Post-Match Condition Summary (V24D6G6A) -->
         <div class="section post-match-summary" *ngIf="!loading && !error && detail !== null">
-          <h3 class="section-title">Post-Match Condition</h3>
+          <h3 class="section-title">Estado post-partido</h3>
           <div class="condition-summary">
             <div class="condition-row" *ngIf="hasInjuryEvents()">
               <span class="condition-badge injury-badge">🤕</span>
@@ -201,10 +201,10 @@ import {
             <div class="condition-row discipline-row" *ngIf="yellowCardCount() > 0 || redCardCount() > 0">
               <span class="discipline-summary">
                 <span *ngIf="yellowCardCount() > 0" class="card-count">
-                  <span class="card-badge yellow-badge">🟨</span> {{ yellowCardCount() }} yellow card{{ yellowCardCount() > 1 ? 's' : '' }}
+                  <span class="card-badge yellow-badge">🟨</span> {{ yellowCardCount() }} amarilla{{ yellowCardCount() > 1 ? 's' : '' }}
                 </span>
                 <span *ngIf="redCardCount() > 0" class="card-count">
-                  <span class="card-badge red-badge">🟥</span> {{ redCardCount() }} red card{{ redCardCount() > 1 ? 's' : '' }}
+                  <span class="card-badge red-badge">🟥</span> {{ redCardCount() }} roja{{ redCardCount() > 1 ? 's' : '' }}
                 </span>
               </span>
             </div>
@@ -213,21 +213,21 @@ import {
 
         <!-- Timeline Section -->
         <div class="section">
-          <h3 class="section-title">Timeline</h3>
+          <h3 class="section-title">Línea de tiempo</h3>
           <div *ngIf="detail.timeline.length === 0" class="empty-state">
-            No key moments were recorded for this match — the action happened, we just don't have the play-by-play.
+            No se registraron momentos clave para este partido. La acción ocurrió, pero todavía no tenemos el relato minuto a minuto.
           </div>
           <ul class="timeline-list" *ngIf="detail.timeline.length > 0">
             <li *ngFor="let event of detail.timeline" class="timeline-item">
               <span class="event-minute">{{ event.minute }}'</span>
-              <span class="event-badge" [ngClass]="eventClass(event.type)">{{ event.type }}</span>
+              <span class="event-badge" [ngClass]="eventClass(event.type)">{{ eventTypeLabel(event.type) }}</span>
               <div class="event-body">
                 <span class="event-player">{{ event.playerName }}</span>
-                <span class="event-assist" *ngIf="event.relatedPlayerName">assist: {{ event.relatedPlayerName }}</span>
+                <span class="event-assist" *ngIf="event.relatedPlayerName">asistencia: {{ event.relatedPlayerName }}</span>
               </div>
               <div class="event-meta">
                 <span class="event-xg" *ngIf="event.xg != null">xG {{ event.xg.toFixed(2) }}</span>
-                <span class="event-desc">{{ event.description }}</span>
+                <span class="event-desc">{{ eventDescriptionLabel(event.description) }}</span>
               </div>
             </li>
           </ul>
@@ -235,7 +235,7 @@ import {
 
         <!-- Stats Comparison Section -->
         <div class="section">
-          <h3 class="section-title">Stats</h3>
+          <h3 class="section-title">Estadísticas</h3>
           <div class="stats-table">
             <div class="stats-row" *ngFor="let row of statsComparison()">
               <span class="stat-label">{{ row.label }}</span>
@@ -252,9 +252,9 @@ import {
 
         <!-- Players Section -->
         <div class="section">
-          <h3 class="section-title">Players</h3>
+          <h3 class="section-title">Jugadores</h3>
           <div *ngIf="!hasPlayerRatings()" class="empty-state">
-            Per-player ratings are not available for this match yet. They'll show up here as the engine collects more data.
+            Las calificaciones por jugador todavía no están disponibles para este partido. Van a aparecer acá cuando el motor tenga más datos.
           </div>
           <div *ngIf="hasPlayerRatings()" class="players-container">
             <div class="team-players" *ngFor="let team of playerRatingsByTeam()">
@@ -995,7 +995,7 @@ export class V24MatchDetailPageComponent implements OnInit, OnChanges {
         this.cdr.detectChanges();
       },
       error: (err) => {
-        this.error = 'Failed to load match detail.';
+        this.error = 'No se pudo cargar el detalle del partido.';
         this.loading = false;
         this.cdr.detectChanges();
       }
@@ -1011,6 +1011,41 @@ export class V24MatchDetailPageComponent implements OnInit, OnChanges {
     'OFFSIDE': 'event-offside', 'CORNER': 'event-corner', 'CHANCE_CREATED': 'event-chance_created'
   };
   eventClass(type: string): string { return this.typeMap[type] ?? 'event-shot'; }
+
+  private eventLabelMap: Record<string, string> = {
+    GOAL: 'Gol',
+    SHOT: 'Tiro',
+    SHOT_ON_TARGET: 'Tiro al arco',
+    BLOCK: 'Bloqueo',
+    MISS: 'Tiro desviado',
+    FOUL: 'Falta',
+    YELLOW_CARD: 'Amarilla',
+    RED_CARD: 'Roja',
+    INJURY: 'Lesión',
+    SUBSTITUTION: 'Cambio',
+    OFFSIDE: 'Offside',
+    CORNER: 'Córner',
+    CHANCE_CREATED: 'Chance creada'
+  };
+
+  eventTypeLabel(type: string): string {
+    return this.eventLabelMap[type] ?? type;
+  }
+
+  eventDescriptionLabel(description: string | null | undefined): string {
+    if (!description) return '';
+    return description
+      .replace(/^Chance created for (.+)$/i, 'Chance creada para $1')
+      .replace(/^Shot saved$/i, 'Tiro atajado')
+      .replace(/^Shot missed$/i, 'Tiro desviado')
+      .replace(/^Offside$/i, 'Offside')
+      .replace(/^(.+) committed a foul$/i, '$1 cometió una falta')
+      .replace(/^(.+) received a yellow card$/i, '$1 recibió amarilla')
+      .replace(/^(.+) received a red card$/i, '$1 recibió roja')
+      .replace(/^(.+) scored$/i, 'Gol de $1')
+      .replace(/^(.+) was injured$/i, '$1 se lesionó')
+      .replace(/^Substitution: (.+)$/i, 'Cambio: $1');
+  }
 
   // P1a: stats comparison now includes a delta field for visual indication
   // of home - away (color-coded green/red/grey in the template).
@@ -1028,10 +1063,10 @@ export class V24MatchDetailPageComponent implements OnInit, OnChanges {
       return { label, home: formatFn(homeVal), away: formatFn(awayVal), delta: { value, formatted, winner } };
     };
     return [
-      row('Goals', this.detail.homeGoals, this.detail.awayGoals, n => String(Math.round(n))),
+      row('Goles', this.detail.homeGoals, this.detail.awayGoals, n => String(Math.round(n))),
       row('xG', this.detail.homeXg, this.detail.awayXg, n => n.toFixed(2)),
-      row('Shots', this.detail.homeShots, this.detail.awayShots, n => String(Math.round(n))),
-      row('Possession', this.detail.homePossession, this.detail.awayPossession, n => `${Math.round(n)}%`)
+      row('Tiros', this.detail.homeShots, this.detail.awayShots, n => String(Math.round(n))),
+      row('Posesión', this.detail.homePossession, this.detail.awayPossession, n => `${Math.round(n)}%`)
     ];
   }
 
@@ -1047,8 +1082,8 @@ export class V24MatchDetailPageComponent implements OnInit, OnChanges {
       return { label, players: s, topPlayer: s[0] };
     };
     return [
-      withTop(home, 'Home Team'),
-      withTop(away, 'Away Team')
+      withTop(home, 'Equipo local'),
+      withTop(away, 'Equipo visitante')
     ].filter(t => t.players.length > 0);
   }
 
@@ -1074,16 +1109,16 @@ export class V24MatchDetailPageComponent implements OnInit, OnChanges {
 
   injuredPlayerSummary(): { playerName: string; minute: number }[] {
     return this.injuryEvents().map(e => ({
-      playerName: e.playerName || 'Unknown',
+      playerName: e.playerName || 'Sin identificar',
       minute: e.minute
     }));
   }
 
   postMatchConditionLabel(): string {
     if (this.hasInjuryEvents()) {
-      return `🤕 ${this.injuryEventsCount()} injury event${this.injuryEventsCount() > 1 ? 's' : ''} occurred`;
+      return `🤕 ${this.injuryEventsCount()} evento${this.injuryEventsCount() > 1 ? 's' : ''} de lesión`;
     }
-    return 'No injury events recorded for this match.';
+    return 'No se registraron lesiones en este partido.';
   }
 
   // === Shot Map (V24D6O) ===

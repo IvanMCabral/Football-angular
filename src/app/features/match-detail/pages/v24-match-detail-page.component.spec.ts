@@ -136,7 +136,7 @@ describe('V24MatchDetailPageComponent — V24D24 @Input path', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    expect(component.error).toContain('Failed');
+    expect(component.error).toContain('No se pudo cargar');
     expect(component.loading).toBeFalse();
     expect(component.detail).toBeNull();
   });
