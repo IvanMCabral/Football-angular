@@ -130,6 +130,7 @@ import {
   TIMELINE_MAX_MINUTE,
   TIMELINE_STEP,
 } from './test-harness.constants';
+import { csvCell as formatCsvCell } from './test-harness-export-utils';
 import {
   playerSwapHasLargeQualityDrop as hasLargePlayerSwapQualityDrop,
   playerSwapOverallDelta as getPlayerSwapOverallDelta,
@@ -6547,9 +6548,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     this.snackBar.open(`Scenario battery CSV exported (${rows.length} rows).`, 'OK', { duration: 2500 });
   }
   private csvCell(value: unknown): string {
-    if (value === null || value === undefined) return '';
-    const text = String(value);
-    return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+    return formatCsvCell(value);
   }
   private playerSwapExportRow(row: PlayerSwapMatrixSummary): Record<string, unknown> {
     return {
