@@ -161,6 +161,7 @@ import {
   positionPixelChannelBreakdownRead as getPositionPixelChannelBreakdownRead,
   PositionPixelChannelBreakdown,
   positionPixelChannelSign as getPositionPixelChannelSign,
+  positionPixelCoachRead as getPositionPixelCoachRead,
   positionPixelContextualCoverageNote as getPositionPixelContextualCoverageNote,
   positionPixelCoverageChannelLabel as getPositionPixelCoverageChannelLabel,
   positionPixelDecisionScore as getPositionPixelDecisionScore,
@@ -13475,108 +13476,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return Math.max(-9.99, Math.min(9.99, Number.isFinite(value) ? value : 0));
   }
   positionPixelCoachRead(row: PositionPixelMatrixSummary): string {
-    const vertical = row.targetYPercent - row.fromYPercent;
-    const horizontal = row.targetXPercent - row.fromXPercent;
-    const movedUp = vertical <= -3.5;
-    const movedDown = vertical >= 3.5;
-    const movedWide = Math.abs(row.targetXPercent - 50) > Math.abs(row.fromXPercent - 50) + 2.5;
-    const movedInside = Math.abs(row.targetXPercent - 50) < Math.abs(row.fromXPercent - 50) - 2.5;
-    const attackGain = this.positionPixelAttackGainScore(row);
-    const attackLoss = this.positionPixelAttackLossScore(row);
-    const defensiveRisk = this.positionPixelDefensiveRiskScore(row);
-    const defensiveGain = this.positionPixelDefensiveGainScore(row);
-    const coverageBreakdown = this.positionPixelChannelBreakdown(row).coverage;
-    const contextualCoverage = this.positionPixelUsesContextualCoverage(row, coverageBreakdown);
-    const ownWideDelta = row.deltaWideShotsFor + Math.abs(row.deltaLeftWideXgFor) + Math.abs(row.deltaRightWideXgFor);
-    const againstWideDelta = row.deltaWideShotsAgainst + Math.abs(row.deltaLeftWideXgAgainst) + Math.abs(row.deltaRightWideXgAgainst);
-    const centralDelta = row.deltaCentralShotsFor + row.deltaCentralXgFor;
-    const centralAgainstDelta = row.deltaCentralShotsAgainst + row.deltaCentralXgAgainst;
-    if (this.positionPixelDistance(row) <= 1.25) {
-      return row.signalScore >= 0.050
-        ? 'Micro con señal: revisar si ese borde de zona pesa demasiado.'
-        : 'Micro estable: el pixel no rompe la lectura del motor.';
-    }
-    if (movedWide && movedUp && attackGain >= 0.7 && defensiveRisk >= 0.7) {
-      return 'Diagonal abierta alta: gana amplitud/profundidad, pero deja espalda; tradeoff banda-altura.';
-    }
-    if (movedWide && movedDown && defensiveGain >= 0.7 && attackLoss >= 0.5) {
-      return 'Diagonal abierta baja: suma cobertura exterior, pero pierde amenaza/conexion interior.';
-    }
-    if (movedInside && movedUp && attackGain >= 0.7 && defensiveRisk >= 0.7) {
-      return 'Diagonal interior alta: suma presencia central, pero puede liberar banda; tradeoff centro-banda.';
-    }
-    if (movedInside && movedDown && defensiveGain >= 0.7 && attackLoss >= 0.5) {
-      return 'Diagonal interior baja: compacta el bloque, pero reduce amplitud y salida.';
-    }
-    if (movedUp && attackGain >= 0.9 && defensiveRisk >= 0.7) {
-      const line = this.strictPositionPixelLine(row.playerPosition) ?? this.positionPixelVisualLine(row.fromYPercent);
-      if (line === 'DEF') {
-        return 'Sube un defensor: suma salida/amenaza, pero abre espalda; tratarlo como tradeoff de riesgo.';
-      }
-      return 'Proyecta al jugador: suma ataque, pero deja espalda para el rival.';
-    }
-    if (movedUp && defensiveRisk >= 0.9 && attackGain < 0.7) {
-      const line = this.strictPositionPixelLine(row.playerPosition) ?? this.positionPixelVisualLine(row.fromYPercent);
-      const targetLine = this.positionPixelVisualLine(row.targetYPercent);
-      if (line === 'DEF' && targetLine === 'MID' && this.positionPixelDistance(row) > 10) {
-        return 'DEF->MID grande: rompe la línea defensiva sin ganancia clara; alerta fuerte de riesgo.';
-      }
-      return 'Sube sin ventaja clara: gana riesgo y puede quedar desconectado.';
-    }
-    if (contextualCoverage && defensiveRisk >= 0.8) {
-      return 'Baja un delantero: cobertura contextual, pero sube el riesgo; no asumir mejora defensiva real.';
-    }
-    if (contextualCoverage && defensiveGain >= 0.8 && attackLoss >= 0.6) {
-      return 'Baja un delantero: suma apoyo contextual, pero resigna amenaza ofensiva.';
-    }
-    if (contextualCoverage && defensiveGain >= 0.8) {
-      return 'Baja un delantero: puede ayudar al bloque, pero validar en partido si protege de verdad.';
-    }
-    if (movedDown && defensiveGain >= 0.8 && attackLoss >= 0.6) {
-      return 'Baja para cubrir: protege mejor, pero resigna salida ofensiva.';
-    }
-    if (movedDown && defensiveGain >= 0.8) {
-      return 'Mejora cobertura: el equipo queda mas protegido atras.';
-    }
-    if (movedWide && attackGain >= 0.7 && defensiveRisk >= 0.8 && againstWideDelta >= 0.3) {
-      return 'Abre la cancha: gana banda, pero el rival tambien encuentra ese costado; tradeoff de amplitud.';
-    }
-    if (movedWide && defensiveRisk >= 0.8 && againstWideDelta >= 0.3) {
-      return 'Abre la banda, pero el rival tambien encuentra ese costado.';
-    }
-    if (movedWide && attackGain >= 0.7 && ownWideDelta >= 0.4) {
-      return 'Abre la cancha: mejora ataque por banda.';
-    }
-    if (movedInside && (attackGain >= 0.7 || centralDelta >= 0.2) && defensiveRisk >= 0.8 && againstWideDelta >= 0.3) {
-      return 'Se cierra por dentro: mejora conexion, pero libera la banda; tradeoff interior/exterior.';
-    }
-    if (movedInside && attackGain >= 0.7 && centralDelta >= 0.2) {
-      return 'Se cierra por dentro: mejora conexión y juego central.';
-    }
-    if (movedInside && defensiveRisk >= 0.8 && againstWideDelta >= 0.3) {
-      return 'Se mete al centro: puede liberar la banda a la espalda.';
-    }
-    if (attackGain >= 0.9 && defensiveGain >= 0.8) {
-      return 'Ajuste positivo: mejora ataque y control defensivo en este contexto.';
-    }
-    if (attackLoss >= 0.9 && defensiveRisk >= 0.8) {
-      return 'Mal ajuste: pierde amenaza y concede mas riesgo.';
-    }
-    if (attackGain >= 0.9) {
-      return 'Gana amenaza ofensiva: el movimiento ayuda a generar ocasiones.';
-    }
-    if (attackLoss >= 0.9) {
-      return 'Pierde amenaza: el equipo ataca peor con esa ubicación.';
-    }
-    if (defensiveRisk >= 0.9) {
-      return centralAgainstDelta >= againstWideDelta
-        ? 'Aumenta riesgo por dentro: revisar cobertura central.'
-        : 'Aumenta riesgo por banda: revisar espalda y ayudas.';
-    }
-    if (defensiveGain >= 0.9) {
-      return 'Mejora protección: baja la producción ofensiva rival.';
-    }
-    return 'Cambio leve: señal baja, sin lectura táctica dominante.';
+    return getPositionPixelCoachRead(row);
   }
   private positionPixelWideChannelReason(row: PositionPixelMatrixSummary): string {
     return getPositionPixelWideChannelReason(row, (value) => this.fmtDeltaMicro(value));
