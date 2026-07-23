@@ -1,4 +1,4 @@
-import { csvCell } from './test-harness-export-utils';
+import { csvCell, csvLines } from './test-harness-export-utils';
 
 describe('test-harness-export-utils', () => {
   it('keeps simple CSV cells readable', () => {
@@ -18,5 +18,25 @@ describe('test-harness-export-utils', () => {
 
   it('escapes quotes inside quoted CSV cells', () => {
     expect(csvCell('he said "ok"')).toBe('"he said ""ok"""');
+  });
+
+  it('builds CSV lines from a header and plain rows', () => {
+    expect(csvLines(['name', 'score'], [
+      { name: 'A', score: 1 },
+      { name: 'B', score: 2 },
+    ])).toEqual([
+      'name,score',
+      'A,1',
+      'B,2',
+    ]);
+  });
+
+  it('builds CSV lines with escaped row values', () => {
+    expect(csvLines(['name', 'note'], [
+      { name: 'A', note: 'wide, central' },
+    ])).toEqual([
+      'name,note',
+      'A,"wide, central"',
+    ]);
   });
 });

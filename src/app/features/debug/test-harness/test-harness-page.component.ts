@@ -130,7 +130,7 @@ import {
   TIMELINE_MAX_MINUTE,
   TIMELINE_STEP,
 } from './test-harness.constants';
-import { csvCell as formatCsvCell } from './test-harness-export-utils';
+import { csvCell as formatCsvCell, csvLines as buildCsvLines } from './test-harness-export-utils';
 import {
   playerSwapHasLargeQualityDrop as hasLargePlayerSwapQualityDrop,
   playerSwapOverallDelta as getPlayerSwapOverallDelta,
@@ -6378,10 +6378,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       'homeCentralShots', 'homeWideShots', 'homeLongShots',
       'awayCentralShots', 'awayWideShots', 'awayLongShots',
     ];
-    const lines = [
-      header.join(','),
-      ...rows.map((r) => header.map((key) => this.csvCell((r as unknown as Record<string, unknown>)[key])).join(',')),
-    ];
+    const lines = this.csvLines(header, rows as unknown as Record<string, unknown>[]);
     const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -6414,10 +6411,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       'swappedAvgXgFor', 'swappedAvgXgAgainst', 'swappedAvgXgDiff',
       'timestamp',
     ];
-    const lines = [
-      header.join(','),
-      header.map((key) => this.csvCell((exportRow as Record<string, unknown>)[key])).join(','),
-    ];
+    const lines = this.csvLines(header, [exportRow as Record<string, unknown>]);
     const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -6451,10 +6445,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       'swappedAvgXgFor', 'swappedAvgXgAgainst', 'swappedAvgXgDiff',
       'timestamp',
     ];
-    const lines = [
-      header.join(','),
-      ...exportRows.map((row) => header.map((key) => this.csvCell(row[key])).join(',')),
-    ];
+    const lines = this.csvLines(header, exportRows);
     const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -6478,10 +6469,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       'deltaCentralXgAgainst', 'deltaWideXgAgainst', 'deltaLongXgAgainst',
       'baselineXgFor', 'baselineXgAgainst', 'movedXgFor', 'movedXgAgainst', 'timestamp',
     ];
-    const lines = [
-      header.join(','),
-      ...rows.map((r) => header.map((key) => this.csvCell((r as unknown as Record<string, unknown>)[key])).join(',')),
-    ];
+    const lines = this.csvLines(header, rows as unknown as Record<string, unknown>[]);
     const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -6509,10 +6497,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       'avgUserLeftWideDelta', 'avgUserRightWideDelta', 'avgOpponentLeftWideDelta', 'avgOpponentRightWideDelta',
       'avgUserLeftWideXgDelta', 'avgUserRightWideXgDelta', 'avgOpponentLeftWideXgDelta', 'avgOpponentRightWideXgDelta',
     ];
-    const lines = [
-      header.join(','),
-      ...rows.map((row) => header.map((key) => this.csvCell(row[key])).join(',')),
-    ];
+    const lines = this.csvLines(header, rows);
     const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -6534,10 +6519,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       'plan', 'twoWay', 'attack', 'shape', 'protect', 'avoid', 'opponentThreat',
       'planDetail', 'twoWayDetail', 'attackDetail', 'shapeDetail', 'protectDetail', 'avoidDetail', 'opponentThreatDetail',
     ];
-    const lines = [
-      header.join(','),
-      ...rows.map((row) => header.map((key) => this.csvCell(row[key])).join(',')),
-    ];
+    const lines = this.csvLines(header, rows);
     const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -6549,6 +6531,9 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   }
   private csvCell(value: unknown): string {
     return formatCsvCell(value);
+  }
+  private csvLines(header: string[], rows: Record<string, unknown>[]): string[] {
+    return buildCsvLines(header, rows);
   }
   private playerSwapExportRow(row: PlayerSwapMatrixSummary): Record<string, unknown> {
     return {
