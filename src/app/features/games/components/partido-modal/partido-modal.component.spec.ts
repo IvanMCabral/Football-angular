@@ -574,6 +574,37 @@ describe('PartidoModalComponent (V25D89-FRONT-A)', () => {
     expect(payload.targetYPercent).toBe(40);
   });
 
+  it('plain pointer click selects a player without changing restored pixels', () => {
+    dialogData.currentSlots = dialogData.currentSlots.map(slot => slot.slotIndex === 6
+      ? { ...slot, customXPercent: 47.25, customYPercent: 58.75 }
+      : slot
+    );
+    fixture = TestBed.createComponent(PartidoModalComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+
+    component.onPitchSlotPointerDown({
+      button: 0,
+      pointerId: 7,
+      currentTarget: { setPointerCapture: jasmine.createSpy('setPointerCapture') },
+      preventDefault: jasmine.createSpy('preventDefault'),
+      stopPropagation: jasmine.createSpy('stopPropagation'),
+    } as unknown as PointerEvent, 6);
+
+    component.onPitchPointerUp({
+      currentTarget: {
+        getBoundingClientRect: () => ({ left: 100, top: 50, width: 1000, height: 500 }),
+      },
+      clientX: 650,
+      clientY: 250,
+      preventDefault: jasmine.createSpy('preventDefault'),
+    } as unknown as PointerEvent);
+
+    expect(component.freePositionLeftPercent(6)).toBe(47.25);
+    expect(component.freePositionTopPercent(6)).toBe(58.75);
+    expect(component.hasPendingChanges()).toBeFalse();
+  });
+
   it('pointer drag keeps the goalkeeper fixed', () => {
     component.onPitchSlotPointerDown({
       button: 0,

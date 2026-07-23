@@ -1961,10 +1961,10 @@ export class PartidoModalComponent {
     const start = this.pointerDragStartCoords ?? this.baseSlotCoords(slotIdx);
     const target = event.currentTarget as HTMLElement;
     const next = this.coordsFromPointerEvent(event, target) ?? this.freeSlotCoords.get(slotIdx) ?? start;
-    this.freeSlotCoords.set(slotIdx, next);
-    this.clearAutoFillMarker(slotIdx);
-    this.bumpFreePositionRevision();
-    if (this.pointerDragMoved || Math.abs(start.x - next.x) >= 0.05 || Math.abs(start.y - next.y) >= 0.05) {
+    if (this.pointerDragMoved) {
+      this.freeSlotCoords.set(slotIdx, next);
+      this.clearAutoFillMarker(slotIdx);
+      this.bumpFreePositionRevision();
       this.persistLastNudgeHarnessCase(slotIdx, start, next);
       this.rememberCurrentPlayerCoord(slotIdx, next);
       this.suppressNextSlotClick = true;
