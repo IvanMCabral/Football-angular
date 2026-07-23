@@ -3538,7 +3538,7 @@ describe('TestHarnessPageComponent', () => {
     expect(component.positionPixelMatrixRows()[0].targetYPercent).toBe(32);
     expect(component.lineupDebugSnapshot()?.rows.map((row) => row.name)).toEqual([
       'Player 6 (antes)',
-      'Player 6 (despues)',
+      'Player 6 (después)',
     ]);
     expect(component.lineupDebugSnapshot()?.rows.map((row) => row.y)).toEqual([50, 32]);
   });

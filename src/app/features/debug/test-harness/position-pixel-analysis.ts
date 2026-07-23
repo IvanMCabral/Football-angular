@@ -242,7 +242,7 @@ export function positionPixelTacticalReadReason(
     `defensive risk ${positionPixelDefensiveRiskScore(row).toFixed(2)}`,
     `defensive gain ${positionPixelDefensiveGainScore(row).toFixed(2)}`,
     positionPixelWideChannelReason(row, formatDeltaMicro)
-  ].join(' ? ');
+  ].join(' · ');
 }
 
 export function positionPixelCoachRead(row: PositionPixelMatrixSummary): string {
@@ -415,7 +415,7 @@ export function positionPixelChannelBreakdownDetail(
   if (contextualCoverageNote) {
     parts.push(contextualCoverageNote);
   }
-  return parts.join(' ? ');
+  return parts.join(' · ');
 }
 
 export function positionPixelUsesContextualCoverage(
@@ -437,9 +437,9 @@ export function positionPixelContextualCoverageNote(
   }
   const defensiveRisk = positionPixelDefensiveRiskScore(row);
   if (defensiveRisk >= 0.8) {
-    return `cobertura contextual: ATT baj? pero el riesgo defensivo sube (${defensiveRisk.toFixed(2)}); tratar como alerta, no como mejora limpia`;
+    return `cobertura contextual: ATT bajó pero el riesgo defensivo sube (${defensiveRisk.toFixed(2)}); tratar como alerta, no como mejora limpia`;
   }
-  return 'cobertura contextual: ATT baj?; validar si realmente protege o solo cambia el dibujo';
+  return 'cobertura contextual: ATT bajó; validar si realmente protege o solo cambia el dibujo';
 }
 
 export function positionPixelClampBreakdownScore(value: number): number {
@@ -471,7 +471,7 @@ export function positionPixelVisualExpectationDetail(
   if (mismatches.length > 0) {
     return mismatches.join(' · ');
   }
-  return `coherente: ${shapeMove} ? ${channelBreakdownRead}`;
+  return `coherente: ${shapeMove} · ${channelBreakdownRead}`;
 }
 
 export function positionPixelIsMicroVisualMismatch(row: PositionPixelMatrixSummary): boolean {
@@ -581,7 +581,7 @@ export function positionPixelVisualEngineTensionDetail(
   if (tension.length === 0) {
     return `visual y motor alineados: ${channelBreakdownRead} · ${tacticalRead}`;
   }
-  return tension.map((item) => item.detail).join(' ? ');
+  return tension.map((item) => item.detail).join(' · ');
 }
 
 export function positionPixelVisualEngineTensions(
@@ -739,7 +739,7 @@ export function positionPixelShapeMoveDetail(row: PositionPixelMatrixSummary): s
       notes.push('microajuste visual sin cambio de zona');
     }
   }
-  return `${notes.join(' ? ')} ? ${positionPixelShapeDeltaText(fromLine, fromChannel, toLine, toChannel)}`;
+  return `${notes.join(' · ')} · ${positionPixelShapeDeltaText(fromLine, fromChannel, toLine, toChannel)}`;
 }
 
 export function positionPixelShapeDeltaText(

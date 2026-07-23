@@ -1296,10 +1296,10 @@ import {
               Resultado: {{ smoke.verdictDetail }}
             </small>
             <small>
-              Incluye: {{ smoke.included.join(' ? ') }}
+              Incluye: {{ smoke.included.join(' · ') }}
             </small>
             <small *ngIf="smoke.skipped.length > 0">
-              Pendiente/omitido: {{ smoke.skipped.join(' ? ') }}
+              Pendiente/omitido: {{ smoke.skipped.join(' · ') }}
             </small>
           </article>
           <div class="formation-matrix analysis-matrix current-lineup-replay">
@@ -1364,16 +1364,16 @@ import {
           <div *ngIf="lineupDiagnostic() as diagnostic" class="formation-matrix analysis-matrix current-lineup-replay">
             <div class="matrix-header">
               <strong>XI efectivo del motor</strong>
-              <span>Seed {{ diagnostic.seed }} ? titulares, roles, eficacia y promedio colectivo usados para diagnosticar el partido</span>
+              <span>Seed {{ diagnostic.seed }} · titulares, roles, eficacia y promedio colectivo usados para diagnosticar el partido</span>
             </div>
             <div class="diagnostic-team-grid">
               <div class="diagnostic-team-card" *ngFor="let team of lineupDiagnosticTeams(diagnostic); trackBy: trackByLineupDiagnosticTeam">
                 <h3>{{ team.teamName }}</h3>
                 <p>
-                  {{ team.formation }} ? {{ team.style }} ? {{ team.starters }}/11
-                  ? OVR {{ team.avgOverall | number:'1.1-1' }}
-                  ? Colectivo {{ team.avgCollective | number:'1.1-1' }}
-                  ? Eff {{ team.avgEffectiveness | percent:'1.0-0' }}
+                  {{ team.formation }} · {{ team.style }} · {{ team.starters }}/11
+                  · OVR {{ team.avgOverall | number:'1.1-1' }}
+                  · Colectivo {{ team.avgCollective | number:'1.1-1' }}
+                  · Eff {{ team.avgEffectiveness | percent:'1.0-0' }}
                 </p>
                 <div *ngIf="team.width as width" class="width-diagnostic-card">
                   <div>
@@ -1427,7 +1427,7 @@ import {
                             {{ p.assignmentVerdict || 'Aceptable' }}
                           </span>
                           <br>
-                          <span class="diagnostic-muted">rol {{ p.roleBonus ?? 0 }} ? lado {{ p.sideBonus ?? 0 }}</span>
+                          <span class="diagnostic-muted">rol {{ p.roleBonus ?? 0 }} · lado {{ p.sideBonus ?? 0 }}</span>
                         </td>
                         <td class="diagnostic-read">{{ p.assignmentRead || '-' }}</td>
                         <td>{{ p.slotId || 'manual' }}</td>
@@ -1522,7 +1522,7 @@ import {
               </div>
             </div>
             <p class="panel-hint current-replay-starters">
-              {{ replay.starters.join(' ? ') }}
+              {{ replay.starters.join(' · ') }}
             </p>
           </div>
           <div *ngIf="currentLineupMultiSeedSummary() as summary" class="formation-matrix analysis-matrix current-lineup-replay">
@@ -1737,11 +1737,11 @@ import {
             </p>
             <p class="panel-hint current-replay-starters">
               Poss {{ fmtPct(swap.baseline.avgPossessionFor) }} -> {{ fmtPct(swap.swapped.avgPossessionFor) }}
-              ? Zonas C/B/L
+              · Zonas C/B/L
               {{ fmtXg(swap.baseline.avgCentralShotsFor) }}/{{ fmtXg(swap.baseline.avgWideShotsFor) }}/{{ fmtXg(swap.baseline.avgLongShotsFor) }}
               ->
               {{ fmtXg(swap.swapped.avgCentralShotsFor) }}/{{ fmtXg(swap.swapped.avgWideShotsFor) }}/{{ fmtXg(swap.swapped.avgLongShotsFor) }}
-              ? En contra
+              · En contra
               {{ fmtXg(swap.baseline.avgCentralShotsAgainst) }}/{{ fmtXg(swap.baseline.avgWideShotsAgainst) }}/{{ fmtXg(swap.baseline.avgLongShotsAgainst) }}
               ->
               {{ fmtXg(swap.swapped.avgCentralShotsAgainst) }}/{{ fmtXg(swap.swapped.avgWideShotsAgainst) }}/{{ fmtXg(swap.swapped.avgLongShotsAgainst) }}
@@ -1931,7 +1931,7 @@ import {
               </div>
               <div class="metric-card">
                 <span class="metric-label">Confidence</span>
-                <span class="metric-value">{{ battery.confidence }} ? {{ battery.precision }}</span>
+                <span class="metric-value">{{ battery.confidence }} · {{ battery.precision }}</span>
               </div>
             </div>
             <div class="table-scroll compact-position-table">
@@ -1988,7 +1988,7 @@ import {
           <div *ngIf="playerSwapPrecisionComparisonRows().length > 0" class="formation-matrix analysis-matrix current-lineup-replay">
             <div class="matrix-header">
               <strong>Comparacion precision cambio jugador</strong>
-              <span>Rapido 3 seeds vs Balanceado 10 seeds ? {{ playerSwapPrecisionComparisonRows().length }} swaps</span>
+              <span>Rápido 3 seeds vs Balanceado 10 seeds · {{ playerSwapPrecisionComparisonRows().length }} swaps</span>
             </div>
             <div class="table-scroll compact-position-table">
               <table>
@@ -2027,8 +2027,8 @@ import {
             <div class="matrix-header">
               <strong>Impacto rol-slot</strong>
               <span *ngIf="roleSlotImpactRows()[0] as first">
-                {{ first.baselinePlayerName }} ? slot {{ first.slotId }}
-                ? XY {{ first.slotXPercent }}/{{ first.slotYPercent }}
+                {{ first.baselinePlayerName }} · slot {{ first.slotId }}
+                · XY {{ first.slotXPercent }}/{{ first.slotYPercent }}
                 · seeds {{ first.seedStart }}..{{ first.seedEnd }}
               </span>
             </div>
@@ -2082,7 +2082,7 @@ import {
               <button type="button" class="matrix-export" (click)="copyRoleSlotImpactSmokeReport()">
                 Copy MD
               </button>
-              <span>{{ roleSlotImpactSmokeRows().length }} slots ? lectura rápida del XI</span>
+              <span>{{ roleSlotImpactSmokeRows().length }} slots · lectura rápida del XI</span>
             </div>
             <p class="panel-hint current-replay-starters">
               Semáforo: si el mejor rol tiene mucha ventaja contra el peor, el slot está leyendo rol/posición de forma clara.
@@ -2118,8 +2118,8 @@ import {
           </div>
           <div *ngIf="allFormationRoleSlotSmokeRows().length > 0" class="formation-matrix analysis-matrix current-lineup-replay">
             <div class="matrix-header">
-              <strong>Smoke roles-slot por formacion</strong>
-              <span>{{ allFormationRoleSlotSmokeRows().length }} formaciones ? roles por slot real</span>
+              <strong>Smoke roles-slot por formación</strong>
+              <span>{{ allFormationRoleSlotSmokeRows().length }} formaciones · roles por slot real</span>
               <button type="button" class="matrix-export" (click)="copyAllFormationsRoleSlotSmokeJson()">
                 Copiar JSON
               </button>
@@ -2521,7 +2521,7 @@ import {
               </div>
             </div>
             <div *ngIf="positionPixelMatchSmokeSummary().length > 1" class="matrix-scroll position-smoke-summary">
-              <div class="matrix-table position-smoke-table" role="table" aria-label="Smoke posicion multi-partido summary">
+              <div class="matrix-table position-smoke-table" role="table" aria-label="Smoke posición multi-partido summary">
                 <div class="matrix-row formation-matrix-row matrix-row-head" role="row">
                   <span role="columnheader">Match</span>
                   <span role="columnheader">Rows</span>
@@ -2620,7 +2620,7 @@ import {
               <label>
                 Sort
                 <select [ngModel]="positionPixelSortMode()" (ngModelChange)="setPositionPixelSortMode($event)">
-                  <option value="default">Orden de ejecucion</option>
+                  <option value="default">Orden de ejecución</option>
                   <option value="read-desc">Read priority</option>
                   <option value="impact-desc">Impact</option>
                   <option value="distance-desc">Movement distance</option>
@@ -2631,7 +2631,7 @@ import {
               </span>
             </div>
             <div class="matrix-scroll">
-              <div class="matrix-scroll-hint" aria-hidden="true">Scroll horizontal para ver lectura ofensiva/defensiva completa -></div>
+              <div class="matrix-scroll-hint" aria-hidden="true">Scroll horizontal para ver lectura ofensiva/defensiva completa →</div>
               <div class="matrix-table position-movement-table" role="table" aria-label="Position movement preset comparison">
                 <div class="matrix-row formation-matrix-row matrix-row-head" role="row">
                   <span role="columnheader">Player</span>
@@ -2761,7 +2761,7 @@ import {
               <strong>Formation averages</strong>
               <span>
                 Seeds {{ formationMatrixSummaryResults()[0].seedStart }}-{{ formationMatrixSummaryResults()[0].seedEnd }}
-                ? {{ formationMatrixSummaryResults()[0].seedCount }} corridas por formacion
+                · {{ formationMatrixSummaryResults()[0].seedCount }} corridas por formación
               </span>
             </div>
             <div *ngIf="formationCoachSummary() as coach" class="current-replay-grid" role="group" aria-label="Formation coach recommendations">
@@ -2769,25 +2769,25 @@ import {
                 <span>{{ coach.bestBalance.label }}</span>
                 <strong>{{ coach.bestBalance.formation }}</strong>
                 <small>{{ coach.bestBalance.identity }}</small>
-                <small [class]="coach.bestBalance.cssClass">{{ coach.bestBalance.read }} ? {{ coach.bestBalance.detail }}</small>
+                <small [class]="coach.bestBalance.cssClass">{{ coach.bestBalance.read }} · {{ coach.bestBalance.detail }}</small>
               </div>
               <div>
                 <span>{{ coach.bestAttack.label }}</span>
                 <strong>{{ coach.bestAttack.formation }}</strong>
                 <small>{{ coach.bestAttack.identity }}</small>
-                <small [class]="coach.bestAttack.cssClass">{{ coach.bestAttack.read }} ? {{ coach.bestAttack.detail }}</small>
+                <small [class]="coach.bestAttack.cssClass">{{ coach.bestAttack.read }} · {{ coach.bestAttack.detail }}</small>
               </div>
               <div>
                 <span>{{ coach.safest.label }}</span>
                 <strong>{{ coach.safest.formation }}</strong>
                 <small>{{ coach.safest.identity }}</small>
-                <small [class]="coach.safest.cssClass">{{ coach.safest.read }} ? {{ coach.safest.detail }}</small>
+                <small [class]="coach.safest.cssClass">{{ coach.safest.read }} · {{ coach.safest.detail }}</small>
               </div>
               <div>
                 <span>{{ coach.avoid.label }}</span>
                 <strong>{{ coach.avoid.formation }}</strong>
                 <small>{{ coach.avoid.identity }}</small>
-                <small [class]="coach.avoid.cssClass">{{ coach.avoid.read }} ? {{ coach.avoid.detail }}</small>
+                <small [class]="coach.avoid.cssClass">{{ coach.avoid.read }} · {{ coach.avoid.detail }}</small>
               </div>
             </div>
             <div class="matrix-scroll">
@@ -2896,7 +2896,7 @@ import {
             <div class="matrix-header">
               <strong>Lab bloque bajo 5-4-1</strong>
               <span>
-                Segunda línea alta / base / baja ? {{ lowBlockLabRows()[0].seedCount }} seeds
+                Segunda línea alta / base / baja · {{ lowBlockLabRows()[0].seedCount }} seeds
               </span>
             </div>
             <p class="panel-hint">
@@ -2943,7 +2943,7 @@ import {
                     <small>{{ signed(row.deltaPossessionFor) }}</small>
                   </span>
                   <span role="cell">
-                    C {{ row.avgCentralShotsAgainst | number:'1.1-1' }} ? B {{ row.avgWideShotsAgainst | number:'1.1-1' }}
+                    C {{ row.avgCentralShotsAgainst | number:'1.1-1' }} · B {{ row.avgWideShotsAgainst | number:'1.1-1' }}
                   </span>
                 </div>
               </div>
@@ -2952,7 +2952,7 @@ import {
           <div *ngIf="backFiveTransitionLabRows().length > 0" class="formation-matrix analysis-matrix">
             <div class="matrix-header">
               <strong>Lab transicion 5-3-2</strong>
-              <span>Carrileros bajos / base / altos ? {{ backFiveTransitionLabRows()[0].seedCount }} seeds</span>
+              <span>Carrileros bajos / base / altos · {{ backFiveTransitionLabRows()[0].seedCount }} seeds</span>
             </div>
             <p class="panel-hint">
               Compara el mismo partido y los mismos jugadores: solo cambia la altura visual de los carrileros del 5-3-2.
@@ -2993,8 +2993,8 @@ import {
             <div class="matrix-header">
               <strong>Línea de 5 family lab</strong>
               <span>
-                5-4-1 / 5-3-2 / 3-5-2 ? {{ backFiveFamilyLabRows()[0].seedCount }} seeds
-                <ng-container *ngIf="backFiveFamilyLabScope() as scope"> ? {{ scope }}</ng-container>
+                5-4-1 / 5-3-2 / 3-5-2 · {{ backFiveFamilyLabRows()[0].seedCount }} seeds
+                <ng-container *ngIf="backFiveFamilyLabScope() as scope"> · {{ scope }}</ng-container>
               </span>
             </div>
             <p class="panel-hint">
@@ -3021,7 +3021,7 @@ import {
                 >
                   <span role="cell">
                     <strong>{{ row.label }}</strong>
-                    <small>{{ row.formation }} ? {{ row.visualPlan }}</small>
+                    <small>{{ row.formation }} · {{ row.visualPlan }}</small>
                   </span>
                   <span role="cell" [class]="row.className">{{ row.read }}</span>
                   <span role="cell">{{ row.avgXgFor | number:'1.2-2' }} <small>{{ signed(row.deltaXgFor) }}</small></span>
@@ -3040,7 +3040,7 @@ import {
               <strong>Línea de 5 context smoke</strong>
               <span>
                 {{ backFiveContextSmokeRows().length }} lecturas ?
-                {{ backFiveContextSmokeRows()[0].seedCount }} seeds ? local/visitante
+                {{ backFiveContextSmokeRows()[0].seedCount }} seeds · local/visitante
               </span>
             </div>
             <p class="panel-hint">
@@ -3104,7 +3104,7 @@ import {
                 >
                   <span role="cell">
                     <strong>{{ row.controlledTeamName }}</strong>
-                    <small>{{ row.controlledSide === 'HOME' ? 'local' : 'visitante' }} ? {{ row.matchLabel }}</small>
+                    <small>{{ row.controlledSide === 'HOME' ? 'local' : 'visitante' }} · {{ row.matchLabel }}</small>
                   </span>
                   <span role="cell" [class]="row.className">{{ row.read }}</span>
                   <span role="cell">{{ row.bestPlan }} <small>{{ signed(row.bestXgDiff) }}</small></span>
@@ -3225,7 +3225,7 @@ import {
           <div *ngIf="sideMirrorDecisionRows().length > 0" class="formation-matrix analysis-matrix">
             <div class="matrix-header">
               <strong>Mirror decision: sintético vs real</strong>
-              <span>Control sano contra partido real ? decide si tocar motor o revisar DT/plantel</span>
+              <span>Control sano contra partido real · decide si tocar motor o revisar DT/plantel</span>
             </div>
             <div *ngIf="sideMirrorDecisionSummary() as summary" class="coach-pick-grid">
               <article class="coach-pick-card">
@@ -3273,7 +3273,7 @@ import {
           <div *ngIf="scenarioMatrixResults().length > 0" class="formation-matrix analysis-matrix scenario-matrix">
             <div class="matrix-header">
               <strong>Matriz escenarios</strong>
-              <span>Mismo partido + seed {{ seedInputModel ?? 'auto' }} ? cambios tacticos en vivo</span>
+              <span>Mismo partido + seed {{ seedInputModel ?? 'auto' }} · cambios tácticos en vivo</span>
               <button type="button" class="matrix-export" (click)="copyScenarioMatrixJson()">
                 Copiar JSON
               </button>
@@ -3406,7 +3406,7 @@ import {
                   <option value="read-desc">Read priority</option>
                   <option value="impact-desc">Impact</option>
                   <option value="xg-desc">xG movement</option>
-                  <option value="default">Orden de ejecucion</option>
+                  <option value="default">Orden de ejecución</option>
                 </select>
               </label>
               <span class="position-read-count">
@@ -5322,9 +5322,9 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           ? substitutionSummary.deltaXgAgainst < -0.001 || substitutionSummary.deltaShotsAgainst < -0.01
           : substitutionSignal;
     const substitutionObserved = substitutionSummary
-      ? `${substitutionSummary.playerOffName} -> ${substitutionSummary.playerOnName} min ${substitutionSummary.minute} ? dXG ${this.fmtDeltaNumber(substitutionSummary.deltaXgFor)} ? dShots ${this.fmtDeltaNumber(substitutionSummary.deltaShotsFor)}`
+      ? `${substitutionSummary.playerOffName} → ${substitutionSummary.playerOnName} min ${substitutionSummary.minute} · dXG ${this.fmtDeltaNumber(substitutionSummary.deltaXgFor)} · dShots ${this.fmtDeltaNumber(substitutionSummary.deltaShotsFor)}`
       : hasSubstitutionTiming
-        ? `${substitutionTimingRows[0].playerOffName} -> ${substitutionTimingRows[0].playerOnName} min ${substitutionTimingRows.map((row) => `${row.minute}'`).join('/')} ? ${substitutionTimingSignalRows}/${substitutionTimingRows.length} con señal`
+        ? `${substitutionTimingRows[0].playerOffName} → ${substitutionTimingRows[0].playerOnName} min ${substitutionTimingRows.map((row) => `${row.minute}'`).join('/')} · ${substitutionTimingSignalRows}/${substitutionTimingRows.length} con señal`
         : 'Not run yet';
     return [
       {
@@ -5365,7 +5365,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           : 'Not run yet',
         verdict: !hasPixelEvidence ? 'Pending' : hasVisiblePixelSignal ? 'OK' : pixelEvidenceNote ? 'Review' : 'Review',
         next: !hasPixelEvidence
-          ? 'Run Matriz presets posicion or line smokes.'
+          ? 'Run Matriz presets posición or line smokes.'
           : pixelEvidenceNote && !hasVisiblePixelSignal
             ? pixelEvidenceNote
             : pixelVisibleRows > 0 || pixelVisibleFivePxRows > 0 || pixelBigTacticalMoveRows > 0
@@ -5373,7 +5373,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
             : pixelMeasurableSmoothRows > 0
               ? 'Smooth low-block signal: keep as valid unless tuning needs more weight.'
             : pixelRowsAreMicroOnly
-              ? 'Micro movements are stable; run Matriz presets posicion for larger tactical moves.'
+              ? 'Micro movements are stable; run Matriz presets posición for larger tactical moves.'
               : 'Increase seeds or inspect engine sensitivity.',
       },
         {
@@ -6508,7 +6508,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   downloadScenarioBatteryCsv(): void {
     const rows = this.scenarioBatteryRows().map((row) => this.scenarioBatteryExportRow(row));
     if (rows.length === 0) {
-      this.snackBar.open('Run Tablero bateria first.', 'OK', { duration: 2500 });
+      this.snackBar.open('Run Tablero batería first.', 'OK', { duration: 2500 });
       return;
     }
     const header = [
@@ -7275,7 +7275,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     if (starterLine === expected.starterLine && benchLine === expected.benchLine) {
       return base;
     }
-    return `${base} ? fallback ${starterLine}->${benchLine}`;
+      return `${base} · fallback ${starterLine}→${benchLine}`;
   }
   private playerSwapEstresExpectedLines(testCase: string): { starterLine: 'ATT' | 'MID' | 'DEF'; benchLine: 'ATT' | 'MID' | 'DEF' } | null {
     if (testCase.includes('atacante por defensor')) return { starterLine: 'ATT', benchLine: 'DEF' };
@@ -9703,7 +9703,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         }
         this.snackBar.open(
           summary
-            ? `Probar recomendaci?n modal: ${summary.playerOffName} -> ${summary.playerOnName}, ${this.playerSwapCoachObjectiveRead()}.`
+            ? `Probar recomendación modal: ${summary.playerOffName} → ${summary.playerOnName}, ${this.playerSwapCoachObjectiveRead()}.`
             : 'Probar recomendaci?n modal completed with insufficient samples.',
           'OK',
           { duration: 4500 }
@@ -9856,7 +9856,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         this.analysisReadyMessage.set(
           this.fmtError(err, 'Batería cambio jugador falló antes de generar Panel E')
         );
-        this.snackBar.open(this.fmtError(err, 'No se pudo correr bateria de cambio de jugador'), 'OK', { duration: 5000 });
+        this.snackBar.open(this.fmtError(err, 'No se pudo correr batería de cambio de jugador'), 'OK', { duration: 5000 });
         this.refreshLineupContext();
       },
       complete: () => {
@@ -10057,7 +10057,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     this.runPositionPixelMatrixWithPresets(
       seedCount,
       (fromX, fromY) => this.positionMovementPresets(fromX, fromY),
-      'Matriz presets posicion'
+      'Matriz presets posición'
     );
   }
   onRunManualShapeVsPresetSmoke(): void {
@@ -10344,7 +10344,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
             {
               index: 2,
               playerId: modalMove.playerId,
-              name: `${modalMove.playerName} (despues)`,
+              name: `${modalMove.playerName} (después)`,
               position: modalMove.playerPosition ?? modalMove.playerRole ?? '?',
               slotId: modalMove.slotId ?? row.slotId,
               x: modalMove.targetXPercent,
@@ -10520,8 +10520,8 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const runScope = (index: number): void => {
       const scope = scopes[index];
       if (!scope) {
-        this.snackBar.open('Tablero completo posicion complete.', 'OK', { duration: 4500 });
-        this.markReplayAnalysisReady('Tablero completo posicion listo en Panel E.');
+        this.snackBar.open('Tablero completo posición complete.', 'OK', { duration: 4500 });
+        this.markReplayAnalysisReady('Tablero completo posición listo en Panel E.');
         return;
       }
       if (scope === 'ALL') {
@@ -10539,7 +10539,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
               '5px center deeper',
               'big zone cross',
             ].includes(preset.label)),
-          'Full board ? ALL',
+      'Full board · ALL',
           matches,
           null,
           null,
@@ -10553,7 +10553,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         seedCount,
         (fromX, fromY) => this.positionMovementPresets(fromX, fromY)
           .filter((preset) => ['5px forward', '5px deeper', '5px wide', '5px center'].includes(preset.label)),
-        `Full board ? ${scope}`,
+      `Full board · ${scope}`,
         matches,
         (lineup) => this.pickPositionPixelLineCandidates(lineup, scope, 6),
         scope,
@@ -10751,10 +10751,10 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       line,
       candidates: candidates.length,
       expectedRows,
-      players: candidates.map((candidate) => `${candidate.starterName} (${candidate.starterPosition})`).join(' ? '),
-      slotRoles: candidates.map((candidate) => slotRolesByPlayer.get(candidate.starterId) ?? '?').join(' ? '),
+      players: candidates.map((candidate) => `${candidate.starterName} (${candidate.starterPosition})`).join(' · '),
+      slotRoles: candidates.map((candidate) => slotRolesByPlayer.get(candidate.starterId) ?? '?').join(' · '),
       verdict,
-      warnings: warnings.join(' ? '),
+      warnings: warnings.join(' · '),
     };
   }
   private tacticalRoleFromVisualLine(line: 'DEF' | 'MID' | 'ATT'): string {
@@ -10958,7 +10958,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         this.positionPixelMatrixSummary.set(this.pickPositionPixelHeadlineRow(rows));
         this.positionPixelEvidenceNote.set(rows.length > 0
           ? (mapErrors.length > 0 ? `${label}: filas parciales. ${responseDiagnostics} ${mapErrors[0]}` : null)
-          : `${label}: sin filas utiles. ${lastPixelRunDiagnostics} ${responseDiagnostics} ${mapErrors[0] ?? errorItems[0]?.error ?? 'El motor/interceptor no devolvio cuerpo usable.'}`);
+          : `${label}: sin filas útiles. ${lastPixelRunDiagnostics} ${responseDiagnostics} ${mapErrors[0] ?? errorItems[0]?.error ?? 'El motor/interceptor no devolvió cuerpo usable.'}`);
         if (smokeScope) {
           this.recordPositionPixelSmokeRun(smokeScope, label, rows);
         }
@@ -10988,7 +10988,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           this.markReplayAnalysisReady(`${label} listo en Panel E.`);
         } else {
           const note = this.positionPixelEvidenceNote()
-            ?? `${label} termin? sin filas. ${lastPixelRunDiagnostics} Revisar candidatos, slots, partido seleccionado y presets.`;
+            ?? `${label} terminó sin filas. ${lastPixelRunDiagnostics} Revisar candidatos, slots, partido seleccionado y presets.`;
           this.positionPixelEvidenceNote.set(note);
           this.analysisReadyMessage.set(note);
           window.setTimeout(() => this.scrollToReplayAnalysis(), 0);
@@ -11045,7 +11045,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   private calibrationLabel(match: TestHarnessMatchRow, presetLabel: string): string {
     const team = this.userTeamName();
     const opponent = team && match.homeTeamName === team ? match.awayTeamName : match.homeTeamName;
-    return `R${match.round} vs ${opponent} ? ${presetLabel}`;
+    return `R${match.round} vs ${opponent} · ${presetLabel}`;
   }
   /**
    * V24D24.2: simulate the selected round (Panel B dropdown). Extracts the
@@ -11201,7 +11201,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       `${attackShape}; ${defenseShape}`,
       attackChannels,
       defenseChannels,
-    ].join(' ? ');
+    ].join(' · ');
   }
   private toFormationCoachPick(label: string, row: FormationMatrixSummaryRow): FormationCoachPick {
     const bestOfBad = this.formationPickIsBestOfBad(row);
@@ -11216,7 +11216,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       `diff ${this.fmtDeltaNumber(row.avgXgDiff)}`,
       `tiros ${this.fmtXg(row.avgShotsFor)} / ${this.fmtXg(row.avgShotsAgainst)}`,
       `posesion ${this.fmtPct(row.avgPossessionFor)}`,
-    ].join(' ? ');
+    ].join(' · ');
     return {
       label: displayLabel,
       formation: row.formation,
@@ -11372,7 +11372,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       const player = playerById.get(slot.playerId);
       return {
         slotId: slot.subdivisionId,
-        label: `${slot.subdivisionId} ? ${player?.name ?? slot.playerId} (${player?.position ?? '?'})`,
+        label: `${slot.subdivisionId} · ${player?.name ?? slot.playerId} (${player?.position ?? '?'})`,
       };
     });
   }
@@ -11629,7 +11629,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       case 'Pixel no-cliff rule':
         return 'Correr chequeo sensibilidad';
       case 'Señal cambio jugador':
-        return 'Correr bateria de cambio jugador';
+        return 'Correr batería de cambio jugador';
       default:
         return 'Sin acción directa';
     }
@@ -15740,7 +15740,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           this.markReplayAnalysisReady(readyMessage);
         } else {
           this.analysisReadyMessage.set(
-            `${label} no devolvio escenarios para Panel E. Verifica que el partido siga seleccionado y que el grupo tenga escenarios.`
+            `${label} no devolvió escenarios para Panel E. Verificá que el partido siga seleccionado y que el grupo tenga escenarios.`
           );
         }
       },
@@ -16074,8 +16074,8 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     ).subscribe({
       next: () => {
         this.handleLabMutationSuccess();
-        this.analysisReadyMessage.set(`DEF fallback lab listo: ${this.defensiveFallbackLabRead ?? 'corr? XI efectivo para ver fallback defensivo.'}`);
-        this.snackBar.open('DEF fallback lab preparado. Corr? XI efectivo.', 'OK', { duration: 4500 });
+        this.analysisReadyMessage.set(`DEF fallback lab listo: ${this.defensiveFallbackLabRead ?? 'corré XI efectivo para ver fallback defensivo.'}`);
+        this.snackBar.open('DEF fallback lab preparado. Corré XI efectivo.', 'OK', { duration: 4500 });
       },
       error: (err) => {
         this.mutationInFlight.set(false);
@@ -16122,7 +16122,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       error: (err) => {
         this.mutationInFlight.set(false);
         this.analysisReadyMessage.set(
-          this.fmtError(err, 'Smoke completo de cambios fallo antes de generar Panel E')
+          this.fmtError(err, 'Smoke completo de cambios falló antes de generar Panel E')
         );
         this.snackBar.open(this.fmtError(err, 'No se pudo correr smoke completo de cambios'), 'OK', { duration: 5000 });
         this.refreshLineupContext();
@@ -16172,7 +16172,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const originalSlots = this.buildLineupSlots(lineup);
     const originalPlayerIds = this.lineupPlayerIdsFromSlots(originalSlots);
     if (originalSlots.length !== 11 || originalPlayerIds.length !== 11) {
-      throw new Error(`DEF fallback lab necesita 11 slots actuales, tiene ${originalSlots.length}. Corr? auto-select primero.`);
+      throw new Error(`DEF fallback lab necesita 11 slots actuales, tiene ${originalSlots.length}. Corré auto-select primero.`);
     }
     const players = lineup.players ?? [];
     const playerById = new Map(players.map((player) => [player.playerId, player]));
@@ -16188,7 +16188,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       .sort((a, b) => this.defensiveFallbackTargetPriority(a.role, a.slot.subdivisionId) - this.defensiveFallbackTargetPriority(b.role, b.slot.subdivisionId));
     const defensiveSlot = defensiveSlots[0]?.slot ?? originalSlots.find((slot) => this.isDefensiveFallbackTargetSlot(slot.subdivisionId, formation));
     if (!defensiveSlot) {
-      throw new Error('DEF fallback lab no encontr? slot defensivo CB/LB/RB para forzar.');
+      throw new Error('DEF fallback lab no encontró slot defensivo CB/LB/RB para forzar.');
     }
     const attackingOrMidSlot = originalSlots
       .map((slot) => {
@@ -16204,7 +16204,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       })
       .sort((a, b) => a.priority - b.priority)[0]?.slot;
     if (!attackingOrMidSlot) {
-      throw new Error('DEF fallback lab no encontr? un titular no-defensivo para mover a defensa.');
+      throw new Error('DEF fallback lab no encontró un titular no-defensivo para mover a defensa.');
     }
     const targetPlayerId = attackingOrMidSlot.playerId;
     const displacedDefenderId = defensiveSlot.playerId;
@@ -16230,7 +16230,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         slots: originalSlots,
       },
       read: `${targetPlayer?.name ?? targetPlayerId} (${targetPlayer?.position ?? '?'}) -> ${defensiveRole} ${defensiveSlot.subdivisionId}; `
-        + `${displacedPlayer?.name ?? displacedDefenderId} vuelve a ${attackingOrMidSlot.subdivisionId}. Corr? XI efectivo para ver fallback defensivo.`,
+        + `${displacedPlayer?.name ?? displacedDefenderId} vuelve a ${attackingOrMidSlot.subdivisionId}. Corré XI efectivo para ver fallback defensivo.`,
     };
   }
   private defensiveFallbackTargetPriority(role: string, subdivisionId: string | null | undefined): number {
@@ -16317,7 +16317,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     this.analysisReadyMessage.set(
       match.homeTeamName === teamName || match.awayTeamName === teamName
         ? `Panel E preparado para ${matchName}. Corre un smoke/matriz para generar una lectura nueva.`
-        : `Panel E preparado para ${matchName}. Controlar quedo en Local; podes correr smokes multi-seed para este partido.`
+        : `Panel E preparado para ${matchName}. Controlar quedó en Local; podés correr smokes multi-seed para este partido.`
     );
   }
   // ============== Internal helpers ==============
@@ -16619,7 +16619,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         playerName: player.name,
         position: player.position,
         slotId: slotByPlayer.get(player.playerId) ?? '',
-        label: `${player.name} (${player.position}) ? ${slotByPlayer.get(player.playerId) ?? 'slot'}`,
+        label: `${player.name} (${player.position}) · ${slotByPlayer.get(player.playerId) ?? 'slot'}`,
       }));
     const benchOptions = squad
       .filter((player) => !lineupIds.has(player.sessionPlayerId) && !player.injured && !player.suspended && player.position !== 'GK')
@@ -16628,7 +16628,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         playerName: player.name,
         position: player.position,
         score: player.attack + player.technique + player.speed,
-        label: `${player.name} (${player.position}) ? atk ${player.attack} ? tech ${player.technique} ? pace ${player.speed}`,
+        label: `${player.name} (${player.position}) · atk ${player.attack} · tech ${player.technique} · pace ${player.speed}`,
       }))
       .sort((a, b) => b.score - a.score);
     this.playerSwapSlotOptions.set(slotOptions);
