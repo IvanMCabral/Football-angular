@@ -110,8 +110,207 @@ export interface TestHarnessMatchRow {
    * by the backend. All matches in the same round share the same roundId.
    * The "Simulate round N" button POSTs this roundId to
    * `/api/v1/match-engine/rounds/start`.
-   */
+  */
   roundId?: string | null;
+}
+
+export interface RoundGroup {
+  round: number;
+  byeTeam: string | null;
+  matches: TestHarnessMatchRow[];
+}
+
+export interface TestHarnessSnapshotFixture {
+  matchId: string;
+  homeTeamId: string;
+  awayTeamId: string;
+  round: number;
+  status: 'PENDING' | 'SIMULATING' | 'COMPLETED' | string;
+  homeGoals?: number | null;
+  awayGoals?: number | null;
+  homeTeamName?: string | null;
+  awayTeamName?: string | null;
+  roundId?: string | null;
+}
+
+export interface TestHarnessSnapshotResponse {
+  fixtures?: TestHarnessSnapshotFixture[] | null;
+  squadHealthSummary?: TestHarnessSquadHealthSummary | null;
+}
+
+export interface TestHarnessSquadHealthSummary {
+  squadSize?: number | null;
+  injuredCount?: number | null;
+  suspendedCount?: number | null;
+  yellowCardsCount?: number | null;
+  redCardsCount?: number | null;
+}
+
+export interface FocusedWideBatteryRow {
+  formation: string;
+  style: TeamStyle;
+  styleLabel: string;
+  seedStart: number;
+  seedEnd: number;
+  seedCount: number;
+  avgXgFor: number;
+  avgXgAgainst: number;
+  avgXgDiff: number;
+  avgShotsFor: number;
+  avgShotsAgainst: number;
+  avgWideShotsFor: number;
+  avgCentralShotsFor: number;
+  wideShare: number;
+  deltaXgFor: number;
+  deltaWideShotsFor: number;
+  deltaWideShare: number;
+  read: string;
+  className: string;
+}
+
+export interface FormationReplayResult {
+  formation: FormationCode;
+  homeGoals: number | null;
+  awayGoals: number | null;
+  homePossession: number | null;
+  awayPossession: number | null;
+  homeShots: number | null;
+  awayShots: number | null;
+  homeXg: number | null;
+  awayXg: number | null;
+  homeCentralShots: number;
+  homeWideShots: number;
+  homeLongShots: number;
+  awayCentralShots: number;
+  awayWideShots: number;
+  awayLongShots: number;
+}
+
+export interface CurrentLineupReplayResult {
+  label: string;
+  formation: string | null;
+  seed: number | null;
+  style: TeamStyle;
+  playerCount: number;
+  starters: string[];
+  score: string;
+  possession: string;
+  shots: string;
+  xg: string;
+  zones: string;
+  timestamp: string;
+}
+
+export interface CurrentLineupMultiSeedSummary {
+  label: string;
+  formation: string | null;
+  style: TeamStyle;
+  seedStart: number;
+  seedEnd: number;
+  seedCount: number;
+  playerCount: number;
+  starters: string[];
+  avgGoalsFor: number;
+  avgGoalsAgainst: number;
+  avgGoalDiff: number;
+  avgPossessionFor: number;
+  avgShotsFor: number;
+  avgShotsAgainst: number;
+  avgShotDiff: number;
+  avgXgFor: number;
+  avgXgAgainst: number;
+  avgXgDiff: number;
+  avgCentralShotsFor: number;
+  avgWideShotsFor: number;
+  avgLongShotsFor: number;
+  avgCentralShotsAgainst: number;
+  avgWideShotsAgainst: number;
+  avgLongShotsAgainst: number;
+  timestamp: string;
+}
+
+export interface LowBlockLabRow {
+  variant: 'high' | 'base' | 'low';
+  label: string;
+  secondLineY: number;
+  formation: string | null;
+  seedStart: number;
+  seedCount: number;
+  avgXgFor: number;
+  avgXgAgainst: number;
+  avgXgDiff: number;
+  avgShotsFor: number;
+  avgShotsAgainst: number;
+  avgPossessionFor: number;
+  avgWideShotsAgainst: number;
+  avgCentralShotsAgainst: number;
+  deltaXgFor: number;
+  deltaXgAgainst: number;
+  deltaXgDiff: number;
+  deltaShotsAgainst: number;
+  deltaPossessionFor: number;
+  read: string;
+  className: string;
+}
+
+export interface BackFiveTransitionLabRow {
+  variant: 'low' | 'base' | 'high';
+  label: string;
+  wingbackY: number;
+  formation: string | null;
+  seedStart: number;
+  seedCount: number;
+  avgXgFor: number;
+  avgXgAgainst: number;
+  avgXgDiff: number;
+  avgShotsFor: number;
+  avgShotsAgainst: number;
+  avgPossessionFor: number;
+  avgWideShotsFor: number;
+  avgWideShotsAgainst: number;
+  avgCentralShotsAgainst: number;
+  deltaXgFor: number;
+  deltaXgAgainst: number;
+  deltaXgDiff: number;
+  deltaWideShotsFor: number;
+  deltaWideShotsAgainst: number;
+  read: string;
+  className: string;
+}
+
+export interface ModalVsCanonicalSummary {
+  label: string;
+  formation: string | null;
+  style: TeamStyle;
+  seedStart: number;
+  seedEnd: number;
+  seedCount: number;
+  customSlotCount: number;
+  customMovableSlotCount: number;
+  movedPlayers: string[];
+  engineImpactLabel: string;
+  engineImpactDetail: string;
+  canonical: CurrentLineupMultiSeedSummary;
+  modal: CurrentLineupMultiSeedSummary;
+  deltaGoalsFor: number;
+  deltaGoalsAgainst: number;
+  deltaGoalDiff: number;
+  deltaPossessionFor: number;
+  deltaShotsFor: number;
+  deltaShotsAgainst: number;
+  deltaShotDiff: number;
+  deltaXgFor: number;
+  deltaXgAgainst: number;
+  deltaXgDiff: number;
+  deltaCentralShotsFor: number;
+  deltaWideShotsFor: number;
+  deltaLongShotsFor: number;
+  deltaCentralShotsAgainst: number;
+  deltaWideShotsAgainst: number;
+  deltaLongShotsAgainst: number;
+  coachRead: string;
+  coachReadClass: string;
+  timestamp: string;
 }
 
 /**

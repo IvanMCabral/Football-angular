@@ -33,216 +33,46 @@ import { LineupSlotDTO } from '../../../shared/models/lineup/lineup-slot.dto';
 import { FormationDTO } from '../../../shared/models/lineup/formation.dto';
 import {
   FORMATION_CODES,
+  BackFiveTransitionLabRow,
   CustomFixture,
+  CurrentLineupMultiSeedSummary,
+  CurrentLineupReplayResult,
+  FocusedWideBatteryRow,
   FormationCode,
   FormationMatrixRow,
   FormationMatrixSummaryRow,
+  FormationReplayResult,
   LabMutationResult,
   LineupDiagnostic,
   LineupDiagnosticPlayer,
   LineupDiagnosticTeam,
+  LowBlockLabRow,
   MatchFixture,
   MatchPreviewSummary,
+  ModalVsCanonicalSummary,
   PlayerSwapMatrixSummaryRow,
   PositionPixelMatrixSummaryRow,
   RoleSlotImpactSummaryRow,
+  RoundGroup,
   ScenarioMatrixRow,
   ScenarioMatrixSummaryRow,
   SideMirrorSyntheticLabRow,
   SubstitutionWhatIfSummaryRow,
   TestHarnessMatchRow,
+  TestHarnessSquadHealthSummary,
+  TestHarnessSnapshotFixture,
+  TestHarnessSnapshotResponse,
   TeamStyle,
 } from '../models/test-harness.model';
 import { TestHarnessService } from '../services/test-harness.service';
-interface RoundGroup {
-  round: number;
-  byeTeam: string | null;
-  matches: TestHarnessMatchRow[];
-}
-interface TestHarnessSnapshotFixture {
-  matchId: string;
-  homeTeamId: string;
-  awayTeamId: string;
-  round: number;
-  status: 'PENDING' | 'SIMULATING' | 'COMPLETED' | string;
-  homeGoals?: number | null;
-  awayGoals?: number | null;
-  homeTeamName?: string | null;
-  awayTeamName?: string | null;
-  roundId?: string | null;
-}
-interface TestHarnessSnapshotResponse {
-  fixtures?: TestHarnessSnapshotFixture[] | null;
-  squadHealthSummary?: TestHarnessSquadHealthSummary | null;
-}
-interface TestHarnessSquadHealthSummary {
-  squadSize?: number | null;
-  injuredCount?: number | null;
-  suspendedCount?: number | null;
-  yellowCardsCount?: number | null;
-  redCardsCount?: number | null;
-}
-
-interface FocusedWideBatteryRow {
-  formation: string;
-  style: TeamStyle;
-  styleLabel: string;
-  seedStart: number;
-  seedEnd: number;
-  seedCount: number;
-  avgXgFor: number;
-  avgXgAgainst: number;
-  avgXgDiff: number;
-  avgShotsFor: number;
-  avgShotsAgainst: number;
-  avgWideShotsFor: number;
-  avgCentralShotsFor: number;
-  wideShare: number;
-  deltaXgFor: number;
-  deltaWideShotsFor: number;
-  deltaWideShare: number;
-  read: string;
-  className: string;
-}
-interface FormationReplayResult {
-  formation: FormationCode;
-  homeGoals: number | null;
-  awayGoals: number | null;
-  homePossession: number | null;
-  awayPossession: number | null;
-  homeShots: number | null;
-  awayShots: number | null;
-  homeXg: number | null;
-  awayXg: number | null;
-  homeCentralShots: number;
-  homeWideShots: number;
-  homeLongShots: number;
-  awayCentralShots: number;
-  awayWideShots: number;
-  awayLongShots: number;
-}
-interface CurrentLineupReplayResult {
-  label: string;
-  formation: string | null;
-  seed: number | null;
-  style: TeamStyle;
-  playerCount: number;
-  starters: string[];
-  score: string;
-  possession: string;
-  shots: string;
-  xg: string;
-  zones: string;
-  timestamp: string;
-}
-interface CurrentLineupMultiSeedSummary {
-  label: string;
-  formation: string | null;
-  style: TeamStyle;
-  seedStart: number;
-  seedEnd: number;
-  seedCount: number;
-  playerCount: number;
-  starters: string[];
-  avgGoalsFor: number;
-  avgGoalsAgainst: number;
-  avgGoalDiff: number;
-  avgPossessionFor: number;
-  avgShotsFor: number;
-  avgShotsAgainst: number;
-  avgShotDiff: number;
-  avgXgFor: number;
-  avgXgAgainst: number;
-  avgXgDiff: number;
-  avgCentralShotsFor: number;
-  avgWideShotsFor: number;
-  avgLongShotsFor: number;
-  avgCentralShotsAgainst: number;
-  avgWideShotsAgainst: number;
-  avgLongShotsAgainst: number;
-  timestamp: string;
-}
-interface LowBlockLabRow {
-  variant: 'high' | 'base' | 'low';
-  label: string;
-  secondLineY: number;
-  formation: string | null;
-  seedStart: number;
-  seedCount: number;
-  avgXgFor: number;
-  avgXgAgainst: number;
-  avgXgDiff: number;
-  avgShotsFor: number;
-  avgShotsAgainst: number;
-  avgPossessionFor: number;
-  avgWideShotsAgainst: number;
-  avgCentralShotsAgainst: number;
-  deltaXgFor: number;
-  deltaXgAgainst: number;
-  deltaXgDiff: number;
-  deltaShotsAgainst: number;
-  deltaPossessionFor: number;
-  read: string;
-  className: string;
-}
-interface BackFiveTransitionLabRow {
-  variant: 'low' | 'base' | 'high';
-  label: string;
-  wingbackY: number;
-  formation: string | null;
-  seedStart: number;
-  seedCount: number;
-  avgXgFor: number;
-  avgXgAgainst: number;
-  avgXgDiff: number;
-  avgShotsFor: number;
-  avgShotsAgainst: number;
-  avgPossessionFor: number;
-  avgWideShotsFor: number;
-  avgWideShotsAgainst: number;
-  avgCentralShotsAgainst: number;
-  deltaXgFor: number;
-  deltaXgAgainst: number;
-  deltaXgDiff: number;
-  deltaWideShotsFor: number;
-  deltaWideShotsAgainst: number;
-  read: string;
-  className: string;
-}
-interface ModalVsCanonicalSummary {
-  label: string;
-  formation: string | null;
-  style: TeamStyle;
-  seedStart: number;
-  seedEnd: number;
-  seedCount: number;
-  customSlotCount: number;
-  customMovableSlotCount: number;
-  movedPlayers: string[];
-  engineImpactLabel: string;
-  engineImpactDetail: string;
-  canonical: CurrentLineupMultiSeedSummary;
-  modal: CurrentLineupMultiSeedSummary;
-  deltaGoalsFor: number;
-  deltaGoalsAgainst: number;
-  deltaGoalDiff: number;
-  deltaPossessionFor: number;
-  deltaShotsFor: number;
-  deltaShotsAgainst: number;
-  deltaShotDiff: number;
-  deltaXgFor: number;
-  deltaXgAgainst: number;
-  deltaXgDiff: number;
-  deltaCentralShotsFor: number;
-  deltaWideShotsFor: number;
-  deltaLongShotsFor: number;
-  deltaCentralShotsAgainst: number;
-  deltaWideShotsAgainst: number;
-  deltaLongShotsAgainst: number;
-  coachRead: string;
-  coachReadClass: string;
-  timestamp: string;
-}
+import {
+  CURRENT_LINEUP_MULTI_SEED_COUNT,
+  CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS,
+  DEFAULT_REPLAY_SEED,
+  TIMELINE_DEBOUNCE_MS,
+  TIMELINE_MAX_MINUTE,
+  TIMELINE_STEP,
+} from './test-harness.constants';
 interface FormationCoachPick {
   label: string;
   formation: string;
@@ -859,17 +689,6 @@ interface TeamStyleOption {
   label: string;
   hint: string;
 }
-const TIMELINE_DEBOUNCE_MS = 150;
-const TIMELINE_MAX_MINUTE = 90;
-const TIMELINE_STEP = 5;
-/**
- * V24D24.2: Default seed for the "Repetir con seed" button. Same number as
- * the regression-test baseline so Iván can reproduce a known result with
- * one click. The user is free to override.
- */
-const DEFAULT_REPLAY_SEED = 12345;
-const CURRENT_LINEUP_MULTI_SEED_COUNT = 5;
-const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
 /**
  * V24D24: Test-Harness UI page (4-panel layout).
  *
