@@ -152,6 +152,14 @@ import {
   playerSwapTacticalBreakdown as getPlayerSwapTacticalBreakdown,
   playerSwapTacticalLabel as getPlayerSwapTacticalLabel,
 } from './player-swap-analysis';
+import {
+  positionPixelDistance as getPositionPixelDistance,
+  positionPixelMovementConfidence as getPositionPixelMovementConfidence,
+  positionPixelSignalClass as getPositionPixelSignalClass,
+  positionPixelSignalDetail as getPositionPixelSignalDetail,
+  positionPixelSignalRead as getPositionPixelSignalRead,
+  positionPixelSignalScore as getPositionPixelSignalScore,
+} from './position-pixel-analysis';
 /**
  * V24D24: Test-Harness UI page (4-panel layout).
  *
@@ -13328,71 +13336,21 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return `read-${this.positionPixelReadLevel(row)}`;
   }
   private positionPixelSignalScoreFromRow(row: PositionPixelMatrixSummaryRow): number {
-    const distance = Math.hypot(row.targetXPercent - row.fromXPercent, row.targetYPercent - row.fromYPercent);
-    const xgSignal = Math.max(
-      Math.abs(row.deltaXgFor),
-      Math.abs(row.deltaXgAgainst),
-      Math.abs(row.deltaXgDiff),
-      Math.abs(row.deltaCentralXgFor),
-      Math.abs(row.deltaWideXgFor),
-      Math.abs(row.deltaLongXgFor),
-      Math.abs(row.deltaCentralXgAgainst),
-      Math.abs(row.deltaWideXgAgainst),
-      Math.abs(row.deltaLongXgAgainst),
-      Math.abs(row.deltaLeftWideXgFor ?? 0),
-      Math.abs(row.deltaRightWideXgFor ?? 0),
-      Math.abs(row.deltaLeftWideXgAgainst ?? 0),
-      Math.abs(row.deltaRightWideXgAgainst ?? 0),
-    );
-    const shotSignal = Math.max(
-      Math.abs(row.deltaShotsFor),
-      Math.abs(row.deltaShotsAgainst),
-      Math.abs(row.deltaCentralShotsFor) + Math.abs(row.deltaWideShotsFor) + Math.abs(row.deltaLongShotsFor),
-      Math.abs(row.deltaCentralShotsAgainst) + Math.abs(row.deltaWideShotsAgainst) + Math.abs(row.deltaLongShotsAgainst),
-    ) * 0.025;
-    const possSignal = Math.abs(row.deltaPossessionFor) * 0.010;
-    const distanceSignal = Math.min(0.090, distance * (distance <= 1.25 ? 0.008 : 0.012));
-    const playerTacticalSignal = Math.max(
-      Math.abs(row.deltaPlayerEffectiveness ?? 0) * 0.50,
-      Math.abs(row.deltaPlayerCollective ?? 0) * 0.015,
-    );
-    const rawSignal = Math.max(xgSignal, shotSignal, possSignal, distanceSignal, playerTacticalSignal);
-    return rawSignal * this.positionPixelMovementConfidence(distance);
+    return getPositionPixelSignalScore(row);
   }
   private positionPixelSignalReadFromRow(row: PositionPixelMatrixSummaryRow): string {
     const score = this.positionPixelSignalScoreFromRow(row);
-    const distance = Math.hypot(row.targetXPercent - row.fromXPercent, row.targetYPercent - row.fromYPercent);
-    if (distance <= 1.25 && score >= 0.050) return `Micro-check ${score.toFixed(3)}`;
-    if (score >= 0.120) return `Alta ${score.toFixed(3)}`;
-    if (score >= 0.050) return `Media ${score.toFixed(3)}`;
-    if (score >= 0.020) return `Baja ${score.toFixed(3)}`;
-    return `Micro ${score.toFixed(3)}`;
+    return getPositionPixelSignalRead(score, getPositionPixelDistance(row));
   }
   private positionPixelSignalClassFromRow(row: PositionPixelMatrixSummaryRow): string {
     const score = this.positionPixelSignalScoreFromRow(row);
-    const distance = Math.hypot(row.targetXPercent - row.fromXPercent, row.targetYPercent - row.fromYPercent);
-    if (distance <= 1.25 && score >= 0.050) return 'read-check';
-    if (score >= 0.120) return 'delta-negative';
-    if (score >= 0.050) return 'read-check';
-    if (score >= 0.020) return 'read-stable';
-    return 'delta-neutral';
+    return getPositionPixelSignalClass(score, getPositionPixelDistance(row));
   }
   private positionPixelSignalDetailFromRow(row: PositionPixelMatrixSummaryRow): string {
-    return [
-      `señal ${this.positionPixelSignalScoreFromRow(row).toFixed(3)}`,
-      `xG for/ag/diff ${this.fmtDeltaMicro(row.deltaXgFor)}/${this.fmtDeltaMicro(row.deltaXgAgainst)}/${this.fmtDeltaMicro(row.deltaXgDiff)}`,
-      `shots for/ag ${this.fmtDeltaNumber(row.deltaShotsFor)}/${this.fmtDeltaNumber(row.deltaShotsAgainst)}`,
-      `poss ${this.fmtDeltaNumber(row.deltaPossessionFor)}%`,
-      `eff ${this.fmtDeltaMicro(row.deltaPlayerEffectiveness ?? 0)}`,
-      `collective ${this.fmtDeltaNumber(row.deltaPlayerCollective ?? 0)}`,
-      `dist ${Math.hypot(row.targetXPercent - row.fromXPercent, row.targetYPercent - row.fromYPercent).toFixed(2)}px`,
-    ].join(' ? ');
+    return getPositionPixelSignalDetail(row, (value) => this.fmtDeltaMicro(value), (value) => this.fmtDeltaNumber(value));
   }
   private positionPixelMovementConfidence(distance: number): number {
-    if (!Number.isFinite(distance)) return 1;
-    if (distance <= 1.25) return 0.35;
-    if (distance <= 6.0) return 0.70;
-    return 1;
+    return getPositionPixelMovementConfidence(distance);
   }
   positionPixelTacticalRead(row: PositionPixelMatrixSummary): string {
     const attackGain = this.positionPixelAttackGainScore(row);
