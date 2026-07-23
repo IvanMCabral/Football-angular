@@ -2259,7 +2259,7 @@ import {
               <span>
                 {{ debug.label }} · {{ lineupDebugScopeLabel(debug) }} · formación {{ debug.formation || '?' }}
                 · seleccionada {{ debug.selectedFormation || '?' }}
-                · jugadores {{ debug.playerCount }}/11
+                · jugadores {{ lineupDebugPlayerCountLabel(debug) }}
                 · slots {{ debug.persistedSlotCount }}/{{ debug.effectiveSlotCount }}
                 · candidatos {{ debug.candidatesCount }}
               </span>
@@ -8457,8 +8457,10 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const candidateIds = new Set(candidates.map((candidate) => candidate.starterId));
     const warnings: string[] = [];
     const players = lineup.players ?? [];
-    if (players.length !== 11) {
-      warnings.push(`Expected 11 players, got ${players.length}.`);
+    if (players.length === 0 && candidates.length > 0) {
+      warnings.push('Sweep de calibración sin XI actual; usa candidatos preset del partido.');
+    } else if (players.length !== 11) {
+      warnings.push(`XI incompleto: ${players.length}/11 jugadores.`);
     }
     if (persistedSlots.length < Math.min(players.length, 11)) {
       warnings.push(`Persisted slots incomplete: ${persistedSlots.length}/${Math.min(players.length, 11)}. Canonical fallback may be used.`);
@@ -11550,6 +11552,12 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   }
   trackByLineupDebugRow(_index: number, row: LineupDebugRow): string {
     return row.playerId || `${row.index}-${row.slotId}`;
+  }
+  lineupDebugPlayerCountLabel(debug: LineupDebugSnapshot): string {
+    if (debug.playerCount === 0 && debug.candidatesCount > 0) {
+      return `presets (${debug.candidatesCount})`;
+    }
+    return `${debug.playerCount}/11`;
   }
   lineupDebugScopeLabel(debug: LineupDebugSnapshot): string {
     if (debug.visualLineFilter === 'LAST_MODAL_MOVE') {
@@ -15673,7 +15681,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   onRunScenarioBatteryBoard(): void {
     const matches = this.scenarioBatteryCandidateMatches();
     if (matches.length === 0) {
-      this.snackBar.open('No hay partidos completados para armar la bateria.', 'OK', { duration: 3000 });
+      this.snackBar.open('No hay partidos completados para armar la batería.', 'OK', { duration: 3000 });
       return;
     }
     const seedStart = this.seedInputModel ?? 12345;
@@ -15731,8 +15739,8 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         this.mutationInFlight.set(false);
         this.scenarioBatteryProgress.set('');
         this.scenarioBatteryWorkload.set('');
-        this.markReplayAnalysisReady(`Tablero bateria listo: ${partialRows.filter(Boolean).length} lecturas (${this.scenarioBatteryGroupLabel(scenarioGroup)}, ${matches.length} partidos x local/visitante).`);
-        this.snackBar.open(`Tablero bateria completo: ${partialRows.filter(Boolean).length} lecturas (${this.scenarioBatteryGroupLabel(scenarioGroup)}).`, 'OK', { duration: 3500 });
+        this.markReplayAnalysisReady(`Tablero batería listo: ${partialRows.filter(Boolean).length} lecturas (${this.scenarioBatteryGroupLabel(scenarioGroup)}, ${matches.length} partidos x local/visitante).`);
+        this.snackBar.open(`Tablero batería completo: ${partialRows.filter(Boolean).length} lecturas (${this.scenarioBatteryGroupLabel(scenarioGroup)}).`, 'OK', { duration: 3500 });
       },
       error: (err) => {
         this.mutationInFlight.set(false);
@@ -16483,7 +16491,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const next = nextJob
       ? ` Próximo: ${nextJob.match.homeTeamName} vs ${nextJob.match.awayTeamName} (${nextJob.controlledSide === 'HOME' ? 'local' : 'visitante'}).`
       : ' Cerrando tablero...';
-    return `Tablero bateria: ${completed}/${total} lecturas (${availableMatches}/${targetMatches} partidos).${next}`;
+    return `Tablero batería: ${completed}/${total} lecturas (${availableMatches}/${targetMatches} partidos).${next}`;
   }
   private scenarioBatteryScenarioCountEstimate(group: 'ALL' | 'OFFENSE' | 'DEFENSE' | 'OPPONENT'): number {
     switch (group) {
