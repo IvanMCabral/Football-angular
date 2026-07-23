@@ -1,6 +1,21 @@
 import { PlayerSwapMatrixSummaryRow } from '../models/test-harness.model';
 
 type PlayerSwapOverallRead = Pick<PlayerSwapMatrixSummaryRow, 'baselinePlayerOverall' | 'swapPlayerOverall'>;
+type PlayerSwapSignalRead = Pick<
+  PlayerSwapMatrixSummaryRow,
+  | 'deltaXgDiff'
+  | 'preAutoSubDeltaXgDiff'
+  | 'deltaXgFor'
+  | 'deltaXgAgainst'
+  | 'deltaShotsFor'
+  | 'deltaShotsAgainst'
+>;
+
+export interface PlayerSwapRoleRiskRead {
+  attack: number;
+  control: number;
+  protection: number;
+}
 
 export function playerSwapOverallDelta(row: PlayerSwapOverallRead): number | null {
   if (row.baselinePlayerOverall == null || row.swapPlayerOverall == null) return null;
@@ -27,4 +42,32 @@ export function playerSwapQualityWarning(
 ): string {
   if (!playerSwapHasLargeQualityDrop(row)) return '';
   return ` y baja mucho la calidad individual (${playerSwapOverallDeltaText(row, formatDeltaNumber)})`;
+}
+
+export function playerSwapSignalScore(row: PlayerSwapSignalRead, roleRisk: PlayerSwapRoleRiskRead): number {
+  return Math.max(
+    Math.abs(row.deltaXgDiff),
+    Math.abs(row.preAutoSubDeltaXgDiff || 0),
+    Math.abs(row.deltaXgFor),
+    Math.abs(row.deltaXgAgainst),
+    Math.abs(row.deltaShotsFor) * 0.025,
+    Math.abs(row.deltaShotsAgainst) * 0.025,
+    Math.abs(roleRisk.attack),
+    Math.abs(roleRisk.control),
+    Math.abs(roleRisk.protection),
+  );
+}
+
+export function playerSwapSignalRead(score: number): string {
+  if (score >= 0.120) return `Alta ${score.toFixed(3)}`;
+  if (score >= 0.050) return `Media ${score.toFixed(3)}`;
+  if (score >= 0.020) return `Baja ${score.toFixed(3)}`;
+  return `Micro ${score.toFixed(3)}`;
+}
+
+export function playerSwapSignalClass(score: number): string {
+  if (score >= 0.120) return 'delta-negative';
+  if (score >= 0.050) return 'read-check';
+  if (score >= 0.020) return 'read-stable';
+  return 'delta-neutral';
 }

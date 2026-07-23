@@ -135,6 +135,9 @@ import {
   playerSwapOverallDelta as getPlayerSwapOverallDelta,
   playerSwapOverallDeltaText as getPlayerSwapOverallDeltaText,
   playerSwapQualityWarning as getPlayerSwapQualityWarning,
+  playerSwapSignalClass as getPlayerSwapSignalClass,
+  playerSwapSignalRead as getPlayerSwapSignalRead,
+  playerSwapSignalScore as getPlayerSwapSignalScore,
 } from './player-swap-analysis';
 /**
  * V24D24: Test-Harness UI page (4-panel layout).
@@ -7424,32 +7427,13 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return false;
   }
   private playerSwapSignalScore(row: PlayerSwapMatrixSummaryRow, candidate: PlayerSwapCandidate | null = null): number {
-    const roleRisk = this.playerSwapRoleRisk(candidate);
-    return Math.max(
-      Math.abs(row.deltaXgDiff),
-      Math.abs(row.preAutoSubDeltaXgDiff || 0),
-      Math.abs(row.deltaXgFor),
-      Math.abs(row.deltaXgAgainst),
-      Math.abs(row.deltaShotsFor) * 0.025,
-      Math.abs(row.deltaShotsAgainst) * 0.025,
-      Math.abs(roleRisk.attack),
-      Math.abs(roleRisk.control),
-      Math.abs(roleRisk.protection),
-    );
+    return getPlayerSwapSignalScore(row, this.playerSwapRoleRisk(candidate));
   }
   private playerSwapSignalRead(row: PlayerSwapMatrixSummaryRow, candidate: PlayerSwapCandidate | null = null): string {
-    const score = this.playerSwapSignalScore(row, candidate);
-    if (score >= 0.120) return `Alta ${score.toFixed(3)}`;
-    if (score >= 0.050) return `Media ${score.toFixed(3)}`;
-    if (score >= 0.020) return `Baja ${score.toFixed(3)}`;
-    return `Micro ${score.toFixed(3)}`;
+    return getPlayerSwapSignalRead(this.playerSwapSignalScore(row, candidate));
   }
   private playerSwapSignalClass(row: PlayerSwapMatrixSummaryRow, candidate: PlayerSwapCandidate | null = null): string {
-    const score = this.playerSwapSignalScore(row, candidate);
-    if (score >= 0.120) return 'delta-negative';
-    if (score >= 0.050) return 'read-check';
-    if (score >= 0.020) return 'read-stable';
-    return 'delta-neutral';
+    return getPlayerSwapSignalClass(this.playerSwapSignalScore(row, candidate));
   }
   private playerSwapSignalDetail(row: PlayerSwapMatrixSummaryRow, candidate: PlayerSwapCandidate | null = null): string {
     const roleRisk = this.playerSwapRoleRisk(candidate);
