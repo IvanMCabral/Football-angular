@@ -1126,13 +1126,25 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
         max-width: 100vw;
         width: 100vw;
       }
+      .partido-modal-title,
+      :host ::ng-deep .mat-mdc-dialog-container h2.mat-mdc-dialog-title {
+        gap: 0.35rem;
+        padding: 0.55rem 0.65rem;
+      }
+      .minute-tag {
+        font-size: 0.68rem;
+        padding: 0.12rem 0.42rem;
+      }
+      :host ::ng-deep .mat-mdc-dialog-container .mat-mdc-dialog-content {
+        max-height: calc(100vh - 108px);
+      }
       .pitch {
         padding: 0.35rem 0.25rem;
         gap: 0.2rem;
         /* : mobile pitch keeps the smaller dot scale so
            11 dots still fit on a portrait phone (320-360px viewport).
            320px is enough for 11 x ~24px dots with ~5px gaps. */
-        min-height: min(62vh, 420px);
+        min-height: min(48vh, 340px);
       }
       .pitch::after {
         width: 48px;
@@ -1147,10 +1159,10 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
            legacy 18px so the role label below the name stays legible,
            but small enough that 11 dots fit on a 320px viewport with
            the standard pitch-line gap. */
-        width: 44px;
-        height: 38px;
+        width: 42px;
+        height: 36px;
         min-width: 22px;
-        max-width: 32px;
+        max-width: 38px;
         border-radius: 9px;
         font-size: 0.58rem;
         padding: 1px 1px;
@@ -1173,10 +1185,26 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       .formation-select {
         max-width: 100%;
       }
-      .formation-row { margin-bottom: 0.35rem; }
+      .formation-row {
+        margin: 0.4rem 0.35rem 0.45rem;
+        align-items: stretch;
+      }
       .formation-grid { padding: 0 0.35rem; }
       .col-pitch,
       .col-bench { padding: 0.4rem; }
+      .nudge-panel {
+        width: 100%;
+        justify-content: space-between;
+      }
+      .nudge-copy {
+        min-width: 0;
+      }
+      .bench-list {
+        max-height: 180px;
+      }
+      .partido-modal-actions {
+        padding: 0.45rem 0.65rem 0.5rem;
+      }
       .score-chip {
         font-size: 0.75rem;
         padding: 0.15rem 0.5rem;
@@ -1214,6 +1242,45 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       }
       .dot-role { font-size: 0.5rem; }
       .dot-label { font-size: 0.7rem; }
+    }
+
+    @media (max-height: 760px) and (min-width: 601px) {
+      :host ::ng-deep .mat-mdc-dialog-container .mat-mdc-dialog-content {
+        max-height: calc(100vh - 118px);
+      }
+      .formation-row {
+        margin: 0.35rem 0.5rem 0.4rem;
+        padding: 0.35rem 0.55rem;
+      }
+      .pitch {
+        min-height: 205px;
+        padding-top: 0.35rem;
+        padding-bottom: 0.35rem;
+      }
+      .manager-pitch {
+        padding-bottom: 0.65rem;
+      }
+      .pitch-line {
+        min-height: 36px;
+      }
+      .player-dot {
+        width: 50px;
+        height: 36px;
+        font-size: 0.56rem;
+      }
+      .dot-player-name {
+        font-size: 0.52rem;
+        max-width: 40px;
+      }
+      .dot-role {
+        font-size: 0.43rem;
+      }
+      .hint {
+        display: none;
+      }
+      .bench-list {
+        max-height: 250px;
+      }
     }
 
     @media (min-width: 1600px) {
