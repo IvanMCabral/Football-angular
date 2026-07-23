@@ -33,6 +33,10 @@ import { LineupSlotDTO } from '../../../shared/models/lineup/lineup-slot.dto';
 import { FormationDTO } from '../../../shared/models/lineup/formation.dto';
 import {
   FORMATION_CODES,
+  AllFormationRoleSlotSmokeRow,
+  BackFiveContextSmokeRow,
+  BackFiveContextSmokeSummary,
+  BackFiveFamilyLabRow,
   BackFiveTransitionLabRow,
   ControlledTeamSide,
   CustomFixture,
@@ -53,11 +57,17 @@ import {
   ModalVsCanonicalSummary,
   PlayerSwapMatrixSummaryRow,
   PositionPixelQaLine,
+  PositionPixelQaSummaryRow,
   PositionPixelReadFilter,
   PositionPixelReadLevel,
   PositionPixelMatrixSummaryRow,
+  PositionPixelMatchSmokeSummary,
+  PositionPixelPlayerSmokeSummary,
+  PositionPixelSmokeRunSummary,
   PositionPixelSmokeScope,
   PositionPixelSortMode,
+  ProfessionalSmokeSummary,
+  RoleSlotImpactSmokeRow,
   RoleSlotImpactSummaryRow,
   RoundGroup,
   ScenarioBatteryCoachObjective,
@@ -280,155 +290,6 @@ interface PositionPixelMatrixSummary {
   signalDetail: string;
   timestamp: string;
 }
-interface PositionPixelMatchSmokeSummary {
-  matchLabel: string;
-  rows: number;
-  stable: number;
-  visible: number;
-  strong: number;
-  check: number;
-  microReview: number;
-  visibleRisk: number;
-  visibleAttackLoss: number;
-  bigBadTradeoff: number;
-  avgSignal: number;
-  worstSignal: number;
-  worstMove: string;
-  worstTacticalRead: string;
-  dominantCause: string;
-  fivePxRiskRows: number;
-  fivePxCostRows: number;
-  bigMoveRows: number;
-  bigMoveStrongRows: number;
-  verdict: string;
-  verdictClass: string;
-}
-interface PositionPixelPlayerSmokeSummary {
-  key: string;
-  playerName: string;
-  playerPosition: string;
-  rows: number;
-  fivePxRiskRows: number;
-  fivePxCostRows: number;
-  bigMoveStrongRows: number;
-  bigMoveRows: number;
-  avgSignal: number;
-  worstSignal: number;
-  worstMove: string;
-  dominantCause: string;
-  channelBreakdownTrend: string;
-  verdict: string;
-  verdictClass: string;
-}
-interface RoleSlotImpactSmokeRow {
-  slotId: string;
-  player: string;
-  bestRole: string;
-  bestEff: number;
-  worstRole: string;
-  worstEff: number;
-  gap: number;
-  verdict: string;
-  className: string;
-}
-interface BackFiveFamilyLabRow {
-  key: 'low-block' | 'transition' | 'wingback-control';
-  label: string;
-  formation: string;
-  visualPlan: string;
-  seedStart: number;
-  seedCount: number;
-  avgXgFor: number;
-  avgXgAgainst: number;
-  avgXgDiff: number;
-  avgShotsFor: number;
-  avgShotsAgainst: number;
-  avgPossessionFor: number;
-  avgWideShotsFor: number;
-  avgWideShotsAgainst: number;
-  avgCentralShotsFor: number;
-  avgCentralShotsAgainst: number;
-  deltaXgFor: number;
-  deltaXgAgainst: number;
-  deltaXgDiff: number;
-  deltaWideShotsFor: number;
-  deltaWideShotsAgainst: number;
-  read: string;
-  className: string;
-}
-interface BackFiveContextSmokeRow {
-  matchId: string;
-  matchLabel: string;
-  controlledSide: Exclude<ControlledTeamSide, 'USER'>;
-  controlledTeamName: string;
-  seedStart: number;
-  seedCount: number;
-  bestPlan: string;
-  safestPlan: string;
-  mostOffensivePlan: string;
-  bestXgDiff: number;
-  safestXga: number;
-  mostOffensiveXg: number;
-  lowBlockDiff: number | null;
-  transitionDiff: number | null;
-  wingbackDiff: number | null;
-  read: string;
-  className: string;
-}
-interface BackFiveContextSmokeSummary {
-  total: number;
-  best541: number;
-  best532: number;
-  best352: number;
-  safest541: number;
-  safest532: number;
-  safest352: number;
-  offensive541: number;
-  offensive532: number;
-  offensive352: number;
-  review: number;
-  reviewDetails: string[];
-  read: string;
-  className: string;
-}
-interface ProfessionalSmokeSummary {
-  controlledTeam: string;
-  scope: ControlledTeamSide;
-  verdict?: 'OK' | 'Review' | 'Fail' | 'Partial';
-  verdictDetail?: string;
-  formationRows: number;
-  scenarioRows: number;
-  formationAuditRows?: number;
-  formationAuditFallbackRows?: number;
-  formationAuditReviewRows?: number;
-  pixelRows: number;
-  swapRows: number;
-  substitutionRows?: number;
-  formationSeedCount: number;
-  scenarioSeedCount: number;
-  included: string[];
-  skipped: string[];
-  read: string;
-}
-interface AllFormationRoleSlotSmokeRow {
-  formation: FormationCode;
-  slots: number;
-  clear: number;
-  visible: number;
-  review: number;
-  minGap: number;
-  avgGap: number;
-  weakestSlot: string;
-  verdict: string;
-  className: string;
-}
-interface PositionPixelSmokeRunSummary extends PositionPixelMatchSmokeSummary {
-  scope: PositionPixelSmokeScope;
-  label: string;
-  matchCount: number;
-  playerCount: number;
-  runAt: string;
-}
 interface PositionPixelDiagonalSummary {
   total: number;
   risk: number;
@@ -569,17 +430,6 @@ interface ScenarioBatteryCoachAdvice {
   risk: string;
   why: string;
   next: string;
-}
-interface PositionPixelQaSummaryRow {
-  line: PositionPixelQaLine;
-  total: number;
-  microOk: number;
-  visibleOk: number;
-  strongCoherent: number;
-  visualReview: number;
-  contradiction: number;
-  verdict: string;
-  verdictClass: string;
 }
 type PositionPixelExportRow = PositionPixelMatrixSummary & {
   read: string;
