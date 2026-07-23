@@ -163,6 +163,51 @@ export function playerSwapCoachReadLevel(
   return 'neutral';
 }
 
+export function playerSwapCoachRead(level: PlayerSwapCoachReadLevel): string {
+  if (level === 'upgrade') return 'Clear upgrade';
+  if (level === 'downgrade') return 'Clear downgrade';
+  if (level === 'tradeoff') return 'Trade-off';
+  if (level === 'review') return 'Needs review';
+  return 'Noise / neutral';
+}
+
+export function playerSwapCoachReadClass(level: PlayerSwapCoachReadLevel): string {
+  if (level === 'upgrade') return 'delta-positive';
+  if (level === 'downgrade') return 'delta-negative';
+  if (level === 'tradeoff') return 'read-strong';
+  if (level === 'review') return 'read-check';
+  return 'delta-neutral';
+}
+
+export function playerSwapCoachReadDetail(
+  row: PlayerSwapSignalRead & PlayerSwapOverallRead,
+  roleRisk: PlayerSwapRoleRiskRead,
+  formatDeltaNumber: (value: number) => string,
+): string {
+  const read = playerSwapCoachRead(playerSwapCoachReadLevel(row, roleRisk));
+  const xgDiff = formatDeltaNumber(row.deltaXgDiff);
+  const preXgDiff = formatDeltaNumber(row.preAutoSubDeltaXgDiff || 0);
+  const xgFor = formatDeltaNumber(row.deltaXgFor);
+  const xgAgainst = formatDeltaNumber(row.deltaXgAgainst);
+  const shotsFor = formatDeltaNumber(row.deltaShotsFor);
+  const shotsAgainst = formatDeltaNumber(row.deltaShotsAgainst);
+  const qualityWarning = playerSwapQualityWarning(row, formatDeltaNumber);
+  if (read === 'Clear upgrade') {
+    return `mejora el diferencial xG (${xgDiff}; pre-auto-sub ${preXgDiff}) con riesgo defensivo controlado. Shots ${shotsFor}, shots ag. ${shotsAgainst}.`;
+  }
+  if (read === 'Clear downgrade') {
+    return `empeora el balance esperado (${xgDiff}; pre-auto-sub ${preXgDiff}) o aumenta demasiado el riesgo defensivo. xG for ${xgFor}, xG ag. ${xgAgainst}.`;
+  }
+  if (read === 'Trade-off') {
+    return `gana algo en ataque, pero tambien concede mas. xG for ${xgFor}, xG ag. ${xgAgainst}, shots ag. ${shotsAgainst}.`;
+  }
+  if (read === 'Needs review') {
+    return `la señal es grande pero mezclada${qualityWarning}; conviene repetir con más seeds o mirar eventos. xG diff ${xgDiff}, shots ${shotsFor}/${shotsAgainst}.`;
+  }
+  const roleDetail = roleRisk.detail ? ` ${roleRisk.detail}.` : '';
+  return `no hay señal suficiente de resultado para decidir por este cambio. xG diff ${xgDiff}, pre-auto-sub ${preXgDiff}.${roleDetail}`;
+}
+
 export function playerSwapTacticalLabel(score: number, dimension: string): { label: string; cssClass: string } {
   if (score >= 0.10) return { label: `${dimension} ++`, cssClass: 'delta-positive' };
   if (score >= 0.035) return { label: `${dimension} +`, cssClass: 'delta-positive' };

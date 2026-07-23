@@ -137,6 +137,9 @@ import {
   playerSwapQualityWarning as getPlayerSwapQualityWarning,
   playerSwapCoachAttackScore as getPlayerSwapCoachAttackScore,
   playerSwapCoachNetScore as getPlayerSwapCoachNetScore,
+  playerSwapCoachRead as getPlayerSwapCoachRead,
+  playerSwapCoachReadClass as getPlayerSwapCoachReadClass,
+  playerSwapCoachReadDetail as getPlayerSwapCoachReadDetail,
   playerSwapCoachReadLevel as getPlayerSwapCoachReadLevel,
   playerSwapCoachRiskScore as getPlayerSwapCoachRiskScore,
   playerSwapDecisionScore as getPlayerSwapDecisionScore,
@@ -7322,45 +7325,13 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     };
   }
   private playerSwapCoachRead(row: PlayerSwapMatrixSummaryRow, candidate: PlayerSwapCandidate | null = null): string {
-    const read = this.playerSwapCoachReadLevel(row, candidate);
-    if (read === 'upgrade') return 'Clear upgrade';
-    if (read === 'downgrade') return 'Clear downgrade';
-    if (read === 'tradeoff') return 'Trade-off';
-    if (read === 'review') return 'Needs review';
-    return 'Noise / neutral';
+    return getPlayerSwapCoachRead(this.playerSwapCoachReadLevel(row, candidate));
   }
   private playerSwapCoachReadClass(row: PlayerSwapMatrixSummaryRow, candidate: PlayerSwapCandidate | null = null): string {
-    const read = this.playerSwapCoachReadLevel(row, candidate);
-    if (read === 'upgrade') return 'delta-positive';
-    if (read === 'downgrade') return 'delta-negative';
-    if (read === 'tradeoff') return 'read-strong';
-    if (read === 'review') return 'read-check';
-    return 'delta-neutral';
+    return getPlayerSwapCoachReadClass(this.playerSwapCoachReadLevel(row, candidate));
   }
   private playerSwapCoachReadDetail(row: PlayerSwapMatrixSummaryRow, candidate: PlayerSwapCandidate | null = null): string {
-    const read = this.playerSwapCoachRead(row, candidate);
-    const xgDiff = this.fmtDeltaNumber(row.deltaXgDiff);
-    const preXgDiff = this.fmtDeltaNumber(row.preAutoSubDeltaXgDiff || 0);
-    const xgFor = this.fmtDeltaNumber(row.deltaXgFor);
-    const xgAgainst = this.fmtDeltaNumber(row.deltaXgAgainst);
-    const shotsFor = this.fmtDeltaNumber(row.deltaShotsFor);
-    const shotsAgainst = this.fmtDeltaNumber(row.deltaShotsAgainst);
-    const qualityWarning = this.playerSwapQualityWarning(row);
-    if (read === 'Clear upgrade') {
-      return `mejora el diferencial xG (${xgDiff}; pre-auto-sub ${preXgDiff}) con riesgo defensivo controlado. Shots ${shotsFor}, shots ag. ${shotsAgainst}.`;
-    }
-    if (read === 'Clear downgrade') {
-      return `empeora el balance esperado (${xgDiff}; pre-auto-sub ${preXgDiff}) o aumenta demasiado el riesgo defensivo. xG for ${xgFor}, xG ag. ${xgAgainst}.`;
-    }
-    if (read === 'Trade-off') {
-      return `gana algo en ataque, pero tambien concede mas. xG for ${xgFor}, xG ag. ${xgAgainst}, shots ag. ${shotsAgainst}.`;
-    }
-    if (read === 'Needs review') {
-      return `la señal es grande pero mezclada${qualityWarning}; conviene repetir con más seeds o mirar eventos. xG diff ${xgDiff}, shots ${shotsFor}/${shotsAgainst}.`;
-    }
-    const roleRisk = this.playerSwapRoleRisk(candidate);
-    const roleDetail = roleRisk.detail ? ` ${roleRisk.detail}.` : '';
-    return `no hay señal suficiente de resultado para decidir por este cambio. xG diff ${xgDiff}, pre-auto-sub ${preXgDiff}.${roleDetail}`;
+    return getPlayerSwapCoachReadDetail(row, this.playerSwapRoleRisk(candidate), (value) => this.fmtDeltaNumber(value));
   }
   private playerSwapCoachReadLevel(row: PlayerSwapMatrixSummaryRow, candidate: PlayerSwapCandidate | null = null): 'upgrade' | 'downgrade' | 'tradeoff' | 'neutral' | 'review' {
     return getPlayerSwapCoachReadLevel(row, this.playerSwapRoleRisk(candidate));

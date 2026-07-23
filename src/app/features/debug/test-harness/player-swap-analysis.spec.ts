@@ -1,6 +1,9 @@
 import {
   playerSwapHasLargeQualityDrop,
   playerSwapCoachReadLevel,
+  playerSwapCoachRead,
+  playerSwapCoachReadClass,
+  playerSwapCoachReadDetail,
   playerSwapDecisionScore,
   playerSwapIsActionableRecommendation,
   playerSwapOverallDelta,
@@ -293,5 +296,69 @@ describe('player-swap-analysis', () => {
     expect(playerSwapIsActionableRecommendation({ ...qualityDropUpgrade, seedCount: 10 })).toBeFalse();
     expect(playerSwapIsActionableRecommendation({ ...qualityDropUpgrade, seedCount: 30 })).toBeTrue();
     expect(playerSwapIsActionableRecommendation({ ...qualityDropUpgrade, seedCount: 30, deltaXgAgainst: 0.09 })).toBeFalse();
+  });
+
+  it('maps coach read levels to labels and classes', () => {
+    expect(playerSwapCoachRead('upgrade')).toBe('Clear upgrade');
+    expect(playerSwapCoachReadClass('upgrade')).toBe('delta-positive');
+    expect(playerSwapCoachRead('downgrade')).toBe('Clear downgrade');
+    expect(playerSwapCoachReadClass('downgrade')).toBe('delta-negative');
+    expect(playerSwapCoachRead('tradeoff')).toBe('Trade-off');
+    expect(playerSwapCoachReadClass('tradeoff')).toBe('read-strong');
+    expect(playerSwapCoachRead('review')).toBe('Needs review');
+    expect(playerSwapCoachReadClass('review')).toBe('read-check');
+    expect(playerSwapCoachRead('neutral')).toBe('Noise / neutral');
+    expect(playerSwapCoachReadClass('neutral')).toBe('delta-neutral');
+  });
+
+  it('explains a clear upgrade with xG and shot context', () => {
+    const detail = playerSwapCoachReadDetail(
+      {
+        ...baseDecisionRow,
+        deltaXgDiff: 0.11,
+        preAutoSubDeltaXgDiff: 0.03,
+        deltaXgFor: 0.12,
+        deltaShotsFor: 2,
+      },
+      { attack: 0, control: 0, protection: 0 },
+      formatDelta,
+    );
+
+    expect(detail).toContain('mejora el diferencial xG');
+    expect(detail).toContain('pre-auto-sub +0.03');
+    expect(detail).toContain('Shots +2');
+  });
+
+  it('explains review with quality warning when OVR drops hard', () => {
+    const detail = playerSwapCoachReadDetail(
+      {
+        ...baseDecisionRow,
+        baselinePlayerOverall: 80,
+        swapPlayerOverall: 73,
+        deltaXgDiff: 0.08,
+        deltaXgFor: 0.05,
+      },
+      { attack: 0, control: 0, protection: 0 },
+      formatDelta,
+    );
+
+    expect(detail).toContain('conviene repetir con más seeds');
+    expect(detail).toContain('baja mucho la calidad individual');
+  });
+
+  it('keeps neutral explanations honest when role risk is present', () => {
+    const detail = playerSwapCoachReadDetail(
+      baseDecisionRow,
+      {
+        attack: 0,
+        control: 0,
+        protection: 0,
+        detail: 'Alerta de rol: prueba',
+      },
+      formatDelta,
+    );
+
+    expect(detail).toContain('no hay señal suficiente');
+    expect(detail).toContain('Alerta de rol: prueba');
   });
 });
