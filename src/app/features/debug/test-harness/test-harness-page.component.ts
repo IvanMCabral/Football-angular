@@ -51,6 +51,7 @@ import {
   FormationMatrixSummaryRow,
   FormationReplayResult,
   LabMutationResult,
+  LastModalPositionMoveCase,
   LineupDebugRow,
   LineupDebugSnapshot,
   LineupDiagnostic,
@@ -70,9 +71,14 @@ import {
   PlayerSwapSlotOption,
   PositionPixelQaLine,
   PositionPixelQaSummaryRow,
+  PositionPixelCandidate,
+  PositionPixelDiagonalSummary,
+  PositionPixelExportRow,
+  PositionPixelLineBreakSummary,
   PositionPixelReadFilter,
   PositionPixelReadLevel,
   PositionPixelMatrixSummaryRow,
+  PositionPixelMatrixSummary,
   PositionPixelMatchSmokeSummary,
   PositionPixelPlayerSmokeSummary,
   PositionPixelSmokeRunSummary,
@@ -116,87 +122,6 @@ interface CurrentLineupReplaySample {
   fixture: MatchFixture;
   detail: MatchDetail | null;
   seed: number;
-}
-interface PositionPixelMatrixSummary {
-  label: string;
-  playerName: string;
-  playerPosition: string;
-  slotId: string;
-  fromXPercent: number;
-  fromYPercent: number;
-  targetXPercent: number;
-  targetYPercent: number;
-  seedStart: number;
-  seedEnd: number;
-  deltaShotsFor: number;
-  deltaShotsAgainst: number;
-  deltaPossessionFor: number;
-  deltaXgFor: number;
-  deltaXgAgainst: number;
-  deltaXgDiff: number;
-  deltaCentralShotsFor: number;
-  deltaWideShotsFor: number;
-  deltaLongShotsFor: number;
-  deltaCentralShotsAgainst: number;
-  deltaWideShotsAgainst: number;
-  deltaLongShotsAgainst: number;
-  deltaCentralXgFor: number;
-  deltaWideXgFor: number;
-  deltaLongXgFor: number;
-  deltaLeftWideShotsFor: number;
-  deltaRightWideShotsFor: number;
-  deltaLeftWideXgFor: number;
-  deltaRightWideXgFor: number;
-  deltaCentralXgAgainst: number;
-  deltaWideXgAgainst: number;
-  deltaLongXgAgainst: number;
-  deltaLeftWideShotsAgainst: number;
-  deltaRightWideShotsAgainst: number;
-  deltaLeftWideXgAgainst: number;
-  deltaRightWideXgAgainst: number;
-  baselineXgFor: number;
-  baselineXgAgainst: number;
-  baselineShotsFor: number;
-  baselinePossessionFor: number;
-  movedXgFor: number;
-  movedXgAgainst: number;
-  movedShotsFor: number;
-  movedPossessionFor: number;
-  baselineTacticalPosition: string;
-  movedTacticalPosition: string;
-  baselinePlayerEffectiveness: number;
-  movedPlayerEffectiveness: number;
-  deltaPlayerEffectiveness: number;
-  baselinePlayerCollective: number;
-  movedPlayerCollective: number;
-  deltaPlayerCollective: number;
-  signalScore: number;
-  signalRead: string;
-  signalClass: string;
-  signalDetail: string;
-  timestamp: string;
-}
-interface PositionPixelDiagonalSummary {
-  total: number;
-  risk: number;
-  defenseGain: number;
-  visualMismatch: number;
-  visualMicro: number;
-  visualEngineReview: number;
-  worstVisualMismatch: PositionPixelMatrixSummary | null;
-  worstVisualReview: PositionPixelMatrixSummary | null;
-  best: PositionPixelMatrixSummary | null;
-  worst: PositionPixelMatrixSummary | null;
-}
-interface PositionPixelLineBreakSummary {
-  total: number;
-  borderline: number;
-  big: number;
-  strong: number;
-  badTradeoff: number;
-  attackGain: number;
-  best: PositionPixelMatrixSummary | null;
-  worst: PositionPixelMatrixSummary | null;
 }
 interface ScenarioScoutingNote {
   title: string;
@@ -316,53 +241,6 @@ interface ScenarioBatteryCoachAdvice {
   risk: string;
   why: string;
   next: string;
-}
-type PositionPixelExportRow = PositionPixelMatrixSummary & {
-  read: string;
-  tacticalRead: string;
-  tacticalReadReason: string;
-  channelBreakdownRead: string;
-  channelBreakdownDetail: string;
-  visualExpectationRead: string;
-  visualExpectationDetail: string;
-  visualEngineTensionRead: string;
-  visualEngineTensionDetail: string;
-  shapeMove: string;
-  shapeMoveDetail: string;
-  movementDistance: number;
-  impactScore: number;
-  signalScore: number;
-  signalRead: string;
-  signalDetail: string;
-  attackGainScore: number;
-  attackLossScore: number;
-  defensiveRiskScore: number;
-  defensiveGainScore: number;
-};
-interface PositionPixelCandidate {
-  starterId: string;
-  starterName: string;
-  starterPosition: string;
-  slotId: string;
-}
-interface LastModalPositionMoveCase {
-  version: number;
-  createdAt: string;
-  source: 'squad-editor-modal';
-  formation: string;
-  playerId: string;
-  playerName: string;
-  playerPosition: string | null;
-  playerRole: string | null;
-  slotId: string | null;
-  fromXPercent: number;
-  fromYPercent: number;
-  targetXPercent: number;
-  targetYPercent: number;
-  deltaXPercent: number;
-  deltaYPercent: number;
-  coachReadTitle: string | null;
-  coachReadBody: string | null;
 }
 /**
  * V24D24: Test-Harness UI page (4-panel layout).
