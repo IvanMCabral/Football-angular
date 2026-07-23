@@ -29,6 +29,10 @@ import {
   positionPixelVisualExpectationDetail,
   positionPixelVisualExpectationMismatches,
   positionPixelVisualExpectationRead,
+  positionPixelVisualEngineTensionClass,
+  positionPixelVisualEngineTensionDetail,
+  positionPixelVisualEngineTensionRead,
+  positionPixelVisualEngineTensions,
   positionPixelWideChannelReason,
 } from './position-pixel-analysis';
 
@@ -350,5 +354,62 @@ describe('position-pixel-analysis', () => {
     expect(positionPixelVisualExpectationRead(row, 'MID')).toBe('Visual OK');
     expect(positionPixelVisualExpectationDetail(row, 'MID', 'MID C: mas derecho', 'Amenaza + · Conex. = · Cobertura ='))
       .toContain('coherente');
+  });
+
+  it('flags hard visual-engine contradiction when threat rises but engine loses attack', () => {
+    const row = {
+      ...baseRow,
+      targetXPercent: 58,
+      deltaXgFor: -0.06,
+      deltaShotsFor: -1,
+      deltaWideXgFor: 0.20,
+    } as any;
+    const tensions = positionPixelVisualEngineTensions(row, 'MID');
+
+    expect(tensions.some((item) => item.level === 'hard')).toBeTrue();
+    expect(positionPixelVisualEngineTensionRead(tensions)).toBe('Contradicción');
+    expect(positionPixelVisualEngineTensionClass(tensions)).toBe('read-check');
+    expect(positionPixelVisualEngineTensionDetail(tensions, 'breakdown', 'Attack loss')).toContain('amenaza visual sube');
+  });
+
+  it('downgrades hard contradiction to soft when the visual tradeoff is mixed', () => {
+    const row = {
+      ...baseRow,
+      targetXPercent: 60,
+      deltaXgFor: -0.06,
+      deltaShotsFor: -1,
+      deltaWideXgFor: 0.20,
+      deltaXgAgainst: 0.10,
+    } as any;
+    const tensions = positionPixelVisualEngineTensions(row, 'MID');
+
+    expect(tensions.length).toBeGreaterThan(0);
+    expect(tensions.every((item) => item.level === 'soft')).toBeTrue();
+    expect(positionPixelVisualEngineTensionRead(tensions)).toBe('Tradeoff');
+  });
+
+  it('keeps contextual coverage conflict as soft tension', () => {
+    const row = {
+      ...baseRow,
+      fromYPercent: 24,
+      targetYPercent: 34,
+      deltaXgAgainst: 0.10,
+      deltaWideXgAgainst: -0.30,
+      deltaShotsAgainst: 1,
+    } as any;
+    const tensions = positionPixelVisualEngineTensions(row, 'ATT');
+
+    expect(tensions.some((item) => item.level === 'soft')).toBeTrue();
+    expect(positionPixelVisualEngineTensionRead(tensions)).toBe('Tradeoff');
+  });
+
+  it('reads coherent visual-engine tension when no tension exists', () => {
+    const tensions = positionPixelVisualEngineTensions(baseRow as any, 'MID');
+
+    expect(tensions).toEqual([]);
+    expect(positionPixelVisualEngineTensionRead(tensions)).toBe('Coherente');
+    expect(positionPixelVisualEngineTensionClass(tensions)).toBe('read-stable');
+    expect(positionPixelVisualEngineTensionDetail(tensions, 'Amenaza = · Conex. = · Cobertura =', 'Neutral'))
+      .toContain('visual y motor alineados');
   });
 });

@@ -183,6 +183,11 @@ import {
   positionPixelVisualExpectationDetail as getPositionPixelVisualExpectationDetail,
   positionPixelVisualExpectationMismatches as getPositionPixelVisualExpectationMismatches,
   positionPixelVisualExpectationRead as getPositionPixelVisualExpectationRead,
+  positionPixelVisualEngineTensionClass as getPositionPixelVisualEngineTensionClass,
+  positionPixelVisualEngineTensionDetail as getPositionPixelVisualEngineTensionDetail,
+  positionPixelVisualEngineTensionRead as getPositionPixelVisualEngineTensionRead,
+  positionPixelVisualEngineTensions as getPositionPixelVisualEngineTensions,
+  PositionPixelVisualEngineTension,
   positionPixelIsMicroVisualMismatch as getPositionPixelIsMicroVisualMismatch,
   positionPixelWideChannelReason as getPositionPixelWideChannelReason,
 } from './position-pixel-analysis';
@@ -13422,86 +13427,20 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return getPositionPixelIsMicroVisualMismatch(row);
   }
   positionPixelVisualEngineTensionRead(row: PositionPixelMatrixSummary): string {
-    const tension = this.positionPixelVisualEngineTensions(row);
-    if (tension.some((item) => item.level === 'hard')) return 'Contradicción';
-    if (tension.length > 0) return 'Tradeoff';
-    return 'Coherente';
+    return getPositionPixelVisualEngineTensionRead(this.positionPixelVisualEngineTensions(row));
   }
   positionPixelVisualEngineTensionClass(row: PositionPixelMatrixSummary): string {
-    const tension = this.positionPixelVisualEngineTensions(row);
-    if (tension.some((item) => item.level === 'hard')) return 'read-check';
-    if (tension.length > 0) return 'read-strong';
-    return 'read-stable';
+    return getPositionPixelVisualEngineTensionClass(this.positionPixelVisualEngineTensions(row));
   }
   positionPixelVisualEngineTensionDetail(row: PositionPixelMatrixSummary): string {
-    const tension = this.positionPixelVisualEngineTensions(row);
-    if (tension.length === 0) {
-      return `visual y motor alineados: ${this.positionPixelChannelBreakdownRead(row)} · ${this.positionPixelTacticalRead(row)}`;
-    }
-    return tension.map((item) => item.detail).join(' ? ');
+    return getPositionPixelVisualEngineTensionDetail(
+      this.positionPixelVisualEngineTensions(row),
+      this.positionPixelChannelBreakdownRead(row),
+      this.positionPixelTacticalRead(row)
+    );
   }
-  private positionPixelVisualEngineTensions(row: PositionPixelMatrixSummary): Array<{ level: 'soft' | 'hard'; detail: string }> {
-    const breakdown = this.positionPixelChannelBreakdown(row);
-    const attackLoss = this.positionPixelAttackLossScore(row);
-    const attackGain = this.positionPixelAttackGainScore(row);
-    const defensiveRisk = this.positionPixelDefensiveRiskScore(row);
-    const defensiveGain = this.positionPixelDefensiveGainScore(row);
-    const tacticalRead = this.positionPixelTacticalRead(row);
-    const result: Array<{ level: 'soft' | 'hard'; detail: string }> = [];
-    const visualExpectationMismatches = this.positionPixelVisualExpectationMismatches(row);
-    if (visualExpectationMismatches.length > 0 && !this.positionPixelIsMicroVisualMismatch(row)) {
-      result.push({
-        level: 'soft',
-        detail: `expectativa visual pendiente: ${visualExpectationMismatches.join(' / ')}`,
-      });
-    }
-    const mixedVisualTradeoff = (breakdown.threat >= 0.20 || breakdown.connection >= 0.20 || breakdown.coverage >= 0.20)
-      && (breakdown.threat <= -0.20 || breakdown.connection <= -0.20 || breakdown.coverage <= -0.20);
-    if (breakdown.threat >= 0.35
-        && (tacticalRead === 'Attack loss'
-          || (row.deltaXgFor <= -0.035 && row.deltaShotsFor <= -0.50)
-          || (attackLoss >= 0.8 && attackLoss > attackGain + 0.25))) {
-      result.push({
-        level: 'hard',
-        detail: `amenaza visual sube (${breakdown.threat.toFixed(2)}) pero el motor lee pérdida ofensiva (${attackLoss.toFixed(2)})`,
-      });
-    }
-    if (breakdown.threat <= -0.35
-        && (tacticalRead === 'Attack gain'
-          || (row.deltaXgFor >= 0.035 && row.deltaShotsFor >= 0.50)
-          || (attackGain >= 0.8 && attackGain > attackLoss + 0.25))) {
-      result.push({
-        level: 'hard',
-        detail: `amenaza visual baja (${breakdown.threat.toFixed(2)}) pero el motor lee ganancia ofensiva (${attackGain.toFixed(2)})`,
-      });
-    }
-    if (this.positionPixelHasContextualCoverageConflict(row, breakdown.coverage, defensiveRisk, defensiveGain, tacticalRead)) {
-      result.push({
-        level: 'soft',
-        detail: `cobertura contextual sube (${breakdown.coverage.toFixed(2)}) pero el motor lee riesgo defensivo (${defensiveRisk.toFixed(2)}): no asumir cobertura real`,
-      });
-    }
-    if (breakdown.coverage <= -0.35 && (tacticalRead === 'Def. gain' || (defensiveGain >= 0.8 && defensiveGain > defensiveRisk + 0.25))) {
-      result.push({
-        level: 'hard',
-        detail: `cobertura visual baja (${breakdown.coverage.toFixed(2)}) pero el motor lee mejora defensiva (${defensiveGain.toFixed(2)})`,
-      });
-    }
-    if (breakdown.connection >= 0.35 && attackLoss + defensiveRisk >= 1.8 && attackGain + defensiveGain < 0.8) {
-      result.push({
-        level: 'soft',
-        detail: `conexión visual sube (${breakdown.connection.toFixed(2)}) pero el balance del motor cae fuerte`,
-      });
-    }
-    if (mixedVisualTradeoff && this.positionPixelDistance(row) >= 6) {
-      return result.map((item) => item.level === 'hard'
-        ? {
-          level: 'soft',
-          detail: `${item.detail}; tradeoff visual mixto, no contradiccion dura`,
-        }
-        : item);
-    }
-    return result;
+  private positionPixelVisualEngineTensions(row: PositionPixelMatrixSummary): PositionPixelVisualEngineTension[] {
+    return getPositionPixelVisualEngineTensions(row, this.positionPixelSourceLine(row));
   }
   private positionPixelVisualExpectationMismatches(row: PositionPixelMatrixSummary): string[] {
     return getPositionPixelVisualExpectationMismatches(row, this.positionPixelSourceLine(row));
@@ -13523,18 +13462,6 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   }
   private positionPixelSourceLine(row: PositionPixelMatrixSummary): 'ATT' | 'MID' | 'DEF' {
     return this.strictPositionPixelLine(row.playerPosition) ?? this.positionPixelVisualLine(row.fromYPercent);
-  }
-  private positionPixelHasContextualCoverageConflict(
-    row: PositionPixelMatrixSummary,
-    coverage: number,
-    defensiveRisk: number,
-    defensiveGain: number,
-    tacticalRead: string
-  ): boolean {
-    return coverage >= 0.35
-      && ((tacticalRead === 'Risk' || tacticalRead === 'Bad tradeoff')
-        || (defensiveRisk >= 0.8 && defensiveRisk > defensiveGain + 0.25)
-        || (this.positionPixelUsesContextualCoverage(row, coverage) && defensiveRisk >= 0.65));
   }
   private positionPixelClampBreakdownScore(value: number): number {
     return Math.max(-9.99, Math.min(9.99, Number.isFinite(value) ? value : 0));

@@ -42,6 +42,11 @@ export interface PositionPixelChannelBreakdown {
   coverage: number;
 }
 
+export interface PositionPixelVisualEngineTension {
+  level: 'soft' | 'hard';
+  detail: string;
+}
+
 export function positionPixelDistance(row: Pick<PositionPixelSignalRead, 'fromXPercent' | 'fromYPercent' | 'targetXPercent' | 'targetYPercent'>): number {
   return Math.hypot(row.targetXPercent - row.fromXPercent, row.targetYPercent - row.fromYPercent);
 }
@@ -439,6 +444,110 @@ export function positionPixelVisualExpectationMismatches(
     mismatches.push('se abre: se esperaba alguna señal de banda');
   }
   return mismatches;
+}
+
+export function positionPixelVisualEngineTensionRead(tension: PositionPixelVisualEngineTension[]): string {
+  if (tension.some((item) => item.level === 'hard')) return 'Contradicción';
+  if (tension.length > 0) return 'Tradeoff';
+  return 'Coherente';
+}
+
+export function positionPixelVisualEngineTensionClass(tension: PositionPixelVisualEngineTension[]): string {
+  if (tension.some((item) => item.level === 'hard')) return 'read-check';
+  if (tension.length > 0) return 'read-strong';
+  return 'read-stable';
+}
+
+export function positionPixelVisualEngineTensionDetail(
+  tension: PositionPixelVisualEngineTension[],
+  channelBreakdownRead: string,
+  tacticalRead: string,
+): string {
+  if (tension.length === 0) {
+    return `visual y motor alineados: ${channelBreakdownRead} · ${tacticalRead}`;
+  }
+  return tension.map((item) => item.detail).join(' ? ');
+}
+
+export function positionPixelVisualEngineTensions(
+  row: PositionPixelMatrixSummary,
+  sourceLine: 'ATT' | 'MID' | 'DEF',
+): PositionPixelVisualEngineTension[] {
+  const breakdown = positionPixelChannelBreakdown(row);
+  const attackLoss = positionPixelAttackLossScore(row);
+  const attackGain = positionPixelAttackGainScore(row);
+  const defensiveRisk = positionPixelDefensiveRiskScore(row);
+  const defensiveGain = positionPixelDefensiveGainScore(row);
+  const tacticalRead = positionPixelTacticalRead(row);
+  const result: PositionPixelVisualEngineTension[] = [];
+  const visualExpectationMismatches = positionPixelVisualExpectationMismatches(row, sourceLine);
+  if (visualExpectationMismatches.length > 0 && !positionPixelIsMicroVisualMismatch(row)) {
+    result.push({
+      level: 'soft',
+      detail: `expectativa visual pendiente: ${visualExpectationMismatches.join(' / ')}`,
+    });
+  }
+  const mixedVisualTradeoff = (breakdown.threat >= 0.20 || breakdown.connection >= 0.20 || breakdown.coverage >= 0.20)
+    && (breakdown.threat <= -0.20 || breakdown.connection <= -0.20 || breakdown.coverage <= -0.20);
+  if (breakdown.threat >= 0.35
+      && (tacticalRead === 'Attack loss'
+        || (row.deltaXgFor <= -0.035 && row.deltaShotsFor <= -0.50)
+        || (attackLoss >= 0.8 && attackLoss > attackGain + 0.25))) {
+    result.push({
+      level: 'hard',
+      detail: `amenaza visual sube (${breakdown.threat.toFixed(2)}) pero el motor lee pérdida ofensiva (${attackLoss.toFixed(2)})`,
+    });
+  }
+  if (breakdown.threat <= -0.35
+      && (tacticalRead === 'Attack gain'
+        || (row.deltaXgFor >= 0.035 && row.deltaShotsFor >= 0.50)
+        || (attackGain >= 0.8 && attackGain > attackLoss + 0.25))) {
+    result.push({
+      level: 'hard',
+      detail: `amenaza visual baja (${breakdown.threat.toFixed(2)}) pero el motor lee ganancia ofensiva (${attackGain.toFixed(2)})`,
+    });
+  }
+  if (positionPixelHasContextualCoverageConflict(row, sourceLine, breakdown.coverage, defensiveRisk, defensiveGain, tacticalRead)) {
+    result.push({
+      level: 'soft',
+      detail: `cobertura contextual sube (${breakdown.coverage.toFixed(2)}) pero el motor lee riesgo defensivo (${defensiveRisk.toFixed(2)}): no asumir cobertura real`,
+    });
+  }
+  if (breakdown.coverage <= -0.35 && (tacticalRead === 'Def. gain' || (defensiveGain >= 0.8 && defensiveGain > defensiveRisk + 0.25))) {
+    result.push({
+      level: 'hard',
+      detail: `cobertura visual baja (${breakdown.coverage.toFixed(2)}) pero el motor lee mejora defensiva (${defensiveGain.toFixed(2)})`,
+    });
+  }
+  if (breakdown.connection >= 0.35 && attackLoss + defensiveRisk >= 1.8 && attackGain + defensiveGain < 0.8) {
+    result.push({
+      level: 'soft',
+      detail: `conexión visual sube (${breakdown.connection.toFixed(2)}) pero el balance del motor cae fuerte`,
+    });
+  }
+  if (mixedVisualTradeoff && positionPixelDistance(row) >= 6) {
+    return result.map((item) => item.level === 'hard'
+      ? {
+        level: 'soft',
+        detail: `${item.detail}; tradeoff visual mixto, no contradiccion dura`,
+      }
+      : item);
+  }
+  return result;
+}
+
+export function positionPixelHasContextualCoverageConflict(
+  row: PositionPixelMatrixSummary,
+  sourceLine: 'ATT' | 'MID' | 'DEF',
+  coverage: number,
+  defensiveRisk: number,
+  defensiveGain: number,
+  tacticalRead: string
+): boolean {
+  return coverage >= 0.35
+    && ((tacticalRead === 'Risk' || tacticalRead === 'Bad tradeoff')
+      || (defensiveRisk >= 0.8 && defensiveRisk > defensiveGain + 0.25)
+      || (positionPixelUsesContextualCoverage(row, sourceLine, coverage) && defensiveRisk >= 0.65));
 }
 
 export function positionPixelMovementConfidence(distance: number): number {
