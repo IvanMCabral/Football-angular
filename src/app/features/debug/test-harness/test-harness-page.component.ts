@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
+  isDevMode,
   OnDestroy,
   OnInit,
   computed,
@@ -2141,8 +2142,8 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
             <div class="matrix-header">
               <strong>Current lineup replay</strong>
               <span>
-                {{ replay.label }} ? formacion {{ replay.formation || '?' }}
-                ? seed {{ replay.seed ?? 'auto' }} ? {{ selectedStyleLabel() }}
+                {{ replay.label }} · formación {{ replay.formation || '?' }}
+                · seed {{ replay.seed ?? 'auto' }} · {{ selectedStyleLabel() }}
               </span>
               <button type="button" class="matrix-export" (click)="copyCurrentLineupReplayJson()">
                 Copy JSON
@@ -2182,8 +2183,8 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
             <div class="matrix-header">
               <strong>XI actual multi-seed</strong>
               <span>
-                {{ summary.label }} ? formacion {{ summary.formation || '?' }}
-                ? seeds {{ summary.seedStart }}..{{ summary.seedEnd }} ? {{ selectedStyleLabel() }}
+                {{ summary.label }} · formación {{ summary.formation || '?' }}
+                · seeds {{ summary.seedStart }}..{{ summary.seedEnd }} · {{ selectedStyleLabel() }}
               </span>
               <button type="button" class="matrix-export" (click)="copyCurrentLineupMultiSeedJson()">
                 Copy JSON
@@ -2405,7 +2406,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
               <strong>Simular sustitución</strong>
               <span>
                 {{ sub.playerOffName }} -> {{ sub.playerOnName }}
-                ? min {{ sub.minute }} ? seeds {{ sub.seedStart }}..{{ sub.seedEnd }}
+                · min {{ sub.minute }} · seeds {{ sub.seedStart }}..{{ sub.seedEnd }}
               </span>
             </div>
             <div class="current-replay-grid" role="group" aria-label="Simular sustitución summary">
@@ -2496,7 +2497,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
               <strong>Substitution timing matrix</strong>
               <span>
                 {{ substitutionTimingMatrixRows()[0].playerOffName }} -> {{ substitutionTimingMatrixRows()[0].playerOnName }}
-                ? seeds {{ substitutionTimingMatrixRows()[0].seedStart }}..{{ substitutionTimingMatrixRows()[0].seedEnd }}
+                · seeds {{ substitutionTimingMatrixRows()[0].seedStart }}..{{ substitutionTimingMatrixRows()[0].seedEnd }}
               </span>
             </div>
             <div class="matrix-table-wrapper">
@@ -2682,7 +2683,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
               <span *ngIf="roleSlotImpactRows()[0] as first">
                 {{ first.baselinePlayerName }} ? slot {{ first.slotId }}
                 ? XY {{ first.slotXPercent }}/{{ first.slotYPercent }}
-                ? seeds {{ first.seedStart }}..{{ first.seedEnd }}
+                · seeds {{ first.seedStart }}..{{ first.seedEnd }}
               </span>
             </div>
             <p class="panel-hint current-replay-starters">
@@ -2908,13 +2909,13 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
           </div>
           <div *ngIf="lineupDebugSnapshot() as debug" class="formation-matrix analysis-matrix current-lineup-replay">
             <div class="matrix-header">
-              <strong>Current lineup debug</strong>
+              <strong>Lectura del XI actual</strong>
               <span>
-                {{ debug.label }} · {{ lineupDebugScopeLabel(debug) }} · formacion {{ debug.formation || '?' }}
+                {{ debug.label }} · {{ lineupDebugScopeLabel(debug) }} · formación {{ debug.formation || '?' }}
                 · seleccionada {{ debug.selectedFormation || '?' }}
-                · players {{ debug.playerCount }}/11
+                · jugadores {{ debug.playerCount }}/11
                 · slots {{ debug.persistedSlotCount }}/{{ debug.effectiveSlotCount }}
-                · candidates {{ debug.candidatesCount }}
+                · candidatos {{ debug.candidatesCount }}
               </span>
             </div>
             <p class="panel-hint current-replay-starters" *ngIf="debug.warnings.length > 0">
@@ -6543,6 +6544,12 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         });
       }, TIMELINE_DEBOUNCE_MS);
     });
+  }
+
+  private logHarnessRestoreWarning(err: unknown): void {
+    if (isDevMode()) {
+      console.warn('[TEST-HARNESS] Failed to restore lineup after last modal move smoke:', err);
+    }
   }
   // ============== Lifecycle ==============
   ngOnInit(): void {
@@ -11174,7 +11181,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       finalize(() => {
         if (restore) {
           this.harness.manualSelectLineup(restore.formation, restore.playerIds, restore.slots).pipe(take(1)).subscribe({
-            error: (err) => console.warn('[TEST-HARNESS] Failed to restore lineup after last modal move smoke:', err),
+            error: (err) => this.logHarnessRestoreWarning(err),
           });
         }
       })
