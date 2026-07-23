@@ -642,7 +642,7 @@ describe('TestHarnessPageComponent', () => {
     expect(component.professionalSmokeSummary()?.included.join(' ')).toContain('Simular sustitución: 0 caso(s)');
     expect(component.analysisReadyMessage()).toContain('Smoke profesional full listo');
     expect(snackBarSpy.open).toHaveBeenCalledWith(
-      'Smoke profesional full complete: 2 pixel rows, 1 swaps, 0 substitutions.',
+      'Smoke profesional completo listo: 2 filas píxel, 1 swaps, 0 sustituciones.',
       'OK',
       { duration: 4500 }
     );
@@ -3020,7 +3020,7 @@ describe('TestHarnessPageComponent', () => {
     const review = (component as any).scenarioBatteryDecisionReview('NEED_GOAL', decision.label, cards);
 
     expect(decision.label).toBe('Atacar con cuidado: Canal izquierdo vs Rival: canal derecho');
-    expect(decision.detail).toContain('via ofensiva');
+    expect(decision.detail).toContain('vía ofensiva');
     expect(decision.detail).toContain('Amenaza: xGA +0.12');
     expect(review.label).toBe('OK: ataque contextual');
   });
@@ -3096,7 +3096,7 @@ describe('TestHarnessPageComponent', () => {
         review: 'OK: ataque contextual',
         reviewDetail: 'combina ataque y amenaza',
         cards: [
-          { title: 'Atacar', label: 'Canal izquierdo', metrics: 'xG +0.15 / xGA -0.11 / leve', detail: 'via ofensiva', className: 'read-visible' },
+          { title: 'Atacar', label: 'Canal izquierdo', metrics: 'xG +0.15 / xGA -0.11 / leve', detail: 'vía ofensiva', className: 'read-visible' },
           { title: 'Amenaza rival', label: 'Rival: canal derecho', metrics: 'xGA +0.07 / canal +0.45 / fuerte', detail: 'amenaza derecha', className: 'read-check' },
         ],
       } as any,
@@ -3290,9 +3290,9 @@ describe('TestHarnessPageComponent', () => {
     const decision = (component as any).scenarioBatteryDecision(cards, 'NEED_GOAL');
     const review = (component as any).scenarioBatteryDecisionReview('NEED_GOAL', decision.label, cards);
 
-    expect(decision.label).toBe('Sin via clara: 4-3-3');
-    expect(decision.detail).toContain('no encontro una via ofensiva clara');
-    expect(review.label).toBe('OK: sin via clara');
+    expect(decision.label).toBe('Sin vía clara: 4-3-3');
+    expect(decision.detail).toContain('no encontró una vía ofensiva clara');
+    expect(review.label).toBe('OK: sin vía clara');
   });
 
   it('infers tactical battery coach objective from score and minute in auto mode', () => {
@@ -3414,7 +3414,7 @@ describe('TestHarnessPageComponent', () => {
       { review: 'OK' },
       { review: 'OK' },
     ] as any);
-    expect(component.scenarioBatteryReviewHint()).toContain('Revision OK: 2/2');
+    expect(component.scenarioBatteryReviewHint()).toContain('Revisión OK: 2/2');
     component.scenarioBatteryRows.set([
       { review: 'OK' },
       { review: 'Revisar: poco gol' },

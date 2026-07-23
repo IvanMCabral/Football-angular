@@ -3565,7 +3565,7 @@ import {
                   <span role="columnheader">Objetivo</span>
                   <span role="columnheader">Contexto</span>
                   <span role="columnheader">Decision</span>
-                  <span role="columnheader">Revision</span>
+                  <span role="columnheader">Revisión</span>
                   <span role="columnheader">Plan</span>
                   <span role="columnheader">Doble</span>
                   <span role="columnheader">Atacar</span>
@@ -6647,15 +6647,15 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       ? 'Smoke test de baja confianza: usar para detectar señales, no para decidir definitivo. '
       : summary.precision === 'balanced'
         ? 'Lectura balanceada: buena para decidir que casos repetir en Reliable. '
-        : 'Lectura reliable: apta para tomar decisiones de calibracion si la señal es consistente. ';
+        : 'Lectura reliable: apta para tomar decisiones de calibración si la señal es consistente. ';
     const fitWarning = outOfRole > 0
       ? `Hay ${outOfRole} cambio(s) fuera de rol; separar esos experimentos de los cambios naturales. `
       : '';
     if (upgrades > 0 && downgrades === 0 && reviews === 0) {
-      return `${confidencePrefix}${fitWarning}La bateria favorece cambios positivos claros (${upgrades}/${summary.total}).`;
+      return `${confidencePrefix}${fitWarning}La batería favorece cambios positivos claros (${upgrades}/${summary.total}).`;
     }
     if (downgrades > 0 && upgrades === 0 && reviews === 0) {
-      return `${confidencePrefix}${fitWarning}La bateria detecta riesgo de empeorar el equipo (${downgrades}/${summary.total}).`;
+      return `${confidencePrefix}${fitWarning}La batería detecta riesgo de empeorar el equipo (${downgrades}/${summary.total}).`;
     }
     if (upgrades > 0 || downgrades > 0 || reviews > 0) {
       return `${confidencePrefix}${fitWarning}Hay señales mixtas: ${upgrades} upgrade(s), ${downgrades} downgrade(s), ${reviews} para revisar y ${noise} neutro(s). Repetir los casos decisivos con más seeds.`;
@@ -9393,7 +9393,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         const modal = this.currentLineupSummaryFromPreview(modalLineup, modalPreview);
         if (!originalLineup || !canonical || !modal) {
           this.modalVsCanonicalSummary.set(null);
-          this.snackBar.open('Base vs modal completed with insufficient samples.', 'OK', { duration: 4500 });
+          this.snackBar.open('Base vs modal listo con muestra insuficiente.', 'OK', { duration: 4500 });
           return;
         }
         const summary = this.buildModalVsCanonicalSummary(originalLineup, canonical, modal);
@@ -9493,8 +9493,8 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         const summary = this.playerSwapMatrixSummary();
         this.snackBar.open(
           summary
-            ? `Matriz cambio jugador complete: ${summary.baselinePlayer} vs ${summary.swapPlayer}, Delta xG ${this.fmtDeltaNumber(summary.deltaXgFor)}.`
-            : 'Matriz cambio jugador completed with insufficient samples.',
+            ? `Matriz cambio jugador lista: ${summary.baselinePlayer} vs ${summary.swapPlayer}, Delta xG ${this.fmtDeltaNumber(summary.deltaXgFor)}.`
+            : 'Matriz cambio jugador lista con muestra insuficiente.',
           'OK',
           { duration: 4500 }
         );
@@ -9576,8 +9576,8 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         const summary = this.substitutionWhatIfSummary();
         this.snackBar.open(
           summary
-            ? `Simular sustitución complete: ${summary.playerOffName} -> ${summary.playerOnName}, Delta xG ${this.fmtDeltaNumber(summary.deltaXgFor)}.`
-            : 'Simular sustitución completed with insufficient samples.',
+            ? `Simular sustitución lista: ${summary.playerOffName} -> ${summary.playerOnName}, Delta xG ${this.fmtDeltaNumber(summary.deltaXgFor)}.`
+            : 'Simular sustitución lista con muestra insuficiente.',
           'OK',
           { duration: 4500 }
         );
@@ -9595,7 +9595,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       return;
     }
     if (!this.selectedMatchIncludesUserTeam()) {
-      this.snackBar.open('Probar recomendaci?n modal usa el XI de tu equipo.', 'OK', { duration: 3500 });
+      this.snackBar.open('Probar recomendación modal usa el XI de tu equipo.', 'OK', { duration: 3500 });
       return;
     }
     const seedStart = this.seedInputModel ?? DEFAULT_REPLAY_SEED;
@@ -9607,7 +9607,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     this.substitutionWhatIfSummary.set(null);
     this.modalRecommendationCandidateAttempts.set([]);
     this.substitutionTimingMatrixRows.set([]);
-    this.analysisReadyMessage.set(`Probar recomendaci?n modal corriendo: ${this.playerSwapCoachObjectiveRead()}, min ${minute}, ${seedCount} seeds...`);
+    this.analysisReadyMessage.set(`Probar recomendación modal corriendo: ${this.playerSwapCoachObjectiveRead()}, min ${minute}, ${seedCount} seeds...`);
     this.mutationInFlight.set(true);
     let candidate: PlayerSwapCandidate | null = null;
     forkJoin({
@@ -9706,7 +9706,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.mutationInFlight.set(false);
-        this.analysisReadyMessage.set(this.fmtError(err, 'Probar recomendaci?n modal falló antes de generar Panel E'));
+        this.analysisReadyMessage.set(this.fmtError(err, 'Probar recomendación modal falló antes de generar Panel E'));
         this.snackBar.open(this.fmtError(err, 'Failed to run modal recommendation what-if'), 'OK', { duration: 5000 });
         this.refreshLineupContext();
       },
@@ -9720,11 +9720,11 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         this.snackBar.open(
           summary
             ? `Probar recomendación modal: ${summary.playerOffName} → ${summary.playerOnName}, ${this.playerSwapCoachObjectiveRead()}.`
-            : 'Probar recomendaci?n modal completed with insufficient samples.',
+            : 'Probar recomendación modal lista con muestra insuficiente.',
           'OK',
           { duration: 4500 }
         );
-        this.markReplayAnalysisReady('Probar recomendaci?n modal listo en Panel E.');
+        this.markReplayAnalysisReady('Probar recomendación modal listo en Panel E.');
         this.refreshLineupContext();
       },
     });
@@ -9796,8 +9796,8 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         const rows = this.substitutionTimingMatrixRows();
         this.snackBar.open(
           rows.length > 0
-            ? `Matriz minuto de cambio complete: ${rows[0].playerOffName} -> ${rows[0].playerOnName}, ${rows.length} minutos.`
-            : 'Matriz minuto de cambio completed with insufficient samples.',
+            ? `Matriz minuto de cambio lista: ${rows[0].playerOffName} -> ${rows[0].playerOnName}, ${rows.length} minutos.`
+            : 'Matriz minuto de cambio lista con muestra insuficiente.',
           'OK',
           { duration: 4500 }
         );
@@ -9879,7 +9879,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         this.mutationInFlight.set(false);
         const count = this.playerSwapBatterySummaries().length;
         this.snackBar.open(
-          count > 0 ? `Batería cambio jugador complete: ${count} swaps measured.` : 'Batería cambio jugador completed with insufficient samples.',
+          count > 0 ? `Batería cambio jugador lista: ${count} swaps medidos.` : 'Batería cambio jugador lista con muestra insuficiente.',
           'OK',
           { duration: 4500 }
         );
@@ -9940,7 +9940,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         this.mutationInFlight.set(false);
         const changed = this.playerSwapPrecisionComparisonRows().filter((row) => row.stability !== 'Stable read').length;
         this.snackBar.open(
-          `Precision compare complete: ${changed} changed/needs review.`,
+          `Comparación de precisión lista: ${changed} cambiaron o necesitan revisión.`,
           'OK',
           { duration: 4500 }
         );
@@ -10397,7 +10397,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       },
       complete: () => {
         this.mutationInFlight.set(false);
-        this.snackBar.open(`Último movimiento modal complete: ${modalMove.playerName}, ${seedCount} seeds.`, 'OK', { duration: 4500 });
+        this.snackBar.open(`Último movimiento modal listo: ${modalMove.playerName}, ${seedCount} seeds.`, 'OK', { duration: 4500 });
       },
     });
   }
@@ -10630,7 +10630,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         ));
         this.mutationInFlight.set(false);
         this.snackBar.open(
-          allOk ? `Auditoría líneas formación OK (${formation}).` : `Auditoría líneas formación has warnings (${formation}).`,
+          allOk ? `Auditoría líneas formación OK (${formation}).` : `Auditoría líneas formación con avisos (${formation}).`,
           'OK',
           { duration: 4000 }
         );
@@ -10869,7 +10869,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     this.positionPixelEvidenceNote.set(null);
     this.lastPositionPixelRunDiagnostics.set(null);
     this.lastPositionPixelResponseDiagnostics.set(null);
-    let lastPixelRunDiagnostics = `${label}: sin diagnostico todavia.`;
+    let lastPixelRunDiagnostics = `${label}: sin diagnóstico todavía.`;
     this.analysisReadyMessage.set(`${label} corriendo: preparando titulares, movimientos y ${seedCount} seeds...`);
     window.setTimeout(() => this.scrollToReplayAnalysis(), 0);
     const lineup$ = this.selectedMatchIncludesUserTeam()
@@ -11012,8 +11012,8 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         const summary = this.positionPixelMatrixSummary();
         this.snackBar.open(
           summary
-            ? `${label} complete: ${this.positionPixelMatrixRows().length} player/move rows, ${seedCount} seeds.`
-            : 'Position pixel matrix completed with no summary.',
+            ? `${label} listo: ${this.positionPixelMatrixRows().length} filas jugador/movimiento, ${seedCount} seeds.`
+            : 'Matriz de píxeles lista sin resumen.',
           'OK',
           { duration: 4500 }
         );
@@ -12396,11 +12396,11 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   scenarioBatteryReviewHint(): string {
     const rows = this.scenarioBatteryRows();
     if (rows.length === 0) {
-      return 'Revision pendiente: corre Tablero bateria.';
+      return 'Revisión pendiente: corre Tablero batería.';
     }
     const reviewCount = this.scenarioBatteryReviewCount();
     if (reviewCount === 0) {
-      return `Revision OK: ${rows.length}/${rows.length} lecturas coherentes.`;
+      return `Revisión OK: ${rows.length}/${rows.length} lecturas coherentes.`;
     }
     const labels = Array.from(new Set(rows
       .filter((row) => row.review.startsWith('Revisar'))
@@ -12408,7 +12408,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     ));
     const sample = labels.slice(0, 2).join(' + ');
     const suffix = labels.length > 2 ? ` +${labels.length - 2}` : '';
-    return `Revision: ${reviewCount}/${rows.length} para mirar (${sample}${suffix}).`;
+    return `Revisión: ${reviewCount}/${rows.length} para mirar (${sample}${suffix}).`;
   }
   scenarioBatteryReviewItems(): ScenarioBatteryReviewItem[] {
     return this.scenarioBatteryRows()
@@ -12417,7 +12417,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       .map((row) => ({
         key: `${row.matchId}-${row.controlledSide}-${row.review}`,
         summary: `${row.review}: ${row.controlledTeam} vs ${row.matchLabel}`,
-        detail: `${row.coachContext} ? ${row.decision} ? ${row.reviewDetail}`,
+        detail: `${row.coachContext} · ${row.decision} · ${row.reviewDetail}`,
       }));
   }
   scenarioBatteryCoachAdvice(): ScenarioBatteryCoachAdvice | null {
@@ -12939,15 +12939,15 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     }
     if (objective === 'NEED_GOAL' && !attack && !offensiveRisk && !twoWay && avoid) {
       return {
-        label: `Sin via clara: ${avoid.label}`,
-        detail: `Necesitas gol, pero la bateria no encontro una via ofensiva clara; ${avoid.label} aparece como accion a evitar, no como solucion. ${avoid.metrics}. ${avoid.detail}`,
+        label: `Sin vía clara: ${avoid.label}`,
+        detail: `Necesitás gol, pero la batería no encontró una vía ofensiva clara; ${avoid.label} aparece como acción a evitar, no como solución. ${avoid.metrics}. ${avoid.detail}`,
       };
     }
     if (attack) {
       if (threat) {
         return {
           label: `Atacar con cuidado: ${attack.label} vs ${threat.label}`,
-          detail: `${attack.label} es la via ofensiva, pero hay amenaza rival. Ataque: ${attack.metrics}. Amenaza: ${threat.metrics}. ${attack.detail}`,
+          detail: `${attack.label} es la vía ofensiva, pero hay amenaza rival. Ataque: ${attack.metrics}. Amenaza: ${threat.metrics}. ${attack.detail}`,
         };
       }
       return {
@@ -12988,7 +12988,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     }
     return {
       label: 'Mantener equipo',
-      detail: 'No hay una señal suficientemente clara para recomendar un cambio de DT en esta bateria.',
+      detail: 'No hay una señal suficientemente clara para recomendar un cambio de DT en esta batería.',
     };
   }
   private scenarioBatteryDecisionReview(
@@ -12999,22 +12999,22 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const has = (title: string) => cards.some((card) => card.title === title);
     const starts = (...prefixes: string[]) => prefixes.some((prefix) => decisionLabel.startsWith(prefix));
     if (objective === 'NEED_GOAL') {
-      if (starts('Sin via clara')) {
+      if (starts('Sin vía clara')) {
         return {
-          label: 'OK: sin via clara',
-          detail: `El objetivo es buscar gol y la bateria confirmo que no hay Atacar, Riesgo ofensivo ni Doble ganancia; "${decisionLabel}" queda como diagnostico, no como falso positivo.`,
+          label: 'OK: sin vía clara',
+          detail: `El objetivo es buscar gol y la batería confirmó que no hay Atacar, Riesgo ofensivo ni Doble ganancia; "${decisionLabel}" queda como diagnóstico, no como falso positivo.`,
         };
       }
       if (starts('Cerrar partido', 'Cerrar amenaza', 'Proteger', 'No forzar', 'No arriesgar', 'Mantener equipo')) {
         return {
           label: 'Revisar: poco gol',
-          detail: `El objetivo es buscar gol, pero la decision fue "${decisionLabel}". Revisar si faltan escenarios ofensivos claros o si el motor penaliza demasiado el riesgo.`,
+          detail: `El objetivo es buscar gol, pero la decisión fue "${decisionLabel}". Revisar si faltan escenarios ofensivos claros o si el motor penaliza demasiado el riesgo.`,
         };
       }
       if (!has('Atacar') && !has('Riesgo ofensivo') && !has('Doble ganancia')) {
         return {
-          label: 'Revisar: sin via',
-          detail: 'El objetivo es buscar gol, pero la bateria no encontro Atacar, Riesgo ofensivo ni Doble ganancia. Puede ser correcto si no hay buen cambio, pero conviene auditar.',
+          label: 'Revisar: sin vía',
+          detail: 'El objetivo es buscar gol, pero la batería no encontró Atacar, Riesgo ofensivo ni Doble ganancia. Puede ser correcto si no hay buen cambio, pero conviene auditar.',
         };
       }
     }
@@ -13022,31 +13022,31 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       if (starts('Atacar', 'Riesgo alto', 'Riesgo asumible', 'Aprovechar')) {
         return {
           label: 'Revisar: mucho riesgo',
-          detail: `El objetivo es cuidar resultado, pero la decision fue "${decisionLabel}". Revisar si el escenario abre demasiado xGA o si falta una alternativa defensiva mejor.`,
+          detail: `El objetivo es cuidar resultado, pero la decisión fue "${decisionLabel}". Revisar si el escenario abre demasiado xGA o si falta una alternativa defensiva mejor.`,
         };
       }
       if (!has('Cuidar') && !has('Amenaza rival') && !has('Evitar') && !has('Riesgo ofensivo')) {
         return {
           label: 'Revisar: sin cierre',
-          detail: 'El objetivo es cuidar resultado, pero la bateria no encontro Cuidar, Amenaza rival, Evitar ni una accion ofensiva para descartar. Puede faltar cobertura defensiva en los escenarios.',
+          detail: 'El objetivo es cuidar resultado, pero la batería no encontró Cuidar, Amenaza rival, Evitar ni una acción ofensiva para descartar. Puede faltar cobertura defensiva en los escenarios.',
         };
       }
     }
     if (objective === 'NEUTRAL' && starts('Riesgo alto')) {
       return {
         label: 'Revisar: riesgo neutral',
-        detail: `El objetivo es neutral y la decision fue "${decisionLabel}". Puede estar bien, pero conviene revisar si el beneficio ofensivo compensa el riesgo.`,
+        detail: `El objetivo es neutral y la decisión fue "${decisionLabel}". Puede estar bien, pero conviene revisar si el beneficio ofensivo compensa el riesgo.`,
       };
     }
     if (starts('Atacar con cuidado', 'Aprovechar con cuidado')) {
       return {
         label: 'OK: ataque contextual',
-        detail: `La decision "${decisionLabel}" combina via ofensiva con amenaza rival visible.`,
+        detail: `La decisión "${decisionLabel}" combina vía ofensiva con amenaza rival visible.`,
       };
     }
     return {
       label: 'OK',
-      detail: `La decision "${decisionLabel}" es consistente con el objetivo ${this.scenarioBatteryCoachObjectiveLabel(objective)} y las señales disponibles.`,
+      detail: `La decisión "${decisionLabel}" es consistente con el objetivo ${this.scenarioBatteryCoachObjectiveLabel(objective)} y las señales disponibles.`,
     };
   }
   scenarioBatteryCardSummary(row: ScenarioBatteryRow, title: string): string {
@@ -13055,7 +13055,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   }
   scenarioBatteryCardDetail(row: ScenarioBatteryRow, title: string): string {
     const card = row.cards.find((item) => item.title === title);
-    return card ? card.detail : 'Sin señal clara en esta bateria.';
+    return card ? card.detail : 'Sin señal clara en esta batería.';
   }
   scenarioBatteryRiskCardSummary(row: ScenarioBatteryRow): string {
     const card = row.cards.find((item) => item.title === 'Riesgo ofensivo')
@@ -13065,7 +13065,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   scenarioBatteryRiskCardDetail(row: ScenarioBatteryRow): string {
     const card = row.cards.find((item) => item.title === 'Riesgo ofensivo')
       ?? row.cards.find((item) => item.title === 'Evitar');
-    return card ? card.detail : 'Sin riesgo claro en esta bateria.';
+    return card ? card.detail : 'Sin riesgo claro en esta batería.';
   }
   private scenarioBatteryExportRow(row: ScenarioBatteryRow): Record<string, unknown> {
     const summary = (title: string) => this.scenarioBatteryCardSummary(row, title);
@@ -14276,7 +14276,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           this.refreshLineupContext();
         }
         this.snackBar.open(
-          `Matriz formaciones completed (${this.formationReplayResults().length} formations).`,
+          `Matriz formaciones lista (${this.formationReplayResults().length} formaciones).`,
           'OK',
           { duration: 3000 }
         );
@@ -14290,14 +14290,14 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   onRunFormationMatrixSummary(): void {
     const matchId = this.selectedMatchId();
     if (!matchId) {
-      this.snackBar.open('Select a match in Panel C first.', 'OK', { duration: 3000 });
+      this.snackBar.open('Elegí un partido en el Panel C primero.', 'OK', { duration: 3000 });
       return;
     }
     const seedStart = this.summarySeedStart();
     const seedCount = this.scenarioMatrixSummaryEffectiveSeedCount();
     this.scenarioMatrixSummarySeedCount.set(seedCount);
     this.clearFormationAverageResults();
-    this.analysisReadyMessage.set(`Formation averages corriendo: ${seedCount} seeds por formación...`);
+    this.analysisReadyMessage.set(`Promedio formaciones corriendo: ${seedCount} seeds por formación...`);
     this.mutationInFlight.set(true);
     this.harness.setStyle(this.selectedStyleModel).pipe(
       switchMap(() => this.harness.runFormationMatrixSummary(matchId, seedStart, seedCount, this.controlledTeamSideModel))
@@ -14306,7 +14306,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         const safeRows = rows ?? [];
         this.formationMatrixSummaryResults.set(safeRows);
         this.snackBar.open(
-          `Formation averages completed (${safeRows.length} formations ? ${seedCount} seeds).`,
+          `Promedio formaciones listo (${safeRows.length} formaciones · ${seedCount} seeds).`,
           'OK',
           { duration: 3000 }
         );
@@ -14415,7 +14415,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           `Smoke profesional listo para ${controlledName}: ${safeFormationRows.length} formaciones · ${safeScenarioRows.length} escenarios${stepIssues.length > 0 ? ' · con observaciones' : ''}.`
         );
         this.snackBar.open(
-          `Smoke profesional complete: ${safeFormationRows.length} formations, ${safeScenarioRows.length} scenarios.`,
+          `Smoke profesional listo: ${safeFormationRows.length} formaciones, ${safeScenarioRows.length} escenarios.`,
           'OK',
           { duration: 4500 }
         );
@@ -14817,7 +14817,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       read: finalRead,
     });
     this.markReplayAnalysisReady(`Smoke profesional full listo para ${controlledName}: ${pixelRows} píxeles · ${swapRows} swaps · ${substitutionRows} sustituciones.`);
-    this.snackBar.open(`Smoke profesional full complete: ${pixelRows} pixel rows, ${swapRows} swaps, ${substitutionRows} substitutions.`, 'OK', { duration: 4500 });
+    this.snackBar.open(`Smoke profesional completo listo: ${pixelRows} filas píxel, ${swapRows} swaps, ${substitutionRows} sustituciones.`, 'OK', { duration: 4500 });
   }
   private professionalSmokeFinalVerdict(): { verdict: NonNullable<ProfessionalSmokeSummary['verdict']>; detail: string } {
     const checks = this.professionalQaChecklistRows();
@@ -15236,7 +15236,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         this.sideMirrorSmokeRows.set(rows);
         this.realSideMirrorRows.set(rows);
         this.markReplayAnalysisReady(`Smoke espejo bandas listo: ${rows.length} formaciones comparadas.`);
-        this.snackBar.open(`Smoke espejo bandas completed (${rows.length} formaciones).`, 'OK', { duration: 3500 });
+        this.snackBar.open(`Smoke espejo bandas listo (${rows.length} formaciones).`, 'OK', { duration: 3500 });
       },
       error: (err) => {
         this.mutationInFlight.set(false);
@@ -15262,7 +15262,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         this.sideMirrorSmokeRows.set(mappedRows);
         this.syntheticSideMirrorRows.set(mappedRows);
         this.markReplayAnalysisReady(`Lab espejo sintetico listo: ${(rows ?? []).length} formaciones comparadas.`);
-        this.snackBar.open(`Lab espejo sintetico completed (${(rows ?? []).length} formaciones).`, 'OK', { duration: 3500 });
+        this.snackBar.open(`Lab espejo sintético listo (${(rows ?? []).length} formaciones).`, 'OK', { duration: 3500 });
       },
       error: (err) => {
         this.mutationInFlight.set(false);
@@ -15518,7 +15518,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         this.scenarioMatrixResults.set(rows ?? []);
         this.mutationInFlight.set(false);
         this.snackBar.open(
-          `Matriz escenarios completed (${rows?.length ?? 0} scenarios).`,
+          `Matriz escenarios lista (${rows?.length ?? 0} escenarios).`,
           'OK',
           { duration: 3000 }
         );
@@ -15794,7 +15794,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         this.scenarioMatrixSummaryResults.set(safeRows);
         this.mutationInFlight.set(false);
         this.snackBar.open(
-          `${label} completed (${safeRows.length} scenarios x ${seedCount} seeds).`,
+          `${label} listo (${safeRows.length} escenarios x ${seedCount} seeds).`,
           'OK',
           { duration: 3500 }
         );
@@ -16193,7 +16193,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         this.mutationInFlight.set(false);
         const count = this.playerSwapBatterySummaries().length;
         this.snackBar.open(
-          count > 0 ? `Smoke completo de cambios complete: ${count} swaps measured.` : 'Smoke completo de cambios completed with insufficient samples.',
+          count > 0 ? `Smoke completo de cambios listo: ${count} swaps medidos.` : 'Smoke completo de cambios listo con muestra insuficiente.',
           'OK',
           { duration: 4500 }
         );
@@ -16516,7 +16516,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         if (expectedMatchCount > 0 && completed >= expectedMatchCount) {
           this.clearRoundRefreshTimers();
           this.snackBar.open(
-            `Round ${roundNumber} completed (${completed}/${expectedMatchCount}). Tablero bateria ya tiene mas muestra.`,
+            `Fecha ${roundNumber} completada (${completed}/${expectedMatchCount}). Tablero batería ya tiene más muestra.`,
             'OK',
             { duration: 3500 }
           );
