@@ -1,8 +1,10 @@
 import {
   playerSwapHasLargeQualityDrop,
   playerSwapCoachReadLevel,
+  playerSwapDecisionScore,
   playerSwapOverallDelta,
   playerSwapOverallDeltaText,
+  playerSwapProtectSpecialistScore,
   playerSwapQualityWarning,
   playerSwapSignalClass,
   playerSwapSignalRead,
@@ -10,6 +12,7 @@ import {
   playerSwapTacticalBreakdown,
   playerSwapTacticalLabel,
 } from './player-swap-analysis';
+import { PlayerSwapMatrixSummary } from '../models/test-harness.model';
 
 describe('player-swap-analysis', () => {
   const formatDelta = (value: number): string => (value >= 0 ? `+${value}` : `${value}`);
@@ -35,6 +38,45 @@ describe('player-swap-analysis', () => {
     deltaWideShotsAgainst: 0,
     deltaLongShotsAgainst: 0,
   };
+  const baseSummaryRow = {
+    ...baseTacticalRow,
+    testCase: 'swap test',
+    slotId: 'S1',
+    formation: '4-4-2',
+    seedStart: 1,
+    seedEnd: 1,
+    seedCount: 1,
+    baselinePlayer: 'Starter',
+    swapPlayer: 'Bench',
+    baselinePlayerPosition: 'MID',
+    swapPlayerPosition: 'MID',
+    deltaPlayerOverall: 1,
+    baseline: {} as PlayerSwapMatrixSummary['baseline'],
+    swapped: {} as PlayerSwapMatrixSummary['swapped'],
+    deltaGoalsFor: 0,
+    deltaGoalsAgainst: 0,
+    deltaGoalDiff: 0,
+    swapRead: 'Noise / neutral',
+    swapReadDetail: '',
+    swapReadClass: 'delta-neutral',
+    swapFit: 'Same line',
+    swapFitDetail: '',
+    swapFitClass: 'read-stable',
+    tacticalAttackRead: '',
+    tacticalAttackClass: '',
+    tacticalCentralControlRead: '',
+    tacticalCentralControlClass: '',
+    tacticalProtectionRead: '',
+    tacticalProtectionClass: '',
+    tacticalChannelsRead: '',
+    tacticalChannelsClass: '',
+    tacticalBreakdownDetail: '',
+    signalScore: 0,
+    signalRead: '',
+    signalClass: '',
+    signalDetail: '',
+    timestamp: '',
+  } satisfies PlayerSwapMatrixSummary;
 
   it('calculates the individual quality delta for a player swap', () => {
     expect(playerSwapOverallDelta({ baselinePlayerOverall: 72, swapPlayerOverall: 78 })).toBe(6);
@@ -187,5 +229,39 @@ describe('player-swap-analysis', () => {
     expect(breakdown.tacticalProtectionClass).toBe('delta-negative');
     expect(breakdown.tacticalChannelsRead).toBe('Canales +');
     expect(breakdown.tacticalBreakdownDetail).toContain('Alerta de rol: prueba');
+  });
+
+  it('scores player swap recommendations differently by coach objective', () => {
+    const attackingSwap = {
+      ...baseSummaryRow,
+      deltaXgFor: 0.10,
+      deltaShotsFor: 3,
+      deltaWideShotsFor: 2,
+      deltaXgAgainst: 0.06,
+      deltaShotsAgainst: 2,
+    };
+
+    expect(playerSwapDecisionScore(attackingSwap, 'NEED_GOAL')).toBeGreaterThan(playerSwapDecisionScore(attackingSwap, 'PROTECT_RESULT'));
+  });
+
+  it('rewards protect specialists for reducing risk and keeping defensive profile', () => {
+    const defensiveSwap = {
+      ...baseSummaryRow,
+      baselinePlayerPosition: 'DEF',
+      swapPlayerPosition: 'DEF',
+      deltaXgAgainst: -0.08,
+      deltaShotsAgainst: -2,
+      preAutoSubDeltaXgAgainst: -0.04,
+      swapFit: 'Same profile',
+    };
+    const riskyAttacker = {
+      ...baseSummaryRow,
+      swapPlayerPosition: 'ATT',
+      deltaXgAgainst: 0.03,
+      deltaShotsAgainst: 1,
+      swapFit: 'Out of role',
+    };
+
+    expect(playerSwapProtectSpecialistScore(defensiveSwap)).toBeGreaterThan(playerSwapProtectSpecialistScore(riskyAttacker));
   });
 });

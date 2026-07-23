@@ -1,4 +1,8 @@
-import { PlayerSwapMatrixSummary, PlayerSwapMatrixSummaryRow } from '../models/test-harness.model';
+import {
+  PlayerSwapMatrixSummary,
+  PlayerSwapMatrixSummaryRow,
+  ScenarioBatteryCoachObjective,
+} from '../models/test-harness.model';
 
 type PlayerSwapOverallRead = Pick<PlayerSwapMatrixSummaryRow, 'baselinePlayerOverall' | 'swapPlayerOverall'>;
 type PlayerSwapSignalRead = Pick<
@@ -210,4 +214,61 @@ export function playerSwapTacticalBreakdown(
       + `Zonas for C/W/L ${formatDeltaNumber(row.deltaCentralShotsFor)}/${formatDeltaNumber(row.deltaWideShotsFor)}/${formatDeltaNumber(row.deltaLongShotsFor)}; `
       + `against C/W/L ${formatDeltaNumber(row.deltaCentralShotsAgainst)}/${formatDeltaNumber(row.deltaWideShotsAgainst)}/${formatDeltaNumber(row.deltaLongShotsAgainst)}.`,
   };
+}
+
+export function playerSwapDecisionScore(
+  row: PlayerSwapMatrixSummary,
+  objective: ScenarioBatteryCoachObjective,
+): number {
+  const shotDiff = row.deltaShotsFor - row.deltaShotsAgainst;
+  const base = row.deltaXgDiff
+    + (row.preAutoSubDeltaXgDiff || 0) * 0.60
+    + shotDiff * 0.015
+    + row.deltaPossessionFor * 0.0015
+    + Math.min(0, playerSwapOverallDelta(row) ?? 0) * 0.025;
+  if (objective === 'NEED_GOAL') {
+    return base * 0.35
+      + row.deltaXgFor * 1.45
+      + row.deltaShotsFor * 0.035
+      + Math.max(0, row.deltaWideShotsFor + row.deltaCentralShotsFor) * 0.010
+      - Math.max(0, -row.deltaXgFor) * 0.85
+      - Math.max(0, -row.deltaShotsFor) * 0.020
+      - (row.swapFit === 'Out of role' && row.deltaXgFor <= 0 ? 0.08 : 0);
+  }
+  if (objective === 'PROTECT_RESULT') {
+    return base * 0.40
+      - row.deltaXgAgainst * 1.35
+      - row.deltaShotsAgainst * 0.030
+      - Math.max(0, row.deltaWideShotsAgainst + row.deltaCentralShotsAgainst) * 0.010
+      + Math.max(0, row.deltaXgDiff) * 0.35
+      - (row.swapFit === 'Out of role' && row.deltaXgAgainst > 0 ? 0.12 : 0);
+  }
+  return base;
+}
+
+export function playerSwapProtectSpecialistScore(row: PlayerSwapMatrixSummary): number {
+  const benchPosition = row.swapPlayerPosition;
+  const starterPosition = row.baselinePlayerPosition;
+  const defensiveLineBonus = benchPosition === 'DEF'
+    ? 0.22
+    : benchPosition === 'MID'
+      ? 0.10
+      : benchPosition === 'WINGER'
+        ? -0.04
+        : benchPosition === 'ATT'
+          ? -0.16
+          : 0;
+  const preservesDefensiveRole = starterPosition === benchPosition && ['DEF', 'MID'].includes(benchPosition) ? 0.08 : 0;
+  const riskReduction = Math.max(0, -row.deltaXgAgainst) * 2.20
+    + Math.max(0, -row.deltaShotsAgainst) * 0.050
+    + Math.max(0, -(row.preAutoSubDeltaXgAgainst ?? row.deltaXgAgainst)) * 1.10;
+  const riskIncreasePenalty = Math.max(0, row.deltaXgAgainst) * 1.40
+    + Math.max(0, row.deltaShotsAgainst) * 0.025;
+  const attackInsurance = Math.max(0, row.deltaXgDiff) * 0.18;
+  return riskReduction
+    - riskIncreasePenalty
+    + defensiveLineBonus
+    + preservesDefensiveRole
+    + attackInsurance
+    - (row.swapFit === 'Out of role' ? 0.14 : 0);
 }
