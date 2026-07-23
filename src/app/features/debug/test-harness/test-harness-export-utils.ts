@@ -10,3 +10,17 @@ export function csvLines(header: string[], rows: Record<string, unknown>[]): str
     ...rows.map((row) => header.map((key) => csvCell(row[key])).join(',')),
   ];
 }
+
+export function downloadTextFile(
+  text: string,
+  filename: string,
+  mimeType = 'text/plain;charset=utf-8',
+): void {
+  const blob = new Blob([text], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}

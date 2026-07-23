@@ -130,7 +130,11 @@ import {
   TIMELINE_MAX_MINUTE,
   TIMELINE_STEP,
 } from './test-harness.constants';
-import { csvCell as formatCsvCell, csvLines as buildCsvLines } from './test-harness-export-utils';
+import {
+  csvCell as formatCsvCell,
+  csvLines as buildCsvLines,
+  downloadTextFile as saveTextFile,
+} from './test-harness-export-utils';
 import {
   playerSwapHasLargeQualityDrop as hasLargePlayerSwapQualityDrop,
   playerSwapOverallDelta as getPlayerSwapOverallDelta,
@@ -6379,13 +6383,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       'awayCentralShots', 'awayWideShots', 'awayLongShots',
     ];
     const lines = this.csvLines(header, rows as unknown as Record<string, unknown>[]);
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `formation-matrix-${this.seedInputModel ?? 'auto'}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    this.downloadCsv(lines, `formation-matrix-${this.seedInputModel ?? 'auto'}.csv`);
   }
   downloadPlayerSwapMatrixCsv(): void {
     const row = this.playerSwapMatrixSummary();
@@ -6412,13 +6410,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       'timestamp',
     ];
     const lines = this.csvLines(header, [exportRow as Record<string, unknown>]);
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `player-swap-${row.formation}-${row.slotId}-${row.seedStart}-${row.seedEnd}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    this.downloadCsv(lines, `player-swap-${row.formation}-${row.slotId}-${row.seedStart}-${row.seedEnd}.csv`);
     this.snackBar.open('Matriz cambio jugador CSV exported.', 'OK', { duration: 2500 });
   }
   downloadPlayerSwapBatteryCsv(): void {
@@ -6446,13 +6438,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       'timestamp',
     ];
     const lines = this.csvLines(header, exportRows);
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `player-swap-battery-${this.playerSwapBatteryPrecisionModel}-${rows[0].formation}-${rows[0].seedStart}-${rows[0].seedEnd}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    this.downloadCsv(lines, `player-swap-battery-${this.playerSwapBatteryPrecisionModel}-${rows[0].formation}-${rows[0].seedStart}-${rows[0].seedEnd}.csv`);
     this.snackBar.open(`Batería cambio jugador CSV exported (${rows.length} rows).`, 'OK', { duration: 2500 });
   }
   downloadPositionPixelMatrixCsv(): void {
@@ -6470,13 +6456,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       'baselineXgFor', 'baselineXgAgainst', 'movedXgFor', 'movedXgAgainst', 'timestamp',
     ];
     const lines = this.csvLines(header, rows as unknown as Record<string, unknown>[]);
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `position-movement-${this.positionPixelReadFilter()}-${this.positionPixelSortMode()}-${this.seedInputModel ?? 'auto'}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    this.downloadCsv(lines, `position-movement-${this.positionPixelReadFilter()}-${this.positionPixelSortMode()}-${this.seedInputModel ?? 'auto'}.csv`);
     this.snackBar.open(`Position movement CSV exported (${rows.length} rows).`, 'OK', { duration: 2500 });
   }
   downloadScenarioMatrixSummaryCsv(): void {
@@ -6498,13 +6478,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       'avgUserLeftWideXgDelta', 'avgUserRightWideXgDelta', 'avgOpponentLeftWideXgDelta', 'avgOpponentRightWideXgDelta',
     ];
     const lines = this.csvLines(header, rows);
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `scenario-summary-${this.scenarioSummaryReadFilter()}-${this.scenarioSummarySortMode()}-${this.summarySeedStart()}-${this.summarySeedEnd()}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    this.downloadCsv(lines, `scenario-summary-${this.scenarioSummaryReadFilter()}-${this.scenarioSummarySortMode()}-${this.summarySeedStart()}-${this.summarySeedEnd()}.csv`);
     this.snackBar.open(`Scenario summary CSV exported (${rows.length} rows).`, 'OK', { duration: 2500 });
   }
   downloadScenarioBatteryCsv(): void {
@@ -6520,13 +6494,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       'planDetail', 'twoWayDetail', 'attackDetail', 'shapeDetail', 'protectDetail', 'avoidDetail', 'opponentThreatDetail',
     ];
     const lines = this.csvLines(header, rows);
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `scenario-battery-${this.summarySeedStart()}-${this.summarySeedStart() + this.scenarioMatrixSmokeSeedCount() - 1}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    this.downloadCsv(lines, `scenario-battery-${this.summarySeedStart()}-${this.summarySeedStart() + this.scenarioMatrixSmokeSeedCount() - 1}.csv`);
     this.snackBar.open(`Scenario battery CSV exported (${rows.length} rows).`, 'OK', { duration: 2500 });
   }
   private csvCell(value: unknown): string {
@@ -6534,6 +6502,9 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   }
   private csvLines(header: string[], rows: Record<string, unknown>[]): string[] {
     return buildCsvLines(header, rows);
+  }
+  private downloadCsv(lines: string[], filename: string): void {
+    saveTextFile(lines.join('\n'), filename, 'text/csv;charset=utf-8');
   }
   private playerSwapExportRow(row: PlayerSwapMatrixSummary): Record<string, unknown> {
     return {

@@ -1,4 +1,4 @@
-import { csvCell, csvLines } from './test-harness-export-utils';
+import { csvCell, csvLines, downloadTextFile } from './test-harness-export-utils';
 
 describe('test-harness-export-utils', () => {
   it('keeps simple CSV cells readable', () => {
@@ -38,5 +38,22 @@ describe('test-harness-export-utils', () => {
       'name,note',
       'A,"wide, central"',
     ]);
+  });
+
+  it('downloads text files through a temporary object URL', () => {
+    const anchor = document.createElement('a');
+    const clickSpy = spyOn(anchor, 'click');
+    const createElementSpy = spyOn(document, 'createElement').and.returnValue(anchor);
+    const createObjectUrlSpy = spyOn(URL, 'createObjectURL').and.returnValue('blob:test-url');
+    const revokeObjectUrlSpy = spyOn(URL, 'revokeObjectURL');
+
+    downloadTextFile('hello', 'report.csv', 'text/csv;charset=utf-8');
+
+    expect(createElementSpy).toHaveBeenCalledWith('a');
+    expect(createObjectUrlSpy).toHaveBeenCalled();
+    expect(anchor.href).toContain('blob:test-url');
+    expect(anchor.download).toBe('report.csv');
+    expect(clickSpy).toHaveBeenCalled();
+    expect(revokeObjectUrlSpy).toHaveBeenCalledWith('blob:test-url');
   });
 });
