@@ -341,9 +341,24 @@ describe('SquadEditorModalComponent — MVP1-lineup-cancha-1.5 fixes', () => {
 
     // Esperar a que termine la inicialización (loadSquadFromBackend + formations + current)
     setTimeout(() => {
-      // Forzar selectedFormation a 4-3-3 y disparar onFormationChange
-      component.selectedFormation = '4-3-3';
-      component.onFormationChange();
+      const starters = elevenPlayers.map((player, index) => ({
+        ...player,
+        role: player.position,
+        stamina: player.energy,
+        active: true,
+        isEmpty: false,
+        slotId: [
+          'GK-1', 'S22-1', 'S22-2', 'S23-2', 'S24-3',
+          'S13-2', 'S14-2', 'S15-2', 'S04-1', 'S05-2', 'S06-3'
+        ][index]
+      }));
+      (component as any).slotPlayerMap = Object.fromEntries(starters.map(player => [player.slotId, player]));
+      (component as any).homePlayers$.next(starters);
+      (component as any).benchPlayers$.next([]);
+      component.selectedFormation = '4-4-2';
+      component.homeFormation$.next('4-4-2');
+      (component as any).isInitializing = false;
+      component.onFormationChange('4-3-3');
 
       // Esperar a que el Promise de executeFormationChange se resuelva
       // y saveLineup dispare los POSTs a /manual-select y /confirm
@@ -351,10 +366,8 @@ describe('SquadEditorModalComponent — MVP1-lineup-cancha-1.5 fixes', () => {
         const allPostUrls = httpClientSpy.post.calls.allArgs()
           .map(args => String(args[0]));
 
-        expect(allPostUrls.some(u => u.includes('/career/lineup/auto-select')))
-          .toBe(true, 'debe haberse llamado /career/lineup/auto-select');
         expect(allPostUrls.some(u => u.includes('/career/lineup/manual-select')))
-          .toBe(true, 'F4: debe haberse llamado /career/lineup/manual-select (saveLineup defensivo)');
+          .toBe(true, 'F4: debe haberse llamado /career/lineup/manual-select con los mismos jugadores');
         done();
       }, 50);
     }, 30);
@@ -828,7 +841,7 @@ describe('SquadEditorModalComponent — V25D47 (C11b) drag-drop + effectiveness'
       expect(summary?.textContent).toContain('Impacto');
       expect(advice?.textContent).toContain('Rueda de auxilio defensiva');
       done();
-    }, 30);
+    }, 100);
   });
 
   // ---- drag-drop handlers (direct method calls) ----
@@ -2558,7 +2571,33 @@ describe('SquadEditorModalComponent — V25D91.5-FRONT F6 formation change updat
       defenders: 3, midfielders: 5, attackers: 2, outfieldPlayers: 10,
       positions: [
         { index: 0, role: 'GK', xPercent: 50, yPercent: 93, actionRangePercent: 5, subdivisionId: 'GK-1' },
-        { index: 1, role: 'CB', xPercent: 50, yPercent: 85, actionRangePercent: 6, subdivisionId: 'S22-2' }
+        { index: 1, role: 'CB', xPercent: 25, yPercent: 83, actionRangePercent: 6, subdivisionId: 'S22-1' },
+        { index: 2, role: 'CB', xPercent: 50, yPercent: 85, actionRangePercent: 6, subdivisionId: 'S22-2' },
+        { index: 3, role: 'CB', xPercent: 75, yPercent: 83, actionRangePercent: 6, subdivisionId: 'S23-2' },
+        { index: 4, role: 'LWB', xPercent: 10, yPercent: 55, actionRangePercent: 8, subdivisionId: 'S13-1' },
+        { index: 5, role: 'CM', xPercent: 32, yPercent: 55, actionRangePercent: 8, subdivisionId: 'S13-2' },
+        { index: 6, role: 'CM', xPercent: 50, yPercent: 50, actionRangePercent: 8, subdivisionId: 'S14-2' },
+        { index: 7, role: 'CM', xPercent: 68, yPercent: 55, actionRangePercent: 8, subdivisionId: 'S15-2' },
+        { index: 8, role: 'RWB', xPercent: 90, yPercent: 55, actionRangePercent: 8, subdivisionId: 'S15-3' },
+        { index: 9, role: 'ST', xPercent: 38, yPercent: 15, actionRangePercent: 6, subdivisionId: 'S05-2' },
+        { index: 10, role: 'ST', xPercent: 62, yPercent: 15, actionRangePercent: 6, subdivisionId: 'S06-2' }
+      ]
+    },
+    {
+      name: '4-3-3', description: '4-3-3',
+      defenders: 4, midfielders: 3, attackers: 3, outfieldPlayers: 10,
+      positions: [
+        { index: 0, role: 'GK', xPercent: 50, yPercent: 93, actionRangePercent: 5, subdivisionId: 'GK-1' },
+        { index: 1, role: 'LB', xPercent: 11, yPercent: 83, actionRangePercent: 7, subdivisionId: 'S22-1' },
+        { index: 2, role: 'CB', xPercent: 33, yPercent: 83, actionRangePercent: 6, subdivisionId: 'S22-2' },
+        { index: 3, role: 'CB', xPercent: 67, yPercent: 83, actionRangePercent: 6, subdivisionId: 'S23-2' },
+        { index: 4, role: 'RB', xPercent: 89, yPercent: 83, actionRangePercent: 7, subdivisionId: 'S24-3' },
+        { index: 5, role: 'CM', xPercent: 30, yPercent: 50, actionRangePercent: 8, subdivisionId: 'S13-2' },
+        { index: 6, role: 'CM', xPercent: 50, yPercent: 55, actionRangePercent: 7, subdivisionId: 'S14-2' },
+        { index: 7, role: 'CM', xPercent: 70, yPercent: 50, actionRangePercent: 8, subdivisionId: 'S15-2' },
+        { index: 8, role: 'LW', xPercent: 18, yPercent: 17, actionRangePercent: 7, subdivisionId: 'S04-1' },
+        { index: 9, role: 'ST', xPercent: 50, yPercent: 12, actionRangePercent: 6, subdivisionId: 'S05-2' },
+        { index: 10, role: 'RW', xPercent: 82, yPercent: 17, actionRangePercent: 7, subdivisionId: 'S06-3' }
       ]
     }
   ];
@@ -2619,7 +2658,7 @@ describe('SquadEditorModalComponent — V25D91.5-FRONT F6 formation change updat
 
   // ---- F6 regression suite ----
 
-  it('F6 R1: onFormationChange(3-5-2) triggers HTTP /auto-select with formation=3-5-2', (done) => {
+  it('F6 R1: onFormationChange(3-5-2) saves the same XI with formation=3-5-2', (done) => {
     // V25D91.5 F6 fix: ngModelChange() guarantees the model is updated before
     // the handler runs, so passing the new formation explicitly avoids the
     // (change)-vs-NgModel ordering bug that pre-F6 sometimes sent the OLD
@@ -2630,12 +2669,13 @@ describe('SquadEditorModalComponent — V25D91.5-FRONT F6 formation change updat
       // Wait for the HTTP call to flush (subscribe is synchronous since
       // of(...) emits immediately, but cdr.detectChanges etc. may batch).
       setTimeout(() => {
-        const autoSelectCalls = httpClientSpy.post.calls.allArgs()
-          .filter(args => String(args[0]).includes('/career/lineup/auto-select'));
-        expect(autoSelectCalls.length).withContext('at least 1 /auto-select call expected').toBeGreaterThan(0);
-        const lastCall = autoSelectCalls[autoSelectCalls.length - 1];
+        const manualSelectCalls = httpClientSpy.post.calls.allArgs()
+          .filter(args => String(args[0]).includes('/career/lineup/manual-select'));
+        expect(manualSelectCalls.length).withContext('at least 1 /manual-select call expected').toBeGreaterThan(0);
+        const lastCall = manualSelectCalls[manualSelectCalls.length - 1];
         expect((lastCall[1] as any).formation).withContext(
           'body.formation must be the NEW formation (3-5-2), not the OLD one (4-4-2)').toBe('3-5-2');
+        expect((lastCall[1] as any).playerIds.length).withContext('formation changes must keep the same 11 starters').toBe(11);
         done();
       }, 30);
     }, 30);
@@ -2698,19 +2738,19 @@ describe('SquadEditorModalComponent — V25D91.5-FRONT F6 formation change updat
       setTimeout(() => {
         // First HTTP completed, flag reset.
         const callsAfterFirst = httpClientSpy.post.calls.allArgs()
-          .filter(args => String(args[0]).includes('/career/lineup/auto-select')).length;
+          .filter(args => String(args[0]).includes('/career/lineup/manual-select')).length;
 
         component.onFormationChange('4-3-3');
         setTimeout(() => {
           const callsAfterSecond = httpClientSpy.post.calls.allArgs()
-            .filter(args => String(args[0]).includes('/career/lineup/auto-select')).length;
+            .filter(args => String(args[0]).includes('/career/lineup/manual-select')).length;
           expect(callsAfterSecond - callsAfterFirst).withContext(
-            'second formation change must trigger a SECOND /auto-select call (pre-F6 it would be blocked)').toBe(1);
+            'second formation change must trigger a SECOND /manual-select call (pre-F6 it would be blocked)').toBe(1);
 
           // Last call's body must have formation=4-3-3 (the second target),
           // not 3-5-2 (the first target).
           const lastCall = httpClientSpy.post.calls.allArgs()
-            .filter(args => String(args[0]).includes('/career/lineup/auto-select'))
+            .filter(args => String(args[0]).includes('/career/lineup/manual-select'))
             .pop();
           expect((lastCall![1] as any).formation).toBe('4-3-3');
           done();
@@ -2726,14 +2766,14 @@ describe('SquadEditorModalComponent — V25D91.5-FRONT F6 formation change updat
     // before setting isFormationChanging.
     setTimeout(() => {
       const callsBefore = httpClientSpy.post.calls.allArgs()
-        .filter(args => String(args[0]).includes('/career/lineup/auto-select')).length;
+        .filter(args => String(args[0]).includes('/career/lineup/manual-select')).length;
 
       // selectedFormation starts as '4-4-2' (from /current).
       // homeFormation$ also '4-4-2'. Same value → no-op.
       component.onFormationChange('4-4-2');
       setTimeout(() => {
         const callsAfter = httpClientSpy.post.calls.allArgs()
-          .filter(args => String(args[0]).includes('/career/lineup/auto-select')).length;
+          .filter(args => String(args[0]).includes('/career/lineup/manual-select')).length;
         expect(callsAfter - callsBefore).withContext(
           'selecting the current formation must NOT trigger /auto-select').toBe(0);
         expect(component.isFormationChanging).withContext(

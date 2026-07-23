@@ -417,11 +417,11 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
     const activeDebugPartidoEvents = (state.events ?? []).filter(event =>
       event.eventType === 'INJURY'
       && typeof event.description === 'string'
-      && event.description.includes('DebugPartido:')
+      && /Debug\s*Partido:/i.test(event.description)
     );
     if (activeDebugPartidoEvents.length > 0) {
       return {
-        reason: 'Ya hay una lesión debug de partido activa. Cerrá/reabrí o avanzá a un estado limpio antes de crear otra.'
+        reason: 'Ya hay una lesión Debug Partido activa. Cerrá/reabrí o avanzá a un estado limpio antes de crear otra.'
       };
     }
     if (!normalizedSourceSlots) {

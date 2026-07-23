@@ -2106,7 +2106,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
           </div>
           <div *ngIf="formationLineSmokeRows().length > 0" class="formation-matrix analysis-matrix current-lineup-replay">
             <div class="matrix-header">
-              <strong>Auditor?a l?neas formaci?n</strong>
+              <strong>Auditoría líneas formación</strong>
               <span>DEF/MID/ATT candidates for the current visual formation</span>
             </div>
             <div class="table-scroll compact-position-table">
@@ -2242,7 +2242,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
           </div>
           <div *ngIf="modalVsCanonicalSummary() as summary" class="formation-matrix analysis-matrix current-lineup-replay">
             <div class="matrix-header">
-              <strong>Base vs p?xeles del modal</strong>
+              <strong>Base vs píxeles del modal</strong>
               <span>
                 {{ summary.label }} · formación {{ summary.formation || '?' }}
                 · seeds {{ summary.seedStart }}..{{ summary.seedEnd }} · jugadores movidos {{ summary.customMovableSlotCount }}/{{ summary.customSlotCount }}
@@ -2256,7 +2256,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
               {{ summary.movedPlayers.length ? 'Movidos: ' + summary.movedPlayers.join(', ') + '.' : 'No hay jugadores de campo movidos.' }}
               Veredicto motor: {{ summary.engineImpactLabel }} — {{ summary.engineImpactDetail }}
             </p>
-            <div class="current-replay-grid" role="group" aria-label="Base vs p?xeles del modal summary">
+            <div class="current-replay-grid" role="group" aria-label="Base vs píxeles del modal summary">
               <div class="metric-card">
                 <span class="metric-label">Coach read</span>
                 <span class="metric-value" [class]="summary.coachReadClass">{{ summary.coachRead }}</span>
@@ -2534,7 +2534,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
           </div>
           <div *ngIf="playerSwapBatterySummaries().length > 0" class="formation-matrix analysis-matrix current-lineup-replay">
             <div class="matrix-header">
-              <strong>Bater?a cambio jugador</strong>
+              <strong>Batería cambio jugador</strong>
               <span>{{ playerSwapBatterySummaries().length }} swaps · seeds {{ playerSwapBatterySummaries()[0].seedStart }}..{{ playerSwapBatterySummaries()[0].seedEnd }}</span>
               <button type="button" class="matrix-export" (click)="copyPlayerSwapBatteryJson()">
                 Copy JSON
@@ -2546,7 +2546,7 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
                 CSV
               </button>
             </div>
-            <div *ngIf="playerSwapBatterySummary() as battery" class="current-replay-grid" role="group" aria-label="Bater?a cambio jugador summary">
+            <div *ngIf="playerSwapBatterySummary() as battery" class="current-replay-grid" role="group" aria-label="Batería cambio jugador summary">
               <div class="metric-card">
                 <span class="metric-label">Recommendation</span>
                 <span class="metric-value delta-positive">{{ playerSwapBatteryBestWorstText(battery.best) }}</span>
@@ -3507,14 +3507,14 @@ const CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS = 15000;
           </div>
           <div *ngIf="focusedWideBatteryRows().length > 0" class="formation-matrix analysis-matrix">
             <div class="matrix-header">
-              <strong>Bater?a bandas enfocada</strong>
+              <strong>Batería bandas enfocada</strong>
               <span>
                 4-2-3-1 / 4-4-2 / 5-4-1 · Balanceado vs Bandas ·
                 {{ focusedWideBatteryRows()[0].seedCount }} seeds
               </span>
             </div>
             <div class="matrix-scroll">
-              <div class="matrix-table formation-matrix-table" role="table" aria-label="Bater?a bandas enfocada results">
+              <div class="matrix-table formation-matrix-table" role="table" aria-label="Batería bandas enfocada results">
                 <div class="matrix-row formation-matrix-row matrix-row-head" role="row">
                   <span role="columnheader">Form.</span>
                   <span role="columnheader">Estilo</span>
@@ -5935,7 +5935,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
             : 'Check whether substitutions influence engine enough.'
       : hasSwapPrecision
         ? changedSwapReads > 0 ? 'Trust balanced reads; quick is smoke only.' : needsMoreSwapSeeds > 0 ? 'Run balanced or more seeds for borderline swaps.' : 'Precision stable enough.'
-        : 'Run Bater?a cambio jugador or Comparar precisi?n.';
+        : 'Run Batería cambio jugador or Comparar precisión.';
     const substitutionTimingRows = this.substitutionTimingMatrixRows();
     const hasSubstitutionWhatIf = !!substitutionSummary;
     const hasSubstitutionTiming = substitutionTimingRows.length > 0;
@@ -5976,7 +5976,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           ? `${rows.length}/${expectedFormationAuditRows} rows · ${auditedFormationCount}/${this.formationCodes.length} formations · ${countByVerdict('OK')} OK · ${countByVerdict('Fallback')} fallback · ${countByVerdict('Review')} review`
           : 'Not run yet',
         verdict: !hasAudit ? 'Pending' : !hasAllFormationAudit ? 'Review' : hardReviews.length > 0 ? 'Review' : fallbackRows.length > 0 ? 'Fallback' : 'OK',
-        next: !hasAudit ? 'Run Auditor?a todas las formaciones.' : !hasAllFormationAudit ? 'Run the all-formations audit, not only current formation.' : hardReviews.length > 0 ? 'Inspect Review rows first.' : fallbackRows.length > 0 ? 'Fallbacks are allowed; preview/engine apply role-fit penalties.' : 'Keep as contract.',
+        next: !hasAudit ? 'Run Auditoría todas las formaciones.' : !hasAllFormationAudit ? 'Run the all-formations audit, not only current formation.' : hardReviews.length > 0 ? 'Inspect Review rows first.' : fallbackRows.length > 0 ? 'Fallbacks are allowed; preview/engine apply role-fit penalties.' : 'Keep as contract.',
       },
       {
         check: 'Defensive side mapping',
@@ -6026,7 +6026,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           next: !hasPixelEvidence ? 'Run Chequeo sensibilidad.' : pixelEvidenceNote ? pixelEvidenceNote : pixelCliffRows > 0 ? 'Inspect 1px thresholds / zone boundaries.' : pixelRepeatedFivePxRows > 0 || pixelPlayerRepeatedFivePxRows > 0 ? 'Inspect 5px directional sensitivity / zone boundaries.' : pixelVisibleFivePxRows > 0 || pixelBigTacticalMoveRows > 0 ? 'Micro is smooth; calibrate 5px/big tactical sensitivity separately.' : 'Keep as contract.',
         },
       {
-        check: 'Senal cambio jugador',
+        check: 'Señal cambio jugador',
         expected: 'Changing players should affect role quality and match averages.',
         observed: swapObserved,
         verdict: swapVerdict,
@@ -6456,7 +6456,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     if (!m) {
       return '';
     }
-    return `Ojo: el partido seleccionado es ${m.homeTeamName} vs ${m.awayTeamName}, pero Aplicar formaci?n / modal DT afectan a ${userTeam}. Para probar el motor de tu equipo, eleg? un partido donde juegue ${userTeam}. Si quer?s analizar este partido igual, usa Controlar: Local/Visitante.`;
+    return `Ojo: el partido seleccionado es ${m.homeTeamName} vs ${m.awayTeamName}, pero Aplicar formación / modal DT afectan a ${userTeam}. Para probar el motor de tu equipo, elegí un partido donde juegue ${userTeam}. Si querés analizar este partido igual, usa Controlar: Local/Visitante.`;
   }
   controlledTeamContextLabel(): string {
     const m = this.selectedMatch();
@@ -6887,14 +6887,14 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       rows: this.playerSwapBatterySummaries(),
     }, null, 2);
     navigator.clipboard?.writeText(payload).then(
-      () => this.snackBar.open('Bater?a cambio jugador JSON copied.', 'OK', { duration: 2500 }),
+      () => this.snackBar.open('Batería cambio jugador JSON copied.', 'OK', { duration: 2500 }),
       () => this.snackBar.open(payload, 'OK', { duration: 5000 })
     );
   }
   copyPlayerSwapBatteryReport(): void {
     const payload = this.playerSwapBatteryMarkdownReport();
     navigator.clipboard?.writeText(payload).then(
-      () => this.snackBar.open('Bater?a cambio jugador report copied.', 'OK', { duration: 2500 }),
+      () => this.snackBar.open('Batería cambio jugador report copied.', 'OK', { duration: 2500 }),
       () => this.snackBar.open(payload, 'OK', { duration: 5000 })
     );
   }
@@ -7099,7 +7099,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   downloadPlayerSwapBatteryCsv(): void {
     const rows = this.playerSwapBatterySummaries();
     if (rows.length === 0) {
-      this.snackBar.open('Run Bater?a cambio jugador first.', 'OK', { duration: 2500 });
+      this.snackBar.open('Run Batería cambio jugador first.', 'OK', { duration: 2500 });
       return;
     }
     const exportRows = rows.map((row) => this.playerSwapExportRow(row));
@@ -7131,7 +7131,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     a.download = `player-swap-battery-${this.playerSwapBatteryPrecisionModel}-${rows[0].formation}-${rows[0].seedStart}-${rows[0].seedEnd}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    this.snackBar.open(`Bater?a cambio jugador CSV exported (${rows.length} rows).`, 'OK', { duration: 2500 });
+    this.snackBar.open(`Batería cambio jugador CSV exported (${rows.length} rows).`, 'OK', { duration: 2500 });
   }
   downloadPositionPixelMatrixCsv(): void {
     const rows = this.displayedPositionPixelMatrixRows().map((row) => this.positionPixelExportRow(row));
@@ -7313,7 +7313,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   }
   private playerSwapBatteryCoachRead(summary: PlayerSwapBatterySummary): string {
     if (summary.total === 0) {
-      return 'No hay swaps medidos todav?a. Ejecutar Bater?a cambio jugador antes de sacar conclusiones.';
+      return 'No hay swaps medidos todavía. Ejecutar Batería cambio jugador antes de sacar conclusiones.';
     }
     const upgrades = summary.reads['Clear upgrade'] ?? 0;
     const downgrades = summary.reads['Clear downgrade'] ?? 0;
@@ -10209,7 +10209,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     let originalLineup: LineupDTO | null = null;
     this.modalVsCanonicalSummary.set(null);
     this.mutationInFlight.set(true);
-    this.analysisReadyMessage.set(`Base vs p?xeles del modal r?pido: ${seedCount} seeds por estado...`);
+    this.analysisReadyMessage.set(`Base vs píxeles del modal rápido: ${seedCount} seeds por estado...`);
     this.harness.getCurrentLineup().pipe(
       take(1),
       switchMap((lineup) => {
@@ -10217,7 +10217,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         const originalSlots = this.buildLineupSlots(lineup);
         const playerIds = this.lineupPlayerIdsFromSlots(originalSlots);
         if (this.countCustomMovableSlots(lineup) === 0) {
-          throw new Error('No hay jugador de campo con p?xeles persistidos en la alineaci?n actual. Si quer?s medir el ?ltimo movimiento hecho en Partido, us? ?ltimo movimiento modal; para pruebas autom?ticas us? Matriz presets posici?n o Chequeo sensibilidad.');
+          throw new Error('No hay jugador de campo con píxeles persistidos en la alineación actual. Si querés medir el último movimiento hecho en Partido, usá último movimiento modal; para pruebas automáticas usá Matriz presets posición o Chequeo sensibilidad.');
         }
         const canonicalSlots = this.canonicalizeLineupSlots(lineup);
         return this.harness.setStyle(this.selectedStyleModel).pipe(
@@ -10259,7 +10259,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           'OK',
           { duration: 4500 }
         );
-        this.markReplayAnalysisReady('Base vs p?xeles del modal listo en Panel E.');
+        this.markReplayAnalysisReady('Base vs píxeles del modal listo en Panel E.');
       },
       error: (err) => {
         if (originalLineup) {
@@ -10270,7 +10270,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
             .subscribe();
         }
         this.mutationInFlight.set(false);
-        this.analysisReadyMessage.set(this.fmtError(err, 'Base vs p?xeles del modal no pudo generar Panel E'));
+        this.analysisReadyMessage.set(this.fmtError(err, 'Base vs píxeles del modal no pudo generar Panel E'));
         this.snackBar.open(
           this.fmtError(err, 'Failed to compare base vs modal pixels'),
           'OK',
@@ -10682,7 +10682,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       this.positionPixelMatrixRows.set(preservedPixelRows);
       this.positionPixelEvidenceNote.set(preservedPixelNote);
     }
-    this.analysisReadyMessage.set(`Bater?a cambio jugador corriendo: ${seedCount} seeds por cambio...`);
+    this.analysisReadyMessage.set(`Batería cambio jugador corriendo: ${seedCount} seeds por cambio...`);
     this.mutationInFlight.set(true);
     const source$ = this.selectedMatchIncludesUserTeam()
       ? forkJoin({
@@ -10735,11 +10735,11 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         this.mutationInFlight.set(false);
         const count = this.playerSwapBatterySummaries().length;
         this.snackBar.open(
-          count > 0 ? `Bater?a cambio jugador complete: ${count} swaps measured.` : 'Bater?a cambio jugador completed with insufficient samples.',
+          count > 0 ? `Batería cambio jugador complete: ${count} swaps measured.` : 'Batería cambio jugador completed with insufficient samples.',
           'OK',
           { duration: 4500 }
         );
-        this.markReplayAnalysisReady('Bater?a cambio jugador lista en Panel E.');
+        this.markReplayAnalysisReady('Batería cambio jugador lista en Panel E.');
         this.refreshLineupContext();
       },
     });
@@ -11149,7 +11149,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     let restore: { formation: string; playerIds: string[]; slots: LineupSlotDTO[] } | null = null;
     this.clearReplayAnalysisResultsForLatestRun();
     this.mutationInFlight.set(true);
-    this.analysisReadyMessage.set(`?ltimo movimiento modal: preparando ${modalMove.playerName} (${seedCount} seeds)...`);
+    this.analysisReadyMessage.set(`Último movimiento modal: preparando ${modalMove.playerName} (${seedCount} seeds)...`);
     window.setTimeout(() => this.scrollToReplayAnalysis(), 0);
     this.harness.resetInjuries().pipe(
       take(1),
@@ -11192,7 +11192,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         this.positionPixelMatrixRows.set([summary]);
         this.positionPixelMatrixSummary.set(summary);
         this.lineupDebugSnapshot.set({
-          label: '?ltimo movimiento modal',
+          label: 'Último movimiento modal',
           formation: modalMove.formation,
           selectedFormation: this.selectedFormationModel ?? modalMove.formation,
           playerCount: 1,
@@ -11227,16 +11227,16 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           ],
           warnings: modalMove.coachReadTitle ? [modalMove.coachReadTitle] : [],
         });
-        this.markReplayAnalysisReady(`?ltimo movimiento modal listo: ${modalMove.playerName}.`);
+        this.markReplayAnalysisReady(`Último movimiento modal listo: ${modalMove.playerName}.`);
       },
       error: (err) => {
         this.mutationInFlight.set(false);
-        this.analysisReadyMessage.set(this.fmtError(err, '?ltimo movimiento modal falló'));
+        this.analysisReadyMessage.set(this.fmtError(err, 'Último movimiento modal falló'));
         this.snackBar.open(this.fmtError(err, 'Failed to run last modal move'), 'OK', { duration: 5000 });
       },
       complete: () => {
         this.mutationInFlight.set(false);
-        this.snackBar.open(`?ltimo movimiento modal complete: ${modalMove.playerName}, ${seedCount} seeds.`, 'OK', { duration: 4500 });
+        this.snackBar.open(`Último movimiento modal complete: ${modalMove.playerName}, ${seedCount} seeds.`, 'OK', { duration: 4500 });
       },
     });
   }
@@ -11283,7 +11283,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     this.runPositionPixelMatrixWithPresets(
       seedCount,
       (fromX, fromY, candidate) => this.wingbackMovementPresets(fromX, fromY, candidate),
-      'Lab p?xeles carrileros',
+      'Lab píxeles carrileros',
       null,
       (lineup) => this.pickWingbackPixelCandidates(lineup),
       null,
@@ -11315,7 +11315,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       seedCount,
       (fromX, fromY) => this.positionMovementPresets(fromX, fromY)
         .filter((preset) => ['5px wide', '5px center', '5px forward', '5px deeper'].includes(preset.label)),
-      `Bater?a p?xeles enfocada · ${formation}`,
+      `Batería píxeles enfocada · ${formation}`,
       null,
       (lineup) => this.pickFocusedPixelCandidates(lineup),
       null,
@@ -11453,7 +11453,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const formation = this.selectedFormationModel ?? '4-4-2';
     this.clearFormationLineAuditResults();
     this.mutationInFlight.set(true);
-    this.analysisReadyMessage.set(`Auditor?a l?neas formaci?n corriendo para ${formation}...`);
+    this.analysisReadyMessage.set(`Auditoría líneas formación corriendo para ${formation}...`);
     this.currentOrAutoSelectedLineup(formation).subscribe({
       next: (lineup) => {
         const rows = (['DEF', 'MID', 'ATT'] as const).map((line) =>
@@ -11463,21 +11463,21 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         const allOk = rows.every((row) => row.candidates > 0);
         this.lineupDebugSnapshot.set(this.buildLineupDebugSnapshot(
           lineup,
-          'Auditor?a l?neas formaci?n',
+          'Auditoría líneas formación',
           null,
           rows.flatMap((row) => this.pickPositionPixelLineCandidates(lineup, row.line, 6))
         ));
         this.mutationInFlight.set(false);
         this.snackBar.open(
-          allOk ? `Auditor?a l?neas formaci?n OK (${formation}).` : `Auditor?a l?neas formaci?n has warnings (${formation}).`,
+          allOk ? `Auditoría líneas formación OK (${formation}).` : `Auditoría líneas formación has warnings (${formation}).`,
           'OK',
           { duration: 4000 }
         );
-        this.markReplayAnalysisReady(`Auditor?a l?neas formaci?n listo para ${formation}.`);
+        this.markReplayAnalysisReady(`Auditoría líneas formación listo para ${formation}.`);
       },
       error: (err) => {
         this.mutationInFlight.set(false);
-        this.analysisReadyMessage.set(this.fmtError(err, 'Auditor?a l?neas formaci?n falló'));
+        this.analysisReadyMessage.set(this.fmtError(err, 'Auditoría líneas formación falló'));
         this.snackBar.open(this.fmtError(err, 'Failed to run formation line audit'), 'OK', { duration: 5000 });
       },
     });
@@ -11499,7 +11499,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const formations = [...this.formationCodes];
     this.clearFormationLineAuditResults();
     this.mutationInFlight.set(true);
-    this.analysisReadyMessage.set(`Auditor?a todas las formaciones corriendo: ${formations.length} formaciones...`);
+    this.analysisReadyMessage.set(`Auditoría todas las formaciones corriendo: ${formations.length} formaciones...`);
     this.buildAllFormationsLineAuditRows$(matches.length).subscribe({
       next: ({ rows, last }) => {
         this.applyAllFormationsLineAuditRows(rows, last);
@@ -11513,13 +11513,13 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         );
         this.markReplayAnalysisReady(
           reviewCount === 0
-            ? `Auditor?a todas las formaciones listo: ${rows.length} line checks ? ${fallbackCount} fallback penalizado.`
-            : `Auditor?a todas las formaciones listo: ${rows.length} line checks ? ${reviewCount} revisar ? ${fallbackCount} fallback.`
+            ? `Auditoría todas las formaciones listo: ${rows.length} line checks · ${fallbackCount} fallback penalizado.`
+            : `Auditoría todas las formaciones listo: ${rows.length} line checks · ${reviewCount} revisar · ${fallbackCount} fallback.`
         );
       },
       error: (err) => {
         this.mutationInFlight.set(false);
-        this.analysisReadyMessage.set(this.fmtError(err, 'Auditor?a todas las formaciones falló'));
+        this.analysisReadyMessage.set(this.fmtError(err, 'Auditoría todas las formaciones falló'));
         this.snackBar.open(this.fmtError(err, 'Failed to run all formations line audit'), 'OK', { duration: 5000 });
       },
     });
@@ -11566,7 +11566,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     if (last) {
       this.lineupDebugSnapshot.set(this.buildLineupDebugSnapshot(
         last,
-        'Auditor?a todas las formaciones (last formation)',
+        'Auditoría todas las formaciones (last formation)',
         null,
         (['DEF', 'MID', 'ATT'] as const).flatMap((line) => this.pickPositionPixelLineCandidates(last, line, 6))
       ));
@@ -11574,12 +11574,12 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   }
   private allFormationsLineAuditToast(totalRows: number, reviewCount: number, fallbackCount: number): string {
     if (reviewCount > 0) {
-      return `Auditor?a todas las formaciones: ${reviewCount} line checks need review.`;
+      return `Auditoría todas las formaciones: ${reviewCount} line checks need review.`;
     }
     if (fallbackCount > 0) {
-      return `Auditor?a todas las formaciones OK with ${fallbackCount} penalized fallback line checks (${totalRows} total).`;
+      return `Auditoría todas las formaciones OK with ${fallbackCount} penalized fallback line checks (${totalRows} total).`;
     }
-    return `Auditor?a todas las formaciones OK (${totalRows} line checks).`;
+    return `Auditoría todas las formaciones OK (${totalRows} line checks).`;
   }
   private toFormationLineSmokeRow(
     lineup: LineupDTO,
@@ -12386,7 +12386,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   }
   lineupDebugScopeLabel(debug: LineupDebugSnapshot): string {
     if (debug.visualLineFilter === 'LAST_MODAL_MOVE') {
-      return 'foco: ?ltimo jugador movido';
+      return 'foco: último jugador movido';
     }
     if (debug.visualLineFilter === 'any') {
       return 'foco: formación auditada';
@@ -12438,7 +12438,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         return 'Correr full position smoke';
       case 'Pixel no-cliff rule':
         return 'Correr sensitivity check';
-      case 'Senal cambio jugador':
+      case 'Señal cambio jugador':
         return 'Correr bateria de cambio jugador';
       default:
         return 'Sin acción directa';
@@ -12454,7 +12454,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         return !!this.userTeamName();
       case 'Pixel movement signal':
       case 'Pixel no-cliff rule':
-      case 'Senal cambio jugador':
+      case 'Señal cambio jugador':
         return !!this.selectedMatchId();
       default:
         return false;
@@ -12494,7 +12494,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         this.onRunPositionSensitivityCheck();
         this.watchProfessionalQaActionCompletion(check);
         return;
-      case 'Senal cambio jugador':
+      case 'Señal cambio jugador':
         this.onRunPlayerSwapBattery();
         this.watchProfessionalQaActionCompletion(check);
         return;
@@ -12509,7 +12509,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       'All formations audit',
       'Pixel movement signal',
       'Pixel no-cliff rule',
-      'Senal cambio jugador',
+      'Señal cambio jugador',
     ];
     this.qaChecklistRunningAll.set(true);
     window.setTimeout(() => this.runProfessionalQaChecklistQueue(queue, 0), 250);
@@ -15803,8 +15803,8 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         return lower.includes('timeout') || lower.includes('timed out') || lower.includes('error');
       });
       if (baseHadIssue) {
-        this.analysisReadyMessage.set('Smoke profesional full sigue con p?xeles/swaps: la etapa base tuvo observaciones, pero no se corta la evidencia restante.');
-        this.snackBar.open('Smoke full: etapa base con observaciones; sigo con p?xeles/swaps.', 'OK', { duration: 4500 });
+        this.analysisReadyMessage.set('Smoke profesional full sigue con píxeles/swaps: la etapa base tuvo observaciones, pero no se corta la evidencia restante.');
+        this.snackBar.open('Smoke full: etapa base con observaciones; sigo con píxeles/swaps.', 'OK', { duration: 4500 });
       }
       this.runProfessionalSmokeFormationAuditStage(() => {
         if (runId !== this.professionalSmokeFullRunId) return;
@@ -15853,7 +15853,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           `Formation avg: ${formationRows} formaciones`,
           `Scenario smoke: ${scenarioRows} escenarios`,
           `Pixel sensitivity: ${pixelRows} filas`,
-          `Bater?a cambio jugador: ${swapRows} cambios`,
+          `Batería cambio jugador: ${swapRows} cambios`,
           `Simular sustitución: ${substitutionRows} caso(s)`,
         ],
         skipped: ['Smoke full cortado por timeout defensivo; revisar etapa lenta antes de calibrar.'],
@@ -15884,7 +15884,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         included: current?.included ?? [],
         skipped: [
           ...(current?.skipped ?? []),
-          'Auditor?a todas las formaciones omitido: no hay partidos completados del usuario.',
+          'Auditoría todas las formaciones omitido: no hay partidos completados del usuario.',
         ],
         read: current?.read ?? `${this.controlledTeamDisplayName()}: smoke full en progreso.`,
       });
@@ -15899,7 +15899,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       map((result) => ({ result, issue: null as string | null })),
       catchError((err) => of({
         result: { rows: [] as FormationLineSmokeRow[], last: null as LineupDTO | null },
-        issue: this.fmtError(err, 'Auditor?a todas las formaciones timeout/error'),
+        issue: this.fmtError(err, 'Auditoría todas las formaciones timeout/error'),
       }))
     ).subscribe({
       next: ({ result, issue }) => {
@@ -15924,7 +15924,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           scenarioSeedCount: before?.scenarioSeedCount ?? this.scenarioMatrixSmokeSeedCount(),
           included: [
             ...(before?.included ?? []),
-            issue ?? `Auditor?a todas las formaciones: ${rows.length} checks · ${fallbackRows} fallback · ${reviewRows} review`,
+            issue ?? `Auditoría todas las formaciones: ${rows.length} checks · ${fallbackRows} fallback · ${reviewRows} review`,
           ],
           skipped: before?.skipped ?? [],
           read: before?.read ?? `${this.controlledTeamDisplayName()}: smoke full en progreso.`,
@@ -15947,7 +15947,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           included: before?.included ?? [],
           skipped: [
             ...(before?.skipped ?? []),
-            this.fmtError(err, 'Auditor?a todas las formaciones falló dentro del smoke full'),
+            this.fmtError(err, 'Auditoría todas las formaciones falló dentro del smoke full'),
           ],
           read: before?.read ?? `${this.controlledTeamDisplayName()}: smoke full en progreso.`,
         });
@@ -16090,7 +16090,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const skipped = [
       ...((current?.skipped ?? []).filter((item) => {
         const lower = item.toLowerCase();
-        return !lower.includes('p?xeles y swaps') && !lower.includes('compare baseline/live');
+        return !lower.includes('píxeles y swaps') && !lower.includes('compare baseline/live');
       })),
       'Compare baseline/live queda disponible en Abrir comparador.',
     ];
@@ -16114,7 +16114,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       included: [
         ...baseIncluded,
         `Pixel sensitivity: ${pixelRows} filas`,
-        `Bater?a cambio jugador: ${swapRows} cambios`,
+        `Batería cambio jugador: ${swapRows} cambios`,
         `Simular sustitución: ${substitutionRows} caso(s)`,
       ],
       skipped: filteredSkipped,
@@ -16858,7 +16858,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   onRunFocusedWideBattery(): void {
     const matchId = this.selectedMatchId();
     if (!matchId || !this.selectedMatchIncludesUserTeam()) {
-      this.snackBar.open('Elegí un partido de tu equipo para correr Bater?a bandas enfocada.', 'OK', { duration: 4000 });
+      this.snackBar.open('Elegí un partido de tu equipo para correr Batería bandas enfocada.', 'OK', { duration: 4000 });
       return;
     }
     const seedStart = this.seedInputModel ?? 12345;
@@ -16868,7 +16868,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const originalStyle = this.selectedStyleModel;
     this.focusedWideBatteryRows.set([]);
     this.scenarioMatrixSummarySeedCount.set(seedCount);
-    this.analysisReadyMessage.set(`Bater?a bandas enfocada corriendo: ${formations.length} formaciones x ${styles.length} estilos x ${seedCount} seeds...`);
+    this.analysisReadyMessage.set(`Batería bandas enfocada corriendo: ${formations.length} formaciones x ${styles.length} estilos x ${seedCount} seeds...`);
     this.mutationInFlight.set(true);
 
     this.harness.getCurrentLineup().pipe(
@@ -16878,7 +16878,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         const originalPlayerIds = (originalLineup.players ?? []).map((player) => player.playerId);
         const originalSlots = originalLineup.slots ?? [];
         if (originalPlayerIds.length !== 11 || originalSlots.length !== 11) {
-          throw new Error(`Bater?a bandas enfocada necesita 11 titulares y 11 slots; tiene ${originalPlayerIds.length}/${originalSlots.length}.`);
+          throw new Error(`Batería bandas enfocada necesita 11 titulares y 11 slots; tiene ${originalPlayerIds.length}/${originalSlots.length}.`);
         }
         const jobs = formations.flatMap((formation) => styles.map((style) => ({ formation, style })));
         return from(jobs).pipe(
@@ -16902,11 +16902,11 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     ).subscribe({
       next: (rows) => {
         this.focusedWideBatteryRows.set(rows);
-        this.markReplayAnalysisReady(`Bater?a bandas enfocada lista: ${rows.length} lecturas.`);
-        this.snackBar.open('Bater?a bandas enfocada completed.', 'OK', { duration: 3500 });
+        this.markReplayAnalysisReady(`Batería bandas enfocada lista: ${rows.length} lecturas.`);
+        this.snackBar.open('Batería bandas enfocada completed.', 'OK', { duration: 3500 });
       },
       error: (err) => {
-        this.analysisReadyMessage.set(this.fmtError(err, 'Bater?a bandas enfocada falló'));
+        this.analysisReadyMessage.set(this.fmtError(err, 'Batería bandas enfocada falló'));
       },
     });
   }

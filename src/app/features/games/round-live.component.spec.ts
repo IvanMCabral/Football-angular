@@ -916,7 +916,7 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
     const result = component.debugTriggerUserPartidoInjury('home-5');
     const vm = (component as any).vmSubject.value as RoundLiveViewModel;
 
-    expect(result.reason).toContain('Ya hay una lesion Debug Partido activa');
+    expect(result.reason).toContain('Ya hay una lesión Debug Partido activa');
     expect(vm.matches[0].state?.homeSlots?.length).toBe(11);
     expect(vm.matches[0].state?.events?.length).toBe(1);
   });
@@ -942,7 +942,7 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
     const result = component.debugTriggerUserPartidoInjury('home-5');
     const vm = (component as any).vmSubject.value as RoundLiveViewModel;
 
-    expect(result.reason).toContain('XI del usuario ya esta incompleto');
+    expect(result.reason).toContain('XI del usuario ya está incompleto');
     expect(vm.matches[0].state?.homeSlots?.length).toBe(10);
     expect(vm.matches[0].state?.events?.length).toBe(0);
   });
@@ -998,7 +998,7 @@ describe('RoundLiveComponent - V24D14-LIVE-FIX-1.7 Bug #2', () => {
 
     component.onDebugPartidoInjury();
 
-    expect(component.pendingLiveModalNotice).toContain('XI del usuario ya esta incompleto');
+    expect(component.pendingLiveModalNotice).toContain('XI del usuario ya está incompleto');
   });
 
   it('V25D99.21.1: queues rival red-card awareness behind an open Partido modal', (done) => {

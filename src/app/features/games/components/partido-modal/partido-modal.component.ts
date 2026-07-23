@@ -2096,7 +2096,7 @@ export class PartidoModalComponent {
     return (this.data.events ?? []).some(event =>
       event.eventType === 'INJURY'
       && typeof event.description === 'string'
-      && event.description.includes('DebugPartido:')
+      && /Debug\s*Partido:/i.test(event.description)
     );
   }
 

@@ -152,8 +152,8 @@ describe('MatchListComponent — career fixture list', () => {
 
     expect(snapshot().loading).toBe(false);
     expect(snapshot().matchCount).toBe(0);
-    expect(html()).toContain('Los partidos se juegan desde el Dashboard');
-    expect(html()).toContain('Ir al Dashboard');
+    expect(html()).toContain('Los partidos se juegan desde el inicio');
+    expect(html()).toContain('Ir al inicio');
   });
 
   it('renders the setup empty-state when the user has no career and no fixture is visible', async () => {
@@ -169,7 +169,7 @@ describe('MatchListComponent — career fixture list', () => {
     expect(snapshot().loading).toBe(false);
     expect(snapshot().matchCount).toBe(0);
     expect(html()).toContain('No tenés carrera activa');
-    expect(html()).toContain('Iniciar Carrera');
+    expect(html()).toContain('Iniciar carrera');
   });
 
   it('re-clears the error and re-shows the spinner on a second loadMatches() call', async () => {

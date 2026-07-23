@@ -329,7 +329,7 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
       // Coverage percentage visible
       const coverageEl = breakdownEl.querySelector('.breakdown-coverage');
       expect(coverageEl.textContent).toContain('50');
-      expect(coverageEl.textContent).toContain('% coverage');
+      expect(coverageEl.textContent).toContain('% cobertura');
     });
 
     it('should render one row per non-empty position group with label + chips', () => {
@@ -419,7 +419,7 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
 
       const coverageEl = fixture.nativeElement.querySelector('.breakdown-coverage');
       expect(coverageEl.textContent).toContain('10');
-      expect(coverageEl.textContent).toContain('% coverage');
+      expect(coverageEl.textContent).toContain('% cobertura');
     });
   });
 
@@ -789,7 +789,7 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
         .toBeFalse();
       expect(btn.getAttribute('title'))
         .withContext('Confirm button title should show ready-to-confirm text')
-        .toContain('Confirmar y Jugar');
+        .toContain('Confirmar y jugar');
     });
   });
 

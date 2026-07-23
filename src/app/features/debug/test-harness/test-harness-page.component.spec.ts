@@ -289,7 +289,7 @@ describe('TestHarnessPageComponent', () => {
     expect(steps[0].state).toBe('done');
     expect(steps[0].status).toBe('OK');
     expect(steps[1].state).toBe('active');
-    expect(steps[3].body).toContain('Open Match Compare');
+    expect(steps[3].body).toContain('Abrir comparador');
   });
 
   it('falls back to the test-harness snapshot when Panel C fixture endpoint is empty', async () => {
@@ -498,7 +498,7 @@ describe('TestHarnessPageComponent', () => {
 
     expect(component.selectedMatchIncludesUserTeam()).toBeFalse();
     expect(component.selectedMatchScopeWarning()).toContain('Other Team vs Similar Generated Team');
-    expect(component.selectedMatchScopeWarning()).toContain('Set Formation / modal DT afectan a My Team');
+    expect(component.selectedMatchScopeWarning()).toContain('Aplicar formación / modal DT afectan a My Team');
     expect(component.selectedMatchScopeWarning()).toContain('Controlar: Local/Visitante');
   });
 
@@ -506,7 +506,7 @@ describe('TestHarnessPageComponent', () => {
     component.controlledTeamSideModel = 'HOME';
 
     expect(component.canRunUserLineupAudit()).toBeFalse();
-    expect(component.userLineupAuditDisabledReason()).toContain('Formation matrix');
+    expect(component.userLineupAuditDisabledReason()).toContain('Matriz formaciones');
   });
 
   it('does not run all-formations user lineup audit for local or visitor scope', () => {
@@ -520,7 +520,7 @@ describe('TestHarnessPageComponent', () => {
     expect(harness.getCurrentLineup).not.toHaveBeenCalled();
     expect(harness.autoSelectLineup).not.toHaveBeenCalled();
     expect(snackBarSpy.open).toHaveBeenCalledWith(
-      jasmine.stringMatching(/Formation matrix|Formation avg/),
+      jasmine.stringMatching(/Matriz formaciones|Formation avg/),
       'OK',
       { duration: 5000 }
     );
@@ -638,11 +638,11 @@ describe('TestHarnessPageComponent', () => {
     expect(component.professionalSmokeSummary()?.pixelRows).toBe(2);
     expect(component.professionalSmokeSummary()?.swapRows).toBe(1);
     expect(component.professionalSmokeSummary()?.substitutionRows).toBe(0);
-    expect(component.professionalSmokeSummary()?.included.join(' ')).toContain('Player swap battery');
-    expect(component.professionalSmokeSummary()?.included.join(' ')).toContain('Substitution what-if: 0 caso(s)');
-    expect(component.analysisReadyMessage()).toContain('Professional smoke full listo');
+    expect(component.professionalSmokeSummary()?.included.join(' ')).toContain('Batería cambio jugador');
+    expect(component.professionalSmokeSummary()?.included.join(' ')).toContain('Simular sustitución: 0 caso(s)');
+    expect(component.analysisReadyMessage()).toContain('Smoke profesional full listo');
     expect(snackBarSpy.open).toHaveBeenCalledWith(
-      'Professional smoke full complete: 2 pixel rows, 1 swaps, 0 substitutions.',
+      'Smoke profesional full complete: 2 pixel rows, 1 swaps, 0 substitutions.',
       'OK',
       { duration: 4500 }
     );
@@ -1786,7 +1786,7 @@ describe('TestHarnessPageComponent', () => {
     expect(report).toContain('Match: Real Betis vs Real Madrid');
     expect(report).toContain('Mode: natural');
     expect(report).toContain('Precision: balanced');
-    expect(report).toContain('Confidence: Medium confidence');
+    expect(report).toContain('Confidence: Confianza media');
     expect(report).toContain('Seeds: 12345..12354');
     expect(report).toContain('Recommendation: Jude Bellingham -> Endrick');
     expect(report).toContain('Worst: Federico Valverde -> Luka Modric');
@@ -1797,7 +1797,7 @@ describe('TestHarnessPageComponent', () => {
     expect(report).toContain('| Ataque | Control | Proteccion | Canales | Shots | Shots Ag. | xG For | xG Ag. | xG Diff | Pre xG Diff |');
     expect(report).toContain('| Jude Bellingham -> Endrick | — | Same profile | Clear upgrade | Alta 0.150 | Ataque + | Control = | Proteccion = | Canales = | +2.25 | +0.50 | +0.18 | +0.03 | +0.15 | +0.11 |');
     expect(report).toContain('## Tactical breakdown detail');
-    expect(snackBarSpy.open).toHaveBeenCalledWith('Player swap battery report copied.', 'OK', { duration: 2500 });
+    expect(snackBarSpy.open).toHaveBeenCalledWith('Batería cambio jugador report copied.', 'OK', { duration: 2500 });
   });
 
   it('keeps soft repeated 5px risks as playable variation instead of a review pattern', () => {
@@ -2753,7 +2753,7 @@ describe('TestHarnessPageComponent', () => {
     const rows = component.professionalQaChecklistRows();
     const formation = rows.find((row) => row.check === 'All formations audit');
     const pixel = rows.find((row) => row.check === 'Pixel movement signal');
-    const swap = rows.find((row) => row.check === 'Player swap signal');
+    const swap = rows.find((row) => row.check === 'Señal cambio jugador');
 
     expect(formation?.observed).toContain('1/36 rows');
     expect(pixel?.observed).toContain('1 rows');
@@ -2797,7 +2797,7 @@ describe('TestHarnessPageComponent', () => {
   it('reports all-formations hard reviews only when review rows exist', () => {
     const toast = (component as any).allFormationsLineAuditToast(36, 1, 2);
 
-    expect(toast).toBe('All formations line audit: 1 line checks need review.');
+    expect(toast).toBe('Auditoría todas las formaciones: 1 line checks need review.');
   });
 
   it('formats current lineup multi-seed as a readable coach summary', () => {
@@ -2854,7 +2854,7 @@ describe('TestHarnessPageComponent', () => {
     ] as any);
 
     const swap = component.professionalQaChecklistRows()
-      .find((row) => row.check === 'Player swap signal');
+      .find((row) => row.check === 'Señal cambio jugador');
 
     expect(swap?.observed).toContain('3 precision swaps');
     expect(swap?.observed).toContain('1 stable');
@@ -3448,7 +3448,7 @@ describe('TestHarnessPageComponent', () => {
     fixture.detectChanges();
 
     const panel: HTMLElement | null = fixture.nativeElement.querySelector('.scenario-matrix');
-    expect(panel?.textContent).toContain('Same match - seeds');
+    expect(panel?.textContent).toContain('Mismo partido - seeds');
     expect(panel?.textContent).toContain('Delta xG For avg');
     expect(panel?.textContent).toContain('F -1.80');
     expect(panel?.textContent).toContain('vs');
@@ -3644,9 +3644,9 @@ function makeMatchRow(matchId: string) {
     homeTeamName: 'Team 1',
     awayTeamId: 'team-2',
     awayTeamName: 'Team 2',
-    status: 'PENDING' as const,
-    homeGoals: null,
-    awayGoals: null,
+    status: 'COMPLETED' as const,
+    homeGoals: 1,
+    awayGoals: 0,
     homeFormation: null,
     awayFormation: null,
     roundId: 'round-uuid-1',

@@ -838,7 +838,7 @@ describe('PartidoModalComponent (V25D89-FRONT-A)', () => {
     const dialogContentRule = src.match(/\.mat-mdc-dialog-container\s+\.mat-mdc-dialog-content\s*\{[^}]*\}/);
     expect(dialogContentRule).toBeTruthy();
     const ruleSrc = dialogContentRule![0];
-    expect(ruleSrc).toContain('max-height: 80vh');
+    expect(ruleSrc).toContain('max-height: calc(92vh - 116px)');
     expect(ruleSrc).toContain('overflow-y: auto');
   });
 
@@ -1474,12 +1474,12 @@ describe('PartidoModalComponent (V25D89-FRONT-A)', () => {
 
   it('responsive manager pitch uses fluid dimensions and mobile/tablet/desktop breakpoints', () => {
     const src = stripEncapsulation(stylesSource());
-    expect(src).toContain('min-height: clamp(420px, 58vh, 680px)');
-    expect(src).toContain('grid-template-columns: minmax(0, 3fr) minmax(260px, 0.9fr)');
+    expect(src).toContain('min-height: clamp(300px, 36vh, 460px)');
+    expect(src).toContain('grid-template-columns: minmax(0, 3fr) minmax(260px, 0.85fr)');
     expect(src).toContain('@media (max-width: 600px)');
     expect(src).toContain('@media (min-width: 601px) and (max-width: 1024px)');
     expect(src).toContain('@media (min-width: 1600px)');
-    expect(src).toContain('min-height: min(62vh, 420px)');
+    expect(src).toContain('min-height: min(48vh, 340px)');
   });
 
   // ========== F3: real score in header + stats row ==========

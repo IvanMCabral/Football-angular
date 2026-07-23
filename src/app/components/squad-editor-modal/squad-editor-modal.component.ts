@@ -39,7 +39,7 @@ import { SessionPlayer } from '../../shared/models/player.model';
                   [disabled]="isFormationChanging"
                   [title]="(isCustomLineup() ? 'Tu lineup personalizado no coincide con una formación canónica' : '')">
             <option *ngFor="let f of formations" [value]="f">{{f}}</option>
-            <option [value]="userFormationLabel" [disabled]="true">Formacion manual</option>
+            <option [value]="userFormationLabel" [disabled]="true">Formación del User</option>
           </select>
           <span *ngIf="isFormationChanging" class="formation-change-blocked">(espera...)</span>
         </div>
@@ -4721,8 +4721,8 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
       this.cdr.detectChanges();
       return;
     }
-    // Delegate to the canonical formation-change handler which performs the
-    // POST /career/lineup/auto-select + applyLineupToSlots + clears isFormationChanging.
+    // Delegate to the canonical formation-change handler. Formation changes
+    // keep the same XI, remap it into the new shape and persist it manually.
     this.onFormationChange(newValue);
   }
 
@@ -5027,8 +5027,15 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
     this.loadingFormation$.next(true);
     this.cdr.markForCheck();
 
+    const finishFormationChange = () => {
+      this.loadingFormation$.next(false);
+      this.isFormationChanging = false;
+      this.cdr.markForCheck();
+      this.cdr.detectChanges();
+    };
+
     this.applyCurrentXiToFormation(newFormation);
-    this.saveLineup();
+    this.saveLineup(finishFormationChange);
     this.captureRatingsFromFormationEffectiveness();
     this.requestRatingsPreview();
     this.formationChanged.emit({
@@ -5036,14 +5043,9 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
       players: this.homePlayers$.value.slice(0, 11)
     });
     this.formationChangeComplete.emit(this.formationChangeCompleteSubject);
-
-    this.loadingFormation$.next(false);
-    this.isFormationChanging = false;
-    this.cdr.markForCheck();
-    this.cdr.detectChanges();
   }
 
-  private saveLineup(): void {
+  private saveLineup(onDone?: () => void): void {
     // would 422 anyway; we surface the error inline without sending a doomed request.
     const validHomePlayers = this.getUniqueValidHomePlayers();
     const playerCount = validHomePlayers.length;
@@ -5052,11 +5054,13 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
       // any valid lineup between 7 and 11. The actual guard logic (< 7 means block) is unchanged.
       this.errorMessage$.next('Mínimo 7 jugadores para guardar (puedes tener más)');
       this.lineupWarning$.next(null);
+      onDone?.();
       return;
     }
     if (playerCount > 11) {
       this.errorMessage$.next('Máximo 11 jugadores');
       this.lineupWarning$.next(null);
+      onDone?.();
       return;
     }
     this.errorMessage$.next('');
@@ -5092,12 +5096,14 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
           next: (response) => {
             const warnings = response?.warnings ?? [];
             this.lineupWarning$.next(warnings.length > 0 ? warnings[0] : null);
+            onDone?.();
           },
           error: (err) => {
             console.error('[SQUAD-EDITOR] Error confirming lineup:', err);
             if (err.error?.code) {
               this.errorMessage$.next(err.error.message || 'Error al guardar');
             }
+            onDone?.();
           }
         });
       },
@@ -5107,6 +5113,7 @@ handleMarkerDragEnd(event: CdkDragEnd, player: PlayerOnFieldDto): void {
         if (err.error?.code) {
           this.errorMessage$.next(err.error.message || 'Error al guardar');
         }
+        onDone?.();
       }
     });
   }

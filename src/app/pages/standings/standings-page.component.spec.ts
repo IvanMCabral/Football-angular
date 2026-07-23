@@ -103,7 +103,7 @@ describe('StandingsPageComponent — V25D78-C55.2 phase 4 UI (b2)', () => {
     fixture.whenStable().then(() => {
       const h1 = fixture.nativeElement.querySelector('.page-header h1');
       expect(h1).not.toBeNull('header h1 must render');
-      expect(h1.textContent).toContain('Tabla de Posiciones');
+      expect(h1.textContent).toContain('Tabla de posiciones');
       const back = fixture.nativeElement.querySelector('a.back-link');
       expect(back).not.toBeNull('back link must render');
       done();

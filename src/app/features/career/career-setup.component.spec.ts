@@ -78,7 +78,7 @@ describe('CareerSetupComponent — V25D78-C48.1 setup-flow UX gap fix', () => {
         'seed-prompt MUST render when leagues$ emits [] — this is the UX gap fix');
       expect(button).not.toBeNull(
         'seed button MUST render with data-testid="seed-world-button" for E2E hook');
-      expect(button.textContent.trim()).toContain('Inicializar Mi Mundo');
+      expect(button.textContent.trim()).toContain('Inicializar mi mundo');
       expect(button.disabled).toBeFalse();
       done();
     });
