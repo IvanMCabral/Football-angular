@@ -21,6 +21,10 @@ import {
   positionPixelSignalDetail,
   positionPixelSignalRead,
   positionPixelSignalScore,
+  positionPixelChannelLabel,
+  positionPixelShapeDeltaText,
+  positionPixelShapeMove,
+  positionPixelShapeMoveDetail,
   positionPixelTacticalRead,
   positionPixelTacticalReadClass,
   positionPixelTacticalReadReason,
@@ -33,6 +37,8 @@ import {
   positionPixelVisualEngineTensionDetail,
   positionPixelVisualEngineTensionRead,
   positionPixelVisualEngineTensions,
+  positionPixelVisualChannel,
+  positionPixelVisualLine,
   positionPixelWideChannelReason,
 } from './position-pixel-analysis';
 
@@ -411,5 +417,37 @@ describe('position-pixel-analysis', () => {
     expect(positionPixelVisualEngineTensionClass(tensions)).toBe('read-stable');
     expect(positionPixelVisualEngineTensionDetail(tensions, 'Amenaza = · Conex. = · Cobertura =', 'Neutral'))
       .toContain('visual y motor alineados');
+  });
+
+  it('reads visual line and channel bands', () => {
+    expect(positionPixelVisualLine(20)).toBe('ATT');
+    expect(positionPixelVisualLine(50)).toBe('MID');
+    expect(positionPixelVisualLine(80)).toBe('DEF');
+    expect(positionPixelVisualChannel(20)).toBe('L');
+    expect(positionPixelVisualChannel(50)).toBe('C');
+    expect(positionPixelVisualChannel(80)).toBe('R');
+    expect(positionPixelChannelLabel('L')).toBe('banda izquierda');
+  });
+
+  it('describes same-cell shape movements', () => {
+    expect(positionPixelShapeMove({ ...baseRow, fromXPercent: 50, targetXPercent: 55 } as any)).toBe('MID C: mas derecho');
+    expect(positionPixelShapeMove({ ...baseRow, fromYPercent: 50, targetYPercent: 44 } as any)).toBe('MID C: mas alto');
+    expect(positionPixelShapeMove({ ...baseRow, fromXPercent: 50, targetXPercent: 56, fromYPercent: 50, targetYPercent: 44 } as any))
+      .toBe('MID C: diagonal abierto alto');
+  });
+
+  it('describes cross-cell shape movements and detail', () => {
+    const row = {
+      ...baseRow,
+      fromXPercent: 20,
+      targetXPercent: 50,
+      fromYPercent: 50,
+      targetYPercent: 20,
+    } as any;
+
+    expect(positionPixelShapeMove(row)).toBe('-L +C / MID->ATT');
+    expect(positionPixelShapeMoveDetail(row)).toContain('perdiste presencia en banda izquierda');
+    expect(positionPixelShapeMoveDetail(row)).toContain('subiste al jugador de MID a ATT');
+    expect(positionPixelShapeDeltaText('MID', 'L', 'ATT', 'C')).toBe('shape MID L -1 / ATT C +1');
   });
 });

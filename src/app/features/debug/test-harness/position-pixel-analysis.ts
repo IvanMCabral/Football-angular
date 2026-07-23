@@ -47,6 +47,9 @@ export interface PositionPixelVisualEngineTension {
   detail: string;
 }
 
+export type PositionPixelVisualChannel = 'L' | 'C' | 'R';
+export type PositionPixelVisualLine = 'ATT' | 'MID' | 'DEF';
+
 export function positionPixelDistance(row: Pick<PositionPixelSignalRead, 'fromXPercent' | 'fromYPercent' | 'targetXPercent' | 'targetYPercent'>): number {
   return Math.hypot(row.targetXPercent - row.fromXPercent, row.targetYPercent - row.fromYPercent);
 }
@@ -534,6 +537,109 @@ export function positionPixelVisualEngineTensions(
       : item);
   }
   return result;
+}
+
+export function positionPixelVisualChannel(xPercent: number): PositionPixelVisualChannel {
+  if (xPercent < 34) return 'L';
+  if (xPercent > 66) return 'R';
+  return 'C';
+}
+
+export function positionPixelVisualLine(yPercent: number): PositionPixelVisualLine {
+  if (yPercent < 32) return 'ATT';
+  if (yPercent < 69) return 'MID';
+  return 'DEF';
+}
+
+export function positionPixelChannelLabel(channel: PositionPixelVisualChannel): string {
+  if (channel === 'L') return 'banda izquierda';
+  if (channel === 'R') return 'banda derecha';
+  return 'el centro';
+}
+
+export function positionPixelShapeMove(row: PositionPixelMatrixSummary): string {
+  const fromLine = positionPixelVisualLine(row.fromYPercent);
+  const toLine = positionPixelVisualLine(row.targetYPercent);
+  const fromChannel = positionPixelVisualChannel(row.fromXPercent);
+  const toChannel = positionPixelVisualChannel(row.targetXPercent);
+  if (fromLine === toLine && fromChannel === toChannel) {
+    const vertical = row.targetYPercent - row.fromYPercent;
+    const horizontal = row.targetXPercent - row.fromXPercent;
+    if (Math.abs(vertical) >= 4 && Math.abs(horizontal) >= 4) {
+      const verticalLabel = vertical < 0 ? 'alto' : 'bajo';
+      const horizontalLabel = Math.abs(row.targetXPercent - 50) > Math.abs(row.fromXPercent - 50)
+        ? 'abierto'
+        : 'interior';
+      return `${toLine} ${toChannel}: diagonal ${horizontalLabel} ${verticalLabel}`;
+    }
+    if (Math.abs(vertical) >= 4) {
+      return vertical < 0
+        ? `${toLine} ${toChannel}: mas alto`
+        : `${toLine} ${toChannel}: mas bajo`;
+    }
+    if (Math.abs(horizontal) >= 4) {
+      return horizontal < 0
+        ? `${toLine} ${toChannel}: mas izquierdo`
+        : `${toLine} ${toChannel}: mas derecho`;
+    }
+    return `${toLine} ${toChannel}: microajuste`;
+  }
+  const parts: string[] = [];
+  if (fromChannel !== toChannel) {
+    parts.push(`-${fromChannel} +${toChannel}`);
+  }
+  if (fromLine !== toLine) {
+    parts.push(`${fromLine}->${toLine}`);
+  }
+  return parts.length > 0 ? parts.join(' / ') : `${fromLine} ${fromChannel}->${toLine} ${toChannel}`;
+}
+
+export function positionPixelShapeMoveDetail(row: PositionPixelMatrixSummary): string {
+  const fromLine = positionPixelVisualLine(row.fromYPercent);
+  const toLine = positionPixelVisualLine(row.targetYPercent);
+  const fromChannel = positionPixelVisualChannel(row.fromXPercent);
+  const toChannel = positionPixelVisualChannel(row.targetXPercent);
+  const notes: string[] = [];
+  if (fromChannel !== toChannel) {
+    notes.push(`perdiste presencia en ${positionPixelChannelLabel(fromChannel)}`);
+    notes.push(`ganaste presencia en ${positionPixelChannelLabel(toChannel)}`);
+  }
+  if (fromLine !== toLine) {
+    notes.push(row.targetYPercent < row.fromYPercent
+      ? `subiste al jugador de ${fromLine} a ${toLine}`
+      : `bajaste al jugador de ${fromLine} a ${toLine}`);
+  }
+  if (fromLine === toLine && fromChannel === toChannel) {
+    const vertical = row.targetYPercent - row.fromYPercent;
+    const horizontal = row.targetXPercent - row.fromXPercent;
+    if (Math.abs(vertical) >= 4 && Math.abs(horizontal) >= 4) {
+      const horizontalLabel = Math.abs(row.targetXPercent - 50) > Math.abs(row.fromXPercent - 50)
+        ? 'gana amplitud'
+        : 'se mete por dentro';
+      notes.push(vertical < 0
+        ? `diagonal: ${horizontalLabel} y gana altura`
+        : `diagonal: ${horizontalLabel} y baja a cubrir`);
+    } else if (Math.abs(vertical) >= Math.abs(horizontal) && Math.abs(vertical) >= 1) {
+      notes.push(vertical < 0 ? 'ajuste fino: mas profundidad ofensiva' : 'ajuste fino: mas cobertura');
+    } else if (Math.abs(horizontal) >= 1) {
+      notes.push(horizontal < 0 ? 'ajuste fino: carga mas la izquierda' : 'ajuste fino: carga mas la derecha');
+    } else {
+      notes.push('microajuste visual sin cambio de zona');
+    }
+  }
+  return `${notes.join(' ? ')} ? ${positionPixelShapeDeltaText(fromLine, fromChannel, toLine, toChannel)}`;
+}
+
+export function positionPixelShapeDeltaText(
+  fromLine: PositionPixelVisualLine,
+  fromChannel: PositionPixelVisualChannel,
+  toLine: PositionPixelVisualLine,
+  toChannel: PositionPixelVisualChannel,
+): string {
+  if (fromLine === toLine && fromChannel === toChannel) {
+    return `shape ${toLine} ${toChannel} sin cambio de casillero`;
+  }
+  return `shape ${fromLine} ${fromChannel} -1 / ${toLine} ${toChannel} +1`;
 }
 
 export function positionPixelHasContextualCoverageConflict(

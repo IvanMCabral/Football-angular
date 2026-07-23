@@ -175,6 +175,10 @@ import {
   positionPixelSignalDetail as getPositionPixelSignalDetail,
   positionPixelSignalRead as getPositionPixelSignalRead,
   positionPixelSignalScore as getPositionPixelSignalScore,
+  positionPixelChannelLabel as getPositionPixelChannelLabel,
+  positionPixelShapeDeltaText as getPositionPixelShapeDeltaText,
+  positionPixelShapeMove as getPositionPixelShapeMove,
+  positionPixelShapeMoveDetail as getPositionPixelShapeMoveDetail,
   positionPixelTacticalRead as getPositionPixelTacticalRead,
   positionPixelTacticalReadClass as getPositionPixelTacticalReadClass,
   positionPixelTacticalReadReason as getPositionPixelTacticalReadReason,
@@ -189,6 +193,10 @@ import {
   positionPixelVisualEngineTensions as getPositionPixelVisualEngineTensions,
   PositionPixelVisualEngineTension,
   positionPixelIsMicroVisualMismatch as getPositionPixelIsMicroVisualMismatch,
+  positionPixelVisualChannel as getPositionPixelVisualChannel,
+  PositionPixelVisualChannel,
+  positionPixelVisualLine as getPositionPixelVisualLine,
+  PositionPixelVisualLine,
   positionPixelWideChannelReason as getPositionPixelWideChannelReason,
 } from './position-pixel-analysis';
 /**
@@ -13574,96 +13582,24 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return getPositionPixelWideChannelReason(row, (value) => this.fmtDeltaMicro(value));
   }
   positionPixelShapeMove(row: PositionPixelMatrixSummary): string {
-    const fromLine = this.positionPixelVisualLine(row.fromYPercent);
-    const toLine = this.positionPixelVisualLine(row.targetYPercent);
-    const fromChannel = this.positionPixelVisualChannel(row.fromXPercent);
-    const toChannel = this.positionPixelVisualChannel(row.targetXPercent);
-    if (fromLine === toLine && fromChannel === toChannel) {
-      const vertical = row.targetYPercent - row.fromYPercent;
-      const horizontal = row.targetXPercent - row.fromXPercent;
-      if (Math.abs(vertical) >= 4 && Math.abs(horizontal) >= 4) {
-        const verticalLabel = vertical < 0 ? 'alto' : 'bajo';
-        const horizontalLabel = Math.abs(row.targetXPercent - 50) > Math.abs(row.fromXPercent - 50)
-          ? 'abierto'
-          : 'interior';
-        return `${toLine} ${toChannel}: diagonal ${horizontalLabel} ${verticalLabel}`;
-      }
-      if (Math.abs(vertical) >= 4) {
-        return vertical < 0
-          ? `${toLine} ${toChannel}: mas alto`
-          : `${toLine} ${toChannel}: mas bajo`;
-      }
-      if (Math.abs(horizontal) >= 4) {
-        return horizontal < 0
-          ? `${toLine} ${toChannel}: mas izquierdo`
-          : `${toLine} ${toChannel}: mas derecho`;
-      }
-      return `${toLine} ${toChannel}: microajuste`;
-    }
-    const parts: string[] = [];
-    if (fromChannel !== toChannel) {
-      parts.push(`-${fromChannel} +${toChannel}`);
-    }
-    if (fromLine !== toLine) {
-      parts.push(`${fromLine}->${toLine}`);
-    }
-    return parts.length > 0 ? parts.join(' / ') : `${fromLine} ${fromChannel}->${toLine} ${toChannel}`;
+    return getPositionPixelShapeMove(row);
   }
   positionPixelShapeMoveDetail(row: PositionPixelMatrixSummary): string {
-    const fromLine = this.positionPixelVisualLine(row.fromYPercent);
-    const toLine = this.positionPixelVisualLine(row.targetYPercent);
-    const fromChannel = this.positionPixelVisualChannel(row.fromXPercent);
-    const toChannel = this.positionPixelVisualChannel(row.targetXPercent);
-    const notes: string[] = [];
-    if (fromChannel !== toChannel) {
-      notes.push(`perdiste presencia en ${this.positionPixelChannelLabel(fromChannel)}`);
-      notes.push(`ganaste presencia en ${this.positionPixelChannelLabel(toChannel)}`);
-    }
-    if (fromLine !== toLine) {
-      notes.push(row.targetYPercent < row.fromYPercent
-        ? `subiste al jugador de ${fromLine} a ${toLine}`
-        : `bajaste al jugador de ${fromLine} a ${toLine}`);
-    }
-    if (fromLine === toLine && fromChannel === toChannel) {
-      const vertical = row.targetYPercent - row.fromYPercent;
-      const horizontal = row.targetXPercent - row.fromXPercent;
-      if (Math.abs(vertical) >= 4 && Math.abs(horizontal) >= 4) {
-        const horizontalLabel = Math.abs(row.targetXPercent - 50) > Math.abs(row.fromXPercent - 50)
-          ? 'gana amplitud'
-          : 'se mete por dentro';
-        notes.push(vertical < 0
-          ? `diagonal: ${horizontalLabel} y gana altura`
-          : `diagonal: ${horizontalLabel} y baja a cubrir`);
-      } else if (Math.abs(vertical) >= Math.abs(horizontal) && Math.abs(vertical) >= 1) {
-        notes.push(vertical < 0 ? 'ajuste fino: mas profundidad ofensiva' : 'ajuste fino: mas cobertura');
-      } else if (Math.abs(horizontal) >= 1) {
-        notes.push(horizontal < 0 ? 'ajuste fino: carga mas la izquierda' : 'ajuste fino: carga mas la derecha');
-      } else {
-        notes.push('microajuste visual sin cambio de zona');
-      }
-    }
-    return `${notes.join(' ? ')} ? ${this.positionPixelShapeDeltaText(fromLine, fromChannel, toLine, toChannel)}`;
+    return getPositionPixelShapeMoveDetail(row);
   }
   private positionPixelShapeDeltaText(
-    fromLine: 'ATT' | 'MID' | 'DEF',
-    fromChannel: 'L' | 'C' | 'R',
-    toLine: 'ATT' | 'MID' | 'DEF',
-    toChannel: 'L' | 'C' | 'R'
+    fromLine: PositionPixelVisualLine,
+    fromChannel: PositionPixelVisualChannel,
+    toLine: PositionPixelVisualLine,
+    toChannel: PositionPixelVisualChannel
   ): string {
-    if (fromLine === toLine && fromChannel === toChannel) {
-      return `shape ${toLine} ${toChannel} sin cambio de casillero`;
-    }
-    return `shape ${fromLine} ${fromChannel} -1 / ${toLine} ${toChannel} +1`;
+    return getPositionPixelShapeDeltaText(fromLine, fromChannel, toLine, toChannel);
   }
-  private positionPixelVisualChannel(xPercent: number): 'L' | 'C' | 'R' {
-    if (xPercent < 34) return 'L';
-    if (xPercent > 66) return 'R';
-    return 'C';
+  private positionPixelVisualChannel(xPercent: number): PositionPixelVisualChannel {
+    return getPositionPixelVisualChannel(xPercent);
   }
-  private positionPixelVisualLine(yPercent: number): 'ATT' | 'MID' | 'DEF' {
-    if (yPercent < 32) return 'ATT';
-    if (yPercent < 69) return 'MID';
-    return 'DEF';
+  private positionPixelVisualLine(yPercent: number): PositionPixelVisualLine {
+    return getPositionPixelVisualLine(yPercent);
   }
   positionPixelQaSummaryBoard(): PositionPixelQaSummaryRow[] {
     const rows = this.positionPixelMatrixRows();
@@ -13715,10 +13651,8 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     });
   }
   readonly trackByPositionPixelQaSummaryRow = (_index: number, row: PositionPixelQaSummaryRow): string => row.line;
-  private positionPixelChannelLabel(channel: 'L' | 'C' | 'R'): string {
-    if (channel === 'L') return 'banda izquierda';
-    if (channel === 'R') return 'banda derecha';
-    return 'el centro';
+  private positionPixelChannelLabel(channel: PositionPixelVisualChannel): string {
+    return getPositionPixelChannelLabel(channel);
   }
   setPositionPixelReadFilter(value: string): void {
     const allowed: PositionPixelReadFilter[] = [
