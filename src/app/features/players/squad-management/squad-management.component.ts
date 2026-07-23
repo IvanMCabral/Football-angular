@@ -116,85 +116,30 @@ export class SquadManagementComponent implements OnInit {
    team$!: Observable<Team | null>;
    squad$!: Observable<SessionPlayer[]>;
    loading$!: Observable<boolean>;
-   /**
-    * V25D83.1 sprint 2 ajuste (pre-push): post-lineup-confirm loading indicator.
-    *
-    * <p>{@code true} mientras el squad data está siendo (re-)cargado. Se
-    * dispara en dos momentos:
-    * <ol>
-    *   <li>Initial mount del componente (el HTTP a /career/players/squad
-    *       está en flight).</li>
-    *   <li>Post-refetch disparado por {@code refetchSquadTrigger$} — por
-    *       ejemplo después de un lineup-confirm exitoso, o cuando el modal
-    *       squad-editor cierra y necesitamos refrescar el squad para que
-    *       la grid muestre los cambios de energy/condition/etc.</li>
-    * </ol>
-    *
-    * <p>El template renderiza un spinner overlay (full-screen) cuando este
-    * observable emite {@code true}, evitando que el usuario vea la grid
-    * vacía durante el refetch.
-    */
+   /** True while the squad is loading or refreshing after lineup changes. */
    squadLoading$!: Observable<boolean>;
    error$!: Observable<string | null>;
 
-   /**
-    * V25D83.1 sprint 2 ajuste (pre-push): trigger BehaviorSubject que fuerza
-    * un refetch del squad$. Se usa después de acciones que pueden haber
-    * modificado el squad server-side (lineup-confirm, squad-editor close,
-    * continue-to-new-season).
-    *
-    * <p>Patrón (documentado en {@code memory/angular-testing-patterns.md}
-    * → "Refresh pattern via BehaviorSubject tick"): combina con
-    * {@code careerStatusSource$} vía {@code combineLatest} para que el
-    * switchMap interno re-dispare el HTTP.
-    */
+   /** Emits whenever the squad list must be fetched again. */
    private refetchSquadTrigger$ = new BehaviorSubject<void>(undefined);
 
    lineup$!: Observable<LineupDTO | null>;
    lineupLoading$ = new BehaviorSubject<boolean>(false);
    lineupError$ = new BehaviorSubject<string | null>(null);
-   /** V24D6U3: server-issued warnings (LINEUP_SHORT_HANDED, LINEUP_NO_GOALKEEPER). */
+   /** Warning returned by the lineup service, if the current XI is risky. */
    lineupWarning$ = new BehaviorSubject<LineupWarningDTO | null>(null);
    lineupSubject$ = new BehaviorSubject<LineupDTO | null>(null);
    confirmationWarning$ = new BehaviorSubject<string | null>(null);
    pendingRiskyConfirm$ = new BehaviorSubject<boolean>(false);
 
-   /**
-    * V25D44 (Sprint C9): the player currently shown in the chemistry breakdown
-    * popover. {@code null} when no popover is visible. Source of truth for the
-    * template (the popover section uses {@code *ngIf="selectedContributor$ | async"}),
-    * and for {@link isSelectedContributor} which adds a visual highlight
-    * (chip-selected class) to the chip whose contributor is currently open.
-    */
+   /** Player currently shown in the chemistry breakdown popover. */
    selectedContributor$ = new BehaviorSubject<PlayerLineupDTO | null>(null);
 
-    /**
-     * V25D43 (Sprint C8): order in which to render position groups in the
-     * chemistry breakdown. Mirrors the backend {@code ChemistryDetail.PositionGroup.values()}
-     * (GK → DEF → MID → ATT). WINGER skills are folded into ATT on the back.
-     * Exposed as a class field so the template can iterate it deterministically
-     * (the order of {@code Object.keys(bd.positionGroups)} is not guaranteed
-     * by all browsers/runtimes).
-     */
+    /** Stable display order for chemistry position groups. */
     positionGroupOrder: ReadonlyArray<keyof ChemistryBreakdownDTO['positionGroups']> =
         ['GK', 'DEF', 'MID', 'ATT'];
 
-    /**
-     * V25D59-C19 P1 (front): count of persisted subdivision slots for the
-     * current lineup, used by the hero label "Lineup armado: X/11".
-     *
-     * <p>Previously the counter read {@code lineup.players.length}. That lied
-     * when the auto-select back bug (C18b) persisted a short-handed lineup
-     * (e.g. 7 players) — the label still showed "11/11" because some other
-     * display path cached a stale count. After the back fix (C19 P0) auto-select
-     * always returns 11 players AND 11 slots, but for manual-select / legacy
-     * lineups (pre-MVP1-lineup-cancha-1) the {@code slots} field can be absent.
-     *
-     * <p>Resolution: prefer {@code lineup.slots.length} (the persisted subdivision
-     * count, MVP1-lineup-cancha-1 contract) and fall back to
-     * {@code lineup.players.length} for backward compat with careers that haven't
-     * re-armed via auto-select yet.
-     */
+    /** Number of unique occupied lineup slots shown in the squad header. */
     get lineupSlotsCount(): number {
       const lineup = this.lineupSubject$.value;
       if (lineup == null) {
@@ -223,14 +168,7 @@ private applyLineup(lineup: LineupDTO | null): void {
   this.lineupSubject$.next(lineup);
   this.lineupWarning$.next(this.pickLineupWarning(lineup?.warnings));
 
-  /**
-   * V25D99.73-FRONT: keep the /squad formation selector synchronized with
-   * the persisted lineup. The visual editor can change formation internally
-   * and save it through /career/lineup/manual-select; after closing, the
-   * parent refetches /current. Pre-fix we updated lineupSubject$ but left
-   * selectedFormation$ with the old value, so the background selector could
-   * still say 4-4-2 while reopening the modal correctly showed 4-3-3.
-   */
+  // Keep the visible formation selector in sync with the persisted lineup.
   if (lineup?.formation && ALL_FORMATIONS.includes(lineup.formation as any)) {
     this.selectedFormation$.next(lineup.formation);
   }
@@ -257,13 +195,7 @@ private normalizeLineupForDisplay(lineup: LineupDTO | null): LineupDTO | null {
     slots,
   };
 }
-  /**
-   * V25D38-F1: extendido a las 7 formations que el engine soporta.
-   * V25D55-C16 P0.1: extendido a las 12 formations que el back-end
-   * reconoce (7 originales + 5 nuevas from V25D54-C15). Source of truth
-   * movido a `shared/constants/formations.ts` para mantener en sync con
-   * formation-modal, squad-editor-modal y test-harness.
-   */
+  /** Formations supported by lineup editing and match simulation. */
   availableFormations: readonly string[] = ALL_FORMATIONS;
 
    /** Active tab: 'squad' | 'stats' */
@@ -309,19 +241,6 @@ this.squad$ = combineLatest([
         shareReplay(1)
       );
 
-      /**
-       * V25D83.1 sprint 2 ajuste (pre-push): squad loading indicator.
-       *
-       * <p>Patrón derivado de {@code loading$} (más abajo): empieza en
-       * {@code true} vía {@code startWith(true)}, flips a {@code false}
-       * cuando squad$ emite (initial mount o post-refetch). El
-       * {@code distinctUntilChanged} colapsa emisiones redundantes.
-       *
-       * <p>{@code combineLatest([refetchSquadTrigger$, squad$])} garantiza
-       * que cada {@code refetchSquadTrigger$.next()} re-emite (porque el
-       * combineLatest re-evalúa) y el squad$ subsecuente emite el nuevo
-       * payload, dando el patrón true→false→true→false esperado.
-       */
       this.squadLoading$ = combineLatest([
         this.refetchSquadTrigger$,
         this.squad$
@@ -337,19 +256,6 @@ this.squad$ = combineLatest([
         this.team$,
         this.squad$
       ]).pipe(
-        /**
-         * V25D83.1 sprint 2 ajuste (pre-push): fix broken loading$.
-         *
-         * <p>Pre-fix: el pipe terminaba en {@code map(() => false)} — el
-         * spinner de página nunca se mostraba porque cada emission del
-         * combineLatest se mapeaba a false. Era un dead code que
-         * silenciosamente bloqueaba el UX gap.
-         *
-         * <p>Post-fix: patrón {@code startWith(true) → map(() => false) →
-         * distinctUntilChanged} idéntico al usado en {@code career-setup}
-         * (V25D83.1 #1/#2). El spinner aparece mientras careerStatus/team/
-         * squad están awaiting su primer payload.
-         */
         map(() => false),
         startWith(true),
         distinctUntilChanged(),
@@ -413,10 +319,7 @@ this.squad$ = combineLatest([
      this.pendingRiskyConfirm$.next(false);
    }
 
-/**
-     * V24D6U3: Reduce a list of backend warnings to a single banner payload.
-     * Priority: ERROR > WARNING. Returns null when no banner should be shown.
-     */
+    /** Pick the most important lineup warning for the banner. */
     private pickLineupWarning(warnings?: LineupWarningDTO[]): LineupWarningDTO | null {
       if (!warnings || warnings.length === 0) {
         return null;
@@ -449,20 +352,9 @@ this.squad$ = combineLatest([
       return warning.message;
     }
 
-    // ========== V25D44 (Sprint C9): chemistry breakdown interactivity ==========
+    // Chemistry breakdown interactivity.
 
-    /**
-     * V25D44 (Sprint C9): toggle/switch the contributor popover when the user
-     * clicks a skill chip. Behavior:
-     * <ul>
-     *   <li>Same contributor already open → close the popover (toggle off).</li>
-     *   <li>Different contributor → switch the popover to the new one.</li>
-     *   <li>{@code contributorId} not found in the current lineup → no-op
-     *       (backyard compat: don't open a popover with stale data; don't crash).</li>
-     * </ul>
-     * Lookup uses {@code lineup.players} (the 11 SessionPlayer cards already
-     * fetched by {@code /career/lineup/current}); no extra HTTP call needed.
-     */
+    /** Toggle the chemistry contributor popover for a skill chip. */
     onSkillChipClick(contributorId: string): void {
       if (!contributorId) return;
 
@@ -477,8 +369,7 @@ this.squad$ = combineLatest([
       if (!lineup?.players) return;
       const contributor = lineup.players.find(p => p.playerId === contributorId);
       if (!contributor) {
-        // Backyard compat: chip references a playerId not in this lineup
-        // (shouldn't happen, but defensive — don't open a stale popover).
+        // Ignore stale chemistry references gracefully.
         return;
       }
       this.selectedContributor$.next(contributor);
@@ -491,23 +382,12 @@ this.squad$ = combineLatest([
       }
     }
 
-    /**
-     * V25D44 (Sprint C9): true when the chip's contributorId matches the
-     * currently-open popover. Template uses this to add the {@code chip-selected}
-     * class (visual highlight on the active chip).
-     */
+    /** True when a chemistry chip belongs to the open contributor popover. */
     isSelectedContributor(contributorId: string): boolean {
       return this.selectedContributor$.value?.playerId === contributorId;
     }
 
-    /**
-     * V25D44 (Sprint C9): click-outside handler — close the popover when
-     * the user clicks anywhere outside {@code .skill-chip} and outside the
-     * popover itself. Clicks on chips / popover content are ignored here
-     * because they have their own handlers (chip: toggle/switch; popover X:
-     * close). Uses {@link HostListener} so it's wired to {@code document}
-     * automatically (Angular runs it on every click anywhere).
-     */
+    /** Close the contributor popover when the user clicks outside it. */
     @HostListener('document:click', ['$event'])
     onDocumentClick(event: MouseEvent): void {
       if (!this.selectedContributor$.value) return;
@@ -531,29 +411,8 @@ this.squad$ = combineLatest([
    }
 
    /**
-    * V25D99.20-FRONT BUG-4b: handle formation dropdown change.
-    *
-    * <p>Pre-fix behavior (only): update the local {@code selectedFormation$}
-    * BehaviorSubject so the visual editor dialog receives the new formation
-    * label via {@code currentFormation}. The header chem badge and chemistry
-    * score remained stale until the next lineup fetch (which only happens on
-    * modal close, auto-select success, or career-status refresh). Ivan saw
-    * "header says 4-4-2, editor opens with 3-5-2" and read it as the lineup
-    * being random.
-    *
-    * <p>Post-fix behavior: persist the formation to the back via the existing
-    * {@code /career/lineup/manual-select} endpoint with the current lineup's
-    * 11 playerIds + their slots (carrying customX/Y if any), then refetch
-    * {@code /career/lineup/current} so {@code lineupSubject$} reflects the
-    * back's new formation label + recomputed chem. The header chem badge
-    * stays in sync because {@code lineupSubject$} drives the header via the
-    * {@code lineup$ | async} pipe.
-    *
-    * <p>Why /manual-select rather than /auto-select: auto-select rewrites
-    * the 11 player assignments (would lose Ivan's manual lineup changes).
-    * /manual-select with the current playerIds and slots is a label-only
-    * formation change that triggers chem recompute without disturbing the
-    * players.
+    * Persist a formation change without replacing the current XI.
+    * Existing players are reflowed into the target shape when possible.
     */
    onFormationChange(formation: string): void {
      this.selectedFormation$.next(formation);
@@ -625,10 +484,7 @@ this.squad$ = combineLatest([
      this.activeTab$.next(tab);
    }
 
-/**
- * V24D6T2 (bug #6): count of healthy + non-suspended players in the
- * current squad. Used by the Plantilla header to show "available / total".
- */
+/** Count healthy, non-suspended players in the current squad. */
 availableSquadCount(squad: SessionPlayer[] | null): number {
   if (!squad) return 0;
   return squad.filter(p =>
@@ -637,32 +493,20 @@ availableSquadCount(squad: SessionPlayer[] | null): number {
   ).length;
 }
 
-/**
- * MVP1-lineup-cancha-1: abre el {@link SquadEditorModalComponent} con
- * cancha visual y 82 slots. El modal persiste las asignaciones vía
- * {@code /career/lineup/manual-select} y al cerrar refresca el lineup
- * actual para que el squad-management muestre los cambios.
- */
+/** Open the visual lineup editor and refresh squad/lineup state on close. */
 openVisualEditor(): void {
   this.careerStatus$.subscribe(status => {
     if (!status || !status.careerId) {
       return;
     }
-    // V25D66-C26 (Sprint C26): pasar el squad completo via dialog data para
-    // que el modal pueda mostrar la banca con los jugadores del squad no
-    // seleccionados (no solo los del response /career/lineup/current, que
-    // son los 11 del lineup). El modal hace fallback a playersList si el
-    // squad está vacío o ausente (backward compat con callers legacy).
+    // Pass the full squad so the editor can render both XI and bench.
     this.squad$.pipe(take(1)).subscribe(squad => {
       const ref = this.dialog.open(SquadEditorModalComponent, {
         data: {
           careerId: status.careerId,
           matchId: null,
           squad: squad ?? [],
-          // V25D75-C40 B4: pass the parent's current formation so the
-          // dialog opens with the SAME state the parent shows (was
-          // defaulting to '4-4-2' when response.formation was missing,
-          // causing the parent/dialog desync — parent 5-4-1, dialog 4-4-2).
+          // Keep the editor in sync with the formation shown on this page.
           currentFormation: this.selectedFormation$.value
         },
         width: '98vw',
@@ -683,13 +527,6 @@ openVisualEditor(): void {
             })
           )
           .subscribe();
-        /**
-         * V25D83.1 sprint 2 ajuste (pre-push): también refrescar el squad
-         * post-modal-close. El squad-editor-modal puede haber actualizado
-         * condition/energy/etc de los players, y queremos que la grid del
-         * squad-management muestre los datos frescos. El squadLoading$
-         * spinner overlay se renderiza durante el HTTP.
-         */
         this.refreshSquad();
       });
     });
@@ -721,7 +558,7 @@ openVisualEditor(): void {
            userMsg = err.message;
          }
          this.lineupError$.next(userMsg);
-         // Also surface 422 warnings (e.g. LINEUP_MINIMUM_PLAYERS_NOT_MET) in the warning banner
+         // Surface lineup validation errors in the warning banner.
          if (err.error?.code) {
            this.lineupWarning$.next({
              code: err.error.code,
@@ -738,8 +575,7 @@ openVisualEditor(): void {
      const currentLineup = this.lineupSubject$.value;
      const playerCount = this.lineupSlotsCount;
 
-     // V24D6U3: Guard against confirming with <7 or >11. Block client-side
-     // without sending the request — the backend would 422 anyway.
+     // Block impossible team sizes before sending the request.
      if (playerCount < 7 || playerCount > 11) {
        this.lineupError$.next(
          playerCount < 7
@@ -773,15 +609,6 @@ openVisualEditor(): void {
 this.http.post(`${environment.apiUrl}/career/lineup/confirm`, {}).subscribe({
           next: () => {
             this.resetLineupWarning();
-            /**
-             * V25D83.1 sprint 2 ajuste (pre-push): trigger squad refetch
-             * post-lineup-confirm. El lineup-confirm puede modificar el squad
-             * server-side (energy drain, condition updates) y queremos que
-             * el squadLoading$ spinner overlay se muestre brevemente
-             * mientras el HTTP re-fetchea. La navegación a /games/.../live
-             * puede cancelar el observer, pero el patrón queda en sync si
-             * el usuario regresa a /squad después.
-             */
             this.refreshSquad();
             if (careerStatus.careerPhase === 'WAITING_USER') {
              this.http.post<any>(`${environment.apiUrl}/career/${careerStatus.careerId}/next-round`, {}).subscribe({
@@ -842,15 +669,7 @@ this.http.post(`${environment.apiUrl}/career/lineup/confirm`, {}).subscribe({
         next: (response) => {
           if (response.success) {
             this.refreshCareerStatus();
-            // V25D78-C55.13 BUG-1 (BUG_V25D78_CONTINUE_CAREER_SQUAD_BUTTON_NOOP):
-            // Backend successfully creates T3 (careerPhase=PRE_MATCH) but the
-            // squad-management component keeps showing the stale T2 FINISHED
-            // state because the ngOnInit observables (careerStatus$, team$,
-            // squad$, lineup$) were bound once at mount and the alert blocks
-            // the user from perceiving the change. The /dashboard button
-            // works because it uses router.navigate(['/squad']) which forces
-            // re-instantiation. We mirror that behavior here with a full page
-            // reload — simplest and most robust fix for a 2-button component.
+            // Reload to rebuild the route-bound career streams for the new season.
             this.reloadPage();
           } else {
             this.lineupError$.next(response.message || 'Error al iniciar nueva temporada');
@@ -863,13 +682,7 @@ this.http.post(`${environment.apiUrl}/career/lineup/confirm`, {}).subscribe({
       });
     }
 
-    /**
-     * V25D78-C55.13 BUG-1: thin wrapper around {@code window.location.reload()}.
-     * Indirected so spec tests can spyOn it via {@code spyOn(component, 'reloadPage')}
-     * without hitting jsdom's non-writable {@code window.location.reload} property
-     * (which throws "reload is not declared writable or has no setter" on
-     * {@code spyOn(window.location, 'reload')}).
-     */
+    /** Wrapper kept small so tests can spy on page reloads safely. */
     protected reloadPage(): void {
       window.location.reload();
     }
@@ -921,22 +734,10 @@ this.http.post(`${environment.apiUrl}/career/lineup/confirm`, {}).subscribe({
         }),
         catchError(_err => of(null))
       );
-      /**
-       * V25D83.1 sprint 2 ajuste (pre-push): cuando el career-status cambia
-       * (continueToNewSeason, round-end transitions), re-fetchear el squad
-       * para que la grid muestre los datos frescos. El squadLoading$
-       * spinner overlay se renderiza durante el HTTP.
-       */
       this.refetchSquadTrigger$.next();
     }
 
-    /**
-     * V25D83.1 sprint 2 ajuste (pre-push): trigger manual del squad refetch.
-     *
-     * <p>Usado por {@link onConfirmLineup} después de un lineup-confirm
-     * exitoso (pre-navigation a /games/.../live) y por callers externos que
-     * necesiten refrescar el squad sin tocar career-status.
-     */
+    /** Refresh the squad without rebuilding the career status stream. */
     refreshSquad(): void {
       this.refetchSquadTrigger$.next();
     }
