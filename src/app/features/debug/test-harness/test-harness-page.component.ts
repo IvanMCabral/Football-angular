@@ -126,6 +126,7 @@ import {
   CURRENT_LINEUP_MULTI_SEED_COUNT,
   CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS,
   DEFAULT_REPLAY_SEED,
+  SINGLE_MATCH_REPLAY_TIMEOUT_MS,
   TIMELINE_DEBOUNCE_MS,
   TIMELINE_MAX_MINUTE,
   TIMELINE_STEP,
@@ -582,10 +583,20 @@ import {
                 color="primary"
                 (click)="onReplayWithSeed()"
                 [disabled]="mutationInFlight() || !selectedMatchId()"
+                data-testid="replay-with-seed-button"
                 aria-label="Replay selected match with seed"
               >
-                Repetir con seed
+                {{ mutationInFlight() ? 'Repitiendo...' : 'Repetir con seed' }}
               </button>
+              <p
+                *ngIf="replayStatusMessage()"
+                class="replay-status-card"
+                role="status"
+                aria-live="polite"
+                data-testid="replay-status-card"
+              >
+                {{ replayStatusMessage() }}
+              </p>
               <a
                 mat-stroked-button
                 color="primary"
@@ -3912,6 +3923,17 @@ import {
       margin: 1rem 0;
     }
     .button-stack { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 1rem; }
+    .replay-status-card {
+      margin: 0.2rem 0 0;
+      padding: 0.55rem 0.65rem;
+      border: 1px solid rgba(25, 118, 210, 0.28);
+      border-radius: 8px;
+      background: rgba(25, 118, 210, 0.08);
+      color: #174ea6;
+      font-size: 0.82rem;
+      font-weight: 700;
+      line-height: 1.35;
+    }
     .harness-warning {
       margin: 0.75rem 0 0;
       padding: 0.55rem 0.7rem;
@@ -4864,6 +4886,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   readonly loading = signal<boolean>(true);
   /** True while a mutation (set-formation, reset-injuries, replace-fixtures) is in flight. */
   readonly mutationInFlight = signal<boolean>(false);
+  readonly replayStatusMessage = signal<string | null>(null);
   defensiveFallbackRestore: { formation: string; playerIds: string[]; slots: LineupSlotDTO[] } | null = null;
   defensiveFallbackLabRead: string | null = null;
   /** Error message from the initial load (null when OK). */
@@ -9077,26 +9100,38 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   onReplayWithSeed(): void {
     const matchId = this.selectedMatchId();
     if (!matchId) {
+      this.replayStatusMessage.set('Elegí un partido en Panel C antes de repetir con seed.');
       this.snackBar.open('Select a match in Panel C first.', 'OK', {
         duration: 3000,
       });
       return;
     }
+    const seedDesc =
+      this.seedInputModel !== null
+        ? `seed=${this.seedInputModel}`
+        : 'seed no reproducible';
+    this.replayStatusMessage.set(
+      `Repitiendo ${this.selectedMatchLabel()} con ${seedDesc} y foco ${this.selectedStyleLabel()}...`
+    );
     this.mutationInFlight.set(true);
     this.harness.setStyle(this.selectedStyleModel).pipe(
       switchMap(() => this.harness.replayMatch(matchId, this.seedInputModel)),
-      timeout(CURRENT_LINEUP_MULTI_SEED_TIMEOUT_MS),
+      timeout(SINGLE_MATCH_REPLAY_TIMEOUT_MS),
       finalize(() => this.mutationInFlight.set(false))
     ).subscribe({
       next: (fixture) => {
-        const seedDesc =
-          this.seedInputModel !== null
-            ? `seed=${this.seedInputModel}`
-            : 'non-reproducible seed';
         const score =
           fixture?.result != null
             ? ` ? ${fixture.result.homeGoals}-${fixture.result.awayGoals}`
             : '';
+        const status = fixture?.status ? String(fixture.status).toUpperCase() : 'sin estado';
+        const visualScore = fixture?.result != null
+          ? `${fixture.result.homeGoals}-${fixture.result.awayGoals}`
+          : 'sin marcador';
+        this.replayStatusMessage.set(
+          `Replay listo: ${this.selectedMatchLabel()} quedó ${status}, resultado ${visualScore}. ` +
+          'Panel A/D se actualizan con el detalle; si querés comparar contra el vivo, abrí el comparador.'
+        );
         this.snackBar.open(
           `Match replayed (${seedDesc}, ${this.selectedStyleLabel()})${score}.`,
           'OK',
@@ -9117,6 +9152,9 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         this.refreshDetailAfterMutation(2500);
       },
       error: (err) => {
+        this.replayStatusMessage.set(
+          `No se pudo repetir el partido con seed: ${this.fmtError(err, 'error desconocido')}`
+        );
         this.snackBar.open(
           this.fmtError(err, 'Failed to replay match'),
           'OK',

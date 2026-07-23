@@ -1456,6 +1456,8 @@ describe('TestHarnessPageComponent', () => {
 
     expect(harness.replayMatch).toHaveBeenCalledWith('match-1', 999);
     expect(snackBarSpy.open).toHaveBeenCalled();
+    expect(component.replayStatusMessage()).toContain('Replay listo');
+    expect(component.replayStatusMessage()).toContain('3-0');
     expect(component.mutationInFlight()).toBeFalse();
   });
 
@@ -1483,6 +1485,7 @@ describe('TestHarnessPageComponent', () => {
     component.onReplayWithSeed();
 
     expect(harness.replayMatch).not.toHaveBeenCalled();
+    expect(component.replayStatusMessage()).toContain('Elegí un partido');
     expect(snackBarSpy.open).toHaveBeenCalled();
   });
 
@@ -1492,6 +1495,7 @@ describe('TestHarnessPageComponent', () => {
     component.onReplayWithSeed();
 
     expect(component.mutationInFlight()).toBeFalse();
+    expect(component.replayStatusMessage()).toContain('No se pudo repetir');
     expect(snackBarSpy.open).toHaveBeenCalled();
   });
 
