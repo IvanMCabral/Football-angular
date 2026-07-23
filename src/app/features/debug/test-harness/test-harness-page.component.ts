@@ -5221,7 +5221,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       && row.line === 'ATT'
       && row.verdict === 'OK'
       && row.slotRoles
-        .split(/[?,]/)
+        .split(/[?,·]/)
         .map((role) => role.trim())
         .filter((role) => role === 'ST')
         .length >= 2
@@ -5297,6 +5297,14 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const substitutionTimingRows = this.substitutionTimingMatrixRows();
     const hasSubstitutionWhatIf = !!substitutionSummary;
     const hasSubstitutionTiming = substitutionTimingRows.length > 0;
+    const smokeNotes = [
+      ...(this.professionalSmokeSummary()?.included ?? []),
+      ...(this.professionalSmokeSummary()?.skipped ?? []),
+    ];
+    const hasNoSafeSubstitution = smokeNotes.some((note) =>
+      note.toLowerCase().includes('sin sustitución segura')
+      || note.toLowerCase().includes('sin sustitucion segura')
+    );
     const substitutionTimingSignalRows = substitutionTimingRows.filter((row) =>
       Math.abs(row.deltaXgFor) >= 0.001
       || Math.abs(row.deltaXgAgainst) >= 0.001
@@ -5325,6 +5333,8 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       ? `${substitutionSummary.playerOffName} → ${substitutionSummary.playerOnName} min ${substitutionSummary.minute} · dXG ${this.fmtDeltaNumber(substitutionSummary.deltaXgFor)} · dShots ${this.fmtDeltaNumber(substitutionSummary.deltaShotsFor)}`
       : hasSubstitutionTiming
         ? `${substitutionTimingRows[0].playerOffName} → ${substitutionTimingRows[0].playerOnName} min ${substitutionTimingRows.map((row) => `${row.minute}'`).join('/')} · ${substitutionTimingSignalRows}/${substitutionTimingRows.length} con señal`
+        : hasNoSafeSubstitution
+          ? 'Sin sustitución segura para el objetivo DT actual.'
         : 'Not run yet';
     return [
       {
@@ -5394,9 +5404,13 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         check: 'Live substitution signal',
         expected: 'Same seed baseline vs minute substitution should alter match averages in the selected coach objective direction.',
         observed: substitutionObserved,
-        verdict: !hasSubstitutionWhatIf && !hasSubstitutionTiming ? 'Pending' : substitutionSignal && substitutionObjectiveOk ? 'OK' : 'Review',
+        verdict: hasNoSafeSubstitution
+          ? 'Fallback'
+          : !hasSubstitutionWhatIf && !hasSubstitutionTiming ? 'Pending' : substitutionSignal && substitutionObjectiveOk ? 'OK' : 'Review',
         next: !hasSubstitutionWhatIf && !hasSubstitutionTiming
-          ? 'Run Simular sustitución or Smoke profesional full.'
+          ? hasNoSafeSubstitution
+            ? 'No safe substitution for the current coach objective; keep structure or change manually.'
+            : 'Run Simular sustitución or Smoke profesional full.'
           : substitutionSignal && substitutionObjectiveOk
             ? 'Keep as modal -> harness -> engine contract.'
             : substitutionObjective === 'PROTECT_RESULT'
@@ -9991,6 +10005,23 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       || row.deltaShotsAgainst < -0.01
       || (row.deltaXgAgainst <= 0.001 && row.deltaShotsAgainst <= 0.01 && row.deltaXgDiff >= 0.02);
   }
+  private modalRecommendationWhatIfIsSafe(
+    row: SubstitutionWhatIfSummaryRow,
+    objective: ScenarioBatteryCoachObjective
+  ): boolean {
+    if (objective === 'NEED_GOAL') {
+      return row.deltaXgFor > 0.001
+        || row.deltaShotsFor > 0.01
+        || (row.deltaXgFor >= -0.001 && row.deltaShotsFor >= -0.01 && row.deltaXgDiff >= 0.02);
+    }
+    if (objective === 'PROTECT_RESULT') {
+      return this.modalProtectWhatIfIsSafe(row);
+    }
+    return Math.abs(row.deltaXgFor) >= 0.001
+      || Math.abs(row.deltaXgAgainst) >= 0.001
+      || Math.abs(row.deltaShotsFor) >= 0.01
+      || Math.abs(row.deltaShotsAgainst) >= 0.01;
+  }
   private runPlayerSwapBatteryMode(
     matchId: string,
     seedStart: number,
@@ -11601,12 +11632,21 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       .replace(/Run formation audit\./g, 'Corré auditoría de formación.')
       .replace(/Run formación audit\./g, 'Corré auditoría de formación.')
       .replace(/Run Batería cambio jugador or Comparar precisión\./g, 'Corré Batería cambio jugador o Comparar precisión.')
+      .replace(/Run Matriz presets posición or line smokes\./g, 'Corré Matriz presets posición o smokes de líneas.')
       .replace(/Run Matriz presets posicion or line smokes\./g, 'Corré Matriz presets posición o smokes de líneas.')
       .replace(/Run Chequeo sensibilidad\./g, 'Corré Chequeo sensibilidad.')
       .replace(/Run Simular sustitución or Smoke profesional full\./g, 'Corré Simular sustitución o Smoke profesional full.')
       .replace(/Keep as contract\./g, 'Mantener como contrato.')
       .replace(/No fallback detected for this squad\./g, 'No se detectó fallback en este plantel.')
       .replace(/Check side mapping \/ persisted slots\./g, 'Revisar mapeo de lados / slots guardados.')
+      .replace(/Fallbacks are allowed; preview\/engine apply role-fit penalties\./g, 'Los fallback son válidos si quedan visibles y el preview/motor aplican penalización de rol.')
+      .replace(/Fallback is exposed here and penalized by role-fit in preview \+ engine\./g, 'El fallback queda visible y penalizado por encaje de rol en preview + motor.')
+      .replace(/Pinned by backend test\./g, 'Fijado por test de backend.')
+      .replace(/Recheck auto-select reservation\./g, 'Revisar reserva del auto-select.')
+      .replace(/Use best\/worst to tune role quality\./g, 'Usar mejor/peor caso para calibrar calidad de rol.')
+      .replace(/Need-goal objective must raise xG or shots; inspect candidate quality and attacking role fit\./g, 'Si el objetivo es buscar gol, debe subir xG o tiros; revisar calidad del candidato y encaje ofensivo.')
+      .replace(/Micro is smooth; calibrate 5px\/big tactical sensitivity separately\./g, 'El micro-movimiento es suave; calibrar aparte sensibilidad de 5px y movimientos tácticos grandes.')
+      .replace(/Use filas to calibrate direction\./g, 'Usar las filas para calibrar dirección.')
       .replace(/Inspect/g, 'Revisar')
       .replace(/Use rows to calibrate direction\./g, 'Usar las filas para calibrar dirección.');
   }
@@ -14634,23 +14674,37 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       ),
     }).pipe(
       switchMap(({ lineup, squad }) => {
-        const candidate = this.pickAutomaticSwapCandidate(lineup, squad);
-        const playerOffId = this.selectedSwapStarterIdModel || candidate?.starterId;
-        const playerOnId = this.selectedSwapBenchIdModel || candidate?.benchId;
-        if (!playerOffId || !playerOnId) {
-          throw new Error('No pude resolver titular y suplente para substitution smoke.');
+        const objective = this.playerSwapEffectiveCoachObjective();
+        const manualCandidate = this.pickAutomaticSwapCandidate(lineup, squad);
+        const manualPlayerOffId = this.selectedSwapStarterIdModel || manualCandidate?.starterId;
+        const manualPlayerOnId = this.selectedSwapBenchIdModel || manualCandidate?.benchId;
+        const objectiveCandidates = this.pickModalRecommendationSwapCandidates(lineup, squad, objective, 6);
+        const candidates = this.selectedSwapStarterIdModel || this.selectedSwapBenchIdModel
+          ? manualPlayerOffId && manualPlayerOnId
+            ? [{
+                starterId: manualPlayerOffId,
+                starterName: manualCandidate?.starterName ?? 'Manual starter',
+                starterPosition: manualCandidate?.starterPosition ?? 'AUTO',
+                benchId: manualPlayerOnId,
+                benchName: manualCandidate?.benchName ?? 'Manual bench',
+                benchPosition: manualCandidate?.benchPosition ?? 'AUTO',
+                slotId: manualCandidate?.slotId ?? '',
+                testCase: `Smoke manual: ${this.scenarioBatteryCoachObjectiveLabel(objective)}`,
+              }]
+            : []
+          : objectiveCandidates;
+        if (candidates.length === 0) {
+          throw new Error('No pude resolver candidatos seguros para substitution smoke.');
         }
         return this.harness.setStyle(this.selectedStyleModel).pipe(
-          switchMap(() =>
-            this.harness.runSubstitutionWhatIfSummary(matchId, {
-              playerOffId,
-              playerOnId,
-              minute,
-              seedStart,
-              seedCount,
-              controlledTeamSide: 'USER',
-            })
-          )
+          switchMap(() => this.runModalSubstitutionCandidates(matchId, candidates, seedStart, seedCount, minute, objective)),
+          map((items) => {
+            const safe = items.find((item) => this.modalRecommendationWhatIfIsSafe(item.row, objective));
+            if (!safe) {
+              throw new Error(`Sin sustitución segura para ${this.scenarioBatteryCoachObjectiveLabel(objective)}.`);
+            }
+            return safe.row;
+          })
         );
       }),
       timeout(60_000),
