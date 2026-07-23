@@ -135,6 +135,11 @@ import {
   playerSwapOverallDelta as getPlayerSwapOverallDelta,
   playerSwapOverallDeltaText as getPlayerSwapOverallDeltaText,
   playerSwapQualityWarning as getPlayerSwapQualityWarning,
+  playerSwapCoachAttackScore as getPlayerSwapCoachAttackScore,
+  playerSwapCoachNetScore as getPlayerSwapCoachNetScore,
+  playerSwapCoachReadLevel as getPlayerSwapCoachReadLevel,
+  playerSwapCoachRiskScore as getPlayerSwapCoachRiskScore,
+  playerSwapRoleTradeoff as getPlayerSwapRoleTradeoff,
   playerSwapSignalClass as getPlayerSwapSignalClass,
   playerSwapSignalRead as getPlayerSwapSignalRead,
   playerSwapSignalScore as getPlayerSwapSignalScore,
@@ -7353,38 +7358,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return `no hay señal suficiente de resultado para decidir por este cambio. xG diff ${xgDiff}, pre-auto-sub ${preXgDiff}.${roleDetail}`;
   }
   private playerSwapCoachReadLevel(row: PlayerSwapMatrixSummaryRow, candidate: PlayerSwapCandidate | null = null): 'upgrade' | 'downgrade' | 'tradeoff' | 'neutral' | 'review' {
-    const net = this.playerSwapCoachNetScore(row);
-    const attack = this.playerSwapCoachAttackScore(row);
-    const risk = this.playerSwapCoachRiskScore(row);
-    const roleRisk = this.playerSwapRoleRisk(candidate);
-    const roleSignal = Math.max(Math.abs(roleRisk.attack), Math.abs(roleRisk.control), Math.abs(roleRisk.protection));
-    const signal = Math.max(
-      Math.abs(row.deltaXgDiff),
-      Math.abs(row.preAutoSubDeltaXgDiff || 0),
-      Math.abs(row.deltaXgFor),
-      Math.abs(row.deltaXgAgainst),
-      Math.abs(row.deltaShotsFor) * 0.025,
-      Math.abs(row.deltaShotsAgainst) * 0.025,
-      roleSignal,
-    );
-    if (this.playerSwapHasLargeQualityDrop(row)) {
-      const preNet = row.preAutoSubDeltaXgDiff || 0;
-      const stableStrongGain = net >= 0.18 && row.deltaXgDiff >= 0.12 && preNet >= 0.06 && risk <= 0.10;
-      if (!stableStrongGain) {
-        if (net <= -0.03 || preNet <= -0.03 || row.deltaXgFor <= -0.03) return 'downgrade';
-        return 'review';
-      }
-    }
-    if (signal < 0.035) return 'neutral';
-    if (roleSignal >= 0.050 && risk < 0.08 && Math.abs(net) < 0.05) return 'review';
-    if (this.playerSwapRoleTradeoff(row, candidate)) return 'tradeoff';
-    if (net >= 0.08 && risk <= 0.16) {
-      return this.playerSwapHasLargeQualityDrop(row) ? 'review' : 'upgrade';
-    }
-    if (net <= -0.08 && (risk >= 0.10 || row.deltaXgFor <= 0)) return 'downgrade';
-    if (attack >= 0.12 && risk >= 0.12) return 'tradeoff';
-    if (signal >= 0.18 || Math.abs(net) >= 0.06) return 'review';
-    return 'neutral';
+    return getPlayerSwapCoachReadLevel(row, this.playerSwapRoleRisk(candidate));
   }
   private playerSwapHasLargeQualityDrop(row: Pick<PlayerSwapMatrixSummaryRow, 'baselinePlayerOverall' | 'swapPlayerOverall'>): boolean {
     return hasLargePlayerSwapQualityDrop(row);
@@ -7399,32 +7373,16 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return getPlayerSwapOverallDeltaText(row, (value) => this.fmtDeltaNumber(value));
   }
   private playerSwapCoachNetScore(row: PlayerSwapMatrixSummaryRow): number {
-    const shotDiff = row.deltaShotsFor - row.deltaShotsAgainst;
-    return row.deltaXgDiff + (row.preAutoSubDeltaXgDiff || 0) * 0.60 + shotDiff * 0.015 + row.deltaPossessionFor * 0.0015;
+    return getPlayerSwapCoachNetScore(row);
   }
   private playerSwapCoachAttackScore(row: PlayerSwapMatrixSummaryRow): number {
-    return Math.max(0, row.deltaXgFor) + Math.max(0, row.preAutoSubDeltaXgFor || 0) * 0.60 + Math.max(0, row.deltaShotsFor) * 0.015;
+    return getPlayerSwapCoachAttackScore(row);
   }
   private playerSwapCoachRiskScore(row: PlayerSwapMatrixSummaryRow): number {
-    return Math.max(0, row.deltaXgAgainst) + Math.max(0, row.preAutoSubDeltaXgAgainst || 0) * 0.60 + Math.max(0, row.deltaShotsAgainst) * 0.015;
+    return getPlayerSwapCoachRiskScore(row);
   }
   private playerSwapRoleTradeoff(row: PlayerSwapMatrixSummaryRow, candidate: PlayerSwapCandidate | null = null): boolean {
-    const roleRisk = this.playerSwapRoleRisk(candidate);
-    const defensiveGain =
-      Math.max(0, -row.deltaXgAgainst)
-      + Math.max(0, -(row.preAutoSubDeltaXgAgainst || 0)) * 0.60
-      + Math.max(0, -row.deltaShotsAgainst) * 0.015
-      + Math.max(0, roleRisk.protection);
-    const attackCost =
-      Math.max(0, -row.deltaXgFor)
-      + Math.max(0, -(row.preAutoSubDeltaXgFor || 0)) * 0.60
-      + Math.max(0, -row.deltaShotsFor) * 0.015
-      + Math.max(0, -roleRisk.attack);
-    const protectionCost = Math.max(0, -roleRisk.protection);
-    const attackGain = this.playerSwapCoachAttackScore(row) + Math.max(0, roleRisk.attack);
-    if (attackCost >= 0.050 && defensiveGain >= 0.060) return true;
-    if (protectionCost >= 0.050 && attackGain >= 0.050) return true;
-    return false;
+    return getPlayerSwapRoleTradeoff(row, this.playerSwapRoleRisk(candidate));
   }
   private playerSwapSignalScore(row: PlayerSwapMatrixSummaryRow, candidate: PlayerSwapCandidate | null = null): number {
     return getPlayerSwapSignalScore(row, this.playerSwapRoleRisk(candidate));

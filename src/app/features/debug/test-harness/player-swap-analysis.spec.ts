@@ -1,5 +1,6 @@
 import {
   playerSwapHasLargeQualityDrop,
+  playerSwapCoachReadLevel,
   playerSwapOverallDelta,
   playerSwapOverallDeltaText,
   playerSwapQualityWarning,
@@ -10,6 +11,19 @@ import {
 
 describe('player-swap-analysis', () => {
   const formatDelta = (value: number): string => (value >= 0 ? `+${value}` : `${value}`);
+  const baseDecisionRow = {
+    baselinePlayerOverall: 75,
+    swapPlayerOverall: 76,
+    deltaXgDiff: 0,
+    preAutoSubDeltaXgDiff: 0,
+    preAutoSubDeltaXgFor: 0,
+    preAutoSubDeltaXgAgainst: 0,
+    deltaXgFor: 0,
+    deltaXgAgainst: 0,
+    deltaShotsFor: 0,
+    deltaShotsAgainst: 0,
+    deltaPossessionFor: 0,
+  };
 
   it('calculates the individual quality delta for a player swap', () => {
     expect(playerSwapOverallDelta({ baselinePlayerOverall: 72, swapPlayerOverall: 78 })).toBe(6);
@@ -44,6 +58,7 @@ describe('player-swap-analysis', () => {
         deltaXgAgainst: 0.01,
         deltaShotsFor: 1,
         deltaShotsAgainst: 8,
+        deltaPossessionFor: 0,
       },
       { attack: 0.02, control: 0.03, protection: 0.04 },
     );
@@ -60,5 +75,68 @@ describe('player-swap-analysis', () => {
     expect(playerSwapSignalClass(0.02)).toBe('read-stable');
     expect(playerSwapSignalRead(0.019)).toBe('Micro 0.019');
     expect(playerSwapSignalClass(0.019)).toBe('delta-neutral');
+  });
+
+  it('reads a stable attacking improvement as a clear upgrade', () => {
+    expect(playerSwapCoachReadLevel(
+      {
+        ...baseDecisionRow,
+        deltaXgDiff: 0.11,
+        preAutoSubDeltaXgDiff: 0.03,
+        deltaXgFor: 0.12,
+        deltaShotsFor: 2,
+      },
+      { attack: 0, control: 0, protection: 0 },
+    )).toBe('upgrade');
+  });
+
+  it('reads a risky negative swap as a clear downgrade', () => {
+    expect(playerSwapCoachReadLevel(
+      {
+        ...baseDecisionRow,
+        deltaXgDiff: -0.09,
+        deltaXgFor: -0.01,
+        deltaXgAgainst: 0.11,
+        deltaShotsAgainst: 1,
+      },
+      { attack: 0, control: 0, protection: 0 },
+    )).toBe('downgrade');
+  });
+
+  it('reads attack gain with defensive exposure as a trade-off', () => {
+    expect(playerSwapCoachReadLevel(
+      {
+        ...baseDecisionRow,
+        deltaXgDiff: 0.01,
+        deltaXgFor: 0.13,
+        deltaXgAgainst: 0.13,
+      },
+      { attack: 0, control: 0, protection: 0 },
+    )).toBe('tradeoff');
+  });
+
+  it('forces review when quality drops hard without a stable strong gain', () => {
+    expect(playerSwapCoachReadLevel(
+      {
+        ...baseDecisionRow,
+        baselinePlayerOverall: 80,
+        swapPlayerOverall: 73,
+        deltaXgDiff: 0.08,
+        deltaXgFor: 0.05,
+      },
+      { attack: 0, control: 0, protection: 0 },
+    )).toBe('review');
+  });
+
+  it('keeps tiny mixed deltas neutral', () => {
+    expect(playerSwapCoachReadLevel(
+      {
+        ...baseDecisionRow,
+        deltaXgDiff: 0.01,
+        deltaXgFor: 0.01,
+        deltaXgAgainst: 0.01,
+      },
+      { attack: 0, control: 0, protection: 0 },
+    )).toBe('neutral');
   });
 });
