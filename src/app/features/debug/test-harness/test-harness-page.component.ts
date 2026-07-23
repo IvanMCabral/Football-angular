@@ -130,6 +130,12 @@ import {
   TIMELINE_MAX_MINUTE,
   TIMELINE_STEP,
 } from './test-harness.constants';
+import {
+  playerSwapHasLargeQualityDrop as hasLargePlayerSwapQualityDrop,
+  playerSwapOverallDelta as getPlayerSwapOverallDelta,
+  playerSwapOverallDeltaText as getPlayerSwapOverallDeltaText,
+  playerSwapQualityWarning as getPlayerSwapQualityWarning,
+} from './player-swap-analysis';
 /**
  * V24D24: Test-Harness UI page (4-panel layout).
  *
@@ -7378,21 +7384,16 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return 'neutral';
   }
   private playerSwapHasLargeQualityDrop(row: Pick<PlayerSwapMatrixSummaryRow, 'baselinePlayerOverall' | 'swapPlayerOverall'>): boolean {
-    const delta = this.playerSwapOverallDelta(row);
-    return delta != null && delta <= -6;
+    return hasLargePlayerSwapQualityDrop(row);
   }
   private playerSwapQualityWarning(row: Pick<PlayerSwapMatrixSummaryRow, 'baselinePlayerOverall' | 'swapPlayerOverall'>): string {
-    if (!this.playerSwapHasLargeQualityDrop(row)) return '';
-    return ` y baja mucho la calidad individual (${this.playerSwapOverallDeltaText(row)})`;
+    return getPlayerSwapQualityWarning(row, (value) => this.fmtDeltaNumber(value));
   }
   private playerSwapOverallDelta(row: Pick<PlayerSwapMatrixSummaryRow, 'baselinePlayerOverall' | 'swapPlayerOverall'>): number | null {
-    if (row.baselinePlayerOverall == null || row.swapPlayerOverall == null) return null;
-    return row.swapPlayerOverall - row.baselinePlayerOverall;
+    return getPlayerSwapOverallDelta(row);
   }
   private playerSwapOverallDeltaText(row: Pick<PlayerSwapMatrixSummaryRow, 'baselinePlayerOverall' | 'swapPlayerOverall'>): string {
-    const delta = this.playerSwapOverallDelta(row);
-    if (row.baselinePlayerOverall == null || row.swapPlayerOverall == null || delta == null) return 'OVR desconocido';
-    return `${row.baselinePlayerOverall}${String.fromCharCode(8594)}${row.swapPlayerOverall} (${this.fmtDeltaNumber(delta)})`;
+    return getPlayerSwapOverallDeltaText(row, (value) => this.fmtDeltaNumber(value));
   }
   private playerSwapCoachNetScore(row: PlayerSwapMatrixSummaryRow): number {
     const shotDiff = row.deltaShotsFor - row.deltaShotsAgainst;
