@@ -6407,6 +6407,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     ];
     const lines = this.csvLines(header, rows as unknown as Record<string, unknown>[]);
     this.downloadCsv(lines, `formation-matrix-${this.seedInputModel ?? 'auto'}.csv`);
+    this.snackBar.open(`Matriz formaciones CSV exported (${rows.length} rows).`, 'OK', { duration: 2500 });
   }
   downloadPlayerSwapMatrixCsv(): void {
     const row = this.playerSwapMatrixSummary();

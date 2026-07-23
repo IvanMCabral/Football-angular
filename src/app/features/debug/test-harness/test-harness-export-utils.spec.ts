@@ -46,6 +46,8 @@ describe('test-harness-export-utils', () => {
     const createElementSpy = spyOn(document, 'createElement').and.returnValue(anchor);
     const createObjectUrlSpy = spyOn(URL, 'createObjectURL').and.returnValue('blob:test-url');
     const revokeObjectUrlSpy = spyOn(URL, 'revokeObjectURL');
+    const appendChildSpy = spyOn(document.body, 'appendChild').and.callThrough();
+    const removeChildSpy = spyOn(document.body, 'removeChild').and.callThrough();
 
     downloadTextFile('hello', 'report.csv', 'text/csv;charset=utf-8');
 
@@ -53,7 +55,10 @@ describe('test-harness-export-utils', () => {
     expect(createObjectUrlSpy).toHaveBeenCalled();
     expect(anchor.href).toContain('blob:test-url');
     expect(anchor.download).toBe('report.csv');
+    expect(anchor.style.display).toBe('none');
+    expect(appendChildSpy).toHaveBeenCalledWith(anchor);
     expect(clickSpy).toHaveBeenCalled();
+    expect(removeChildSpy).toHaveBeenCalledWith(anchor);
     expect(revokeObjectUrlSpy).toHaveBeenCalledWith('blob:test-url');
   });
 });
