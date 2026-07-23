@@ -257,7 +257,7 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
     }
     :host ::ng-deep .mat-mdc-dialog-container .mat-mdc-dialog-content {
       padding: 0;
-      max-height: 80vh;
+      max-height: calc(92vh - 116px);
       overflow-y: auto;
     }
     .partido-modal-title,
@@ -380,8 +380,8 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       align-items: center;
       gap: 0.75rem;
       flex-wrap: wrap;
-      margin-bottom: 0.65rem;
-      padding: 0.65rem 0.75rem;
+      margin: 0.55rem 0.6rem 0.65rem;
+      padding: 0.55rem 0.7rem;
       border: 1px solid rgba(20, 83, 45, 0.12);
       border-radius: 14px;
       background:
@@ -422,7 +422,7 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
          8px ~ 285px of inner content) don't crowd the pitch border.
          380px leaves ~95px of headroom for the center circle + the
          halfway line pseudo-elements. */
-      min-height: clamp(420px, 58vh, 680px);
+      min-height: clamp(300px, 36vh, 460px);
       justify-content: space-around;
       margin-bottom: 0.25rem;
       overflow: hidden;
@@ -480,6 +480,7 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       /* El XI propio se lee como el editor principal: arco propio abajo,
          ataque arriba. No cambia slotIndex ni motor; sólo la presentación. */
       flex-direction: column-reverse;
+      padding-bottom: clamp(1rem, 2vh, 1.4rem);
     }
 
     .player-dot {
@@ -572,7 +573,7 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       display: flex;
       align-items: center;
       gap: 0.75rem;
-      padding: 0.55rem 0.7rem;
+      padding: 0.35rem 0.55rem;
       border: 1px solid rgba(20, 83, 45, 0.16);
       border-radius: 14px;
       background: #ffffff;
@@ -608,7 +609,19 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       display: grid;
       grid-template-columns: 1fr;
       justify-items: center;
-      gap: 0.1rem;
+      gap: 0;
+    }
+
+    .nudge-pad button.mat-mdc-icon-button {
+      width: 30px;
+      height: 28px;
+      padding: 0;
+    }
+
+    .nudge-pad button.mat-mdc-outlined-button {
+      min-width: 64px;
+      height: 30px;
+      padding: 0 0.55rem;
     }
 
     .nudge-middle {
@@ -622,8 +635,8 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       align-items: center;
       justify-content: center;
       width: 1.5rem;
-      height: 1.5rem;
-      font-size: 1.15rem;
+      height: 1.25rem;
+      font-size: 1rem;
       font-weight: 800;
       line-height: 1;
     }
@@ -957,13 +970,23 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
     .formation-grid {
       display: grid;
       grid-template-columns: 1fr;
-      gap: 0.4rem;
+      gap: 0.6rem;
+      padding: 0 0.6rem;
       margin-bottom: 0.2rem;
     }
     @media (min-width: 601px) {
       .formation-grid {
-        grid-template-columns: minmax(0, 3fr) minmax(260px, 0.9fr);
+        grid-template-columns: minmax(0, 3fr) minmax(260px, 0.85fr);
       }
+    }
+    .col-pitch,
+    .col-bench {
+      min-width: 0;
+      padding: 0.55rem;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.72);
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
     }
     .col-pitch h3,
     .col-bench h3 {
@@ -977,7 +1000,7 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       display: flex;
       flex-direction: column;
       gap: 0.25rem;
-      max-height: 280px;
+      max-height: clamp(240px, 45vh, 520px);
       overflow-y: auto;
       padding: 0.3rem;
       background: #f9fafb;
@@ -1076,6 +1099,8 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       padding: 0.55rem 1rem 0.65rem;
       background: #f8fafc;
       border-top: 1px solid rgba(15, 23, 42, 0.08);
+      position: relative;
+      z-index: 2;
     }
 
     /* : success toast styling (snackbar)  -  same as F5. */
@@ -1149,6 +1174,9 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
         max-width: 100%;
       }
       .formation-row { margin-bottom: 0.35rem; }
+      .formation-grid { padding: 0 0.35rem; }
+      .col-pitch,
+      .col-bench { padding: 0.4rem; }
       .score-chip {
         font-size: 0.75rem;
         padding: 0.15rem 0.5rem;
