@@ -6,6 +6,7 @@ import {
   positionPixelChannelBreakdownDetail,
   positionPixelChannelBreakdownRead,
   positionPixelChannelSign,
+  positionPixelCoachRead,
   positionPixelContextualCoverageNote,
   positionPixelCoverageChannelLabel,
   positionPixelDecisionScore,
@@ -40,6 +41,7 @@ import {
   positionPixelVisualChannel,
   positionPixelVisualLine,
   positionPixelWideChannelReason,
+  strictPositionPixelLine,
 } from './position-pixel-analysis';
 
 describe('position-pixel-analysis', () => {
@@ -449,5 +451,26 @@ describe('position-pixel-analysis', () => {
     expect(positionPixelShapeMoveDetail(row)).toContain('perdiste presencia en banda izquierda');
     expect(positionPixelShapeMoveDetail(row)).toContain('subiste al jugador de MID a ATT');
     expect(positionPixelShapeDeltaText('MID', 'L', 'ATT', 'C')).toBe('shape MID L -1 / ATT C +1');
+  });
+
+  it('reads coach-level movement for micro stable pixels', () => {
+    expect(positionPixelCoachRead({ ...baseRow, targetXPercent: 50.5 } as any))
+      .toBe('Micro estable: el pixel no rompe la lectura del motor.');
+  });
+
+  it('reads coach-level movement for defender projection risk', () => {
+    const row = {
+      ...baseRow,
+      playerPosition: 'DEF',
+      fromYPercent: 76,
+      targetYPercent: 60,
+      deltaXgFor: 0.10,
+      deltaShotsFor: 1,
+      deltaXgAgainst: 0.10,
+      deltaShotsAgainst: 1,
+    } as any;
+
+    expect(strictPositionPixelLine('DEF')).toBe('DEF');
+    expect(positionPixelCoachRead(row)).toContain('Sube un defensor');
   });
 });
