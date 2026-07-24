@@ -267,6 +267,57 @@ export function scenarioDecisionConfidenceFromReadLevel(level: string): string {
   return 'marginal';
 }
 
+export function scenarioDecisionMetrics(
+  title: string,
+  row: ScenarioMatrixSummaryRow,
+  isOpponentRow: boolean,
+  opponentMaxChannelXgDelta: number,
+  confidence: string,
+  formatDeltaNumber: (value: number) => string
+): string {
+  if (title === 'Amenaza rival' || isOpponentRow) {
+    return `xGA ${formatDeltaNumber(row.avgOpponentXgDelta)} / canal ${formatDeltaNumber(opponentMaxChannelXgDelta)} / ${confidence}`;
+  }
+  return `xG ${formatDeltaNumber(row.avgUserXgDelta)} / xGA ${formatDeltaNumber(row.avgOpponentXgDelta)} / ${confidence}`;
+}
+
+export function scenarioAttackCandidateIsCoachWorthy(row: ScenarioMatrixSummaryRow): boolean {
+  const directAttackScenario = ['m45-central', 'm45-wide', 'm45-left', 'm45-right'].includes(row.scenario);
+  const tacticalAttackAction = row.actionType === 'FORMATION'
+    || row.actionType === 'SUBSTITUTION'
+    || (row.actionType === 'POSITION' && row.scenario.startsWith('m45-shape-'));
+  if (!directAttackScenario && !tacticalAttackAction) {
+    return false;
+  }
+  const minUpside = row.actionType === 'SUBSTITUTION' ? 0.045 : 0.06;
+  const maxRisk = row.actionType === 'SUBSTITUTION' ? 0.18 : 0.16;
+  return row.avgUserXgDelta >= minUpside
+    && row.avgOpponentXgDelta <= maxRisk
+    && row.avgUserShotsDelta >= -0.6;
+}
+
+export function scenarioAttackPlanScore(row: ScenarioMatrixSummaryRow): number {
+  const risk = Math.max(0, row.avgOpponentXgDelta);
+  const shots = Math.max(0, row.avgUserShotsDelta) * 0.01;
+  const substitutionBonus = row.actionType === 'SUBSTITUTION' ? 0.015 : 0;
+  return row.avgUserXgDelta + shots + substitutionBonus - (risk * 0.45);
+}
+
+export function scenarioProtectionCandidateIsCoachWorthy(
+  row: ScenarioMatrixSummaryRow,
+  actionLabel: string
+): boolean {
+  const looksLikeSubstitution = row.actionType === 'SUBSTITUTION'
+    || (row.actionDetail ?? '').includes('->')
+    || actionLabel.includes('->');
+  if (!looksLikeSubstitution) {
+    return true;
+  }
+  const defensiveImpact = Math.max(0, -row.avgOpponentXgDelta);
+  const shotImpact = Math.max(0, -row.avgOpponentShotsDelta);
+  return defensiveImpact >= 0.045 && (shotImpact >= 0.25 || defensiveImpact >= 0.065);
+}
+
 export function scenarioSummaryImpactScore(row: ScenarioMatrixSummaryRow): number {
   const userXg = Math.abs(row.avgUserXgDelta) / 0.12;
   const opponentXg = Math.abs(row.avgOpponentXgDelta) / 0.10;

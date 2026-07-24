@@ -157,14 +157,18 @@ import {
 import {
   scenarioActionLabel as getScenarioActionLabel,
   scenarioActionKey as getScenarioActionKey,
+  scenarioAttackCandidateIsCoachWorthy as getScenarioAttackCandidateIsCoachWorthy,
+  scenarioAttackPlanScore as getScenarioAttackPlanScore,
   scenarioBatteryCoachAdvice as getScenarioBatteryCoachAdvice,
   scenarioBatteryCoachObjectiveLabel as getScenarioBatteryCoachObjectiveLabel,
   scenarioBatteryGroupLabel as getScenarioBatteryGroupLabel,
   scenarioBatteryReviewCount as getScenarioBatteryReviewCount,
   scenarioBatteryReviewHint as getScenarioBatteryReviewHint,
   scenarioBatteryReviewItems as getScenarioBatteryReviewItems,
+  scenarioDecisionMetrics as getScenarioDecisionMetrics,
   scenarioOpponentProtectionRead as getScenarioOpponentProtectionRead,
   scenarioOpponentRiskRead as getScenarioOpponentRiskRead,
+  scenarioProtectionCandidateIsCoachWorthy as getScenarioProtectionCandidateIsCoachWorthy,
   scenarioShapeActionLabel as getScenarioShapeActionLabel,
   scenarioSummaryActionLabel as getScenarioSummaryActionLabel,
   scenarioSummaryAttackGainScore as getScenarioSummaryAttackGainScore,
@@ -12453,10 +12457,14 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     };
   }
   private scenarioDecisionMetrics(title: string, row: ScenarioMatrixSummaryRow): string {
-    if (title === 'Amenaza rival' || this.isOpponentScenarioRow(row)) {
-      return `xGA ${this.fmtDeltaNumber(row.avgOpponentXgDelta)} / canal ${this.fmtDeltaNumber(this.scenarioOpponentMaxChannelXgDelta(row))} / ${this.scenarioDecisionConfidence(row)}`;
-    }
-    return `xG ${this.fmtDeltaNumber(row.avgUserXgDelta)} / xGA ${this.fmtDeltaNumber(row.avgOpponentXgDelta)} / ${this.scenarioDecisionConfidence(row)}`;
+    return getScenarioDecisionMetrics(
+      title,
+      row,
+      this.isOpponentScenarioRow(row),
+      this.scenarioOpponentMaxChannelXgDelta(row),
+      this.scenarioDecisionConfidence(row),
+      (value) => this.fmtDeltaNumber(value)
+    );
   }
   private isOpponentScenarioRow(row: ScenarioMatrixSummaryRow): boolean {
     return getScenarioSummaryIsOpponentRow(row);
@@ -12468,38 +12476,16 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return getScenarioTwoWayScore(row);
   }
   private scenarioAttackCandidateIsCoachWorthy(row: ScenarioMatrixSummaryRow): boolean {
-    const directAttackScenario = ['m45-central', 'm45-wide', 'm45-left', 'm45-right'].includes(row.scenario);
-    const tacticalAttackAction = row.actionType === 'FORMATION'
-      || row.actionType === 'SUBSTITUTION'
-      || (row.actionType === 'POSITION' && row.scenario.startsWith('m45-shape-'));
-    if (!directAttackScenario && !tacticalAttackAction) {
-      return false;
-    }
-    const minUpside = row.actionType === 'SUBSTITUTION' ? 0.045 : 0.06;
-    const maxRisk = row.actionType === 'SUBSTITUTION' ? 0.18 : 0.16;
-    return row.avgUserXgDelta >= minUpside
-      && row.avgOpponentXgDelta <= maxRisk
-      && row.avgUserShotsDelta >= -0.6;
+    return getScenarioAttackCandidateIsCoachWorthy(row);
   }
   private scenarioAttackPlanScore(row: ScenarioMatrixSummaryRow): number {
-    const risk = Math.max(0, row.avgOpponentXgDelta);
-    const shots = Math.max(0, row.avgUserShotsDelta) * 0.01;
-    const substitutionBonus = row.actionType === 'SUBSTITUTION' ? 0.015 : 0;
-    return row.avgUserXgDelta + shots + substitutionBonus - (risk * 0.45);
+    return getScenarioAttackPlanScore(row);
   }
   private scenarioDecisionConfidence(row: ScenarioMatrixSummaryRow): string {
     return getScenarioDecisionConfidenceFromReadLevel(this.scenarioSummaryReadLevel(row));
   }
   private scenarioProtectionCandidateIsCoachWorthy(row: ScenarioMatrixSummaryRow): boolean {
-    const looksLikeSubstitution = row.actionType === 'SUBSTITUTION'
-      || (row.actionDetail ?? '').includes('->')
-      || this.summaryActionLabel(row).includes('->');
-    if (!looksLikeSubstitution) {
-      return true;
-    }
-    const defensiveImpact = Math.max(0, -row.avgOpponentXgDelta);
-    const shotImpact = Math.max(0, -row.avgOpponentShotsDelta);
-    return defensiveImpact >= 0.045 && (shotImpact >= 0.25 || defensiveImpact >= 0.065);
+    return getScenarioProtectionCandidateIsCoachWorthy(row, this.summaryActionLabel(row));
   }
   private buildScenarioBatteryRow(
     match: TestHarnessMatchRow,

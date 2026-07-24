@@ -1,13 +1,17 @@
 import {
   scenarioActionLabel,
   scenarioActionKey,
+  scenarioAttackCandidateIsCoachWorthy,
+  scenarioAttackPlanScore,
   scenarioBatteryCoachAdvice,
   scenarioBatteryCoachObjectiveLabel,
   scenarioBatteryGroupLabel,
   scenarioBatteryReviewHint,
   scenarioBatteryReviewItems,
+  scenarioDecisionMetrics,
   scenarioOpponentProtectionRead,
   scenarioOpponentRiskRead,
+  scenarioProtectionCandidateIsCoachWorthy,
   scenarioShapeActionLabel,
   scenarioSummaryActionLabel,
   scenarioSummaryAttackGainScore,
@@ -369,6 +373,31 @@ describe('test-harness-scenario-battery-utils', () => {
     expect(scenarioDecisionConfidenceFromReadLevel('visible')).toBe('media');
     expect(scenarioDecisionConfidenceFromReadLevel('small')).toBe('leve');
     expect(scenarioDecisionConfidenceFromReadLevel('noise')).toBe('marginal');
+  });
+
+  it('builds scenario decision metrics and coach-worthy filters', () => {
+    const row = {
+      scenario: 'm45-wide',
+      actionType: 'FORMATION',
+      actionDetail: '4-3-3',
+      avgUserXgDelta: 0.08,
+      avgOpponentXgDelta: 0.04,
+      avgUserShotsDelta: 0.5,
+      avgOpponentShotsDelta: -0.3,
+    } as ScenarioMatrixSummaryRow;
+    const fmt = (value: number) => `${value >= 0 ? '+' : ''}${value.toFixed(2)}`;
+
+    expect(scenarioDecisionMetrics('Atacar', row, false, 0.06, 'media', fmt)).toBe('xG +0.08 / xGA +0.04 / media');
+    expect(scenarioDecisionMetrics('Amenaza rival', row, false, 0.06, 'fuerte', fmt)).toBe('xGA +0.04 / canal +0.06 / fuerte');
+    expect(scenarioDecisionMetrics('Cualquier titulo', row, true, 0.05, 'leve', fmt)).toBe('xGA +0.04 / canal +0.05 / leve');
+    expect(scenarioAttackCandidateIsCoachWorthy(row)).toBeTrue();
+    expect(scenarioAttackCandidateIsCoachWorthy({ ...row, scenario: 'm45-other', actionType: 'STYLE' })).toBeFalse();
+    expect(scenarioAttackCandidateIsCoachWorthy({ ...row, avgUserXgDelta: 0.04 })).toBeFalse();
+    expect(scenarioAttackPlanScore(row)).toBeCloseTo(0.067, 5);
+    expect(scenarioAttackPlanScore({ ...row, actionType: 'SUBSTITUTION' })).toBeCloseTo(0.082, 5);
+    expect(scenarioProtectionCandidateIsCoachWorthy(row, '4-3-3')).toBeTrue();
+    expect(scenarioProtectionCandidateIsCoachWorthy({ ...row, actionType: 'SUBSTITUTION', avgOpponentXgDelta: -0.05, avgOpponentShotsDelta: -0.3 }, 'A -> B')).toBeTrue();
+    expect(scenarioProtectionCandidateIsCoachWorthy({ ...row, actionType: 'SUBSTITUTION', avgOpponentXgDelta: -0.04, avgOpponentShotsDelta: -0.2 }, 'A -> B')).toBeFalse();
   });
 
   it('scores scenario summary impact from the largest normalized signal', () => {
