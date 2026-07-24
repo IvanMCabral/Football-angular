@@ -1,22 +1,3 @@
-/**
- * V25D78-C48.1: spec para {@link CareerSetupComponent}.
- *
- * <p>Setup-flow UX gap fix: cuando un user nuevo accede a /career/setup y el world
- * aún no está seedeado (POST /world/seed-la-liga nunca llamado), la respuesta de
- * {@code GET /world/leagues?userId=me} retorna {@code []}. El componente debe mostrar
- * un CTA "Inicializar Mi Mundo" en ese estado, no dejar al user con un dropdown
- * vacío sin path forward (bug encontrado por REVISOR C48 V7).
- *
- * <p>Tests cubren:
- * <ol>
- *   <li>Render: el botón "Inicializar Mi Mundo" aparece cuando leagues está vacío.</li>
- *   <li>Click: seedWorld() llama POST /world/seed-la-liga?userId=me con el JWT del user.</li>
- *   <li>Refresh post-seed: leagues$ se re-fetchea después de 200 OK (dropdown se puebla).</li>
- *   <li>Regression: el botón NO aparece cuando leagues ya tiene La Liga (no se duplica el CTA).</li>
- *   <li>Error handling: si POST falla, error$ se popula con mensaje claro.</li>
- *   <li>Debounce: double-click durante seed no dispara un segundo POST.</li>
- * </ol>
- */
 import { Component, NO_ERRORS_SCHEMA } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
@@ -25,7 +6,7 @@ import { of, throwError, BehaviorSubject, Subject } from 'rxjs';
 import { CareerSetupComponent } from './career-setup.component';
 import { AuthService } from '../../core/services/auth.service';
 
-describe('CareerSetupComponent — V25D78-C48.1 setup-flow UX gap fix', () => {
+describe('CareerSetupComponent — setup flow', () => {
   let component: CareerSetupComponent;
   let fixture: ComponentFixture<CareerSetupComponent>;
   let httpSpy: jasmine.SpyObj<HttpClient>;
@@ -65,7 +46,7 @@ describe('CareerSetupComponent — V25D78-C48.1 setup-flow UX gap fix', () => {
     component = fixture.componentInstance;
   });
 
-  it('V25D78-C48.1 #1: "Inicializar Mi Mundo" button RENDERS when leagues is empty', (done: DoneFn) => {
+  it('renders the world initialization prompt when leagues are empty', (done: DoneFn) => {
     // Setup: GET /world/leagues returns [] (new user, no seed yet)
     httpSpy.get.and.returnValue(of([]));
     fixture.detectChanges();
@@ -84,7 +65,7 @@ describe('CareerSetupComponent — V25D78-C48.1 setup-flow UX gap fix', () => {
     });
   });
 
-  it('V25D78-C48.1 #2: button does NOT render when leagues already has La Liga (regression)', (done: DoneFn) => {
+  it('does not render the world initialization prompt when leagues exist', (done: DoneFn) => {
     // Setup: GET /world/leagues returns [La Liga] (pre-seeded user)
     httpSpy.get.and.returnValue(of([LA_LIGA]));
     fixture.detectChanges();
@@ -101,7 +82,7 @@ describe('CareerSetupComponent — V25D78-C48.1 setup-flow UX gap fix', () => {
     });
   });
 
-  it('V25D78-C48.1 #3: click seedWorld() POSTs to /world/seed-la-liga with JWT userId', (done: DoneFn) => {
+  it('posts seedWorld request with the authenticated user id', (done: DoneFn) => {
     // Setup: empty leagues, successful seed POST
     httpSpy.get.and.returnValue(of([]));
     httpSpy.post.and.returnValue(of({
@@ -133,7 +114,7 @@ describe('CareerSetupComponent — V25D78-C48.1 setup-flow UX gap fix', () => {
     });
   });
 
-  it('V25D78-C48.1 #4: after successful seed, leagues$ is re-fetched (dropdown auto-populates)', (done: DoneFn) => {
+  it('re-fetches leagues after successful world initialization', (done: DoneFn) => {
     // V25D78-C48.1 design: refreshLeaguesTrigger is a BehaviorSubject that, when
     // emitted after seed success, causes leagues$ to re-fetch via combineLatest.
     // This test verifies the mechanism by counting HTTP GET calls.
@@ -162,7 +143,7 @@ describe('CareerSetupComponent — V25D78-C48.1 setup-flow UX gap fix', () => {
     });
   });
 
-  it('V25D78-C48.1 #5: seedWorld() error populates error$ with clear message', (done: DoneFn) => {
+  it('stores a clear error message when world initialization fails', (done: DoneFn) => {
     // Setup: empty leagues, seed POST fails
     httpSpy.get.and.returnValue(of([]));
     httpSpy.post.and.returnValue(throwError(() => ({
@@ -189,7 +170,7 @@ describe('CareerSetupComponent — V25D78-C48.1 setup-flow UX gap fix', () => {
     });
   });
 
-  it('V25D78-C48.1 #6: double-click while seeding is ignored (debounce via seedingWorld flag)', (done: DoneFn) => {
+  it('keeps seedWorld guarded by the seedingWorld flag', (done: DoneFn) => {
     // Setup: empty leagues, seed POST that we control (will return after we call)
     httpSpy.get.and.returnValue(of([]));
     // Use an Observable that never emits — keeps seedingWorld=true until we
@@ -226,33 +207,8 @@ describe('CareerSetupComponent — V25D78-C48.1 setup-flow UX gap fix', () => {
     });
   });
 
-  /**
-   * V25D83 sprint: loading-state UX gap fix.
-   *
-   * <p>Before this fix {@code loading$} was derived from
-   * {@code leagues$.pipe(map(leagues => leagues === null))} which was
-   * always {@code false} (the source emits {@code League[]}, never
-   * {@code null}). The page-level spinner in the template therefore
-   * never rendered, leaving a blank screen during the initial
-   * {@code GET /world/leagues} HTTP.
-   *
-   * <p>Tests cover:
-   * <ol>
-   *   <li>{@code loading$} starts at {@code true} on subscription and
-   *       flips to {@code false} once {@code leagues$} emits (success).</li>
-   *   <li>The page-level spinner renders when {@code loading$} is true
-   *       (verified by {@code data-testid} presence).</li>
-   *   <li>After leagues emit, the spinner disappears and the seed/CTA
-   *       renders (regression — existing tests cover this; the new
-   *       assertion is that the spinner does NOT survive past the
-   *       first emission).</li>
-   *   <li>{@code loadingTeams$} flips true on league-selection before
-   *       {@code teamsWithOVR$} emits (the new "Cargando equipos..."
-   *       inline spinner).</li>
-   * </ol>
-   */
-  describe('V25D83 sprint: loading-state UX gap fix', () => {
-    it('V25D83 #1: loading$ starts true and flips to false on first leagues$ emission (data flow)', (done: DoneFn) => {
+  describe('loading states', () => {
+    it('loading$ starts true and flips to false on first leagues$ emission', (done: DoneFn) => {
       httpSpy.get.and.returnValue(of([LA_LIGA]));
       fixture.detectChanges();
 
@@ -271,7 +227,7 @@ describe('CareerSetupComponent — V25D78-C48.1 setup-flow UX gap fix', () => {
       });
     });
 
-    it('V25D83 #2: page-level spinner renders during initial load and disappears after (template)', (done: DoneFn) => {
+    it('renders page-level spinner during initial load and hides it after leagues load', (done: DoneFn) => {
       // Use a Subject (cold — no initial value) so the /world/leagues
       // HTTP blocks until we explicitly emit. This lets us observe the
       // loading-state DOM (spinner visible) before the chain resolves.
@@ -297,7 +253,7 @@ describe('CareerSetupComponent — V25D78-C48.1 setup-flow UX gap fix', () => {
       });
     });
 
-    it('V25D83 #3: loadingTeams$ flips true on league-selection (UX gap)', (done: DoneFn) => {
+    it('loadingTeams$ flips true on league selection', (done: DoneFn) => {
       // Use Subject (cold) for the teams HTTP so the chain blocks until
       // we explicitly push. This lets us observe the loading transition
       // cleanly: a fresh league-selection fires concat(of([]), HTTP) and
@@ -329,7 +285,7 @@ describe('CareerSetupComponent — V25D78-C48.1 setup-flow UX gap fix', () => {
       });
     });
 
-    it('V25D83 #4: loadingTeams$ flips false after teamsWithOVR$ emits the real payload', (done: DoneFn) => {
+    it('loadingTeams$ flips false after teamsWithOVR$ emits teams', (done: DoneFn) => {
       // Cold subject for the teams HTTP — blocks until we push. We then
       // push a non-empty teams array and verify loadingTeams$ flips false.
       const TEAMS_SUBJECT = new Subject<any[]>();
@@ -367,24 +323,8 @@ describe('CareerSetupComponent — V25D78-C48.1 setup-flow UX gap fix', () => {
     });
   });
 
-  /**
-   * V25D83.1 sprint 2 ajuste (pre-push): cache de leagues$ con shareReplay(1).
-   *
-   * <p>Pre-fix: leagues$ terminaba en switchMap (cold). Cada nuevo
-   * subscriber disparaba un nuevo GET /world/leagues. El template usa
-   * `(leagues$ | async)` en 3 sitios (seed-flow, select de Liga, y el
-   * `take(1)` de ngOnInit), generando hasta 3 HTTP requests paralelos
-   * para la misma data.
-   *
-   * <p>Post-fix: shareReplay({ bufferSize: 1, refCount: false }) cachea la
-   * primera emission y la re-emite a subscribers sin refetch.
-   *
-   * <p>Test: con un httpSpy que cuente las llamadas a /world/leagues,
-   * suscribimos leagues$ 3 veces (simulando los 3 callers del template)
-   * y verificamos que solo se haga 1 HTTP request.
-   */
-  describe('V25D83.1 sprint 2 ajuste: leagues$ shareReplay(1) cache', () => {
-    it('V25D83.1 #1: multiple subscribers to leagues$ only fire ONE HTTP request (shareReplay cache OK)', (done: DoneFn) => {
+  describe('leagues$ cache', () => {
+    it('multiple subscribers to leagues$ only fire one HTTP request', (done: DoneFn) => {
       // Count only calls to /world/leagues (not /teams-with-ovr / division-preview / etc.)
       let leaguesCallCount = 0;
       httpSpy.get.and.callFake(((url: string) => {
@@ -431,7 +371,7 @@ describe('CareerSetupComponent — V25D78-C48.1 setup-flow UX gap fix', () => {
       });
     });
   });
-  describe('V25D78-C55.2 phase 4 UI (a) + (a2): division tier badges', () => {
+  describe('division tier badges', () => {
     const TEAMS_WITH_OVR = [
       { worldTeamId: 'team-real-madrid', name: 'Real Madrid', country: 'ES', formation: '4-3-3', ovr: 88, playerCount: 25 },
       { worldTeamId: 'team-barcelona',   name: 'Barcelona',   country: 'ES', formation: '4-3-3', ovr: 86, playerCount: 25 }
@@ -453,7 +393,7 @@ describe('CareerSetupComponent — V25D78-C48.1 setup-flow UX gap fix', () => {
      * against the template source to avoid coupling against async-pipe
      * render timing.
      */
-    it('(a): teamsWithOVR$ emits teams payload from /teams-with-ovr (data flow OK)', (done: DoneFn) => {
+    it('teamsWithOVR$ emits teams payload from /teams-with-ovr', (done: DoneFn) => {
       httpSpy.get.and.callFake(((url: string) => {
         if (url.includes('/teams-with-ovr')) return of(TEAMS_WITH_OVR);
         return of([]);
@@ -479,7 +419,7 @@ describe('CareerSetupComponent — V25D78-C48.1 setup-flow UX gap fix', () => {
      * team option MUST end with the `- PRIMERA` suffix. This is the visual
      * contract (V25D78-C55.2 phase 4 UI a).
      */
-    it('(a): single-division option template literal ends with "- PRIMERA"', () => {
+    it('single-division option template literal ends with "- PRIMERA"', () => {
       // Read the template source via the @Component decorator metadata. The
       // templateUrl points to the file; the resolved string is on the
       // component's ɵcmp definition.
@@ -524,7 +464,7 @@ describe('CareerSetupComponent — V25D78-C48.1 setup-flow UX gap fix', () => {
     /**
      * (a2) data flow: divisionPreviews$ emits the 3-tier payload.
      */
-    it('(a2): divisionPreviews$ emits 3-tier payload from /division-preview', (done: DoneFn) => {
+    it('divisionPreviews$ emits 3-tier payload from /division-preview', (done: DoneFn) => {
       httpSpy.get.and.callFake(((url: string) => {
         if (url.includes('/division-preview')) return of(DIVISION_PREVIEWS);
         return of([]);
@@ -554,7 +494,7 @@ describe('CareerSetupComponent — V25D78-C48.1 setup-flow UX gap fix', () => {
      * include tier-specific class bindings (division-badge-primera,
      * -segunda, -tercera) driven off the card's divIndex.
      */
-    it('(a2): multi-division preview card template uses tier-specific badge classes', () => {
+    it('multi-division preview card template uses tier-specific badge classes', () => {
       // Same drift-detection strategy as the (a) option-text test: assert
       // that the contract string contains the expected tier labels and the
       // divIndex lookup expression. Keeping these in lockstep with the
@@ -574,32 +514,7 @@ describe('CareerSetupComponent — V25D78-C48.1 setup-flow UX gap fix', () => {
     });
   });
 
-  /**
-   * V25D82 sprint 2 UX fix: auto-select the first available league on
-   * {@code ngOnInit} so the team dropdown is populated WITHOUT requiring
-   * the user to click the league dropdown first.
-   *
-   * <p>Before this fix {@code ngOnInit()} was empty: leagues were
-   * fetched (via the {@code leagues$} observable wired in the
-   * constructor), but the manager had to manually open the dropdown
-   * and click a league for {@code teamsWithOVR$} to start emitting.
-   * That gap confused users hitting {@code /career/setup} for the
-   * first time.
-   *
-   * <p>Tests cover:
-   * <ol>
-   *   <li>Auto-select: with leagues=[La Liga], {@code ngOnInit} sets
-   *       {@code selectedLeagueId} AND triggers the GET to
-   *       {@code /world/leagues/:id/teams-with-ovr} so teams populate.</li>
-   *   <li>No override: if the user already selected a league (e.g. via
-   *       {@code [(ngModel)]} binding before {@code ngOnInit} fires),
-   *       {@code ngOnInit} must NOT clobber their choice.</li>
-   *   <li>Empty leagues: if {@code leagues$} emits an empty array
-   *       (new user, world not seeded), {@code ngOnInit} is a no-op —
-   *       no crash, no spurious GET to {@code /teams-with-ovr}.</li>
-   * </ol>
-   */
-  describe('V25D82 sprint 2 UX fix: ngOnInit auto-selects first league', () => {
+  describe('ngOnInit league selection', () => {
     const LA_LIGA_2 = {
       realLeagueId: 'real-liga-2',
       name: 'La Liga 2024/25',
@@ -626,7 +541,7 @@ describe('CareerSetupComponent — V25D78-C48.1 setup-flow UX gap fix', () => {
       return urls;
     }
 
-    it('V25D82 #1: ngOnInit auto-selects first league AND fetches its teams (UX gap fix)', (done: DoneFn) => {
+    it('auto-selects first league and fetches its teams', (done: DoneFn) => {
       // Setup: GET /world/leagues returns [La Liga] (pre-seeded user).
       const urls = captureGetUrls();
       // The teams-with-ovr GET (auto-triggered by the auto-select path)
@@ -665,7 +580,7 @@ describe('CareerSetupComponent — V25D78-C48.1 setup-flow UX gap fix', () => {
       });
     });
 
-    it('V25D82 #2: ngOnInit does NOT override user-selected league', (done: DoneFn) => {
+    it('does not override a user-selected league', (done: DoneFn) => {
       // Setup: pre-select a league BEFORE ngOnInit runs. This simulates
       // the dropdown's [(ngModel)] binding having fired before the
       // component hook (e.g. fast mount + browser autofill race).
@@ -696,7 +611,7 @@ describe('CareerSetupComponent — V25D78-C48.1 setup-flow UX gap fix', () => {
       });
     });
 
-    it('V25D82 #3: ngOnInit handles empty leagues array gracefully (no crash, no teams fetch)', (done: DoneFn) => {
+    it('handles empty leagues array without crashing or fetching teams', (done: DoneFn) => {
       // Setup: new user, world not seeded — GET /world/leagues returns [].
       const urls = captureGetUrls();
       httpSpy.get.and.callFake(((url: string) => {
