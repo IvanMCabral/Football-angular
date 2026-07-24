@@ -170,6 +170,8 @@ import {
   styleLabelFromActionDetail as getStyleLabelFromActionDetail,
 } from './test-harness-scenario-battery-utils';
 import {
+  backFiveContextClass as getBackFiveContextClass,
+  backFiveContextRead as getBackFiveContextRead,
   backFiveFamilyClass as getBackFiveFamilyClass,
   backFiveFamilyRead as getBackFiveFamilyRead,
   backFiveTransitionClass as getBackFiveTransitionClass,
@@ -8150,23 +8152,14 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     safest: BackFiveFamilyLabRow | null,
     offensive: BackFiveFamilyLabRow | null
   ): string {
-    if (!best) return 'Sin datos';
-    if (best.formation === '5-4-1') return safest?.formation === '5-4-1' ? 'Contexto pide bloque' : 'Bloque gana diferencial';
-    if (best.formation === '3-5-2') {
-      return offensive?.formation === '3-5-2' ? 'Contexto pide carrileros' : 'Carrileros ganan diferencial';
-    }
-    if (safest?.formation === '5-4-1' && offensive?.formation === '3-5-2') return 'Transición equilibra extremos';
-    return '5-3-2 punto medio';
+    return getBackFiveContextRead(best, safest, offensive);
   }
   private backFiveContextClass(
     best: BackFiveFamilyLabRow | null,
     safest: BackFiveFamilyLabRow | null,
     offensive: BackFiveFamilyLabRow | null
   ): string {
-    if (!best) return 'read-visible';
-    if (best.formation === safest?.formation && best.formation === offensive?.formation) return 'read-strong';
-    if (best.formation === '5-3-2') return 'read-check';
-    return 'read-visible';
+    return getBackFiveContextClass(best, safest, offensive);
   }
   private maxBy<T>(items: T[], score: (item: T) => number): T | null {
     return items.reduce<T | null>((best, item) => !best || score(item) > score(best) ? item : best, null);

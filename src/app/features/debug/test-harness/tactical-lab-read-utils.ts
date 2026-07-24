@@ -97,3 +97,28 @@ export function backFiveFamilyClass(
   if (key === 'low-block') return deltaXgAgainst < -0.03 ? 'read-strong' : 'read-visible';
   return deltaXgFor > 0.03 || deltaWideShotsFor > 0.20 || deltaWideShotsAgainst > 0.15 ? 'read-visible' : 'read-check';
 }
+
+export function backFiveContextRead(
+  best: Pick<BackFiveFamilyLabRow, 'formation'> | null,
+  safest: Pick<BackFiveFamilyLabRow, 'formation'> | null,
+  offensive: Pick<BackFiveFamilyLabRow, 'formation'> | null
+): string {
+  if (!best) return 'Sin datos';
+  if (best.formation === '5-4-1') return safest?.formation === '5-4-1' ? 'Contexto pide bloque' : 'Bloque gana diferencial';
+  if (best.formation === '3-5-2') {
+    return offensive?.formation === '3-5-2' ? 'Contexto pide carrileros' : 'Carrileros ganan diferencial';
+  }
+  if (safest?.formation === '5-4-1' && offensive?.formation === '3-5-2') return 'Transición equilibra extremos';
+  return '5-3-2 punto medio';
+}
+
+export function backFiveContextClass(
+  best: Pick<BackFiveFamilyLabRow, 'formation'> | null,
+  safest: Pick<BackFiveFamilyLabRow, 'formation'> | null,
+  offensive: Pick<BackFiveFamilyLabRow, 'formation'> | null
+): string {
+  if (!best) return 'read-visible';
+  if (best.formation === safest?.formation && best.formation === offensive?.formation) return 'read-strong';
+  if (best.formation === '5-3-2') return 'read-check';
+  return 'read-visible';
+}

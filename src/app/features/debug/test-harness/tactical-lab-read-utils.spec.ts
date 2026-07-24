@@ -1,6 +1,8 @@
 import {
   backFiveFamilyClass,
   backFiveFamilyRead,
+  backFiveContextClass,
+  backFiveContextRead,
   backFiveTransitionClass,
   backFiveTransitionRead,
   lowBlockLabClass,
@@ -60,5 +62,26 @@ describe('tactical-lab-read-utils', () => {
     expect(backFiveFamilyClass('low-block', 0, 0, 0, 0)).toBe('read-visible');
     expect(backFiveFamilyClass('wingback-control', 0.04, 0, 0, 0)).toBe('read-visible');
     expect(backFiveFamilyClass('wingback-control', 0, 0, 0, 0)).toBe('read-check');
+  });
+
+  it('reads contextual back-five plan choices', () => {
+    const plan = (formation: string) => ({ formation });
+
+    expect(backFiveContextRead(null, null, null)).toBe('Sin datos');
+    expect(backFiveContextRead(plan('5-4-1'), plan('5-4-1'), plan('3-5-2'))).toBe('Contexto pide bloque');
+    expect(backFiveContextRead(plan('5-4-1'), plan('5-3-2'), plan('3-5-2'))).toBe('Bloque gana diferencial');
+    expect(backFiveContextRead(plan('3-5-2'), plan('5-4-1'), plan('3-5-2'))).toBe('Contexto pide carrileros');
+    expect(backFiveContextRead(plan('3-5-2'), plan('5-4-1'), plan('5-3-2'))).toBe('Carrileros ganan diferencial');
+    expect(backFiveContextRead(plan('5-3-2'), plan('5-4-1'), plan('3-5-2'))).toBe('Transición equilibra extremos');
+    expect(backFiveContextRead(plan('5-3-2'), plan('5-3-2'), plan('5-3-2'))).toBe('5-3-2 punto medio');
+  });
+
+  it('maps contextual back-five reads to visual classes', () => {
+    const plan = (formation: string) => ({ formation });
+
+    expect(backFiveContextClass(null, null, null)).toBe('read-visible');
+    expect(backFiveContextClass(plan('5-4-1'), plan('5-4-1'), plan('5-4-1'))).toBe('read-strong');
+    expect(backFiveContextClass(plan('5-3-2'), plan('5-4-1'), plan('3-5-2'))).toBe('read-check');
+    expect(backFiveContextClass(plan('3-5-2'), plan('5-4-1'), plan('3-5-2'))).toBe('read-visible');
   });
 });
