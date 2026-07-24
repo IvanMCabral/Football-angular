@@ -170,6 +170,7 @@ import {
   scenarioSummaryAttackGainScore as getScenarioSummaryAttackGainScore,
   scenarioSummaryAttackLossScore as getScenarioSummaryAttackLossScore,
   scenarioSummaryCoachReadPrefix as getScenarioSummaryCoachReadPrefix,
+  scenarioSummaryCoherentSubstitutionSignal as getScenarioSummaryCoherentSubstitutionSignal,
   scenarioDecisionConfidenceFromReadLevel as getScenarioDecisionConfidenceFromReadLevel,
   scenarioSummaryDefensiveGainScore as getScenarioSummaryDefensiveGainScore,
   scenarioSummaryDefensiveRiskScore as getScenarioSummaryDefensiveRiskScore,
@@ -177,6 +178,7 @@ import {
   scenarioSummaryFormationLabel as getScenarioSummaryFormationLabel,
   scenarioSummaryImpactScore as getScenarioSummaryImpactScore,
   scenarioSummaryIsFormationNoop as getScenarioSummaryIsFormationNoop,
+  scenarioSummaryNeedsReview as getScenarioSummaryNeedsReview,
   scenarioSummaryIsOpponentRow as getScenarioSummaryIsOpponentRow,
   scenarioSummaryIsShapeAction as getScenarioSummaryIsShapeAction,
   scenarioSummaryOpponentChannelRead as getScenarioSummaryOpponentChannelRead,
@@ -12902,50 +12904,10 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return getScenarioSummaryDefensiveRiskScore(row);
   }
   private scenarioSummaryNeedsReview(row: ScenarioMatrixSummaryRow): boolean {
-    if (row.actionType !== 'SUBSTITUTION') return false;
-    const detail = `${row.scenario} ${row.actionDetail}`.toLowerCase();
-    const isDowngrade = detail.includes('downgrade') || /\[-\d+/.test(detail);
-    const isUpgrade = detail.includes('upgrade') || /\[\+\d+/.test(detail);
-    if (isDowngrade && row.avgUserXgDelta > 0.08 && row.avgOpponentXgDelta <= 0.02) {
-      return true;
-    }
-    if (isUpgrade && row.avgUserXgDelta < -0.08 && row.avgOpponentXgDelta >= -0.02) {
-      return true;
-    }
-    return false;
+    return getScenarioSummaryNeedsReview(row);
   }
   private scenarioSummaryCoherentSubstitutionSignal(row: ScenarioMatrixSummaryRow): boolean {
-    if (row.actionType !== 'SUBSTITUTION') return false;
-    const detail = `${row.scenario} ${row.actionDetail}`.toLowerCase();
-    const isDowngrade = detail.includes('downgrade') || /\[-\d+/.test(detail);
-    const isUpgrade = detail.includes('upgrade') || /\[\+\d+/.test(detail);
-    const isDefensive = detail.includes('defensive') || detail.includes('(def)');
-    const isOffensive = detail.includes('offensive') || detail.includes('(att)');
-    if (isDowngrade && isDefensive) {
-      const xgaWorse = row.avgOpponentXgDelta >= 0.04;
-      const shotsWorse = row.avgOpponentShotsDelta >= 0.45;
-      const territoryWorse = (row.avgOpponentCentralDelta + row.avgOpponentWideDelta) >= 0.35;
-      const channelWorse = (row.avgOpponentCentralXgDelta + row.avgOpponentWideXgDelta
-        + Math.max(row.avgOpponentLeftWideXgDelta, 0)
-        + Math.max(row.avgOpponentRightWideXgDelta, 0)) >= 0.035;
-      return (xgaWorse && shotsWorse) || (xgaWorse && territoryWorse) || (shotsWorse && channelWorse);
-    }
-    if (isUpgrade && isDefensive) {
-      const xgaBetter = row.avgOpponentXgDelta <= -0.04;
-      const shotsBetter = row.avgOpponentShotsDelta <= -0.45;
-      const territoryBetter = (row.avgOpponentCentralDelta + row.avgOpponentWideDelta) <= -0.35;
-      const channelBetter = (row.avgOpponentCentralXgDelta + row.avgOpponentWideXgDelta
-        + Math.min(row.avgOpponentLeftWideXgDelta, 0)
-        + Math.min(row.avgOpponentRightWideXgDelta, 0)) <= -0.035;
-      return (xgaBetter && shotsBetter) || (xgaBetter && territoryBetter) || (shotsBetter && channelBetter);
-    }
-    if (isUpgrade && isOffensive) {
-      return row.avgUserXgDelta >= 0.04 && row.avgUserShotsDelta >= 0.35;
-    }
-    if (isDowngrade && isOffensive) {
-      return row.avgUserXgDelta <= -0.04 && row.avgUserShotsDelta <= -0.35;
-    }
-    return false;
+    return getScenarioSummaryCoherentSubstitutionSignal(row);
   }
   scenarioGoalDiff(row: ScenarioMatrixRow): number {
     const baseline = this.scenarioBaseline();

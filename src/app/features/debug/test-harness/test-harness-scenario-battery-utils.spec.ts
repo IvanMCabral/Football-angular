@@ -13,6 +13,7 @@ import {
   scenarioSummaryAttackGainScore,
   scenarioSummaryAttackLossScore,
   scenarioSummaryCoachReadPrefix,
+  scenarioSummaryCoherentSubstitutionSignal,
   scenarioDecisionConfidenceFromReadLevel,
   scenarioSummaryDefensiveGainScore,
   scenarioSummaryDefensiveRiskScore,
@@ -22,6 +23,7 @@ import {
   scenarioSummaryIsFormationNoop,
   scenarioSummaryIsOpponentRow,
   scenarioSummaryIsShapeAction,
+  scenarioSummaryNeedsReview,
   scenarioSummaryOpponentChannelRead,
   scenarioSummaryOutcomeClass,
   scenarioSummaryOutcomeSummaryFromOutcomes,
@@ -292,6 +294,73 @@ describe('test-harness-scenario-battery-utils', () => {
     expect(scenarioSummaryAttackLossScore(row)).toBeCloseTo(4, 5);
     expect(scenarioSummaryDefensiveGainScore(row)).toBe(0);
     expect(scenarioSummaryDefensiveRiskScore(row)).toBeCloseTo(4, 5);
+  });
+
+  it('flags substitution rows for review when the label and result disagree', () => {
+    const base = {
+      scenario: 'm45-substitution',
+      actionType: 'SUBSTITUTION',
+      actionDetail: 'Downgrade [-4]',
+      avgUserXgDelta: 0.09,
+      avgOpponentXgDelta: 0.01,
+    } as ScenarioMatrixSummaryRow;
+
+    expect(scenarioSummaryNeedsReview(base)).toBeTrue();
+    expect(scenarioSummaryNeedsReview({
+      ...base,
+      actionDetail: 'Upgrade [+4]',
+      avgUserXgDelta: -0.09,
+      avgOpponentXgDelta: -0.01,
+    })).toBeTrue();
+    expect(scenarioSummaryNeedsReview({ ...base, actionType: 'FORMATION' })).toBeFalse();
+    expect(scenarioSummaryNeedsReview({ ...base, avgUserXgDelta: 0.04 })).toBeFalse();
+  });
+
+  it('detects coherent defensive substitution signals', () => {
+    const downgrade = {
+      scenario: 'm45-substitution defensive',
+      actionType: 'SUBSTITUTION',
+      actionDetail: 'Downgrade defensive [-3]',
+      avgOpponentXgDelta: 0.04,
+      avgOpponentShotsDelta: 0.45,
+      avgOpponentCentralDelta: 0,
+      avgOpponentWideDelta: 0,
+      avgOpponentCentralXgDelta: 0,
+      avgOpponentWideXgDelta: 0,
+      avgOpponentLeftWideXgDelta: 0,
+      avgOpponentRightWideXgDelta: 0,
+    } as ScenarioMatrixSummaryRow;
+    const upgrade = {
+      ...downgrade,
+      actionDetail: 'Upgrade defensive [+3]',
+      avgOpponentXgDelta: -0.04,
+      avgOpponentShotsDelta: -0.45,
+    } as ScenarioMatrixSummaryRow;
+
+    expect(scenarioSummaryCoherentSubstitutionSignal(downgrade)).toBeTrue();
+    expect(scenarioSummaryCoherentSubstitutionSignal(upgrade)).toBeTrue();
+    expect(scenarioSummaryCoherentSubstitutionSignal({ ...downgrade, avgOpponentShotsDelta: 0.1 })).toBeFalse();
+  });
+
+  it('detects coherent offensive substitution signals', () => {
+    const upgrade = {
+      scenario: 'm45-substitution offensive',
+      actionType: 'SUBSTITUTION',
+      actionDetail: 'Upgrade offensive [+3]',
+      avgUserXgDelta: 0.04,
+      avgUserShotsDelta: 0.35,
+    } as ScenarioMatrixSummaryRow;
+    const downgrade = {
+      ...upgrade,
+      actionDetail: 'Downgrade offensive [-3]',
+      avgUserXgDelta: -0.04,
+      avgUserShotsDelta: -0.35,
+    } as ScenarioMatrixSummaryRow;
+
+    expect(scenarioSummaryCoherentSubstitutionSignal(upgrade)).toBeTrue();
+    expect(scenarioSummaryCoherentSubstitutionSignal(downgrade)).toBeTrue();
+    expect(scenarioSummaryCoherentSubstitutionSignal({ ...upgrade, actionType: 'FORMATION' })).toBeFalse();
+    expect(scenarioSummaryCoherentSubstitutionSignal({ ...upgrade, avgUserShotsDelta: 0.1 })).toBeFalse();
   });
 
   it('reads user attacking channels from xG and shot volume', () => {

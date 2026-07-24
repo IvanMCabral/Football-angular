@@ -316,6 +316,54 @@ export function scenarioSummaryDefensiveRiskScore(row: ScenarioMatrixSummaryRow)
     + Math.max(0, row.avgOpponentCentralXgDelta + row.avgOpponentWideXgDelta) / 0.12;
 }
 
+export function scenarioSummaryNeedsReview(row: ScenarioMatrixSummaryRow): boolean {
+  if (row.actionType !== 'SUBSTITUTION') return false;
+  const detail = `${row.scenario} ${row.actionDetail}`.toLowerCase();
+  const isDowngrade = detail.includes('downgrade') || /\[-\d+/.test(detail);
+  const isUpgrade = detail.includes('upgrade') || /\[\+\d+/.test(detail);
+  if (isDowngrade && row.avgUserXgDelta > 0.08 && row.avgOpponentXgDelta <= 0.02) {
+    return true;
+  }
+  if (isUpgrade && row.avgUserXgDelta < -0.08 && row.avgOpponentXgDelta >= -0.02) {
+    return true;
+  }
+  return false;
+}
+
+export function scenarioSummaryCoherentSubstitutionSignal(row: ScenarioMatrixSummaryRow): boolean {
+  if (row.actionType !== 'SUBSTITUTION') return false;
+  const detail = `${row.scenario} ${row.actionDetail}`.toLowerCase();
+  const isDowngrade = detail.includes('downgrade') || /\[-\d+/.test(detail);
+  const isUpgrade = detail.includes('upgrade') || /\[\+\d+/.test(detail);
+  const isDefensive = detail.includes('defensive') || detail.includes('(def)');
+  const isOffensive = detail.includes('offensive') || detail.includes('(att)');
+  if (isDowngrade && isDefensive) {
+    const xgaWorse = row.avgOpponentXgDelta >= 0.04;
+    const shotsWorse = row.avgOpponentShotsDelta >= 0.45;
+    const territoryWorse = (row.avgOpponentCentralDelta + row.avgOpponentWideDelta) >= 0.35;
+    const channelWorse = (row.avgOpponentCentralXgDelta + row.avgOpponentWideXgDelta
+      + Math.max(row.avgOpponentLeftWideXgDelta, 0)
+      + Math.max(row.avgOpponentRightWideXgDelta, 0)) >= 0.035;
+    return (xgaWorse && shotsWorse) || (xgaWorse && territoryWorse) || (shotsWorse && channelWorse);
+  }
+  if (isUpgrade && isDefensive) {
+    const xgaBetter = row.avgOpponentXgDelta <= -0.04;
+    const shotsBetter = row.avgOpponentShotsDelta <= -0.45;
+    const territoryBetter = (row.avgOpponentCentralDelta + row.avgOpponentWideDelta) <= -0.35;
+    const channelBetter = (row.avgOpponentCentralXgDelta + row.avgOpponentWideXgDelta
+      + Math.min(row.avgOpponentLeftWideXgDelta, 0)
+      + Math.min(row.avgOpponentRightWideXgDelta, 0)) <= -0.035;
+    return (xgaBetter && shotsBetter) || (xgaBetter && territoryBetter) || (shotsBetter && channelBetter);
+  }
+  if (isUpgrade && isOffensive) {
+    return row.avgUserXgDelta >= 0.04 && row.avgUserShotsDelta >= 0.35;
+  }
+  if (isDowngrade && isOffensive) {
+    return row.avgUserXgDelta <= -0.04 && row.avgUserShotsDelta <= -0.35;
+  }
+  return false;
+}
+
 export function scenarioSummaryFormationLabel(row: ScenarioMatrixSummaryRow): string {
   const base = row.baselineFormation || '';
   const changed = row.changedFormation || (row.actionType === 'FORMATION' ? row.actionDetail : '');
