@@ -9,6 +9,7 @@ import {
   scenarioBatteryCardDetail,
   scenarioBatteryCardSummary,
   scenarioBatteryCandidateMatches,
+  scenarioBatteryAutoObjectiveHint,
   scenarioBatteryCoachAdvice,
   scenarioBatteryCoachContext,
   scenarioBatteryCoachObjectiveHint,
@@ -148,6 +149,17 @@ describe('test-harness-scenario-battery-utils', () => {
     expect(scenarioBatteryCoachObjectiveLabel('NEUTRAL')).toBe('Neutral');
     expect(scenarioBatteryGroupLabel('ALL')).toBe('Todo');
     expect(scenarioBatteryGroupLabel('OPPONENT')).toBe('Rival');
+  });
+
+  it('builds auto objective hints from match state', () => {
+    expect(scenarioBatteryAutoObjectiveHint(null, 'HOME', 55))
+      .toBe('Auto: usa resultado y minuto; sin partido seleccionado, lectura equilibrada.');
+    expect(scenarioBatteryAutoObjectiveHint(matchRow({ homeGoals: 0, awayGoals: 1 }), 'HOME', 72))
+      .toContain('Auto: Necesito gol (perdiendo por 1, min 72,');
+    expect(scenarioBatteryAutoObjectiveHint(matchRow({ homeGoals: 2, awayGoals: 1 }), 'HOME', 75))
+      .toContain('Auto: Cuidar resultado (ganando por 1, min 75,');
+    expect(scenarioBatteryAutoObjectiveHint(matchRow({ homeGoals: 1, awayGoals: 1 }), 'AWAY', 30))
+      .toContain('Auto: Neutral (empatado, min 30,');
   });
 
   it('summarizes scenario outcomes for visual counters', () => {

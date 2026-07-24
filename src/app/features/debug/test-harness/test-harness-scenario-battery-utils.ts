@@ -367,6 +367,29 @@ export function inferScenarioBatteryCoachObjective(
   return 'NEUTRAL';
 }
 
+export function scenarioBatteryAutoObjectiveHint(
+  match: TestHarnessMatchRow | null,
+  controlledSide: ScenarioBatteryControlledSide,
+  selectedMinute: number
+): string {
+  if (!match) {
+    return 'Auto: usa resultado y minuto; sin partido seleccionado, lectura equilibrada.';
+  }
+  const objective = inferScenarioBatteryCoachObjective(match, controlledSide, selectedMinute);
+  const label = scenarioBatteryCoachObjectiveLabel(objective);
+  const minute = scenarioBatteryDecisionMinute(match, selectedMinute);
+  const goalDiff = scenarioBatteryGoalDiff(match, controlledSide);
+  const pressure = scenarioBatteryContextPressure(match, controlledSide);
+  const diffText = goalDiff === null
+    ? 'marcador desconocido'
+    : goalDiff > 0
+      ? `ganando por ${goalDiff}`
+      : goalDiff < 0
+        ? `perdiendo por ${Math.abs(goalDiff)}`
+        : 'empatado';
+  return `Auto: ${label} (${diffText}, min ${minute}, ${pressure.label}).`;
+}
+
 export function scenarioBatteryCoachContext(
   match: TestHarnessMatchRow,
   controlledSide: ScenarioBatteryControlledSide,

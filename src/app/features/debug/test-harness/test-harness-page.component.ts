@@ -165,6 +165,7 @@ import {
   scenarioBatteryCardDetail as getScenarioBatteryCardDetail,
   scenarioBatteryCardSummary as getScenarioBatteryCardSummary,
   scenarioBatteryCandidateMatches as getScenarioBatteryCandidateMatches,
+  scenarioBatteryAutoObjectiveHint as getScenarioBatteryAutoObjectiveHint,
   scenarioBatteryCoachContext as getScenarioBatteryCoachContext,
   scenarioBatteryCoachAdvice as getScenarioBatteryCoachAdvice,
   scenarioBatteryCoachObjectiveHint as getScenarioBatteryCoachObjectiveHint,
@@ -11915,22 +11916,10 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   private scenarioBatteryAutoObjectiveHint(): string {
     const match = this.selectedMatch();
     if (!match) {
-      return 'Auto: usa resultado y minuto; sin partido seleccionado, lectura equilibrada.';
+      return getScenarioBatteryAutoObjectiveHint(null, 'HOME', this.selectedMinute());
     }
     const side = this.resolveControlledSideForMatch(match);
-    const objective = this.inferScenarioBatteryCoachObjective(match, side);
-    const label = this.scenarioBatteryCoachObjectiveLabel(objective);
-    const minute = this.scenarioBatteryDecisionMinute(match);
-    const goalDiff = this.scenarioBatteryGoalDiff(match, side);
-    const pressure = this.scenarioBatteryContextPressure(match, side);
-    const diffText = goalDiff === null
-      ? 'marcador desconocido'
-      : goalDiff > 0
-        ? `ganando por ${goalDiff}`
-        : goalDiff < 0
-          ? `perdiendo por ${Math.abs(goalDiff)}`
-          : 'empatado';
-    return `Auto: ${label} (${diffText}, min ${minute}, ${pressure.label}).`;
+    return getScenarioBatteryAutoObjectiveHint(match, side, this.selectedMinute());
   }
   private scenarioBatteryEffectiveCoachObjective(
     match: TestHarnessMatchRow,
