@@ -1,25 +1,3 @@
-/**
- * V25D78-C55.2 phase 4 UI (c) + (d2): tests for dashboard user-division
- * pill + auto-trigger of the promotions dialog.
- *
- * <p>Coverage:
- * <ul>
- *   <li>(c) When {@code careerStatus.userDivision} is set, the dashboard
- *       renders the prominent tier pill (PRIMERA / SEGUNDA / TERCERA).</li>
- *   <li>(c) When {@code careerStatus.userDivision} is null/omitted, the
- *       pill does NOT render (legacy back).</li>
- *   <li>(d2) When {@code careerStatus.promotionsAvailable} is true and the
- *       season hasn't been 'viewed' yet, the dashboard calls
- *       {@code GET /career/promotions} and opens the
- *       {@link PromotionsDialogComponent} via {@code MatDialog.open()}.</li>
- *   <li>(d2) After the dialog closes, localStorage records the season so
- *       subsequent loads don't re-open.</li>
- *   <li>(d2) If the user already viewed this season's promotions, the
- *       dialog does NOT open.</li>
- *   <li>(d2) If /career/promotions returns [] the dialog does NOT open
- *       (stale engine flag safety).</li>
- * </ul>
- */
 import { Component, NO_ERRORS_SCHEMA } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
@@ -38,7 +16,7 @@ import { PromotionResult } from '../../core/services/career.model';
 })
 class StubComponent {}
 
-describe('DashboardComponent — V25D78-C55.2 phase 4 UI (c) + (d2)', () => {
+describe('DashboardComponent — division and promotions state', () => {
   let component: DashboardComponent;
   let fixture: ComponentFixture<DashboardComponent>;
   let httpSpy: jasmine.SpyObj<HttpClient>;
@@ -104,7 +82,7 @@ describe('DashboardComponent — V25D78-C55.2 phase 4 UI (c) + (d2)', () => {
     component = fixture.componentInstance;
   });
 
-  it('(c): renders user-division pill when careerStatus.userDivision is set', (done: DoneFn) => {
+  it('renders user-division pill when careerStatus.userDivision is set', (done: DoneFn) => {
     httpSpy.get.and.callFake(((url: string) => {
       if (url.includes('/career/status')) {
         return of({
@@ -150,7 +128,7 @@ describe('DashboardComponent — V25D78-C55.2 phase 4 UI (c) + (d2)', () => {
     expect(text).not.toContain('CREAR CARRERA');
   });
 
-  it('(c): hides user-division pill when careerStatus.userDivision is null', (done: DoneFn) => {
+  it('hides user-division pill when careerStatus.userDivision is null', (done: DoneFn) => {
     httpSpy.get.and.callFake(((url: string) => {
       if (url.includes('/career/status')) {
         return of({
@@ -178,12 +156,7 @@ describe('DashboardComponent — V25D78-C55.2 phase 4 UI (c) + (d2)', () => {
     });
   });
 
-  it('(C55.10 Item 1): tier-real — pill renders CUARTA verbatim with tier-default fallback', (done: DoneFn) => {
-    // C55.10 Item 1: backend now sends the literal tier label (CUARTA,
-    // QUINTA, …) — the front must consume it AS-IS without mapping. CSS
-    // contract: the unknown-tier pill gets `tier-default` styling so it
-    // stays visually distinct from PRIMERA/SEGUNDA/TERCERA instead of
-    // falling back to unstyled text.
+  it('renders lower-division labels verbatim with tier-default fallback', (done: DoneFn) => {
     httpSpy.get.and.callFake(((url: string) => {
       if (url.includes('/career/status')) {
         return of({
@@ -217,7 +190,7 @@ describe('DashboardComponent — V25D78-C55.2 phase 4 UI (c) + (d2)', () => {
     });
   });
 
-  it('(C55.10 Item 1): tierCssClass() helper covers PRIMERA/SEGUNDA/TERCERA/tier-default', () => {
+  it('maps known division labels to their tier CSS classes', () => {
     // Unit test of the tier-class helper. Verifies the mapping contract
     // used by both the dashboard pill template binding and the standings
     // page.
@@ -231,13 +204,7 @@ describe('DashboardComponent — V25D78-C55.2 phase 4 UI (c) + (d2)', () => {
     expect(component.tierCssClass(undefined)).toBe('tier-default');
   });
 
-  it('(d2): auto-opens PromotionsDialog when promotionsAvailable=true and not yet viewed (direct)', () => {
-    // V25D78-C55.2 phase 4 UI (d2): direct unit test of the auto-trigger
-    // path. We invoke the private method directly with a manually bound
-    // `dialog` reference because `inject(MatDialog)` resolves to the real
-    // MatDialog instance even when a `useValue` spy is provided (the
-    // override is consumed as a `_parentDialog` dep, not the main token —
-    // known Karma/jsdom + Material 18+ interaction).
+  it('auto-opens PromotionsDialog when promotionsAvailable=true and not yet viewed', () => {
     const promotions: PromotionResult[] = [
       { teamId: 't-x', teamName: 'Real Madrid', fromDivisionId: 'd-1', fromDivisionName: 'PRIMERA', toDivisionId: 'd-2', toDivisionName: 'SEGUNDA', type: 'RELEGATED', fromPosition: 19 }
     ];
@@ -267,7 +234,7 @@ describe('DashboardComponent — V25D78-C55.2 phase 4 UI (c) + (d2)', () => {
     );
   });
 
-  it('(d2): does NOT open dialog when promotionsAvailable=true but already viewed', (done: DoneFn) => {
+  it('does not open promotions dialog when the season was already viewed', (done: DoneFn) => {
     localStorage.setItem(`c55.phase4.viewedSeason.${CAREER_ID}`, String(SEASON));
 
     httpSpy.get.and.callFake(((url: string) => {
@@ -298,7 +265,7 @@ describe('DashboardComponent — V25D78-C55.2 phase 4 UI (c) + (d2)', () => {
     });
   });
 
-  it('(d2): does NOT open dialog when /career/promotions returns [] (stale flag)', (done: DoneFn) => {
+  it('does not open promotions dialog when /career/promotions returns an empty list', (done: DoneFn) => {
     httpSpy.get.and.callFake(((url: string) => {
       if (url.includes('/career/status')) {
         return of({
@@ -327,7 +294,7 @@ describe('DashboardComponent — V25D78-C55.2 phase 4 UI (c) + (d2)', () => {
     });
   });
 
-  it('(d2): does NOT open dialog when promotionsAvailable=false', (done: DoneFn) => {
+  it('does not open promotions dialog when promotionsAvailable=false', (done: DoneFn) => {
     httpSpy.get.and.callFake(((url: string) => {
       if (url.includes('/career/status')) {
         return of({
@@ -355,7 +322,7 @@ describe('DashboardComponent — V25D78-C55.2 phase 4 UI (c) + (d2)', () => {
     });
   });
 
-  it('(d2): silent failure — /career/promotions errors do not crash the dashboard', (done: DoneFn) => {
+  it('does not crash when /career/promotions fails', (done: DoneFn) => {
     httpSpy.get.and.callFake(((url: string) => {
       if (url.includes('/career/status')) {
         return of({
@@ -384,15 +351,7 @@ describe('DashboardComponent — V25D78-C55.2 phase 4 UI (c) + (d2)', () => {
     });
   });
 
-  it('(C55.10 Item 2): re-fetches dependent datasets when careerPhase changes to POST_SEASON', (done: DoneFn) => {
-    // C55.10 Item 2 — gap A13: when the engine signals a season just ended
-    // (careerPhase goes WAITING_USER → POST_SEASON), the dashboard must
-    // re-fetch squad, userStats, and worldStatus. Without this the page
-    // keeps displaying stale numbers even after the career advance on
-    // the back. We invoke loadCareerStatus() manually with a controlled
-    // second emission and verify the dependent GETs re-fire.
-
-    // FIRST emission: WAITING_USER (initial ngOnInit path).
+  it('re-fetches dependent datasets when careerPhase changes to POST_SEASON', (done: DoneFn) => {
     httpSpy.get.and.callFake(((url: string) => {
       if (url.includes('/career/status')) {
         return of({
@@ -464,16 +423,7 @@ describe('DashboardComponent — V25D78-C55.2 phase 4 UI (c) + (d2)', () => {
     });
   });
 
-  it('(C55.10 Item 2): re-fetches dependent datasets when season changes (e.g. after /career/continue)', (done: DoneFn) => {
-    // C55.10 Item 2 — same refresh-on-change contract, but for the season
-    // axis: when the user hits /career/continue, the back bumps season
-    // 1 → 2 and the dashboard must pick up the new numbers even though
-    // careerPhase may stay (or move to POST_SEASON). We bypass the initial
-    // snapshot via a single POST_SEASON emission that primes
-    // lastSeenPhase/Season with the final-round state, then issue a
-    // second loadCareerStatus() with season=2 to verify the refresh fires.
-
-    // FIRST emission: season 1, POST_SEASON.
+  it('re-fetches dependent datasets when season changes after career continue', (done: DoneFn) => {
     httpSpy.get.and.callFake(((url: string) => {
       if (url.includes('/career/status')) {
         return of({
@@ -533,7 +483,7 @@ describe('DashboardComponent — V25D78-C55.2 phase 4 UI (c) + (d2)', () => {
     });
   });
 
-  it('(C55.10 Item 2): no-op refresh when neither careerPhase nor season changes', (done: DoneFn) => {
+  it('does not refresh dependent datasets when neither careerPhase nor season changes', (done: DoneFn) => {
     // Negative test: if the second /career/status response has the same
     // (phase, season) as the snapshot, the dashboard must NOT re-fetch
     // the dependent datasets. Re-firing unconditionally would multiply
@@ -585,39 +535,20 @@ describe('DashboardComponent — V25D78-C55.2 phase 4 UI (c) + (d2)', () => {
   });
 });
 
-/**
- * V25D78-C55.7.7 BUG-M3: dashboard "Jugar Fecha" label is season-aware.
- *
- * <p>Pre-fix the label hardcoded `currentRound + 1` which overshot
- * `totalRounds` at season end (T1 R10 finished → "Jugar Fecha 11", which
- * doesn't exist). Post-fix: when `currentRound + 1 > totalRounds`, the
- * label flips to "Continuar Temporada {season+1}" and the subtitle hints
- * "Temporada finalizada, ver resultados".
- *
- * <p>Coverage:
- * <ul>
- *   <li>Mid-season (currentRound=3, totalRounds=10): "Jugar Fecha 4".</li>
- *   <li>Last round played (currentRound=10, totalRounds=10): "Continuar Temporada 2".</li>
- *   <li>Null/omitted status: safe fallback "Jugar Próxima Fecha".</li>
- *   <li>Subtitle mirrors the same season-end logic.</li>
- * </ul>
- */
-describe('DashboardComponent — V25D78-C55.7.7 BUG-M3 (season-aware Jugar Fecha label)', () => {
+describe('DashboardComponent — season-aware play-next labels', () => {
   let component: DashboardComponent;
 
   beforeEach(() => {
     component = Object.create(DashboardComponent.prototype);
   });
 
-  it('M3 mid-season (currentRound=3, totalRounds=10): label = "Jugar Fecha 4"', () => {
+  it('returns next-round label during the season', () => {
     const status = { currentRound: 3, totalRounds: 10, season: 1 } as any;
     expect(component.playNextRoundLabel(status)).toBe('Jugar Fecha 4');
     expect(component.playNextRoundSubtitle(status)).toBe('Confirmar para iniciar');
   });
 
-  it('M3 last round played (currentRound=10, totalRounds=10): label = "Continuar Temporada 2"', () => {
-    // BUG-M3 reproduction: pre-fix this would have said "Jugar Fecha 11"
-    // (currentRound + 1 = 11, which doesn't exist in a 10-round tournament).
+  it('returns continue-season label after the last round', () => {
     const status = { currentRound: 10, totalRounds: 10, season: 1 } as any;
     expect(component.playNextRoundLabel(status))
       .toBe('Continuar Temporada 2');
@@ -625,41 +556,25 @@ describe('DashboardComponent — V25D78-C55.7.7 BUG-M3 (season-aware Jugar Fecha
       .toBe('Temporada finalizada, ver resultados');
   });
 
-  it('M3 season already advanced (currentRound=1, totalRounds=10, season=2): "Jugar Fecha 2"', () => {
+  it('returns next-round label after a new season has started', () => {
     const status = { currentRound: 1, totalRounds: 10, season: 2 } as any;
     expect(component.playNextRoundLabel(status)).toBe('Jugar Fecha 2');
   });
 
-  it('M3 null/undefined status: safe fallback', () => {
+  it('returns safe fallback label without career status', () => {
     expect(component.playNextRoundLabel(null)).toBe('Jugar Próxima Fecha');
     expect(component.playNextRoundLabel(undefined)).toBe('Jugar Próxima Fecha');
   });
 });
 
-/**
- * V25D78-C55.7.7 BUG-L1: dashboard welcome banner prefers displayName.
- *
- * <p>Pre-fix the template hardcoded `info.username` and showed e.g.
- * "Welcome back, smoke-c55.7.4!" which felt impersonal. Post-fix
- * {@link DashboardComponent#displayNameOf} picks:
- * {@code displayName} → {@code email} → {@code username}.
- *
- * <p>Coverage:
- * <ul>
- *   <li>Backend emits displayName: it wins.</li>
- *   <li>No displayName yet: email is friendlier than username.</li>
- *   <li>Empty / whitespace displayName: treated as absent.</li>
- *   <li>Null/undefined user: safe "manager" fallback.</li>
- * </ul>
- */
-describe('DashboardComponent — V25D78-C55.7.7 BUG-L1 (displayNameOf helper)', () => {
+describe('DashboardComponent — displayNameOf helper', () => {
   let component: DashboardComponent;
 
   beforeEach(() => {
     component = Object.create(DashboardComponent.prototype);
   });
 
-  it('L1 happy path: displayName wins when present', () => {
+  it('prefers displayName when present', () => {
     expect(component.displayNameOf({
       displayName: 'Iván Cabral',
       email: 'ivan@example.com',
@@ -667,7 +582,7 @@ describe('DashboardComponent — V25D78-C55.7.7 BUG-L1 (displayNameOf helper)', 
     })).toBe('Iván Cabral');
   });
 
-  it('L1 fallback: email when no displayName (current backend state)', () => {
+  it('falls back to email when displayName is missing', () => {
     // Pre-fix showed username; post-fix shows the email until backend
     // starts emitting displayName.
     expect(component.displayNameOf({
@@ -677,7 +592,7 @@ describe('DashboardComponent — V25D78-C55.7.7 BUG-L1 (displayNameOf helper)', 
     })).toBe('smoke-c55.7.4-20260701160000@test.com');
   });
 
-  it('L1 whitespace displayName: treated as absent (trim check)', () => {
+  it('treats whitespace displayName as absent', () => {
     expect(component.displayNameOf({
       displayName: '   ',
       email: 'fallback@example.com',
@@ -685,12 +600,12 @@ describe('DashboardComponent — V25D78-C55.7.7 BUG-L1 (displayNameOf helper)', 
     })).toBe('fallback@example.com');
   });
 
-  it('L1 null/undefined user: safe manager fallback', () => {
+  it('returns manager for null or undefined user', () => {
     expect(component.displayNameOf(null)).toBe('manager');
     expect(component.displayNameOf(undefined)).toBe('manager');
   });
 
-  it('L1 fallback chain: no displayName + no email → username', () => {
+  it('falls back to username when displayName and email are missing', () => {
     expect(component.displayNameOf({
       displayName: null,
       username: 'last-resort'
