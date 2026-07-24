@@ -81,6 +81,51 @@ export function scenarioBatteryCoachAdvice(rows: ScenarioBatteryRow[]): Scenario
   };
 }
 
+export interface ScenarioSummaryOutcomeSummaryItem {
+  label: string;
+  count: number;
+  className: string;
+  hint: string;
+}
+
+export function scenarioSummaryOutcomeSummaryFromOutcomes(
+  outcomes: string[]
+): ScenarioSummaryOutcomeSummaryItem[] {
+  const countMatching = (matches: (outcome: string) => boolean): number => outcomes.filter(matches).length;
+  return [
+    {
+      label: 'Upgrade',
+      className: 'read-visible',
+      hint: 'Mejora clara: sube ataque y/o baja amenaza rival sin coste fuerte.',
+      count: countMatching((outcome) => outcome === 'Upgrade' || outcome === 'Lean up'),
+    },
+    {
+      label: 'Tradeoff',
+      className: 'read-strong',
+      hint: 'Gana algo y paga algo: mejor ataque con más riesgo, o más protección con menos ataque.',
+      count: countMatching((outcome) => outcome === 'Tradeoff'),
+    },
+    {
+      label: 'Risk/Exposure',
+      className: 'read-check',
+      hint: 'Empeora el equipo, abre riesgo importante o el rival expone un carril/zona.',
+      count: countMatching((outcome) => outcome === 'Risk' || outcome === 'Downgrade' || outcome === 'Exposure'),
+    },
+    {
+      label: 'Contained',
+      className: 'read-visible',
+      hint: 'El rival prueba un carril/plan pero queda contenido.',
+      count: countMatching((outcome) => outcome === 'Contained'),
+    },
+    {
+      label: 'Neutral',
+      className: 'read-stable',
+      hint: 'Sin cambio futbolístico suficiente para tomar decisión.',
+      count: countMatching((outcome) => outcome === 'Neutral'),
+    },
+  ];
+}
+
 export function scenarioShapeActionLabel(actionDetail: string): string | null {
   const normalized = actionDetail.trim().toLowerCase();
   if (normalized.startsWith('right-overload')) return 'Sobrecarga derecha';

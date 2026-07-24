@@ -13,6 +13,7 @@ import {
   scenarioSummaryFormationLabel,
   scenarioSummaryIsFormationNoop,
   scenarioSummaryOpponentChannelRead,
+  scenarioSummaryOutcomeSummaryFromOutcomes,
   scenarioSummaryUserChannelRead,
 } from './test-harness-scenario-battery-utils';
 import { ScenarioBatteryRow, ScenarioMatrixSummaryRow, TeamStyleOption } from '../models/test-harness.model';
@@ -51,6 +52,34 @@ describe('test-harness-scenario-battery-utils', () => {
     expect(scenarioBatteryCoachObjectiveLabel('NEUTRAL')).toBe('Neutral');
     expect(scenarioBatteryGroupLabel('ALL')).toBe('Todo');
     expect(scenarioBatteryGroupLabel('OPPONENT')).toBe('Rival');
+  });
+
+  it('summarizes scenario outcomes for visual counters', () => {
+    const summary = scenarioSummaryOutcomeSummaryFromOutcomes([
+      'Upgrade',
+      'Lean up',
+      'Tradeoff',
+      'Risk',
+      'Downgrade',
+      'Exposure',
+      'Contained',
+      'Neutral',
+      'Baseline/no-op',
+      'Channel shift',
+    ]);
+
+    expect(summary.map((item) => item.label)).toEqual([
+      'Upgrade',
+      'Tradeoff',
+      'Risk/Exposure',
+      'Contained',
+      'Neutral',
+    ]);
+    expect(summary.find((item) => item.label === 'Upgrade')?.count).toBe(2);
+    expect(summary.find((item) => item.label === 'Tradeoff')?.count).toBe(1);
+    expect(summary.find((item) => item.label === 'Risk/Exposure')?.count).toBe(3);
+    expect(summary.find((item) => item.label === 'Contained')?.count).toBe(1);
+    expect(summary.find((item) => item.label === 'Neutral')?.count).toBe(1);
   });
 
   it('summarizes battery reviews', () => {

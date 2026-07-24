@@ -170,6 +170,7 @@ import {
   scenarioSummaryFormationLabel as getScenarioSummaryFormationLabel,
   scenarioSummaryIsFormationNoop as getScenarioSummaryIsFormationNoop,
   scenarioSummaryOpponentChannelRead as getScenarioSummaryOpponentChannelRead,
+  scenarioSummaryOutcomeSummaryFromOutcomes as getScenarioSummaryOutcomeSummaryFromOutcomes,
   scenarioSummaryUserChannelRead as getScenarioSummaryUserChannelRead,
   styleLabelFromActionDetail as getStyleLabelFromActionDetail,
 } from './test-harness-scenario-battery-utils';
@@ -12853,45 +12854,9 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return getScenarioSummaryOpponentChannelRead(row);
   }
   scenarioSummaryOutcomeSummary(): Array<{ label: string; count: number; className: string; hint: string }> {
-    const rows = this.scenarioMatrixSummaryResults();
-    const definitions = [
-      {
-        label: 'Upgrade',
-        className: 'read-visible',
-        hint: 'Mejora clara: sube ataque y/o baja amenaza rival sin coste fuerte.',
-        matches: (outcome: string) => outcome === 'Upgrade' || outcome === 'Lean up',
-      },
-      {
-        label: 'Tradeoff',
-        className: 'read-strong',
-        hint: 'Gana algo y paga algo: mejor ataque con más riesgo, o más protección con menos ataque.',
-        matches: (outcome: string) => outcome === 'Tradeoff',
-      },
-      {
-        label: 'Risk/Exposure',
-        className: 'read-check',
-        hint: 'Empeora el equipo, abre riesgo importante o el rival expone un carril/zona.',
-        matches: (outcome: string) => outcome === 'Risk' || outcome === 'Downgrade' || outcome === 'Exposure',
-      },
-      {
-        label: 'Contained',
-        className: 'read-visible',
-        hint: 'El rival prueba un carril/plan pero queda contenido.',
-        matches: (outcome: string) => outcome === 'Contained',
-      },
-      {
-        label: 'Neutral',
-        className: 'read-stable',
-        hint: 'Sin cambio futbolístico suficiente para tomar decisión.',
-        matches: (outcome: string) => outcome === 'Neutral',
-      },
-    ];
-    return definitions.map((definition) => ({
-      label: definition.label,
-      className: definition.className,
-      hint: definition.hint,
-      count: rows.filter((row) => definition.matches(this.scenarioSummaryOutcome(row))).length,
-    }));
+    return getScenarioSummaryOutcomeSummaryFromOutcomes(
+      this.scenarioMatrixSummaryResults().map((row) => this.scenarioSummaryOutcome(row))
+    );
   }
   private scenarioSummaryExportRow(row: ScenarioMatrixSummaryRow): Record<string, unknown> {
     return {
