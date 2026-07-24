@@ -200,6 +200,9 @@ import {
   playerSwapHasLargeQualityDrop as hasLargePlayerSwapQualityDrop,
   playerSwapBatteryCoachRead as getPlayerSwapBatteryCoachRead,
   playerSwapBatteryCounterText as getPlayerSwapBatteryCounterText,
+  playerSwapBatteryBestWorstText as getPlayerSwapBatteryBestWorstText,
+  playerSwapObjectiveContrastText as getPlayerSwapObjectiveContrastText,
+  playerSwapObjectiveText as getPlayerSwapObjectiveText,
   playerSwapOverallDelta as getPlayerSwapOverallDelta,
   playerSwapOverallDeltaText as getPlayerSwapOverallDeltaText,
   playerSwapQualityWarning as getPlayerSwapQualityWarning,
@@ -11843,43 +11846,18 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return getPlayerSwapBatteryCounterText(counts);
   }
   playerSwapBatteryBestWorstText(row: PlayerSwapMatrixSummary | null): string {
-    if (!row) return 'sin datos';
-    const objective = this.playerSwapEffectiveCoachObjective();
-    const objectivePrefix = objective === 'NEED_GOAL'
-      ? 'para buscar gol'
-      : objective === 'PROTECT_RESULT'
-        ? 'para cerrar'
-        : 'balance';
-    if (!this.playerSwapIsActionableRecommendation(row) && row.swapRead !== 'Clear downgrade') {
-      return `sin cambio recomendado ${objectivePrefix}; mejor caso a revisar: ${row.baselinePlayer} -> ${row.swapPlayer} (${this.fmtDeltaNumber(row.deltaXgDiff)} xG diff, ${row.swapRead})`;
-    }
-    return `${row.baselinePlayer} -> ${row.swapPlayer} (${this.fmtDeltaNumber(row.deltaXgDiff)} xG diff, ${row.swapFit}; ${objectivePrefix})`;
+    return getPlayerSwapBatteryBestWorstText(
+      row,
+      this.playerSwapEffectiveCoachObjective(),
+      (value) => this.fmtDeltaNumber(value),
+      (item) => this.playerSwapIsActionableRecommendation(item)
+    );
   }
   playerSwapObjectiveText(row: PlayerSwapMatrixSummary | null, objective: ScenarioBatteryCoachObjective): string {
-    if (!row) return 'sin datos';
-    const label = objective === 'NEED_GOAL'
-      ? `ataque ${this.fmtDeltaNumber(row.deltaXgFor)} xG / ${this.fmtDeltaNumber(row.deltaShotsFor)} tiros`
-      : `riesgo ${this.fmtDeltaNumber(-row.deltaXgAgainst)} xGA / ${this.fmtDeltaNumber(-row.deltaShotsAgainst)} tiros ag.`;
-    return `${row.baselinePlayer} -> ${row.swapPlayer} (${label}; ${row.swapRead})`;
+    return getPlayerSwapObjectiveText(row, objective, (value) => this.fmtDeltaNumber(value));
   }
   playerSwapObjectiveContrastText(summary: PlayerSwapBatterySummary): string {
-    const attack = summary.bestAttack;
-    const protect = summary.bestProtect;
-    if (!attack || !protect) return 'sin datos suficientes';
-    const attackKey = `${attack.baselinePlayer}->${attack.swapPlayer}`;
-    const protectKey = `${protect.baselinePlayer}->${protect.swapPlayer}`;
-    const attackSignal = Math.max(0, attack.deltaXgFor) + Math.max(0, attack.deltaShotsFor) * 0.015;
-    const protectSignal = Math.max(0, -protect.deltaXgAgainst) + Math.max(0, -protect.deltaShotsAgainst) * 0.015;
-    if (attackKey !== protectKey) {
-      return `contraste real: atacar ${attack.baselinePlayer} -> ${attack.swapPlayer}; cerrar ${protect.baselinePlayer} -> ${protect.swapPlayer}`;
-    }
-    if (attack.swapRead === 'Clear upgrade' && attack.deltaXgFor >= 0 && attack.deltaXgAgainst <= 0) {
-      return 'mismo cambio sirve para ambos: mejora ataque y baja riesgo';
-    }
-    if (attackSignal < 0.035 && protectSignal < 0.035) {
-      return 'sin contraste real: no hay señal fuerte para atacar ni cerrar';
-    }
-    return 'sin contraste real: el mismo cambio domina la muestra';
+    return getPlayerSwapObjectiveContrastText(summary);
   }
   playerSwapCoachObjectiveRead(): string {
     return this.scenarioBatteryCoachObjectiveLabel(this.playerSwapEffectiveCoachObjective());

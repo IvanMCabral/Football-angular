@@ -1,4 +1,5 @@
 import {
+  playerSwapBatteryBestWorstText,
   playerSwapBatteryCoachRead,
   playerSwapBatteryCounterText,
   playerSwapHasLargeQualityDrop,
@@ -10,6 +11,8 @@ import {
   playerSwapIsActionableRecommendation,
   playerSwapOverallDelta,
   playerSwapOverallDeltaText,
+  playerSwapObjectiveContrastText,
+  playerSwapObjectiveText,
   playerSwapPrecisionStability,
   playerSwapPrecisionStabilityClass,
   playerSwapProtectSpecialistScore,
@@ -146,6 +149,75 @@ describe('player-swap-analysis', () => {
       precision: 'balanced',
       confidence: 'medium',
     } as any)).toContain('ruido o impacto menor');
+  });
+
+  it('formats player swap best/worst recommendation text by coach objective', () => {
+    const actionable = () => true;
+    const notActionable = () => false;
+
+    expect(playerSwapBatteryBestWorstText(baseSummaryRow, 'NEED_GOAL', formatDelta, actionable))
+      .toContain('para buscar gol');
+    expect(playerSwapBatteryBestWorstText(baseSummaryRow, 'PROTECT_RESULT', formatDelta, actionable))
+      .toContain('para cerrar');
+    expect(playerSwapBatteryBestWorstText({ ...baseSummaryRow, swapRead: 'Noise / neutral' }, 'NEUTRAL', formatDelta, notActionable))
+      .toContain('sin cambio recomendado balance');
+    expect(playerSwapBatteryBestWorstText(null, 'NEUTRAL', formatDelta, actionable)).toBe('sin datos');
+  });
+
+  it('formats player swap objective text for attack and protection', () => {
+    const attacking = {
+      ...baseSummaryRow,
+      baselinePlayer: 'Starter',
+      swapPlayer: 'Bench',
+      deltaXgFor: 0.12,
+      deltaShotsFor: 3,
+      deltaXgAgainst: 0.08,
+      deltaShotsAgainst: 2,
+      swapRead: 'Clear upgrade',
+    };
+
+    expect(playerSwapObjectiveText(attacking, 'NEED_GOAL', formatDelta))
+      .toContain('ataque +0.12 xG / +3 tiros');
+    expect(playerSwapObjectiveText(attacking, 'PROTECT_RESULT', formatDelta))
+      .toContain('riesgo -0.08 xGA / -2 tiros ag.');
+    expect(playerSwapObjectiveText(null, 'NEED_GOAL', formatDelta)).toBe('sin datos');
+  });
+
+  it('explains player swap objective contrast', () => {
+    const attack = {
+      ...baseSummaryRow,
+      baselinePlayer: 'Starter',
+      swapPlayer: 'Attacker',
+      deltaXgFor: 0.12,
+      deltaShotsFor: 3,
+      deltaXgAgainst: 0.02,
+      deltaShotsAgainst: 1,
+      swapRead: 'Clear upgrade',
+    };
+    const protect = {
+      ...baseSummaryRow,
+      baselinePlayer: 'Starter',
+      swapPlayer: 'Defender',
+      deltaXgFor: 0.01,
+      deltaShotsFor: 0,
+      deltaXgAgainst: -0.12,
+      deltaShotsAgainst: -3,
+      swapRead: 'Clear upgrade',
+    };
+
+    expect(playerSwapObjectiveContrastText({ bestAttack: null, bestProtect: null } as any))
+      .toBe('sin datos suficientes');
+    expect(playerSwapObjectiveContrastText({ bestAttack: attack, bestProtect: protect } as any))
+      .toContain('contraste real');
+    expect(playerSwapObjectiveContrastText({
+      bestAttack: { ...attack, deltaXgAgainst: -0.02 },
+      bestProtect: { ...attack, deltaXgAgainst: -0.02 },
+    } as any))
+      .toBe('mismo cambio sirve para ambos: mejora ataque y baja riesgo');
+    expect(playerSwapObjectiveContrastText({
+      bestAttack: { ...attack, deltaXgFor: 0.01, deltaShotsFor: 0, deltaXgAgainst: 0.01, deltaShotsAgainst: 0 },
+      bestProtect: { ...attack, deltaXgFor: 0.01, deltaShotsFor: 0, deltaXgAgainst: 0.01, deltaShotsAgainst: 0 },
+    } as any)).toContain('no hay señal fuerte');
   });
 
   it('calculates the individual quality delta for a player swap', () => {

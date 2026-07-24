@@ -84,6 +84,58 @@ export function playerSwapBatteryCoachRead(summary: PlayerSwapBatterySummary): s
   return `${confidencePrefix}${fitWarning}No aparece una señal fuerte: los cambios medidos se comportan como ruido o impacto menor.`;
 }
 
+export function playerSwapBatteryBestWorstText(
+  row: PlayerSwapMatrixSummary | null,
+  objective: ScenarioBatteryCoachObjective,
+  formatDeltaNumber: (value: number) => string,
+  isActionableRecommendation: (row: PlayerSwapMatrixSummary) => boolean,
+): string {
+  if (!row) return 'sin datos';
+  const objectivePrefix = playerSwapCoachObjectivePrefix(objective);
+  if (!isActionableRecommendation(row) && row.swapRead !== 'Clear downgrade') {
+    return `sin cambio recomendado ${objectivePrefix}; mejor caso a revisar: ${row.baselinePlayer} -> ${row.swapPlayer} (${formatDeltaNumber(row.deltaXgDiff)} xG diff, ${row.swapRead})`;
+  }
+  return `${row.baselinePlayer} -> ${row.swapPlayer} (${formatDeltaNumber(row.deltaXgDiff)} xG diff, ${row.swapFit}; ${objectivePrefix})`;
+}
+
+export function playerSwapObjectiveText(
+  row: PlayerSwapMatrixSummary | null,
+  objective: ScenarioBatteryCoachObjective,
+  formatDeltaNumber: (value: number) => string,
+): string {
+  if (!row) return 'sin datos';
+  const label = objective === 'NEED_GOAL'
+    ? `ataque ${formatDeltaNumber(row.deltaXgFor)} xG / ${formatDeltaNumber(row.deltaShotsFor)} tiros`
+    : `riesgo ${formatDeltaNumber(-row.deltaXgAgainst)} xGA / ${formatDeltaNumber(-row.deltaShotsAgainst)} tiros ag.`;
+  return `${row.baselinePlayer} -> ${row.swapPlayer} (${label}; ${row.swapRead})`;
+}
+
+export function playerSwapObjectiveContrastText(summary: PlayerSwapBatterySummary): string {
+  const attack = summary.bestAttack;
+  const protect = summary.bestProtect;
+  if (!attack || !protect) return 'sin datos suficientes';
+  const attackKey = `${attack.baselinePlayer}->${attack.swapPlayer}`;
+  const protectKey = `${protect.baselinePlayer}->${protect.swapPlayer}`;
+  const attackSignal = Math.max(0, attack.deltaXgFor) + Math.max(0, attack.deltaShotsFor) * 0.015;
+  const protectSignal = Math.max(0, -protect.deltaXgAgainst) + Math.max(0, -protect.deltaShotsAgainst) * 0.015;
+  if (attackKey !== protectKey) {
+    return `contraste real: atacar ${attack.baselinePlayer} -> ${attack.swapPlayer}; cerrar ${protect.baselinePlayer} -> ${protect.swapPlayer}`;
+  }
+  if (attack.swapRead === 'Clear upgrade' && attack.deltaXgFor >= 0 && attack.deltaXgAgainst <= 0) {
+    return 'mismo cambio sirve para ambos: mejora ataque y baja riesgo';
+  }
+  if (attackSignal < 0.035 && protectSignal < 0.035) {
+    return 'sin contraste real: no hay señal fuerte para atacar ni cerrar';
+  }
+  return 'sin contraste real: el mismo cambio domina la muestra';
+}
+
+function playerSwapCoachObjectivePrefix(objective: ScenarioBatteryCoachObjective): string {
+  if (objective === 'NEED_GOAL') return 'para buscar gol';
+  if (objective === 'PROTECT_RESULT') return 'para cerrar';
+  return 'balance';
+}
+
 export function playerSwapOverallDelta(row: PlayerSwapOverallRead): number | null {
   if (row.baselinePlayerOverall == null || row.swapPlayerOverall == null) return null;
   return row.swapPlayerOverall - row.baselinePlayerOverall;
