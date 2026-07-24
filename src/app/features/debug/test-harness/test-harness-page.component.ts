@@ -166,6 +166,7 @@ import {
   scenarioBatteryDecision as getScenarioBatteryDecision,
   scenarioBatteryDecisionReview as getScenarioBatteryDecisionReview,
   scenarioBatteryCoachObjectiveLabel as getScenarioBatteryCoachObjectiveLabel,
+  scenarioBatteryExportRow as getScenarioBatteryExportRow,
   scenarioBatteryGroupLabel as getScenarioBatteryGroupLabel,
   scenarioBatteryReviewCount as getScenarioBatteryReviewCount,
   scenarioBatteryReviewHint as getScenarioBatteryReviewHint,
@@ -12468,38 +12469,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return getScenarioBatteryRiskCardDetail(row);
   }
   private scenarioBatteryExportRow(row: ScenarioBatteryRow): Record<string, unknown> {
-    const summary = (title: string) => this.scenarioBatteryCardSummary(row, title);
-    const detail = (title: string) => this.scenarioBatteryCardDetail(row, title);
-    return {
-      match: row.matchLabel,
-      controlledTeam: row.controlledTeam,
-      controlledSide: row.controlledSide,
-      scenarioGroup: this.scenarioBatteryGroupLabel(row.scenarioGroup),
-      coachObjective: this.scenarioBatteryCoachObjectiveLabel(row.coachObjective),
-      coachContext: row.coachContext,
-      coachContextDetail: row.coachContextDetail,
-      review: row.review,
-      reviewDetail: row.reviewDetail,
-      seedStart: row.seedStart,
-      seedCount: row.seedCount,
-      scenarioCount: row.scenarioCount,
-      decision: row.decision,
-      decisionDetail: row.decisionDetail,
-      plan: summary('Plan actual'),
-      twoWay: summary('Doble ganancia'),
-      attack: summary('Atacar'),
-      shape: summary('Forma'),
-      protect: summary('Cuidar'),
-      avoid: this.scenarioBatteryRiskCardSummary(row),
-      opponentThreat: summary('Amenaza rival'),
-      planDetail: detail('Plan actual'),
-      twoWayDetail: detail('Doble ganancia'),
-      attackDetail: detail('Atacar'),
-      shapeDetail: detail('Forma'),
-      protectDetail: detail('Cuidar'),
-      avoidDetail: this.scenarioBatteryRiskCardDetail(row),
-      opponentThreatDetail: detail('Amenaza rival'),
-    };
+    return getScenarioBatteryExportRow(row);
   }
   private scenarioOpponentMaxChannelXgDelta(row: ScenarioMatrixSummaryRow): number {
     return Math.max(

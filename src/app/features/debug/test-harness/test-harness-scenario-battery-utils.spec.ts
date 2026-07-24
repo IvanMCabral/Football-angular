@@ -10,6 +10,7 @@ import {
   scenarioBatteryDecision,
   scenarioBatteryDecisionReview,
   scenarioBatteryCoachObjectiveLabel,
+  scenarioBatteryExportRow,
   scenarioBatteryGroupLabel,
   scenarioBatteryReviewHint,
   scenarioBatteryReviewItems,
@@ -548,6 +549,49 @@ describe('test-harness-scenario-battery-utils', () => {
     expect(scenarioBatteryRiskCardDetail(battery)).toBe('Abre demasiado el partido.');
     expect(scenarioBatteryRiskCardSummary(row({ cards: [] }))).toBe('-');
     expect(scenarioBatteryRiskCardDetail(row({ cards: [] }))).toBe('Sin riesgo claro en esta batería.');
+  });
+
+  it('exports scenario battery rows with readable labels and card fields', () => {
+    const exported = scenarioBatteryExportRow(row({
+      scenarioGroup: 'DEFENSE',
+      coachObjective: 'PROTECT_RESULT',
+      cards: [
+        {
+          title: 'Plan actual',
+          label: '4-4-2 base',
+          metrics: 'xG 1.10 / xGA 0.90',
+          detail: 'Plan estable.',
+          className: 'decision-neutral',
+        },
+        {
+          title: 'Cuidar',
+          label: 'Bloque medio',
+          metrics: 'xGA -0.12',
+          detail: 'Cierra el centro.',
+          className: 'decision-safe',
+        },
+        {
+          title: 'Riesgo ofensivo',
+          label: 'Ataque total',
+          metrics: 'xGA +0.18',
+          detail: 'Demasiado abierto.',
+          className: 'decision-risk',
+        },
+      ],
+    }));
+
+    expect(exported['match']).toBe('A vs B');
+    expect(exported['scenarioGroup']).toBe('Defensa');
+    expect(exported['coachObjective']).toBe('Cuidar resultado');
+    expect(exported['decision']).toBe('Atacar');
+    expect(exported['plan']).toBe('4-4-2 base - xG 1.10 / xGA 0.90');
+    expect(exported['protect']).toBe('Bloque medio - xGA -0.12');
+    expect(exported['avoid']).toBe('Ataque total - xGA +0.18');
+    expect(exported['planDetail']).toBe('Plan estable.');
+    expect(exported['protectDetail']).toBe('Cierra el centro.');
+    expect(exported['avoidDetail']).toBe('Demasiado abierto.');
+    expect(exported['attack']).toBe('-');
+    expect(exported['attackDetail']).toBe('Sin señal clara en esta batería.');
   });
 
   it('scores scenario summary impact from the largest normalized signal', () => {

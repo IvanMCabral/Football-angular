@@ -359,6 +359,41 @@ export function scenarioBatteryRiskCardDetail(row: ScenarioBatteryRow): string {
   return card ? card.detail : 'Sin riesgo claro en esta batería.';
 }
 
+export function scenarioBatteryExportRow(row: ScenarioBatteryRow): Record<string, unknown> {
+  const summary = (title: string) => scenarioBatteryCardSummary(row, title);
+  const detail = (title: string) => scenarioBatteryCardDetail(row, title);
+  return {
+    match: row.matchLabel,
+    controlledTeam: row.controlledTeam,
+    controlledSide: row.controlledSide,
+    scenarioGroup: scenarioBatteryGroupLabel(row.scenarioGroup),
+    coachObjective: scenarioBatteryCoachObjectiveLabel(row.coachObjective),
+    coachContext: row.coachContext,
+    coachContextDetail: row.coachContextDetail,
+    review: row.review,
+    reviewDetail: row.reviewDetail,
+    seedStart: row.seedStart,
+    seedCount: row.seedCount,
+    scenarioCount: row.scenarioCount,
+    decision: row.decision,
+    decisionDetail: row.decisionDetail,
+    plan: summary('Plan actual'),
+    twoWay: summary('Doble ganancia'),
+    attack: summary('Atacar'),
+    shape: summary('Forma'),
+    protect: summary('Cuidar'),
+    avoid: scenarioBatteryRiskCardSummary(row),
+    opponentThreat: summary('Amenaza rival'),
+    planDetail: detail('Plan actual'),
+    twoWayDetail: detail('Doble ganancia'),
+    attackDetail: detail('Atacar'),
+    shapeDetail: detail('Forma'),
+    protectDetail: detail('Cuidar'),
+    avoidDetail: scenarioBatteryRiskCardDetail(row),
+    opponentThreatDetail: detail('Amenaza rival'),
+  };
+}
+
 export function scenarioBatteryGroupLabel(group: 'ALL' | 'OFFENSE' | 'DEFENSE' | 'OPPONENT'): string {
   switch (group) {
     case 'ALL':
