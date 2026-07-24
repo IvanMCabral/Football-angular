@@ -1,12 +1,20 @@
 import {
+  FormationMatrixSummaryRow,
   FormationWidthRead,
   FormationWingbackRead,
   SideMirrorSmokeRow,
+  SideMirrorSyntheticLabRow,
 } from '../models/test-harness.model';
 import { FormationDTO } from '../../../shared/models/lineup/formation.dto';
 
 type FormationPosition = FormationDTO['positions'][number];
 type FormationLane = 'LEFT' | 'CENTER' | 'RIGHT';
+
+const SIDE_MIRROR_VERDICT_ORDER: Record<SideMirrorSmokeRow['verdict'], number> = {
+  OK: 0,
+  Parcial: 1,
+  Revisar: 2,
+};
 
 export function formationPositionLane(position: FormationPosition): FormationLane {
   const role = String(position.role ?? '').toUpperCase();
@@ -129,4 +137,107 @@ export function sideMirrorRealRead(
     return formation + ': caso real no cambia canal ante banda débil; revisar plantel, roles y estilo.';
   }
   return 'No hay señal lateral suficiente; revisar muestra y compararla contra el control sintético.';
+}
+
+export function buildSideMirrorSmokeRowsFromMatrix(
+  weakLeftRows: FormationMatrixSummaryRow[],
+  weakRightRows: FormationMatrixSummaryRow[],
+  positionsByFormation: Record<string, FormationPosition[]>
+): SideMirrorSmokeRow[] {
+  const rightByFormation = new Map(weakRightRows.map((row) => [row.formation, row]));
+  return weakLeftRows
+    .map((weakLeft) => {
+      const weakRight = rightByFormation.get(weakLeft.formation);
+      if (!weakRight) return null;
+      const weakLeftWideXgL = weakLeft.avgLeftWideXgFor ?? 0;
+      const weakLeftWideXgR = weakLeft.avgRightWideXgFor ?? 0;
+      const weakRightWideXgL = weakRight.avgLeftWideXgFor ?? 0;
+      const weakRightWideXgR = weakRight.avgRightWideXgFor ?? 0;
+      const weakLeftRightEdge = roundTo(weakLeftWideXgR - weakLeftWideXgL, 3);
+      const weakRightLeftEdge = roundTo(weakRightWideXgL - weakRightWideXgR, 3);
+      const weakLeftOk = weakLeftRightEdge >= 0.015;
+      const weakRightOk = weakRightLeftEdge >= 0.015;
+      const verdict: SideMirrorSmokeRow['verdict'] = weakLeftOk && weakRightOk
+        ? 'OK'
+        : weakLeftOk || weakRightOk
+          ? 'Parcial'
+          : 'Revisar';
+      const width = formationWidthReadFromPositions(positionsByFormation[weakLeft.formation] ?? []);
+      const wingback = formationWingbackReadFromPositions(positionsByFormation[weakLeft.formation] ?? []);
+      return {
+        formation: weakLeft.formation,
+        seedStart: weakLeft.seedStart,
+        seedEnd: weakLeft.seedEnd,
+        seedCount: weakLeft.seedCount,
+        weakLeftWideXgL,
+        weakLeftWideXgR,
+        weakRightWideXgL,
+        weakRightWideXgR,
+        weakLeftWideShotsL: weakLeft.avgLeftWideShotsFor ?? 0,
+        weakLeftWideShotsR: weakLeft.avgRightWideShotsFor ?? 0,
+        weakRightWideShotsL: weakRight.avgLeftWideShotsFor ?? 0,
+        weakRightWideShotsR: weakRight.avgRightWideShotsFor ?? 0,
+        weakLeftRightEdge,
+        weakRightLeftEdge,
+        verdict,
+        widthRead: width.read,
+        widthClass: width.className,
+        wingbackRead: wingback.read,
+        wingbackClass: wingback.className,
+        read: sideMirrorRealRead(
+          verdict,
+          weakLeft.formation,
+          weakLeftRightEdge,
+          weakRightLeftEdge,
+          width,
+          wingback
+        ),
+      };
+    })
+    .filter((row): row is SideMirrorSmokeRow => row !== null)
+    .sort(sortSideMirrorSmokeRows);
+}
+
+export function mapSyntheticSideMirrorRows(
+  rows: SideMirrorSyntheticLabRow[],
+  positionsByFormation: Record<string, FormationPosition[]>
+): SideMirrorSmokeRow[] {
+  return rows
+    .map((row) => {
+      const width = formationWidthReadFromPositions(positionsByFormation[row.formation] ?? []);
+      const wingback = formationWingbackReadFromPositions(positionsByFormation[row.formation] ?? []);
+      return {
+        formation: row.formation,
+        seedStart: row.seedStart,
+        seedEnd: row.seedEnd,
+        seedCount: row.seedCount,
+        weakLeftWideXgL: row.weakLeftWideXgL,
+        weakLeftWideXgR: row.weakLeftWideXgR,
+        weakRightWideXgL: row.weakRightWideXgL,
+        weakRightWideXgR: row.weakRightWideXgR,
+        weakLeftWideShotsL: row.weakLeftWideShotsL,
+        weakLeftWideShotsR: row.weakLeftWideShotsR,
+        weakRightWideShotsL: row.weakRightWideShotsL,
+        weakRightWideShotsR: row.weakRightWideShotsR,
+        weakLeftRightEdge: row.weakLeftRightEdge,
+        weakRightLeftEdge: row.weakRightLeftEdge,
+        verdict: row.verdict,
+        widthRead: width.read,
+        widthClass: width.className,
+        wingbackRead: wingback.read,
+        wingbackClass: wingback.className,
+        read: row.read,
+      };
+    })
+    .sort(sortSideMirrorSmokeRows);
+}
+
+function sortSideMirrorSmokeRows(a: SideMirrorSmokeRow, b: SideMirrorSmokeRow): number {
+  return SIDE_MIRROR_VERDICT_ORDER[a.verdict] - SIDE_MIRROR_VERDICT_ORDER[b.verdict]
+    || a.formation.localeCompare(b.formation);
+}
+
+function roundTo(value: number, decimals: number): number {
+  const factor = 10 ** decimals;
+  return Math.round(value * factor) / factor;
 }

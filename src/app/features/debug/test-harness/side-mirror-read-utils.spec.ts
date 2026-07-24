@@ -1,7 +1,9 @@
 import {
+  buildSideMirrorSmokeRowsFromMatrix,
   formationPositionLane,
   formationWidthReadFromPositions,
   formationWingbackReadFromPositions,
+  mapSyntheticSideMirrorRows,
   sideMirrorRealRead,
 } from './side-mirror-read-utils';
 import { FormationWidthRead, FormationWingbackRead } from '../models/test-harness.model';
@@ -103,5 +105,114 @@ describe('side-mirror-read-utils', () => {
   it('keeps non-near-zero review rows as insufficient lateral signal', () => {
     expect(sideMirrorRealRead('Revisar', '4-3-3', 0.03, -0.02, wide, noWingbacks))
       .toContain('control sintético');
+  });
+
+  it('builds real side mirror rows by pairing weak-left and weak-right matrix rows', () => {
+    const positionsByFormation = {
+      '4-4-2': [
+        { role: 'GK' },
+        { role: 'LB' },
+        { role: 'RB' },
+        { role: 'LM' },
+        { role: 'RM' },
+        { role: 'CM' },
+      ],
+      '4-3-3': [
+        { role: 'GK' },
+        { role: 'LB' },
+        { role: 'LW' },
+        { role: 'CM' },
+      ],
+    } as any;
+    const rows = buildSideMirrorSmokeRowsFromMatrix([
+      {
+        formation: '4-4-2',
+        seedStart: 1,
+        seedEnd: 3,
+        seedCount: 3,
+        avgLeftWideXgFor: 0.01,
+        avgRightWideXgFor: 0.04,
+        avgLeftWideShotsFor: 1,
+        avgRightWideShotsFor: 4,
+      },
+      {
+        formation: '4-3-3',
+        seedStart: 1,
+        seedEnd: 3,
+        seedCount: 3,
+        avgLeftWideXgFor: 0.02,
+        avgRightWideXgFor: 0.02,
+      },
+      {
+        formation: 'missing-right',
+        seedStart: 1,
+        seedEnd: 3,
+        seedCount: 3,
+      },
+    ] as any[], [
+      {
+        formation: '4-4-2',
+        seedStart: 1,
+        seedEnd: 3,
+        seedCount: 3,
+        avgLeftWideXgFor: 0.05,
+        avgRightWideXgFor: 0.02,
+        avgLeftWideShotsFor: 5,
+        avgRightWideShotsFor: 2,
+      },
+      {
+        formation: '4-3-3',
+        seedStart: 1,
+        seedEnd: 3,
+        seedCount: 3,
+        avgLeftWideXgFor: 0.02,
+        avgRightWideXgFor: 0.02,
+      },
+    ] as any[], positionsByFormation);
+
+    expect(rows.map((row) => row.formation)).toEqual(['4-4-2', '4-3-3']);
+    expect(rows[0].verdict).toBe('OK');
+    expect(rows[0].weakLeftRightEdge).toBe(0.03);
+    expect(rows[0].weakRightLeftEdge).toBe(0.03);
+    expect(rows[0].read).toContain('responde');
+    expect(rows[1].verdict).toBe('Revisar');
+  });
+
+  it('maps synthetic side mirror rows with formation width and wingback reads', () => {
+    const rows = mapSyntheticSideMirrorRows([
+      {
+        formation: '4-4-2',
+        seedStart: 1,
+        seedEnd: 2,
+        seedCount: 2,
+        weakLeftWideXgL: 0.01,
+        weakLeftWideXgR: 0.03,
+        weakRightWideXgL: 0.04,
+        weakRightWideXgR: 0.02,
+        weakLeftWideShotsL: 1,
+        weakLeftWideShotsR: 3,
+        weakRightWideShotsL: 4,
+        weakRightWideShotsR: 2,
+        weakLeftRightEdge: 0.02,
+        weakRightLeftEdge: 0.02,
+        mirrorGap: 0,
+        verdict: 'OK',
+        read: 'synthetic ok',
+      },
+    ], {
+      '4-4-2': [
+        { role: 'GK' },
+        { role: 'LB' },
+        { role: 'RB' },
+        { role: 'LM' },
+        { role: 'RM' },
+        { role: 'CM' },
+      ],
+    } as any);
+
+    expect(rows).toHaveSize(1);
+    expect(rows[0].read).toBe('synthetic ok');
+    expect(rows[0].widthRead).toContain('OK');
+    expect(rows[0].wingbackRead).toBe('Sin LWB/RWB');
   });
 });

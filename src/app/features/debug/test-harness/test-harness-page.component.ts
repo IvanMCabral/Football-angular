@@ -174,9 +174,10 @@ import {
   styleLabelFromActionDetail as getStyleLabelFromActionDetail,
 } from './test-harness-scenario-battery-utils';
 import {
-  formationPositionLane as getFormationPositionLane,
+  buildSideMirrorSmokeRowsFromMatrix as buildSideMirrorSmokeRowsFromMatrixUtils,
   formationWidthReadFromPositions as getFormationWidthReadFromPositions,
   formationWingbackReadFromPositions as getFormationWingbackReadFromPositions,
+  mapSyntheticSideMirrorRows as mapSyntheticSideMirrorRowsUtils,
   sideMirrorRealRead as getSideMirrorRealRead,
 } from './side-mirror-read-utils';
 import {
@@ -15016,69 +15017,15 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     const positions = this.formationPositionsByName()[formation] ?? [];
     return getFormationWingbackReadFromPositions(positions);
   }
-  private formationPositionLane(position: FormationDTO['positions'][number]): 'LEFT' | 'CENTER' | 'RIGHT' {
-    return getFormationPositionLane(position);
-  }
   private buildSideMirrorSmokeRows(
     weakLeftRows: FormationMatrixSummaryRow[],
     weakRightRows: FormationMatrixSummaryRow[]
   ): SideMirrorSmokeRow[] {
-    const rightByFormation = new Map(weakRightRows.map((row) => [row.formation, row]));
-    return weakLeftRows
-      .map((weakLeft) => {
-        const weakRight = rightByFormation.get(weakLeft.formation);
-        if (!weakRight) return null;
-        const weakLeftWideXgL = weakLeft.avgLeftWideXgFor ?? 0;
-        const weakLeftWideXgR = weakLeft.avgRightWideXgFor ?? 0;
-        const weakRightWideXgL = weakRight.avgLeftWideXgFor ?? 0;
-        const weakRightWideXgR = weakRight.avgRightWideXgFor ?? 0;
-        const weakLeftRightEdge = this.roundTo(weakLeftWideXgR - weakLeftWideXgL, 3);
-        const weakRightLeftEdge = this.roundTo(weakRightWideXgL - weakRightWideXgR, 3);
-        const weakLeftOk = weakLeftRightEdge >= 0.015;
-        const weakRightOk = weakRightLeftEdge >= 0.015;
-        const verdict: SideMirrorSmokeRow['verdict'] = weakLeftOk && weakRightOk
-          ? 'OK'
-          : weakLeftOk || weakRightOk
-            ? 'Parcial'
-            : 'Revisar';
-        const width = this.formationWidthRead(weakLeft.formation);
-        const wingback = this.formationWingbackRead(weakLeft.formation);
-        const read = this.sideMirrorRealRead(
-          verdict,
-          weakLeft.formation,
-          weakLeftRightEdge,
-          weakRightLeftEdge,
-          width,
-          wingback
-        );
-        return {
-          formation: weakLeft.formation,
-          seedStart: weakLeft.seedStart,
-          seedEnd: weakLeft.seedEnd,
-          seedCount: weakLeft.seedCount,
-          weakLeftWideXgL,
-          weakLeftWideXgR,
-          weakRightWideXgL,
-          weakRightWideXgR,
-          weakLeftWideShotsL: weakLeft.avgLeftWideShotsFor ?? 0,
-          weakLeftWideShotsR: weakLeft.avgRightWideShotsFor ?? 0,
-          weakRightWideShotsL: weakRight.avgLeftWideShotsFor ?? 0,
-          weakRightWideShotsR: weakRight.avgRightWideShotsFor ?? 0,
-          weakLeftRightEdge,
-          weakRightLeftEdge,
-          verdict,
-          widthRead: width.read,
-          widthClass: width.className,
-          wingbackRead: wingback.read,
-          wingbackClass: wingback.className,
-          read,
-        };
-      })
-      .filter((row): row is SideMirrorSmokeRow => row !== null)
-      .sort((a, b) => {
-        const order = { OK: 0, Parcial: 1, Revisar: 2 };
-        return order[a.verdict] - order[b.verdict] || a.formation.localeCompare(b.formation);
-      });
+    return buildSideMirrorSmokeRowsFromMatrixUtils(
+      weakLeftRows,
+      weakRightRows,
+      this.formationPositionsByName()
+    );
   }
   private sideMirrorRealRead(
     verdict: SideMirrorSmokeRow['verdict'],
@@ -15091,37 +15038,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return getSideMirrorRealRead(verdict, formation, weakLeftRightEdge, weakRightLeftEdge, width, wingback);
   }
   private mapSyntheticSideMirrorRows(rows: SideMirrorSyntheticLabRow[]): SideMirrorSmokeRow[] {
-    return rows
-      .map((row) => {
-        const width = this.formationWidthRead(row.formation);
-        const wingback = this.formationWingbackRead(row.formation);
-        return {
-          formation: row.formation,
-          seedStart: row.seedStart,
-          seedEnd: row.seedEnd,
-          seedCount: row.seedCount,
-          weakLeftWideXgL: row.weakLeftWideXgL,
-          weakLeftWideXgR: row.weakLeftWideXgR,
-          weakRightWideXgL: row.weakRightWideXgL,
-          weakRightWideXgR: row.weakRightWideXgR,
-          weakLeftWideShotsL: row.weakLeftWideShotsL,
-          weakLeftWideShotsR: row.weakLeftWideShotsR,
-          weakRightWideShotsL: row.weakRightWideShotsL,
-          weakRightWideShotsR: row.weakRightWideShotsR,
-          weakLeftRightEdge: row.weakLeftRightEdge,
-          weakRightLeftEdge: row.weakRightLeftEdge,
-          verdict: row.verdict,
-          widthRead: width.read,
-          widthClass: width.className,
-          wingbackRead: wingback.read,
-          wingbackClass: wingback.className,
-          read: row.read,
-        };
-      })
-      .sort((a, b) => {
-        const order = { OK: 0, Parcial: 1, Revisar: 2 };
-        return order[a.verdict] - order[b.verdict] || a.formation.localeCompare(b.formation);
-      });
+    return mapSyntheticSideMirrorRowsUtils(rows, this.formationPositionsByName());
   }
   onRunScenarioMatrix(): void {
     const matchId = this.selectedMatchId();
