@@ -126,6 +126,44 @@ export function scenarioSummaryOutcomeSummaryFromOutcomes(
   ];
 }
 
+export function scenarioSummaryOutcomeClass(outcome: string): string {
+  if (outcome === 'Baseline/no-op') return 'read-noise';
+  if (outcome === 'Upgrade' || outcome === 'Lean up') return 'read-visible';
+  if (outcome === 'Contained') return 'read-visible';
+  if (outcome === 'Channel shift') return 'read-visible';
+  if (outcome === 'Tradeoff') return 'read-strong';
+  if (outcome === 'Downgrade' || outcome === 'Risk' || outcome === 'Exposure') return 'read-check';
+  return 'read-stable';
+}
+
+export function scenarioSummaryRecommendationFromOutcome(
+  isFormationNoop: boolean,
+  level: string,
+  outcome: string,
+  prefix: string
+): string {
+  if (isFormationNoop) return 'Control/no-op';
+  if (level === 'noise') return 'No decidir con esto';
+  if (level === 'review') return 'Revisar con mas seeds';
+  if (outcome === 'Upgrade') return prefix === 'rival' ? 'Plan rival peligroso' : 'Usar como plan A';
+  if (outcome === 'Lean up') return prefix === 'rival' ? 'Vigilar ese canal' : 'Usar si necesitas empujar';
+  if (outcome === 'Contained') return 'Usar para proteger';
+  if (outcome === 'Channel shift') return 'Usar para cambiar foco';
+  if (outcome === 'Tradeoff') return 'Usar solo por contexto';
+  if (outcome === 'Downgrade') return 'Evitar salvo urgencia';
+  if (outcome === 'Risk' || outcome === 'Exposure') return 'Evitar si defendes';
+  return 'Señal leve: confirmar';
+}
+
+export function scenarioSummaryRecommendationClass(recommendation: string): string {
+  if (recommendation === 'Control/no-op') return 'read-noise';
+  if (recommendation.startsWith('Usar como plan A') || recommendation.startsWith('Usar para proteger')) return 'read-visible';
+  if (recommendation.startsWith('Usar si') || recommendation.startsWith('Usar para cambiar') || recommendation.startsWith('Plan rival')) return 'read-visible';
+  if (recommendation.startsWith('Usar solo') || recommendation.startsWith('Revisar') || recommendation.startsWith('Vigilar')) return 'read-check';
+  if (recommendation.startsWith('Evitar')) return 'read-strong';
+  return 'read-stable';
+}
+
 export function scenarioShapeActionLabel(actionDetail: string): string | null {
   const normalized = actionDetail.trim().toLowerCase();
   if (normalized.startsWith('right-overload')) return 'Sobrecarga derecha';

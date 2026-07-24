@@ -170,7 +170,10 @@ import {
   scenarioSummaryFormationLabel as getScenarioSummaryFormationLabel,
   scenarioSummaryIsFormationNoop as getScenarioSummaryIsFormationNoop,
   scenarioSummaryOpponentChannelRead as getScenarioSummaryOpponentChannelRead,
+  scenarioSummaryOutcomeClass as getScenarioSummaryOutcomeClass,
   scenarioSummaryOutcomeSummaryFromOutcomes as getScenarioSummaryOutcomeSummaryFromOutcomes,
+  scenarioSummaryRecommendationClass as getScenarioSummaryRecommendationClass,
+  scenarioSummaryRecommendationFromOutcome as getScenarioSummaryRecommendationFromOutcome,
   scenarioSummaryUserChannelRead as getScenarioSummaryUserChannelRead,
   styleLabelFromActionDetail as getStyleLabelFromActionDetail,
 } from './test-harness-scenario-battery-utils';
@@ -12379,14 +12382,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return 'Neutral';
   }
   scenarioSummaryOutcomeClass(row: ScenarioMatrixSummaryRow): string {
-    const outcome = this.scenarioSummaryOutcome(row);
-    if (outcome === 'Baseline/no-op') return 'read-noise';
-    if (outcome === 'Upgrade' || outcome === 'Lean up') return 'read-visible';
-    if (outcome === 'Contained') return 'read-visible';
-    if (outcome === 'Channel shift') return 'read-visible';
-    if (outcome === 'Tradeoff') return 'read-strong';
-    if (outcome === 'Downgrade' || outcome === 'Risk' || outcome === 'Exposure') return 'read-check';
-    return 'read-stable';
+    return getScenarioSummaryOutcomeClass(this.scenarioSummaryOutcome(row));
   }
   scenarioSummaryOutcomeReason(row: ScenarioMatrixSummaryRow): string {
     if (this.scenarioSummaryIsFormationNoop(row)) {
@@ -12459,29 +12455,15 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     ].join(' ? ');
   }
   scenarioSummaryRecommendation(row: ScenarioMatrixSummaryRow): string {
-    if (this.scenarioSummaryIsFormationNoop(row)) return 'Control/no-op';
-    const level = this.scenarioSummaryReadLevel(row);
-    const outcome = this.scenarioSummaryOutcome(row);
-    const prefix = this.scenarioSummaryCoachReadPrefix(row);
-    if (level === 'noise') return 'No decidir con esto';
-    if (level === 'review') return 'Revisar con mas seeds';
-    if (outcome === 'Upgrade') return prefix === 'rival' ? 'Plan rival peligroso' : 'Usar como plan A';
-    if (outcome === 'Lean up') return prefix === 'rival' ? 'Vigilar ese canal' : 'Usar si necesitas empujar';
-    if (outcome === 'Contained') return 'Usar para proteger';
-    if (outcome === 'Channel shift') return 'Usar para cambiar foco';
-    if (outcome === 'Tradeoff') return 'Usar solo por contexto';
-    if (outcome === 'Downgrade') return 'Evitar salvo urgencia';
-    if (outcome === 'Risk' || outcome === 'Exposure') return 'Evitar si defendes';
-    return 'Señal leve: confirmar';
+    return getScenarioSummaryRecommendationFromOutcome(
+      this.scenarioSummaryIsFormationNoop(row),
+      this.scenarioSummaryReadLevel(row),
+      this.scenarioSummaryOutcome(row),
+      this.scenarioSummaryCoachReadPrefix(row)
+    );
   }
   scenarioSummaryRecommendationClass(row: ScenarioMatrixSummaryRow): string {
-    const recommendation = this.scenarioSummaryRecommendation(row);
-    if (recommendation === 'Control/no-op') return 'read-noise';
-    if (recommendation.startsWith('Usar como plan A') || recommendation.startsWith('Usar para proteger')) return 'read-visible';
-    if (recommendation.startsWith('Usar si') || recommendation.startsWith('Usar para cambiar') || recommendation.startsWith('Plan rival')) return 'read-visible';
-    if (recommendation.startsWith('Usar solo') || recommendation.startsWith('Revisar') || recommendation.startsWith('Vigilar')) return 'read-check';
-    if (recommendation.startsWith('Evitar')) return 'read-strong';
-    return 'read-stable';
+    return getScenarioSummaryRecommendationClass(this.scenarioSummaryRecommendation(row));
   }
   scenarioSummaryRecommendationDetail(row: ScenarioMatrixSummaryRow): string {
     return [

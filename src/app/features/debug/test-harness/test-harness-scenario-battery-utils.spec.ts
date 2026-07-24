@@ -13,7 +13,10 @@ import {
   scenarioSummaryFormationLabel,
   scenarioSummaryIsFormationNoop,
   scenarioSummaryOpponentChannelRead,
+  scenarioSummaryOutcomeClass,
   scenarioSummaryOutcomeSummaryFromOutcomes,
+  scenarioSummaryRecommendationClass,
+  scenarioSummaryRecommendationFromOutcome,
   scenarioSummaryUserChannelRead,
 } from './test-harness-scenario-battery-utils';
 import { ScenarioBatteryRow, ScenarioMatrixSummaryRow, TeamStyleOption } from '../models/test-harness.model';
@@ -80,6 +83,49 @@ describe('test-harness-scenario-battery-utils', () => {
     expect(summary.find((item) => item.label === 'Risk/Exposure')?.count).toBe(3);
     expect(summary.find((item) => item.label === 'Contained')?.count).toBe(1);
     expect(summary.find((item) => item.label === 'Neutral')?.count).toBe(1);
+  });
+
+  it('maps scenario outcome classes', () => {
+    expect(scenarioSummaryOutcomeClass('Baseline/no-op')).toBe('read-noise');
+    expect(scenarioSummaryOutcomeClass('Upgrade')).toBe('read-visible');
+    expect(scenarioSummaryOutcomeClass('Lean up')).toBe('read-visible');
+    expect(scenarioSummaryOutcomeClass('Contained')).toBe('read-visible');
+    expect(scenarioSummaryOutcomeClass('Channel shift')).toBe('read-visible');
+    expect(scenarioSummaryOutcomeClass('Tradeoff')).toBe('read-strong');
+    expect(scenarioSummaryOutcomeClass('Downgrade')).toBe('read-check');
+    expect(scenarioSummaryOutcomeClass('Risk')).toBe('read-check');
+    expect(scenarioSummaryOutcomeClass('Exposure')).toBe('read-check');
+    expect(scenarioSummaryOutcomeClass('Neutral')).toBe('read-stable');
+  });
+
+  it('maps scenario summary recommendations from outcome context', () => {
+    expect(scenarioSummaryRecommendationFromOutcome(true, 'strong', 'Upgrade', 'formacion')).toBe('Control/no-op');
+    expect(scenarioSummaryRecommendationFromOutcome(false, 'noise', 'Upgrade', 'formacion')).toBe('No decidir con esto');
+    expect(scenarioSummaryRecommendationFromOutcome(false, 'review', 'Upgrade', 'formacion')).toBe('Revisar con mas seeds');
+    expect(scenarioSummaryRecommendationFromOutcome(false, 'strong', 'Upgrade', 'formacion')).toBe('Usar como plan A');
+    expect(scenarioSummaryRecommendationFromOutcome(false, 'strong', 'Upgrade', 'rival')).toBe('Plan rival peligroso');
+    expect(scenarioSummaryRecommendationFromOutcome(false, 'strong', 'Lean up', 'formacion')).toBe('Usar si necesitas empujar');
+    expect(scenarioSummaryRecommendationFromOutcome(false, 'strong', 'Lean up', 'rival')).toBe('Vigilar ese canal');
+    expect(scenarioSummaryRecommendationFromOutcome(false, 'strong', 'Contained', 'rival')).toBe('Usar para proteger');
+    expect(scenarioSummaryRecommendationFromOutcome(false, 'strong', 'Channel shift', 'rival')).toBe('Usar para cambiar foco');
+    expect(scenarioSummaryRecommendationFromOutcome(false, 'strong', 'Tradeoff', 'formacion')).toBe('Usar solo por contexto');
+    expect(scenarioSummaryRecommendationFromOutcome(false, 'strong', 'Downgrade', 'formacion')).toBe('Evitar salvo urgencia');
+    expect(scenarioSummaryRecommendationFromOutcome(false, 'strong', 'Risk', 'formacion')).toBe('Evitar si defendes');
+    expect(scenarioSummaryRecommendationFromOutcome(false, 'strong', 'Neutral', 'formacion')).toBe('Señal leve: confirmar');
+  });
+
+  it('maps scenario summary recommendation classes', () => {
+    expect(scenarioSummaryRecommendationClass('Control/no-op')).toBe('read-noise');
+    expect(scenarioSummaryRecommendationClass('Usar como plan A')).toBe('read-visible');
+    expect(scenarioSummaryRecommendationClass('Usar para proteger')).toBe('read-visible');
+    expect(scenarioSummaryRecommendationClass('Usar si necesitas empujar')).toBe('read-visible');
+    expect(scenarioSummaryRecommendationClass('Usar para cambiar foco')).toBe('read-visible');
+    expect(scenarioSummaryRecommendationClass('Plan rival peligroso')).toBe('read-visible');
+    expect(scenarioSummaryRecommendationClass('Usar solo por contexto')).toBe('read-check');
+    expect(scenarioSummaryRecommendationClass('Revisar con mas seeds')).toBe('read-check');
+    expect(scenarioSummaryRecommendationClass('Vigilar ese canal')).toBe('read-check');
+    expect(scenarioSummaryRecommendationClass('Evitar si defendes')).toBe('read-strong');
+    expect(scenarioSummaryRecommendationClass('Señal leve: confirmar')).toBe('read-stable');
   });
 
   it('summarizes battery reviews', () => {
