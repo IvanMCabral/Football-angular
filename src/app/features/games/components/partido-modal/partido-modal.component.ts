@@ -2887,17 +2887,11 @@ export class PartidoModalComponent {
   }
 
   /**
-   * : footer "Descartar" handler. Closes the dialog
-   * without saving  -  the dialog opens again with the original
-   * formation (SSE-drel usuario vm$ is untouched).
+   * Footer "Descartar" handler. Closes the dialog without saving, so the live
+   * match keeps the original formation until the manager applies a new change.
    */
   discard(): void {
     this.dialogRef.close({ success: false, reason: 'discarded' });
-  }
-
-  /** @deprecated Use {@link discard} directly. */
-  cancel(): void {
-    this.discard();
   }
 
   ngOnDestroy(): void {
