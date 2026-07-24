@@ -1,4 +1,5 @@
 import {
+  ControlledTeamSide,
   ScenarioBatteryCoachAdvice,
   ScenarioBatteryCoachObjective,
   ScenarioBatteryReviewItem,
@@ -6,7 +7,11 @@ import {
   ScenarioDecisionCard,
   ScenarioMatrixSummaryRow,
   TeamStyleOption,
+  TestHarnessMatchRow,
 } from '../models/test-harness.model';
+
+type ScenarioBatteryControlledSide = Exclude<ControlledTeamSide, 'USER'>;
+type ScenarioBatteryStrength = TestHarnessMatchRow['homeStrength'] | null;
 
 export interface ScenarioDecisionCardBuilderDeps {
   actionKey: (row: ScenarioMatrixSummaryRow) => string;
@@ -35,6 +40,207 @@ export function scenarioBatteryCoachObjectiveLabel(objective: ScenarioBatteryCoa
     default:
       return 'Neutral';
   }
+}
+
+export function scenarioBatteryMetricText(value: number | null | undefined, label: string): string {
+  return value === null || value === undefined ? `${label} ?` : `${label} ${Math.round(value)}`;
+}
+
+export function scenarioBatteryTeamReputation(teamName: string): number {
+  const normalized = teamName
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+  if (/(real madrid|barcelona|atletico madrid)/.test(normalized)) return 5;
+  if (/(sevilla|real sociedad|athletic club|villarreal|real betis|valencia)/.test(normalized)) return 4;
+  if (/(girona|celta vigo|osasuna|mallorca|getafe|rayo vallecano|espanyol|leganes|las palmas|alaves)/.test(normalized)) return 3;
+  if (/(granada|malaga|murcia|zaragoza|valladolid|santander|coruna|pamplona|bilbao|vigo|san sebastian|madrid reserve|barcelona b|valencia city|sevilla athletic)/.test(normalized)) return 2;
+  return 3;
+}
+
+export function scenarioBatteryTeamRating(
+  teamName: string,
+  strength: ScenarioBatteryStrength
+): { value: number; source: 'strength' | 'name' } {
+  const realRating = strength?.startingOvr ?? strength?.squadOvr;
+  return realRating !== null && realRating !== undefined
+    ? { value: realRating, source: 'strength' }
+    : { value: scenarioBatteryTeamReputation(teamName), source: 'name' };
+}
+
+export function scenarioBatteryTeamCondition(
+  strength: ScenarioBatteryStrength
+): { label: string; tired: boolean; fresh: boolean } {
+  const energy = strength?.avgEnergy;
+  const stamina = strength?.avgStamina;
+  const form = strength?.avgForm;
+  const hasRealCondition = energy !== null && energy !== undefined
+    || stamina !== null && stamina !== undefined
+    || form !== null && form !== undefined;
+  if (!hasRealCondition) {
+    return { label: 'condicion?', tired: false, fresh: false };
+  }
+  const tired = (energy !== null && energy !== undefined && energy < 72)
+    || (stamina !== null && stamina !== undefined && stamina < 72)
+    || (form !== null && form !== undefined && form < 45);
+  const fresh = (energy === null || energy === undefined || energy >= 88)
+    && (stamina === null || stamina === undefined || stamina >= 78)
+    && (form === null || form === undefined || form >= 60);
+  if (tired) return { label: 'cansado', tired: true, fresh: false };
+  if (fresh) return { label: 'fresco', tired: false, fresh: true };
+  return { label: 'normal', tired: false, fresh: false };
+}
+
+export function scenarioBatterySquadText(strength: ScenarioBatteryStrength): string {
+  if (!strength) return 'sin strength';
+  const squad = strength.squadOvr ?? '?';
+  const starters = strength.startingOvr ?? '?';
+  const size = strength.squadSize ?? '?';
+  const starterCount = strength.starterCount ?? '?';
+  return `squadOvr ${squad}, startingOvr ${starters}, squad ${size}, XI ${starterCount}`;
+}
+
+export function scenarioBatteryGoalDiff(
+  match: TestHarnessMatchRow,
+  controlledSide: ScenarioBatteryControlledSide
+): number | null {
+  if (match.homeGoals === null || match.awayGoals === null) {
+    return null;
+  }
+  return controlledSide === 'HOME'
+    ? match.homeGoals - match.awayGoals
+    : match.awayGoals - match.homeGoals;
+}
+
+export function scenarioBatteryDecisionMinute(match: TestHarnessMatchRow, selectedMinute: number): number {
+  if (selectedMinute > 0) {
+    return selectedMinute;
+  }
+  return String(match.status).toUpperCase() === 'COMPLETED' ? 75 : 45;
+}
+
+export function scenarioBatteryMatchStateText(
+  match: TestHarnessMatchRow,
+  controlledSide: ScenarioBatteryControlledSide,
+  selectedMinute: number
+): { summary: string; detail: string } {
+  const minute = scenarioBatteryDecisionMinute(match, selectedMinute);
+  const homeGoals = match.homeGoals;
+  const awayGoals = match.awayGoals;
+  const score = homeGoals === null || homeGoals === undefined || awayGoals === null || awayGoals === undefined
+    ? 'marcador ?'
+    : `${homeGoals}-${awayGoals}`;
+  const goalDiff = scenarioBatteryGoalDiff(match, controlledSide);
+  const state = goalDiff === null
+    ? 'estado ?'
+    : goalDiff > 0
+      ? `ganando +${goalDiff}`
+      : goalDiff < 0
+        ? `perdiendo ${goalDiff}`
+        : 'empatado';
+  return {
+    summary: `${score} min ${minute}`,
+    detail: `${score}, min ${minute}, ${state}`,
+  };
+}
+
+export function scenarioBatteryContextPressure(
+  match: TestHarnessMatchRow,
+  controlledSide: ScenarioBatteryControlledSide
+): { label: string; reputationDelta: number; away: boolean; strongThreshold: number; tired: boolean; fresh: boolean } {
+  const ownName = controlledSide === 'HOME' ? match.homeTeamName : match.awayTeamName;
+  const rivalName = controlledSide === 'HOME' ? match.awayTeamName : match.homeTeamName;
+  const ownStrength = controlledSide === 'HOME' ? match.homeStrength : match.awayStrength;
+  const rivalStrength = controlledSide === 'HOME' ? match.awayStrength : match.homeStrength;
+  const ownRating = scenarioBatteryTeamRating(ownName, ownStrength ?? null);
+  const rivalRating = scenarioBatteryTeamRating(rivalName, rivalStrength ?? null);
+  const reputationDelta = ownRating.value - rivalRating.value;
+  const away = controlledSide === 'AWAY';
+  const venue = away ? 'visitante' : 'local';
+  const strongThreshold = ownRating.source === 'strength' && rivalRating.source === 'strength' ? 4 : 2;
+  const level = reputationDelta >= strongThreshold
+    ? 'favorito'
+    : reputationDelta <= -strongThreshold
+      ? 'underdog'
+      : 'parejo';
+  const source = ownRating.source === 'strength' && rivalRating.source === 'strength' ? 'ovr' : 'nombre';
+  const condition = scenarioBatteryTeamCondition(ownStrength ?? null);
+  return {
+    label: `${venue}/${level}/${source}/${condition.label}`,
+    reputationDelta,
+    away,
+    strongThreshold,
+    tired: condition.tired,
+    fresh: condition.fresh,
+  };
+}
+
+export function inferScenarioBatteryCoachObjective(
+  match: TestHarnessMatchRow,
+  controlledSide: ScenarioBatteryControlledSide,
+  selectedMinute: number
+): ScenarioBatteryCoachObjective {
+  const minute = scenarioBatteryDecisionMinute(match, selectedMinute);
+  const goalDiff = scenarioBatteryGoalDiff(match, controlledSide);
+  if (goalDiff === null) {
+    return 'NEUTRAL';
+  }
+  const pressure = scenarioBatteryContextPressure(match, controlledSide);
+  if (goalDiff < 0 && (minute >= (pressure.tired ? 45 : 50) || goalDiff <= -2)) {
+    return 'NEED_GOAL';
+  }
+  if (goalDiff > 0 && (
+    minute >= (pressure.tired ? 60 : 70)
+    || (minute >= (pressure.tired ? 55 : 60) && (pressure.away || pressure.reputationDelta <= 0))
+  )) {
+    return 'PROTECT_RESULT';
+  }
+  if (goalDiff === 0 && (minute >= 70 || (pressure.fresh && !pressure.away && pressure.reputationDelta > 0 && minute >= 65))) {
+    if (pressure.tired && (pressure.away || pressure.reputationDelta <= 0) && minute >= 70) {
+      return 'PROTECT_RESULT';
+    }
+    if (!pressure.tired && !pressure.away && pressure.reputationDelta >= pressure.strongThreshold) {
+      return 'NEED_GOAL';
+    }
+    if (pressure.fresh && !pressure.away && pressure.reputationDelta > 0 && minute >= 65) {
+      return 'NEED_GOAL';
+    }
+    if (pressure.away && pressure.reputationDelta <= -pressure.strongThreshold && minute >= (pressure.tired ? 70 : 75)) {
+      return 'PROTECT_RESULT';
+    }
+  }
+  return 'NEUTRAL';
+}
+
+export function scenarioBatteryCoachContext(
+  match: TestHarnessMatchRow,
+  controlledSide: ScenarioBatteryControlledSide,
+  selectedMinute: number
+): { summary: string; detail: string } {
+  const ownName = controlledSide === 'HOME' ? match.homeTeamName : match.awayTeamName;
+  const rivalName = controlledSide === 'HOME' ? match.awayTeamName : match.homeTeamName;
+  const ownStrength = controlledSide === 'HOME' ? match.homeStrength : match.awayStrength;
+  const rivalStrength = controlledSide === 'HOME' ? match.awayStrength : match.homeStrength;
+  const pressure = scenarioBatteryContextPressure(match, controlledSide);
+  const ownRating = scenarioBatteryTeamRating(ownName, ownStrength ?? null);
+  const rivalRating = scenarioBatteryTeamRating(rivalName, rivalStrength ?? null);
+  const ownEnergy = scenarioBatteryMetricText(ownStrength?.avgEnergy, 'EN');
+  const ownForm = scenarioBatteryMetricText(ownStrength?.avgForm, 'FOR');
+  const ownStamina = scenarioBatteryMetricText(ownStrength?.avgStamina, 'STA');
+  const matchState = scenarioBatteryMatchStateText(match, controlledSide, selectedMinute);
+  const source = ownRating.source === 'strength' && rivalRating.source === 'strength' ? 'OVR real' : 'fallback nombre';
+  const summary = `${matchState.summary} · ${pressure.label} · OVR ${ownRating.value}-${rivalRating.value} · ${ownEnergy}`;
+  const detail = [
+    `${ownName} vs ${rivalName}`,
+    `Partido: ${matchState.detail}`,
+    `Contexto: ${pressure.label}`,
+    `Fuente: ${source}`,
+    `OVR propio/rival: ${ownRating.value}/${rivalRating.value}`,
+    `Condición propia: ${ownEnergy}, ${ownForm}, ${ownStamina}`,
+    `Plantel propio: ${scenarioBatterySquadText(ownStrength ?? null)}`,
+    `Plantel rival: ${scenarioBatterySquadText(rivalStrength ?? null)}`,
+  ].join(' · ');
+  return { summary, detail };
 }
 
 export function buildScenarioDecisionCardsFromSummary(

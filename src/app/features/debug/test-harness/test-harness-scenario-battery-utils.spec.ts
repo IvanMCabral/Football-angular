@@ -4,18 +4,29 @@ import {
   scenarioActionKey,
   scenarioAttackCandidateIsCoachWorthy,
   scenarioAttackPlanScore,
+  inferScenarioBatteryCoachObjective,
   scenarioBatteryCardDetail,
   scenarioBatteryCardSummary,
   scenarioBatteryCoachAdvice,
+  scenarioBatteryCoachContext,
   scenarioBatteryDecision,
+  scenarioBatteryDecisionMinute,
   scenarioBatteryDecisionReview,
   scenarioBatteryCoachObjectiveLabel,
+  scenarioBatteryContextPressure,
   scenarioBatteryExportRow,
+  scenarioBatteryGoalDiff,
   scenarioBatteryGroupLabel,
+  scenarioBatteryMatchStateText,
+  scenarioBatteryMetricText,
   scenarioBatteryReviewHint,
   scenarioBatteryReviewItems,
   scenarioBatteryRiskCardDetail,
   scenarioBatteryRiskCardSummary,
+  scenarioBatterySquadText,
+  scenarioBatteryTeamCondition,
+  scenarioBatteryTeamRating,
+  scenarioBatteryTeamReputation,
   scenarioDecisionMetrics,
   scenarioOpponentProtectionRead,
   scenarioOpponentRiskRead,
@@ -49,7 +60,7 @@ import {
   scenarioSummaryUserChannelRead,
   scenarioTwoWayScore,
 } from './test-harness-scenario-battery-utils';
-import { ScenarioBatteryRow, ScenarioDecisionCard, ScenarioMatrixSummaryRow, TeamStyleOption } from '../models/test-harness.model';
+import { ScenarioBatteryRow, ScenarioDecisionCard, ScenarioMatrixSummaryRow, TeamStyleOption, TestHarnessMatchRow } from '../models/test-harness.model';
 
 const styles: TeamStyleOption[] = [
   { value: 'BALANCED', label: 'Balanced', hint: 'balanced' },
@@ -74,6 +85,41 @@ function row(partial: Partial<ScenarioBatteryRow>): ScenarioBatteryRow {
     seedStart: 12345,
     seedCount: 5,
     cards: [],
+    ...partial,
+  };
+}
+
+function matchRow(partial: Partial<TestHarnessMatchRow> = {}): TestHarnessMatchRow {
+  return {
+    matchId: 'match-1',
+    round: 1,
+    homeTeamId: 'home',
+    homeTeamName: 'Real Madrid',
+    awayTeamId: 'away',
+    awayTeamName: 'Las Palmas',
+    status: 'COMPLETED',
+    homeGoals: 1,
+    awayGoals: 0,
+    homeFormation: '4-4-2',
+    awayFormation: '4-3-3',
+    homeStrength: {
+      squadOvr: 84,
+      startingOvr: 86,
+      squadSize: 24,
+      starterCount: 11,
+      avgEnergy: 90,
+      avgForm: 70,
+      avgStamina: 82,
+    },
+    awayStrength: {
+      squadOvr: 74,
+      startingOvr: 75,
+      squadSize: 23,
+      starterCount: 11,
+      avgEnergy: 76,
+      avgForm: 55,
+      avgStamina: 74,
+    },
     ...partial,
   };
 }
@@ -309,6 +355,57 @@ describe('test-harness-scenario-battery-utils', () => {
       why: '1/2 lecturas coherentes; confirmar con Multi-seed antes de tocar motor.',
       next: 'Bloque bajo. Confirmar con Multi-seed.',
     });
+  });
+
+  it('reads scenario battery coach context from match state and squad strength', () => {
+    const match = matchRow();
+
+    expect(scenarioBatteryMetricText(null, 'EN')).toBe('EN ?');
+    expect(scenarioBatteryMetricText(86.6, 'EN')).toBe('EN 87');
+    expect(scenarioBatteryTeamReputation('Atlético Madrid')).toBe(5);
+    expect(scenarioBatteryTeamReputation('Real Sociedad')).toBe(4);
+    expect(scenarioBatteryTeamReputation('Las Palmas')).toBe(3);
+    expect(scenarioBatteryTeamReputation('Granada')).toBe(2);
+    expect(scenarioBatteryTeamRating('Unknown FC', { startingOvr: 79 })).toEqual({ value: 79, source: 'strength' });
+    expect(scenarioBatteryTeamRating('Barcelona', null)).toEqual({ value: 5, source: 'name' });
+    expect(scenarioBatteryTeamCondition({ avgEnergy: 70, avgForm: 65, avgStamina: 80 })).toEqual({ label: 'cansado', tired: true, fresh: false });
+    expect(scenarioBatteryTeamCondition({ avgEnergy: 90, avgForm: 70, avgStamina: 82 })).toEqual({ label: 'fresco', tired: false, fresh: true });
+    expect(scenarioBatteryTeamCondition(null)).toEqual({ label: 'condicion?', tired: false, fresh: false });
+    expect(scenarioBatterySquadText(match.homeStrength ?? null)).toBe('squadOvr 84, startingOvr 86, squad 24, XI 11');
+    expect(scenarioBatteryGoalDiff(match, 'HOME')).toBe(1);
+    expect(scenarioBatteryGoalDiff(match, 'AWAY')).toBe(-1);
+    expect(scenarioBatteryDecisionMinute(match, 0)).toBe(75);
+    expect(scenarioBatteryDecisionMinute(match, 62)).toBe(62);
+    expect(scenarioBatteryMatchStateText(match, 'HOME', 62)).toEqual({
+      summary: '1-0 min 62',
+      detail: '1-0, min 62, ganando +1',
+    });
+    expect(scenarioBatteryContextPressure(match, 'HOME')).toEqual({
+      label: 'local/favorito/ovr/fresco',
+      reputationDelta: 11,
+      away: false,
+      strongThreshold: 4,
+      tired: false,
+      fresh: true,
+    });
+    expect(scenarioBatteryCoachContext(match, 'HOME', 62)).toEqual({
+      summary: '1-0 min 62 · local/favorito/ovr/fresco · OVR 86-75 · EN 90',
+      detail: 'Real Madrid vs Las Palmas · Partido: 1-0, min 62, ganando +1 · Contexto: local/favorito/ovr/fresco · Fuente: OVR real · OVR propio/rival: 86/75 · Condición propia: EN 90, FOR 70, STA 82 · Plantel propio: squadOvr 84, startingOvr 86, squad 24, XI 11 · Plantel rival: squadOvr 74, startingOvr 75, squad 23, XI 11',
+    });
+  });
+
+  it('infers scenario battery coach objective from score, minute and pressure', () => {
+    expect(inferScenarioBatteryCoachObjective(matchRow({ homeGoals: 0, awayGoals: 1 }), 'HOME', 55)).toBe('NEED_GOAL');
+    expect(inferScenarioBatteryCoachObjective(matchRow({ homeGoals: 2, awayGoals: 0 }), 'AWAY', 45)).toBe('NEED_GOAL');
+    expect(inferScenarioBatteryCoachObjective(matchRow({ homeGoals: 1, awayGoals: 0 }), 'HOME', 72)).toBe('PROTECT_RESULT');
+    expect(inferScenarioBatteryCoachObjective(matchRow({ homeGoals: 1, awayGoals: 1 }), 'HOME', 66)).toBe('NEED_GOAL');
+    expect(inferScenarioBatteryCoachObjective(matchRow({
+      homeGoals: 1,
+      awayGoals: 1,
+      homeStrength: { avgEnergy: 70, startingOvr: 73 },
+      awayStrength: { startingOvr: 78 },
+    }), 'HOME', 72)).toBe('PROTECT_RESULT');
+    expect(inferScenarioBatteryCoachObjective(matchRow({ homeGoals: null, awayGoals: null }), 'HOME', 80)).toBe('NEUTRAL');
   });
 
   it('labels style and shape actions', () => {
