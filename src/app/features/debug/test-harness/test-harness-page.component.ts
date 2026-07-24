@@ -155,6 +155,7 @@ import {
   professionalSmokeVerdictClass as getProfessionalSmokeVerdictClass,
 } from './test-harness-professional-qa-utils';
 import {
+  buildScenarioDecisionCardsFromSummary as buildScenarioDecisionCardsFromSummaryUtils,
   scenarioActionLabel as getScenarioActionLabel,
   scenarioActionKey as getScenarioActionKey,
   scenarioAttackCandidateIsCoachWorthy as getScenarioAttackCandidateIsCoachWorthy,
@@ -5763,112 +5764,23 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     ].slice(0, this.scenarioBatteryMatchLimit());
   }
   private buildScenarioDecisionCards(summaryRows: ScenarioMatrixSummaryRow[]): ScenarioDecisionCard[] {
-    const rows = summaryRows
-      .filter((row) => !row.scenario.includes('noop') && !row.scenario.startsWith('base-'));
-    if (rows.length === 0) {
-      return [];
-    }
-    const cards: ScenarioDecisionCard[] = [];
-    const usedActionKeys = new Set<string>();
-    const ownRows = rows.filter((row) => !this.isOpponentScenarioRow(row));
-    const opponentRows = rows.filter((row) => this.isOpponentScenarioRow(row));
-    const baseline = summaryRows
-      .find((row) => row.scenario.includes('noop') || row.scenario.startsWith('base-'));
-    cards.push({
-      title: 'Plan actual',
-      label: baseline ? this.summaryActionLabel(baseline) : 'Baseline',
-      metrics: baseline
-        ? `xG ${this.fmtDeltaNumber(baseline.avgUserXgDelta)} / xGA ${this.fmtDeltaNumber(baseline.avgOpponentXgDelta)}`
-        : 'Referencia del partido',
-      detail: baseline
-        ? this.scenarioSummaryCoachRead(baseline)
-        : 'Punto de comparacion para medir cada ajuste.',
-      className: 'decision-neutral',
+    return buildScenarioDecisionCardsFromSummaryUtils(summaryRows, {
+      actionKey: (row) => this.scenarioActionKey(row),
+      attackCandidateIsCoachWorthy: (row) => this.scenarioAttackCandidateIsCoachWorthy(row),
+      attackPlanScore: (row) => this.scenarioAttackPlanScore(row),
+      cardFromRow: (title, row, className, detail) => this.scenarioDecisionCardFromRow(title, row, className, detail),
+      isOpponentRow: (row) => this.isOpponentScenarioRow(row),
+      opponentMaxChannelXgDelta: (row) => this.scenarioOpponentMaxChannelXgDelta(row),
+      opponentMinChannelXgDelta: (row) => this.scenarioOpponentMinChannelXgDelta(row),
+      opponentProtectionRead: (row) => this.scenarioOpponentProtectionRead(row),
+      opponentRiskRead: (row) => this.scenarioOpponentRiskRead(row),
+      protectionCandidateIsCoachWorthy: (row) => this.scenarioProtectionCandidateIsCoachWorthy(row),
+      summaryActionLabel: (row) => this.summaryActionLabel(row),
+      summaryCoachRead: (row) => this.scenarioSummaryCoachRead(row),
+      userChannelRead: (row) => this.scenarioSummaryUserChannelRead(row),
+      twoWayScore: (row) => this.scenarioTwoWayScore(row),
+      formatDeltaNumber: (value) => this.fmtDeltaNumber(value),
     });
-    const twoWayAction = ownRows
-      .filter((row) => row.avgUserXgDelta >= 0.04 && row.avgOpponentXgDelta <= -0.04)
-      .sort((a, b) => this.scenarioTwoWayScore(b) - this.scenarioTwoWayScore(a))[0];
-    if (twoWayAction) {
-      cards.push(this.scenarioDecisionCardFromRow(
-        'Doble ganancia',
-        twoWayAction,
-        'decision-attack',
-        `${this.scenarioSummaryUserChannelRead(twoWayAction)} / ${this.scenarioOpponentProtectionRead(twoWayAction)}`,
-      ));
-      usedActionKeys.add(this.scenarioActionKey(twoWayAction));
-    }
-    const attackPlan = ownRows
-      .filter((row) => !usedActionKeys.has(this.scenarioActionKey(row)))
-      .filter((row) => this.scenarioAttackCandidateIsCoachWorthy(row))
-      .sort((a, b) => this.scenarioAttackPlanScore(b) - this.scenarioAttackPlanScore(a))[0];
-    if (attackPlan) {
-      cards.push(this.scenarioDecisionCardFromRow(
-        'Atacar',
-        attackPlan,
-        'decision-attack',
-        this.scenarioSummaryUserChannelRead(attackPlan),
-      ));
-      usedActionKeys.add(this.scenarioActionKey(attackPlan));
-    }
-    const shapeAttack = ownRows
-      .filter((row) => row.scenario.startsWith('m45-shape-'))
-      .filter((row) => !usedActionKeys.has(this.scenarioActionKey(row)))
-      .filter((row) => row.avgUserXgDelta >= 0.08 && row.avgOpponentXgDelta <= 0.12)
-      .sort((a, b) => b.avgUserXgDelta - a.avgUserXgDelta)[0];
-    if (shapeAttack && (!attackPlan || shapeAttack.avgUserXgDelta >= attackPlan.avgUserXgDelta + 0.04)) {
-      cards.push(this.scenarioDecisionCardFromRow(
-        'Forma',
-        shapeAttack,
-        'decision-shape',
-        this.scenarioSummaryUserChannelRead(shapeAttack),
-      ));
-      usedActionKeys.add(this.scenarioActionKey(shapeAttack));
-    }
-    const bestProtection = ownRows
-      .filter((row) => !usedActionKeys.has(this.scenarioActionKey(row)))
-      .filter((row) => this.scenarioProtectionCandidateIsCoachWorthy(row))
-      .filter((row) => row.avgOpponentXgDelta <= 0.03)
-      .filter((row) => row.avgOpponentXgDelta <= -0.06 || this.scenarioOpponentMinChannelXgDelta(row) <= -0.08)
-      .filter((row) => this.scenarioOpponentMaxChannelXgDelta(row) < 0.10)
-      .sort((a, b) => Math.min(a.avgOpponentXgDelta, this.scenarioOpponentMinChannelXgDelta(a))
-        - Math.min(b.avgOpponentXgDelta, this.scenarioOpponentMinChannelXgDelta(b)))[0];
-    if (bestProtection) {
-      cards.push(this.scenarioDecisionCardFromRow(
-        'Cuidar',
-        bestProtection,
-        'decision-safe',
-        this.scenarioOpponentProtectionRead(bestProtection),
-      ));
-      usedActionKeys.add(this.scenarioActionKey(bestProtection));
-    }
-    const biggestRisk = ownRows
-      .filter((row) => this.scenarioOpponentMaxChannelXgDelta(row) >= 0.10 || row.avgOpponentXgDelta >= 0.10)
-      .sort((a, b) => Math.max(b.avgOpponentXgDelta, this.scenarioOpponentMaxChannelXgDelta(b))
-        - Math.max(a.avgOpponentXgDelta, this.scenarioOpponentMaxChannelXgDelta(a)))[0];
-    if (biggestRisk) {
-      const offensiveRisk = biggestRisk.avgUserXgDelta >= 0.02;
-      cards.push(this.scenarioDecisionCardFromRow(
-        offensiveRisk ? 'Riesgo ofensivo' : 'Evitar',
-        biggestRisk,
-        'decision-risk',
-        offensiveRisk
-          ? `${this.scenarioSummaryUserChannelRead(biggestRisk)} / ${this.scenarioOpponentRiskRead(biggestRisk)}`
-          : this.scenarioOpponentRiskRead(biggestRisk),
-      ));
-    }
-    const opponentThreat = opponentRows
-      .filter((row) => this.scenarioOpponentMaxChannelXgDelta(row) >= 0.025 || row.avgOpponentXgDelta >= 0.025)
-      .sort((a, b) => Math.max(b.avgOpponentXgDelta, this.scenarioOpponentMaxChannelXgDelta(b))
-        - Math.max(a.avgOpponentXgDelta, this.scenarioOpponentMaxChannelXgDelta(a)))[0];
-    if (opponentThreat) {
-      cards.push(this.scenarioDecisionCardFromRow(
-        'Amenaza rival',
-        opponentThreat,
-        'decision-risk',
-        this.scenarioOpponentRiskRead(opponentThreat),
-      ));
-    }
-    return cards.slice(0, 7);
   }
   /** User-facing pointer to the latest finished replay-analysis result. */
   readonly analysisReadyMessage = signal<string | null>(null);

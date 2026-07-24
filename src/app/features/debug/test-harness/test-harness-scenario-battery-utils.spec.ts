@@ -1,4 +1,5 @@
 import {
+  buildScenarioDecisionCardsFromSummary,
   scenarioActionLabel,
   scenarioActionKey,
   scenarioAttackCandidateIsCoachWorthy,
@@ -398,6 +399,61 @@ describe('test-harness-scenario-battery-utils', () => {
     expect(scenarioProtectionCandidateIsCoachWorthy(row, '4-3-3')).toBeTrue();
     expect(scenarioProtectionCandidateIsCoachWorthy({ ...row, actionType: 'SUBSTITUTION', avgOpponentXgDelta: -0.05, avgOpponentShotsDelta: -0.3 }, 'A -> B')).toBeTrue();
     expect(scenarioProtectionCandidateIsCoachWorthy({ ...row, actionType: 'SUBSTITUTION', avgOpponentXgDelta: -0.04, avgOpponentShotsDelta: -0.2 }, 'A -> B')).toBeFalse();
+  });
+
+  it('builds scenario decision cards from summary rows', () => {
+    const baseRow = {
+      scenario: 'base-noop',
+      actionType: 'NOOP_REPLAY',
+      actionDetail: 'baseline',
+      avgUserXgDelta: 0,
+      avgOpponentXgDelta: 0,
+      avgUserShotsDelta: 0,
+      avgOpponentShotsDelta: 0,
+    } as ScenarioMatrixSummaryRow;
+    const rows = [
+      baseRow,
+      { ...baseRow, scenario: 'm45-wide', actionType: 'POSITION', actionDetail: 'wide', avgUserXgDelta: 0.08, avgOpponentXgDelta: -0.05 },
+      { ...baseRow, scenario: 'm45-central', actionType: 'FORMATION', actionDetail: '4-3-3', avgUserXgDelta: 0.10, avgOpponentXgDelta: 0.02 },
+      { ...baseRow, scenario: 'm45-risk', actionType: 'STYLE', actionDetail: 'risky', avgUserXgDelta: 0.03, avgOpponentXgDelta: 0.12 },
+      { ...baseRow, scenario: 'm45-opponent-wide', actionType: 'OPPONENT_STYLE', actionDetail: 'wide-rival', avgOpponentXgDelta: 0.06 },
+    ] as ScenarioMatrixSummaryRow[];
+    const fmt = (value: number) => `${value >= 0 ? '+' : ''}${value.toFixed(2)}`;
+    const cards = buildScenarioDecisionCardsFromSummary(rows, {
+      actionKey: (row) => `${row.actionType}:${row.actionDetail || row.scenario}`,
+      attackCandidateIsCoachWorthy: (row) => row.avgUserXgDelta >= 0.06,
+      attackPlanScore: (row) => row.avgUserXgDelta,
+      cardFromRow: (title, row, className, detail) => ({
+        title,
+        label: row.actionDetail || row.scenario,
+        metrics: `${fmt(row.avgUserXgDelta)} / ${fmt(row.avgOpponentXgDelta)}`,
+        detail,
+        className,
+      }),
+      isOpponentRow: (row) => row.scenario.startsWith('m45-opponent-') || row.actionType === 'OPPONENT_STYLE',
+      opponentMaxChannelXgDelta: (row) => row.avgOpponentXgDelta,
+      opponentMinChannelXgDelta: (row) => row.avgOpponentXgDelta,
+      opponentProtectionRead: (row) => `protege ${row.actionDetail}`,
+      opponentRiskRead: (row) => `riesgo ${row.actionDetail}`,
+      protectionCandidateIsCoachWorthy: () => false,
+      summaryActionLabel: (row) => row.actionDetail || 'Baseline',
+      summaryCoachRead: (row) => `coach ${row.actionDetail}`,
+      userChannelRead: (row) => `canal ${row.actionDetail}`,
+      twoWayScore: (row) => Math.max(0, row.avgUserXgDelta) + Math.max(0, -row.avgOpponentXgDelta),
+      formatDeltaNumber: fmt,
+    });
+
+    expect(cards.map((card) => card.title)).toEqual(['Plan actual', 'Doble ganancia', 'Atacar', 'Riesgo ofensivo', 'Amenaza rival']);
+    expect(cards[0]).toEqual({
+      title: 'Plan actual',
+      label: 'baseline',
+      metrics: 'xG +0.00 / xGA +0.00',
+      detail: 'coach baseline',
+      className: 'decision-neutral',
+    });
+    expect(cards[1].detail).toBe('canal wide / protege wide');
+    expect(cards[3].detail).toBe('canal risky / riesgo risky');
+    expect(cards[4].detail).toBe('riesgo wide-rival');
   });
 
   it('scores scenario summary impact from the largest normalized signal', () => {
