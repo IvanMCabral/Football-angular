@@ -170,6 +170,11 @@ import {
   styleLabelFromActionDetail as getStyleLabelFromActionDetail,
 } from './test-harness-scenario-battery-utils';
 import {
+  backFiveFamilyClass as getBackFiveFamilyClass,
+  lowBlockLabClass as getLowBlockLabClass,
+  lowBlockLabRead as getLowBlockLabRead,
+} from './tactical-lab-read-utils';
+import {
   playerSwapHasLargeQualityDrop as hasLargePlayerSwapQualityDrop,
   playerSwapOverallDelta as getPlayerSwapOverallDelta,
   playerSwapOverallDeltaText as getPlayerSwapOverallDeltaText,
@@ -7901,30 +7906,14 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     deltaShotsAgainst: number,
     deltaPossessionFor: number
   ): string {
-    if (variant === 'base') return 'Referencia';
-    if (variant === 'high') {
-      if (deltaXgFor > 0.03 && (deltaXgAgainst > 0.02 || deltaShotsAgainst > 0.20)) {
-        return 'Mas salida, mas riesgo';
-      }
-      if (deltaXgFor > 0.03) return 'Mas salida';
-      return 'Revisar salida';
-    }
-    if (deltaXgAgainst < -0.02 || deltaShotsAgainst < -0.20) return 'Mas bloque';
-    if (deltaPossessionFor < -0.75 && (deltaXgAgainst > 0.02 || deltaShotsAgainst > 0.20)) {
-      return 'Demasiado hundido';
-    }
-    return 'Bloque similar';
+    return getLowBlockLabRead(variant, deltaXgFor, deltaXgAgainst, deltaShotsAgainst, deltaPossessionFor);
   }
   private lowBlockLabClass(
     variant: LowBlockLabRow['variant'],
     deltaXgAgainst: number,
     deltaShotsAgainst: number
   ): string {
-    if (variant === 'base') return 'read-check';
-    if (variant === 'low') {
-      return deltaXgAgainst < -0.02 || deltaShotsAgainst < -0.20 ? 'read-strong' : 'read-visible';
-    }
-    return deltaXgAgainst > 0.02 || deltaShotsAgainst > 0.20 ? 'read-visible' : 'read-check';
+    return getLowBlockLabClass(variant, deltaXgAgainst, deltaShotsAgainst);
   }
   private buildBackFiveTransitionLabRows(items: Array<{
     variant: { variant: BackFiveTransitionLabRow['variant']; label: string; y: number };
@@ -8218,9 +8207,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     deltaWideShotsFor: number,
     deltaWideShotsAgainst: number
   ): string {
-    if (key === 'transition') return 'read-check';
-    if (key === 'low-block') return deltaXgAgainst < -0.03 ? 'read-strong' : 'read-visible';
-    return deltaXgFor > 0.03 || deltaWideShotsFor > 0.20 || deltaWideShotsAgainst > 0.15 ? 'read-visible' : 'read-check';
+    return getBackFiveFamilyClass(key, deltaXgFor, deltaXgAgainst, deltaWideShotsFor, deltaWideShotsAgainst);
   }
   private countCustomMovableSlots(lineup: LineupDTO): number {
     const playerPositionById = new Map((lineup.players ?? []).map((player) => [
