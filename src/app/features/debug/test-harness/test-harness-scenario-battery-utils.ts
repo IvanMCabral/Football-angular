@@ -2,6 +2,7 @@ import {
   ControlledTeamSide,
   ScenarioBatteryCoachAdvice,
   ScenarioBatteryCoachObjective,
+  ScenarioBatteryCoachObjectiveModel,
   ScenarioBatteryReviewItem,
   ScenarioBatteryRow,
   ScenarioDecisionCard,
@@ -39,6 +40,83 @@ export function scenarioBatteryCoachObjectiveLabel(objective: ScenarioBatteryCoa
       return 'Cuidar resultado';
     default:
       return 'Neutral';
+  }
+}
+
+export function scenarioBatteryScopeHint(scope: 'quick' | 'balanced', available: number, limit: number): string {
+  const suffix = available < limit
+    ? ` Hoy hay ${available}/${limit} partidos completados disponibles.`
+    : ` ${available}/${limit} partidos disponibles.`;
+  return scope === 'balanced'
+    ? `Media: hasta 4 partidos x Local/Visitante.${suffix}`
+    : `Rápida: hasta 2 partidos x Local/Visitante.${suffix}`;
+}
+
+export function scenarioBatteryCoachObjectiveHint(model: ScenarioBatteryCoachObjectiveModel, autoHint: string): string {
+  switch (model) {
+    case 'AUTO':
+      return autoHint;
+    case 'NEED_GOAL':
+      return 'Prioriza upside ofensivo aunque abra espacios.';
+    case 'PROTECT_RESULT':
+      return 'Prioriza bajar riesgo y evitar intercambios.';
+    default:
+      return 'Lectura equilibrada para partido abierto.';
+  }
+}
+
+export function scenarioBatteryGroupHint(group: 'ALL' | 'OFFENSE' | 'DEFENSE' | 'OPPONENT'): string {
+  switch (group) {
+    case 'ALL':
+      return 'Todo: ataque, defensa y lectura del rival.';
+    case 'DEFENSE':
+      return 'Defensa: mide protección, riesgos y cierres.';
+    case 'OPPONENT':
+      return 'Rival: mide por donde nos puede atacar.';
+    default:
+      return 'Ataque: mide canales, forma y riesgo ofensivo.';
+  }
+}
+
+export function scenarioBatteryCoverageHint(
+  scope: 'quick' | 'balanced',
+  readings: number,
+  seeds: number,
+  availableMatches: number,
+  targetMatches: number
+): string {
+  const coverage = readings > 0 ? `${readings} lecturas x ${seeds} seeds` : `${seeds} seeds`;
+  if (scope === 'balanced' && availableMatches < targetMatches) {
+    return `Cobertura limitada: ${coverage}; faltan partidos completados para decidir tendencias.`;
+  }
+  return scope === 'balanced'
+    ? `Cobertura media: ${coverage}; usar para decidir tendencias.`
+    : `Cobertura smoke: ${coverage}; usar para detectar señales, no para cerrar balance.`;
+}
+
+export function scenarioBatteryProgressText(
+  completed: number,
+  total: number,
+  availableMatches: number,
+  targetMatches: number,
+  nextJob: { match: TestHarnessMatchRow; controlledSide: ScenarioBatteryControlledSide } | null | undefined
+): string {
+  const next = nextJob
+    ? ` Próximo: ${nextJob.match.homeTeamName} vs ${nextJob.match.awayTeamName} (${nextJob.controlledSide === 'HOME' ? 'local' : 'visitante'}).`
+    : ' Cerrando tablero...';
+  return `Tablero batería: ${completed}/${total} lecturas (${availableMatches}/${targetMatches} partidos).${next}`;
+}
+
+export function scenarioBatteryScenarioCountEstimate(group: 'ALL' | 'OFFENSE' | 'DEFENSE' | 'OPPONENT'): number {
+  switch (group) {
+    case 'ALL':
+      return 29;
+    case 'DEFENSE':
+      return 7;
+    case 'OPPONENT':
+      return 5;
+    default:
+      return 19;
   }
 }
 

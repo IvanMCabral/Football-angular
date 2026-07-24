@@ -9,6 +9,7 @@ import {
   scenarioBatteryCardSummary,
   scenarioBatteryCoachAdvice,
   scenarioBatteryCoachContext,
+  scenarioBatteryCoachObjectiveHint,
   scenarioBatteryDecision,
   scenarioBatteryDecisionMinute,
   scenarioBatteryDecisionReview,
@@ -17,12 +18,17 @@ import {
   scenarioBatteryExportRow,
   scenarioBatteryGoalDiff,
   scenarioBatteryGroupLabel,
+  scenarioBatteryGroupHint,
+  scenarioBatteryCoverageHint,
   scenarioBatteryMatchStateText,
   scenarioBatteryMetricText,
   scenarioBatteryReviewHint,
   scenarioBatteryReviewItems,
   scenarioBatteryRiskCardDetail,
   scenarioBatteryRiskCardSummary,
+  scenarioBatteryProgressText,
+  scenarioBatteryScenarioCountEstimate,
+  scenarioBatteryScopeHint,
   scenarioBatterySquadText,
   scenarioBatteryTeamCondition,
   scenarioBatteryTeamRating,
@@ -355,6 +361,28 @@ describe('test-harness-scenario-battery-utils', () => {
       why: '1/2 lecturas coherentes; confirmar con Multi-seed antes de tocar motor.',
       next: 'Bloque bajo. Confirmar con Multi-seed.',
     });
+  });
+
+  it('builds scenario battery hints, coverage and progress text', () => {
+    expect(scenarioBatteryScopeHint('quick', 1, 2)).toBe('Rápida: hasta 2 partidos x Local/Visitante. Hoy hay 1/2 partidos completados disponibles.');
+    expect(scenarioBatteryScopeHint('balanced', 4, 4)).toBe('Media: hasta 4 partidos x Local/Visitante. 4/4 partidos disponibles.');
+    expect(scenarioBatteryCoachObjectiveHint('AUTO', 'auto read')).toBe('auto read');
+    expect(scenarioBatteryCoachObjectiveHint('NEED_GOAL', 'auto read')).toBe('Prioriza upside ofensivo aunque abra espacios.');
+    expect(scenarioBatteryCoachObjectiveHint('PROTECT_RESULT', 'auto read')).toBe('Prioriza bajar riesgo y evitar intercambios.');
+    expect(scenarioBatteryCoachObjectiveHint('NEUTRAL', 'auto read')).toBe('Lectura equilibrada para partido abierto.');
+    expect(scenarioBatteryGroupHint('ALL')).toBe('Todo: ataque, defensa y lectura del rival.');
+    expect(scenarioBatteryGroupHint('DEFENSE')).toBe('Defensa: mide protección, riesgos y cierres.');
+    expect(scenarioBatteryGroupHint('OPPONENT')).toBe('Rival: mide por donde nos puede atacar.');
+    expect(scenarioBatteryGroupHint('OFFENSE')).toBe('Ataque: mide canales, forma y riesgo ofensivo.');
+    expect(scenarioBatteryCoverageHint('balanced', 0, 5, 1, 4)).toBe('Cobertura limitada: 5 seeds; faltan partidos completados para decidir tendencias.');
+    expect(scenarioBatteryCoverageHint('balanced', 8, 5, 4, 4)).toBe('Cobertura media: 8 lecturas x 5 seeds; usar para decidir tendencias.');
+    expect(scenarioBatteryCoverageHint('quick', 2, 3, 2, 2)).toBe('Cobertura smoke: 2 lecturas x 3 seeds; usar para detectar señales, no para cerrar balance.');
+    expect(scenarioBatteryProgressText(1, 4, 2, 2, { match: matchRow(), controlledSide: 'AWAY' })).toBe('Tablero batería: 1/4 lecturas (2/2 partidos). Próximo: Real Madrid vs Las Palmas (visitante).');
+    expect(scenarioBatteryProgressText(4, 4, 2, 2, null)).toBe('Tablero batería: 4/4 lecturas (2/2 partidos). Cerrando tablero...');
+    expect(scenarioBatteryScenarioCountEstimate('ALL')).toBe(29);
+    expect(scenarioBatteryScenarioCountEstimate('DEFENSE')).toBe(7);
+    expect(scenarioBatteryScenarioCountEstimate('OPPONENT')).toBe(5);
+    expect(scenarioBatteryScenarioCountEstimate('OFFENSE')).toBe(19);
   });
 
   it('reads scenario battery coach context from match state and squad strength', () => {

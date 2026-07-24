@@ -165,12 +165,15 @@ import {
   scenarioBatteryCardSummary as getScenarioBatteryCardSummary,
   scenarioBatteryCoachContext as getScenarioBatteryCoachContext,
   scenarioBatteryCoachAdvice as getScenarioBatteryCoachAdvice,
+  scenarioBatteryCoachObjectiveHint as getScenarioBatteryCoachObjectiveHint,
   scenarioBatteryDecision as getScenarioBatteryDecision,
   scenarioBatteryDecisionMinute as getScenarioBatteryDecisionMinute,
   scenarioBatteryDecisionReview as getScenarioBatteryDecisionReview,
   scenarioBatteryCoachObjectiveLabel as getScenarioBatteryCoachObjectiveLabel,
   scenarioBatteryExportRow as getScenarioBatteryExportRow,
+  scenarioBatteryCoverageHint as getScenarioBatteryCoverageHint,
   scenarioBatteryContextPressure as getScenarioBatteryContextPressure,
+  scenarioBatteryGroupHint as getScenarioBatteryGroupHint,
   scenarioBatteryGroupLabel as getScenarioBatteryGroupLabel,
   scenarioBatteryGoalDiff as getScenarioBatteryGoalDiff,
   scenarioBatteryMatchStateText as getScenarioBatteryMatchStateText,
@@ -180,6 +183,9 @@ import {
   scenarioBatteryReviewItems as getScenarioBatteryReviewItems,
   scenarioBatteryRiskCardDetail as getScenarioBatteryRiskCardDetail,
   scenarioBatteryRiskCardSummary as getScenarioBatteryRiskCardSummary,
+  scenarioBatteryProgressText as getScenarioBatteryProgressText,
+  scenarioBatteryScenarioCountEstimate as getScenarioBatteryScenarioCountEstimate,
+  scenarioBatteryScopeHint as getScenarioBatteryScopeHint,
   scenarioBatterySquadText as getScenarioBatterySquadText,
   scenarioBatteryTeamCondition as getScenarioBatteryTeamCondition,
   scenarioBatteryTeamRating as getScenarioBatteryTeamRating,
@@ -11902,26 +11908,17 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return 'Audita el lineup editable de Mi equipo.';
   }
   scenarioBatteryScopeHint(): string {
-    const available = this.scenarioBatteryCandidateMatches().length;
-    const limit = this.scenarioBatteryMatchLimit();
-    const suffix = available < limit
-      ? ` Hoy hay ${available}/${limit} partidos completados disponibles.`
-      : ` ${available}/${limit} partidos disponibles.`;
-    return this.scenarioBatteryScopeModel === 'balanced'
-      ? `Media: hasta 4 partidos x Local/Visitante.${suffix}`
-      : `Rápida: hasta 2 partidos x Local/Visitante.${suffix}`;
+    return getScenarioBatteryScopeHint(
+      this.scenarioBatteryScopeModel,
+      this.scenarioBatteryCandidateMatches().length,
+      this.scenarioBatteryMatchLimit()
+    );
   }
   scenarioBatteryCoachObjectiveHint(): string {
-    switch (this.scenarioBatteryCoachObjectiveModel) {
-      case 'AUTO':
-        return this.scenarioBatteryAutoObjectiveHint();
-      case 'NEED_GOAL':
-        return 'Prioriza upside ofensivo aunque abra espacios.';
-      case 'PROTECT_RESULT':
-        return 'Prioriza bajar riesgo y evitar intercambios.';
-      default:
-        return 'Lectura equilibrada para partido abierto.';
-    }
+    return getScenarioBatteryCoachObjectiveHint(
+      this.scenarioBatteryCoachObjectiveModel,
+      this.scenarioBatteryAutoObjectiveHint()
+    );
   }
   private scenarioBatteryAutoObjectiveHint(): string {
     const match = this.selectedMatch();
@@ -12009,29 +12006,16 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return getScenarioBatteryCoachObjectiveLabel(objective);
   }
   scenarioBatteryGroupHint(): string {
-    switch (this.scenarioBatteryGroupModel) {
-      case 'ALL':
-        return 'Todo: ataque, defensa y lectura del rival.';
-      case 'DEFENSE':
-        return 'Defensa: mide protección, riesgos y cierres.';
-      case 'OPPONENT':
-        return 'Rival: mide por donde nos puede atacar.';
-      default:
-        return 'Ataque: mide canales, forma y riesgo ofensivo.';
-    }
+    return getScenarioBatteryGroupHint(this.scenarioBatteryGroupModel);
   }
   scenarioBatteryCoverageHint(): string {
-    const readings = this.scenarioBatteryRows().length;
-    const seeds = this.scenarioMatrixSmokeSeedCount();
-    const coverage = readings > 0 ? `${readings} lecturas x ${seeds} seeds` : `${seeds} seeds`;
-    const availableMatches = this.scenarioBatteryCandidateMatches().length;
-    const targetMatches = this.scenarioBatteryMatchLimit();
-    if (this.scenarioBatteryScopeModel === 'balanced' && availableMatches < targetMatches) {
-      return `Cobertura limitada: ${coverage}; faltan partidos completados para decidir tendencias.`;
-    }
-    return this.scenarioBatteryScopeModel === 'balanced'
-      ? `Cobertura media: ${coverage}; usar para decidir tendencias.`
-      : `Cobertura smoke: ${coverage}; usar para detectar señales, no para cerrar balance.`;
+    return getScenarioBatteryCoverageHint(
+      this.scenarioBatteryScopeModel,
+      this.scenarioBatteryRows().length,
+      this.scenarioMatrixSmokeSeedCount(),
+      this.scenarioBatteryCandidateMatches().length,
+      this.scenarioBatteryMatchLimit()
+    );
   }
   scenarioBatteryReviewCount(): number {
     return getScenarioBatteryReviewCount(this.scenarioBatteryRows());
@@ -15361,22 +15345,10 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     targetMatches: number,
     nextJob: { match: TestHarnessMatchRow; controlledSide: 'HOME' | 'AWAY' } | null | undefined
   ): string {
-    const next = nextJob
-      ? ` Próximo: ${nextJob.match.homeTeamName} vs ${nextJob.match.awayTeamName} (${nextJob.controlledSide === 'HOME' ? 'local' : 'visitante'}).`
-      : ' Cerrando tablero...';
-    return `Tablero batería: ${completed}/${total} lecturas (${availableMatches}/${targetMatches} partidos).${next}`;
+    return getScenarioBatteryProgressText(completed, total, availableMatches, targetMatches, nextJob);
   }
   private scenarioBatteryScenarioCountEstimate(group: 'ALL' | 'OFFENSE' | 'DEFENSE' | 'OPPONENT'): number {
-    switch (group) {
-      case 'ALL':
-        return 29;
-      case 'DEFENSE':
-        return 7;
-      case 'OPPONENT':
-        return 5;
-      default:
-        return 19;
-    }
+    return getScenarioBatteryScenarioCountEstimate(group);
   }
   private scheduleRoundCompletionRefresh(roundNumber: number, expectedMatchCount: number): void {
     this.clearRoundRefreshTimers();
