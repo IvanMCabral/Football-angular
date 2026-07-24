@@ -1690,9 +1690,9 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
   }
 
   private mapFixtureStatus(fixtureStatus: string): 'SCHEDULED' | 'SIMULATED' | 'CANCELLED' {
-    // also accept live state statuses (NOT_STARTED /
-    // RUNNING / PAUSED / FINISHED) so SSE-drel usuario updates of rm.match.status
-    // correctly flip SCHEDULED  ->  SIMULATED when the match ends.
+    // Also accept live state statuses (NOT_STARTED / RUNNING / PAUSED /
+    // FINISHED), so SSE updates of rm.match.status correctly flip SCHEDULED
+    // to SIMULATED when the match ends.
     switch (fixtureStatus) {
       case 'PENDING': case 'SIMULATING':
       case 'NOT_STARTED': case 'RUNNING': case 'PAUSED':
