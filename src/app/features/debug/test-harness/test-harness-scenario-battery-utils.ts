@@ -438,6 +438,60 @@ export function scenarioSummaryCoachRead(
   return `${prefix}: ${userChannel} / ${opponentChannel}`;
 }
 
+export function scenarioSummaryOutcomeReason(
+  row: ScenarioMatrixSummaryRow,
+  isFormationNoop: boolean,
+  attackGainScore: number,
+  attackLossScore: number,
+  defensiveGainScore: number,
+  defensiveRiskScore: number
+): string {
+  if (isFormationNoop) {
+    return `Misma formación que la base: ${row.baselineFormation || '?'} = ${row.changedFormation || row.actionDetail || '?'}`;
+  }
+  return [
+    `attack gain ${attackGainScore.toFixed(2)}`,
+    `attack loss ${attackLossScore.toFixed(2)}`,
+    `defensive gain ${defensiveGainScore.toFixed(2)}`,
+    `defensive risk ${defensiveRiskScore.toFixed(2)}`,
+  ].join(' ? ');
+}
+
+export function scenarioSummaryCoachReadDetail(
+  coachRead: string,
+  userChannelRead: string,
+  opponentChannelRead: string,
+  userXgDelta: string,
+  opponentXgDelta: string,
+  userShotsDelta: string,
+  opponentShotsDelta: string,
+  opponentLeftWideXgDelta: string,
+  opponentRightWideXgDelta: string
+): string {
+  return [
+    coachRead,
+    `usuario: ${userChannelRead}`,
+    `rival: ${opponentChannelRead}`,
+    `xG ${userXgDelta} / xGA ${opponentXgDelta}`,
+    `shots ${userShotsDelta} / ag ${opponentShotsDelta}`,
+    `wide L/R rival xG ${opponentLeftWideXgDelta} / ${opponentRightWideXgDelta}`,
+  ].join(' ? ');
+}
+
+export function scenarioSummaryRecommendationDetail(
+  recommendation: string,
+  read: string,
+  outcome: string,
+  coachReadDetail: string
+): string {
+  return [
+    recommendation,
+    `lectura: ${read}`,
+    `resultado: ${outcome}`,
+    coachReadDetail,
+  ].join(' ? ');
+}
+
 export function scenarioSummaryFormationLabel(row: ScenarioMatrixSummaryRow): string {
   const base = row.baselineFormation || '';
   const changed = row.changedFormation || (row.actionType === 'FORMATION' ? row.actionDetail : '');

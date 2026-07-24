@@ -13,6 +13,7 @@ import {
   scenarioSummaryAttackGainScore,
   scenarioSummaryAttackLossScore,
   scenarioSummaryCoachRead,
+  scenarioSummaryCoachReadDetail,
   scenarioSummaryCoachReadPrefix,
   scenarioSummaryCoherentSubstitutionSignal,
   scenarioDecisionConfidenceFromReadLevel,
@@ -28,8 +29,10 @@ import {
   scenarioSummaryOpponentChannelRead,
   scenarioSummaryOutcome,
   scenarioSummaryOutcomeClass,
+  scenarioSummaryOutcomeReason,
   scenarioSummaryOutcomeSummaryFromOutcomes,
   scenarioSummaryRecommendationClass,
+  scenarioSummaryRecommendationDetail,
   scenarioSummaryRecommendationFromOutcome,
   scenarioSummaryUserChannelRead,
   scenarioTwoWayScore,
@@ -210,6 +213,39 @@ describe('test-harness-scenario-battery-utils', () => {
     expect(scenarioSummaryCoachRead({ ...base, avgOpponentRightWideXgDelta: 0.08 }, false, 'visible', 'sin canal claro', 'rival entra más por banda derecha', 'rival')).toBe('rival: rival cambia canal rival entra más por banda derecha');
     expect(scenarioSummaryCoachRead({ ...base, avgOpponentXgDelta: -0.05 }, false, 'visible', 'sin canal claro', 'rival contenido por bandas', 'rival')).toBe('rival: rival contenido rival contenido por bandas');
     expect(scenarioSummaryCoachRead(base, false, 'visible', 'sin canal claro', 'sin riesgo claro', 'rival')).toBe('rival: sin riesgo claro');
+  });
+
+  it('builds scenario summary detail tooltips', () => {
+    const base = {
+      scenario: 'm45-wide',
+      baselineFormation: '4-4-2',
+      changedFormation: '4-4-2',
+      actionDetail: '4-4-2',
+    } as ScenarioMatrixSummaryRow;
+
+    expect(scenarioSummaryOutcomeReason(base, true, 1.2, 0.4, 0.8, 0.3)).toBe('Misma formación que la base: 4-4-2 = 4-4-2');
+    expect(scenarioSummaryOutcomeReason(base, false, 1.234, 0.456, 0.789, 1.111)).toBe('attack gain 1.23 ? attack loss 0.46 ? defensive gain 0.79 ? defensive risk 1.11');
+    expect(
+      scenarioSummaryCoachReadDetail(
+        'forma: gana ataque más peligro por centro',
+        'más peligro por centro',
+        'rival entra más por bandas',
+        '+0.09',
+        '+0.04',
+        '+1.20',
+        '+0.50',
+        '+0.02',
+        '+0.03'
+      )
+    ).toBe('forma: gana ataque más peligro por centro ? usuario: más peligro por centro ? rival: rival entra más por bandas ? xG +0.09 / xGA +0.04 ? shots +1.20 / ag +0.50 ? wide L/R rival xG +0.02 / +0.03');
+    expect(
+      scenarioSummaryRecommendationDetail(
+        'Usar como plan A',
+        'Strong',
+        'Upgrade',
+        'forma: gana ataque más peligro por centro'
+      )
+    ).toBe('Usar como plan A ? lectura: Strong ? resultado: Upgrade ? forma: gana ataque más peligro por centro');
   });
 
   it('maps scenario summary recommendations from outcome context', () => {

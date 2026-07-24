@@ -170,6 +170,7 @@ import {
   scenarioSummaryAttackGainScore as getScenarioSummaryAttackGainScore,
   scenarioSummaryAttackLossScore as getScenarioSummaryAttackLossScore,
   scenarioSummaryCoachRead as getScenarioSummaryCoachRead,
+  scenarioSummaryCoachReadDetail as getScenarioSummaryCoachReadDetail,
   scenarioSummaryCoachReadPrefix as getScenarioSummaryCoachReadPrefix,
   scenarioSummaryCoherentSubstitutionSignal as getScenarioSummaryCoherentSubstitutionSignal,
   scenarioDecisionConfidenceFromReadLevel as getScenarioDecisionConfidenceFromReadLevel,
@@ -185,8 +186,10 @@ import {
   scenarioSummaryOpponentChannelRead as getScenarioSummaryOpponentChannelRead,
   scenarioSummaryOutcome as getScenarioSummaryOutcome,
   scenarioSummaryOutcomeClass as getScenarioSummaryOutcomeClass,
+  scenarioSummaryOutcomeReason as getScenarioSummaryOutcomeReason,
   scenarioSummaryOutcomeSummaryFromOutcomes as getScenarioSummaryOutcomeSummaryFromOutcomes,
   scenarioSummaryRecommendationClass as getScenarioSummaryRecommendationClass,
+  scenarioSummaryRecommendationDetail as getScenarioSummaryRecommendationDetail,
   scenarioSummaryRecommendationFromOutcome as getScenarioSummaryRecommendationFromOutcome,
   scenarioSummaryUserChannelRead as getScenarioSummaryUserChannelRead,
   scenarioTwoWayScore as getScenarioTwoWayScore,
@@ -12378,15 +12381,14 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return getScenarioSummaryOutcomeClass(this.scenarioSummaryOutcome(row));
   }
   scenarioSummaryOutcomeReason(row: ScenarioMatrixSummaryRow): string {
-    if (this.scenarioSummaryIsFormationNoop(row)) {
-      return `Misma formación que la base: ${row.baselineFormation || '?'} = ${row.changedFormation || row.actionDetail || '?'}`;
-    }
-    return [
-      `attack gain ${this.scenarioSummaryAttackGainScore(row).toFixed(2)}`,
-      `attack loss ${this.scenarioSummaryAttackLossScore(row).toFixed(2)}`,
-      `defensive gain ${this.scenarioSummaryDefensiveGainScore(row).toFixed(2)}`,
-      `defensive risk ${this.scenarioSummaryDefensiveRiskScore(row).toFixed(2)}`,
-    ].join(' ? ');
+    return getScenarioSummaryOutcomeReason(
+      row,
+      this.scenarioSummaryIsFormationNoop(row),
+      this.scenarioSummaryAttackGainScore(row),
+      this.scenarioSummaryAttackLossScore(row),
+      this.scenarioSummaryDefensiveGainScore(row),
+      this.scenarioSummaryDefensiveRiskScore(row)
+    );
   }
   scenarioSummaryCoachRead(row: ScenarioMatrixSummaryRow): string {
     return getScenarioSummaryCoachRead(
@@ -12405,14 +12407,17 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return getScenarioSummaryIsShapeAction(actionDetail);
   }
   scenarioSummaryCoachReadDetail(row: ScenarioMatrixSummaryRow): string {
-    return [
+    return getScenarioSummaryCoachReadDetail(
       this.scenarioSummaryCoachRead(row),
-      `usuario: ${this.scenarioSummaryUserChannelRead(row)}`,
-      `rival: ${this.scenarioSummaryOpponentChannelRead(row)}`,
-      `xG ${this.fmtDeltaNumber(row.avgUserXgDelta)} / xGA ${this.fmtDeltaNumber(row.avgOpponentXgDelta)}`,
-      `shots ${this.fmtDeltaNumber(row.avgUserShotsDelta)} / ag ${this.fmtDeltaNumber(row.avgOpponentShotsDelta)}`,
-      `wide L/R rival xG ${this.fmtDeltaNumber(row.avgOpponentLeftWideXgDelta)} / ${this.fmtDeltaNumber(row.avgOpponentRightWideXgDelta)}`,
-    ].join(' ? ');
+      this.scenarioSummaryUserChannelRead(row),
+      this.scenarioSummaryOpponentChannelRead(row),
+      this.fmtDeltaNumber(row.avgUserXgDelta),
+      this.fmtDeltaNumber(row.avgOpponentXgDelta),
+      this.fmtDeltaNumber(row.avgUserShotsDelta),
+      this.fmtDeltaNumber(row.avgOpponentShotsDelta),
+      this.fmtDeltaNumber(row.avgOpponentLeftWideXgDelta),
+      this.fmtDeltaNumber(row.avgOpponentRightWideXgDelta)
+    );
   }
   scenarioSummaryRecommendation(row: ScenarioMatrixSummaryRow): string {
     return getScenarioSummaryRecommendationFromOutcome(
@@ -12426,12 +12431,12 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return getScenarioSummaryRecommendationClass(this.scenarioSummaryRecommendation(row));
   }
   scenarioSummaryRecommendationDetail(row: ScenarioMatrixSummaryRow): string {
-    return [
+    return getScenarioSummaryRecommendationDetail(
       this.scenarioSummaryRecommendation(row),
-      `lectura: ${this.scenarioSummaryRead(row)}`,
-      `resultado: ${this.scenarioSummaryOutcome(row)}`,
-      this.scenarioSummaryCoachReadDetail(row),
-    ].join(' ? ');
+      this.scenarioSummaryRead(row),
+      this.scenarioSummaryOutcome(row),
+      this.scenarioSummaryCoachReadDetail(row)
+    );
   }
   private scenarioDecisionCardFromRow(
     title: string,
