@@ -267,6 +267,55 @@ export function scenarioDecisionConfidenceFromReadLevel(level: string): string {
   return 'marginal';
 }
 
+export function scenarioSummaryImpactScore(row: ScenarioMatrixSummaryRow): number {
+  const userXg = Math.abs(row.avgUserXgDelta) / 0.12;
+  const opponentXg = Math.abs(row.avgOpponentXgDelta) / 0.10;
+  const userShots = Math.abs(row.avgUserShotsDelta) / 2.0;
+  const opponentShots = Math.abs(row.avgOpponentShotsDelta) / 2.0;
+  const possession = Math.abs(row.avgUserPossessionDelta) / 2.0;
+  const zoneShift = (
+    Math.abs(row.avgUserCentralDelta)
+    + Math.abs(row.avgUserWideDelta)
+    + Math.abs(row.avgOpponentCentralDelta)
+    + Math.abs(row.avgOpponentWideDelta)
+  ) / 5.0;
+  const channelXg = (
+    Math.abs(row.avgOpponentCentralXgDelta)
+    + Math.abs(row.avgOpponentWideXgDelta)
+    + Math.abs(row.avgOpponentLeftWideXgDelta)
+    + Math.abs(row.avgOpponentRightWideXgDelta)
+  ) / 0.16;
+  return Math.max(userXg, opponentXg, userShots, opponentShots, possession, zoneShift, channelXg);
+}
+
+export function scenarioSummaryAttackGainScore(row: ScenarioMatrixSummaryRow): number {
+  return Math.max(0, row.avgUserXgDelta) / 0.08
+    + Math.max(0, row.avgUserShotsDelta) / 1.5
+    + Math.max(0, row.avgUserPossessionDelta) / 3.0
+    + Math.max(0, row.avgUserCentralDelta + row.avgUserWideDelta) / 3.0;
+}
+
+export function scenarioSummaryAttackLossScore(row: ScenarioMatrixSummaryRow): number {
+  return Math.max(0, -row.avgUserXgDelta) / 0.08
+    + Math.max(0, -row.avgUserShotsDelta) / 1.5
+    + Math.max(0, -row.avgUserPossessionDelta) / 3.0
+    + Math.max(0, -(row.avgUserCentralDelta + row.avgUserWideDelta)) / 3.0;
+}
+
+export function scenarioSummaryDefensiveGainScore(row: ScenarioMatrixSummaryRow): number {
+  return Math.max(0, -row.avgOpponentXgDelta) / 0.08
+    + Math.max(0, -row.avgOpponentShotsDelta) / 1.5
+    + Math.max(0, -(row.avgOpponentCentralDelta + row.avgOpponentWideDelta)) / 3.0
+    + Math.max(0, -(row.avgOpponentCentralXgDelta + row.avgOpponentWideXgDelta)) / 0.12;
+}
+
+export function scenarioSummaryDefensiveRiskScore(row: ScenarioMatrixSummaryRow): number {
+  return Math.max(0, row.avgOpponentXgDelta) / 0.08
+    + Math.max(0, row.avgOpponentShotsDelta) / 1.5
+    + Math.max(0, row.avgOpponentCentralDelta + row.avgOpponentWideDelta) / 3.0
+    + Math.max(0, row.avgOpponentCentralXgDelta + row.avgOpponentWideXgDelta) / 0.12;
+}
+
 export function scenarioSummaryFormationLabel(row: ScenarioMatrixSummaryRow): string {
   const base = row.baselineFormation || '';
   const changed = row.changedFormation || (row.actionType === 'FORMATION' ? row.actionDetail : '');

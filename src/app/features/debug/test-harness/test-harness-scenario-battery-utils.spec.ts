@@ -10,10 +10,15 @@ import {
   scenarioOpponentRiskRead,
   scenarioShapeActionLabel,
   scenarioSummaryActionLabel,
+  scenarioSummaryAttackGainScore,
+  scenarioSummaryAttackLossScore,
   scenarioSummaryCoachReadPrefix,
   scenarioDecisionConfidenceFromReadLevel,
+  scenarioSummaryDefensiveGainScore,
+  scenarioSummaryDefensiveRiskScore,
   scenarioSummaryFormationHint,
   scenarioSummaryFormationLabel,
+  scenarioSummaryImpactScore,
   scenarioSummaryIsFormationNoop,
   scenarioSummaryIsOpponentRow,
   scenarioSummaryIsShapeAction,
@@ -225,6 +230,68 @@ describe('test-harness-scenario-battery-utils', () => {
     expect(scenarioDecisionConfidenceFromReadLevel('visible')).toBe('media');
     expect(scenarioDecisionConfidenceFromReadLevel('small')).toBe('leve');
     expect(scenarioDecisionConfidenceFromReadLevel('noise')).toBe('marginal');
+  });
+
+  it('scores scenario summary impact from the largest normalized signal', () => {
+    const row = {
+      avgUserXgDelta: 0.06,
+      avgOpponentXgDelta: -0.03,
+      avgUserShotsDelta: 0.4,
+      avgOpponentShotsDelta: -0.2,
+      avgUserPossessionDelta: 0.8,
+      avgUserCentralDelta: 0.5,
+      avgUserWideDelta: -0.4,
+      avgOpponentCentralDelta: 0.3,
+      avgOpponentWideDelta: -0.2,
+      avgOpponentCentralXgDelta: 0.04,
+      avgOpponentWideXgDelta: -0.02,
+      avgOpponentLeftWideXgDelta: 0.03,
+      avgOpponentRightWideXgDelta: -0.01,
+    } as ScenarioMatrixSummaryRow;
+
+    expect(scenarioSummaryImpactScore(row)).toBeCloseTo(0.625, 5);
+  });
+
+  it('scores scenario summary attack and defense directions', () => {
+    const row = {
+      avgUserXgDelta: 0.08,
+      avgUserShotsDelta: 1.5,
+      avgUserPossessionDelta: 3,
+      avgUserCentralDelta: 1,
+      avgUserWideDelta: 2,
+      avgOpponentXgDelta: -0.08,
+      avgOpponentShotsDelta: -1.5,
+      avgOpponentCentralDelta: -1,
+      avgOpponentWideDelta: -2,
+      avgOpponentCentralXgDelta: -0.06,
+      avgOpponentWideXgDelta: -0.06,
+    } as ScenarioMatrixSummaryRow;
+
+    expect(scenarioSummaryAttackGainScore(row)).toBeCloseTo(4, 5);
+    expect(scenarioSummaryAttackLossScore(row)).toBe(0);
+    expect(scenarioSummaryDefensiveGainScore(row)).toBeCloseTo(4, 5);
+    expect(scenarioSummaryDefensiveRiskScore(row)).toBe(0);
+  });
+
+  it('scores scenario summary losses and risks independently', () => {
+    const row = {
+      avgUserXgDelta: -0.08,
+      avgUserShotsDelta: -1.5,
+      avgUserPossessionDelta: -3,
+      avgUserCentralDelta: -1,
+      avgUserWideDelta: -2,
+      avgOpponentXgDelta: 0.08,
+      avgOpponentShotsDelta: 1.5,
+      avgOpponentCentralDelta: 1,
+      avgOpponentWideDelta: 2,
+      avgOpponentCentralXgDelta: 0.06,
+      avgOpponentWideXgDelta: 0.06,
+    } as ScenarioMatrixSummaryRow;
+
+    expect(scenarioSummaryAttackGainScore(row)).toBe(0);
+    expect(scenarioSummaryAttackLossScore(row)).toBeCloseTo(4, 5);
+    expect(scenarioSummaryDefensiveGainScore(row)).toBe(0);
+    expect(scenarioSummaryDefensiveRiskScore(row)).toBeCloseTo(4, 5);
   });
 
   it('reads user attacking channels from xG and shot volume', () => {

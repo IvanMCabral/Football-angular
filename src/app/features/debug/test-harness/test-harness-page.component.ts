@@ -167,10 +167,15 @@ import {
   scenarioOpponentRiskRead as getScenarioOpponentRiskRead,
   scenarioShapeActionLabel as getScenarioShapeActionLabel,
   scenarioSummaryActionLabel as getScenarioSummaryActionLabel,
+  scenarioSummaryAttackGainScore as getScenarioSummaryAttackGainScore,
+  scenarioSummaryAttackLossScore as getScenarioSummaryAttackLossScore,
   scenarioSummaryCoachReadPrefix as getScenarioSummaryCoachReadPrefix,
   scenarioDecisionConfidenceFromReadLevel as getScenarioDecisionConfidenceFromReadLevel,
+  scenarioSummaryDefensiveGainScore as getScenarioSummaryDefensiveGainScore,
+  scenarioSummaryDefensiveRiskScore as getScenarioSummaryDefensiveRiskScore,
   scenarioSummaryFormationHint as getScenarioSummaryFormationHint,
   scenarioSummaryFormationLabel as getScenarioSummaryFormationLabel,
+  scenarioSummaryImpactScore as getScenarioSummaryImpactScore,
   scenarioSummaryIsFormationNoop as getScenarioSummaryIsFormationNoop,
   scenarioSummaryIsOpponentRow as getScenarioSummaryIsOpponentRow,
   scenarioSummaryIsShapeAction as getScenarioSummaryIsShapeAction,
@@ -12882,48 +12887,19 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     };
   }
   private scenarioSummaryImpactScore(row: ScenarioMatrixSummaryRow): number {
-    const userXg = Math.abs(row.avgUserXgDelta) / 0.12;
-    const opponentXg = Math.abs(row.avgOpponentXgDelta) / 0.10;
-    const userShots = Math.abs(row.avgUserShotsDelta) / 2.0;
-    const opponentShots = Math.abs(row.avgOpponentShotsDelta) / 2.0;
-    const possession = Math.abs(row.avgUserPossessionDelta) / 2.0;
-    const zoneShift = (
-      Math.abs(row.avgUserCentralDelta)
-      + Math.abs(row.avgUserWideDelta)
-      + Math.abs(row.avgOpponentCentralDelta)
-      + Math.abs(row.avgOpponentWideDelta)
-    ) / 5.0;
-    const channelXg = (
-      Math.abs(row.avgOpponentCentralXgDelta)
-      + Math.abs(row.avgOpponentWideXgDelta)
-      + Math.abs(row.avgOpponentLeftWideXgDelta)
-      + Math.abs(row.avgOpponentRightWideXgDelta)
-    ) / 0.16;
-    return Math.max(userXg, opponentXg, userShots, opponentShots, possession, zoneShift, channelXg);
+    return getScenarioSummaryImpactScore(row);
   }
   private scenarioSummaryAttackGainScore(row: ScenarioMatrixSummaryRow): number {
-    return Math.max(0, row.avgUserXgDelta) / 0.08
-      + Math.max(0, row.avgUserShotsDelta) / 1.5
-      + Math.max(0, row.avgUserPossessionDelta) / 3.0
-      + Math.max(0, row.avgUserCentralDelta + row.avgUserWideDelta) / 3.0;
+    return getScenarioSummaryAttackGainScore(row);
   }
   private scenarioSummaryAttackLossScore(row: ScenarioMatrixSummaryRow): number {
-    return Math.max(0, -row.avgUserXgDelta) / 0.08
-      + Math.max(0, -row.avgUserShotsDelta) / 1.5
-      + Math.max(0, -row.avgUserPossessionDelta) / 3.0
-      + Math.max(0, -(row.avgUserCentralDelta + row.avgUserWideDelta)) / 3.0;
+    return getScenarioSummaryAttackLossScore(row);
   }
   private scenarioSummaryDefensiveGainScore(row: ScenarioMatrixSummaryRow): number {
-    return Math.max(0, -row.avgOpponentXgDelta) / 0.08
-      + Math.max(0, -row.avgOpponentShotsDelta) / 1.5
-      + Math.max(0, -(row.avgOpponentCentralDelta + row.avgOpponentWideDelta)) / 3.0
-      + Math.max(0, -(row.avgOpponentCentralXgDelta + row.avgOpponentWideXgDelta)) / 0.12;
+    return getScenarioSummaryDefensiveGainScore(row);
   }
   private scenarioSummaryDefensiveRiskScore(row: ScenarioMatrixSummaryRow): number {
-    return Math.max(0, row.avgOpponentXgDelta) / 0.08
-      + Math.max(0, row.avgOpponentShotsDelta) / 1.5
-      + Math.max(0, row.avgOpponentCentralDelta + row.avgOpponentWideDelta) / 3.0
-      + Math.max(0, row.avgOpponentCentralXgDelta + row.avgOpponentWideXgDelta) / 0.12;
+    return getScenarioSummaryDefensiveRiskScore(row);
   }
   private scenarioSummaryNeedsReview(row: ScenarioMatrixSummaryRow): boolean {
     if (row.actionType !== 'SUBSTITUTION') return false;
