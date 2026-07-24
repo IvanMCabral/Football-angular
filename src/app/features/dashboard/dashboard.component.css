@@ -64,9 +64,7 @@
   align-items: stretch;
 }
 
-/* V25D78-C55.2 phase 4 UI (c): prominent user-division card. Spans both
-   columns of the career-actions grid so the user sees their tier
-   (PRIMERA / SEGUNDA / TERCERA) right above the action buttons. */
+/* User division */
 .user-division-card {
   grid-column: 1 / -1;
   display: flex;
@@ -111,10 +109,7 @@
   background: linear-gradient(135deg, #10b981 0%, #059669 100%);
 }
 
-/* C55.10 Item 1 — fallback for any tier not explicitly styled above
-   (CUARTA, QUINTA, SEXTA, …). Neutral gray-indigo so the pill still
-   reads as a tier badge even when the user lands in a lower division
-   they weren't expecting. */
+/* Fallback for lower divisions */
 .tier-default {
   background: linear-gradient(135deg, #64748b 0%, #475569 100%);
 }
@@ -416,7 +411,7 @@
   }
 }
 
-/* V24D6G5A — Squad Condition Warning */
+/* Squad condition warning */
 .squad-warning-container {
   margin: 1.5rem auto;
   max-width: 800px;

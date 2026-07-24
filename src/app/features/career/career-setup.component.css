@@ -111,10 +111,7 @@ h1 {
   margin: 0 auto 1rem;
 }
 
-/* V25D83 sprint: smaller inline spinner for the teams-loading indicator
-   inside form-groups (alongside the team dropdown). Sits next to a
-   "Cargando equipos..." label without taking vertical space from the
-   surrounding form layout. */
+/* Inline loading state */
 .inline-loading {
   display: flex;
   align-items: center;
@@ -283,9 +280,7 @@ h1 {
   text-align: center;
 }
 
-/* V25D78-C48.1: setup-flow UX gap fix.
-   Styles for the "Inicializar Mi Mundo" prompt that shows when a new user
-   has no leagues yet (the world has not been seeded). */
+/* World initialization prompt */
 .seed-flow {
   margin-bottom: 1.5rem;
 }
@@ -349,11 +344,7 @@ h1 {
   font-size: 0.95rem;
 }
 
-/* V25D78-C55.2 phase 4 UI (a)+(a2): tier badges (PRIMERA / SEGUNDA / TERCERA)
-   used both in the single-division team selector hint and the multi-division
-   preview cards. Each tier gets a distinct palette consistent with the
-   existing gradient theme but with enough hue separation for the eye to
-   latch on at a glance. */
+/* Division badges */
 .division-badge {
   display: inline-block;
   padding: 0.15rem 0.6rem;
