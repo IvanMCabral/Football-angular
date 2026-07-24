@@ -4,6 +4,8 @@ import {
   scenarioActionKey,
   scenarioAttackCandidateIsCoachWorthy,
   scenarioAttackPlanScore,
+  scenarioBatteryCardDetail,
+  scenarioBatteryCardSummary,
   scenarioBatteryCoachAdvice,
   scenarioBatteryDecision,
   scenarioBatteryDecisionReview,
@@ -11,6 +13,8 @@ import {
   scenarioBatteryGroupLabel,
   scenarioBatteryReviewHint,
   scenarioBatteryReviewItems,
+  scenarioBatteryRiskCardDetail,
+  scenarioBatteryRiskCardSummary,
   scenarioDecisionMetrics,
   scenarioOpponentProtectionRead,
   scenarioOpponentRiskRead,
@@ -519,6 +523,31 @@ describe('test-harness-scenario-battery-utils', () => {
       label: 'OK',
       detail: 'La decisión "Atacar: Banda izquierda" es consistente con el objetivo Neutral y las señales disponibles.',
     });
+  });
+
+  it('summarizes scenario battery cards and risk fallbacks', () => {
+    const card = (title: string, label = title, metrics = `${title} metrics`, detail = `${title} detail`): ScenarioDecisionCard => ({
+      title,
+      label,
+      metrics,
+      detail,
+      className: 'decision-test',
+    });
+    const battery = row({
+      cards: [
+        card('Atacar', 'Banda izquierda', 'xG +0.12', 'Ataca el lado débil.'),
+        card('Evitar', 'Ataque total', 'xGA +0.20', 'Abre demasiado el partido.'),
+      ],
+    });
+
+    expect(scenarioBatteryCardSummary(battery, 'Atacar')).toBe('Banda izquierda - xG +0.12');
+    expect(scenarioBatteryCardDetail(battery, 'Atacar')).toBe('Ataca el lado débil.');
+    expect(scenarioBatteryCardSummary(battery, 'Cuidar')).toBe('-');
+    expect(scenarioBatteryCardDetail(battery, 'Cuidar')).toBe('Sin señal clara en esta batería.');
+    expect(scenarioBatteryRiskCardSummary(battery)).toBe('Ataque total - xGA +0.20');
+    expect(scenarioBatteryRiskCardDetail(battery)).toBe('Abre demasiado el partido.');
+    expect(scenarioBatteryRiskCardSummary(row({ cards: [] }))).toBe('-');
+    expect(scenarioBatteryRiskCardDetail(row({ cards: [] }))).toBe('Sin riesgo claro en esta batería.');
   });
 
   it('scores scenario summary impact from the largest normalized signal', () => {

@@ -337,6 +337,28 @@ export function scenarioBatteryDecisionReview(
   };
 }
 
+export function scenarioBatteryCardSummary(row: ScenarioBatteryRow, title: string): string {
+  const card = row.cards.find((item) => item.title === title);
+  return card ? `${card.label} - ${card.metrics}` : '-';
+}
+
+export function scenarioBatteryCardDetail(row: ScenarioBatteryRow, title: string): string {
+  const card = row.cards.find((item) => item.title === title);
+  return card ? card.detail : 'Sin señal clara en esta batería.';
+}
+
+export function scenarioBatteryRiskCardSummary(row: ScenarioBatteryRow): string {
+  const card = row.cards.find((item) => item.title === 'Riesgo ofensivo')
+    ?? row.cards.find((item) => item.title === 'Evitar');
+  return card ? `${card.label} - ${card.metrics}` : '-';
+}
+
+export function scenarioBatteryRiskCardDetail(row: ScenarioBatteryRow): string {
+  const card = row.cards.find((item) => item.title === 'Riesgo ofensivo')
+    ?? row.cards.find((item) => item.title === 'Evitar');
+  return card ? card.detail : 'Sin riesgo claro en esta batería.';
+}
+
 export function scenarioBatteryGroupLabel(group: 'ALL' | 'OFFENSE' | 'DEFENSE' | 'OPPONENT'): string {
   switch (group) {
     case 'ALL':

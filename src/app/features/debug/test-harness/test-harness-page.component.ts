@@ -160,6 +160,8 @@ import {
   scenarioActionKey as getScenarioActionKey,
   scenarioAttackCandidateIsCoachWorthy as getScenarioAttackCandidateIsCoachWorthy,
   scenarioAttackPlanScore as getScenarioAttackPlanScore,
+  scenarioBatteryCardDetail as getScenarioBatteryCardDetail,
+  scenarioBatteryCardSummary as getScenarioBatteryCardSummary,
   scenarioBatteryCoachAdvice as getScenarioBatteryCoachAdvice,
   scenarioBatteryDecision as getScenarioBatteryDecision,
   scenarioBatteryDecisionReview as getScenarioBatteryDecisionReview,
@@ -168,6 +170,8 @@ import {
   scenarioBatteryReviewCount as getScenarioBatteryReviewCount,
   scenarioBatteryReviewHint as getScenarioBatteryReviewHint,
   scenarioBatteryReviewItems as getScenarioBatteryReviewItems,
+  scenarioBatteryRiskCardDetail as getScenarioBatteryRiskCardDetail,
+  scenarioBatteryRiskCardSummary as getScenarioBatteryRiskCardSummary,
   scenarioDecisionMetrics as getScenarioDecisionMetrics,
   scenarioOpponentProtectionRead as getScenarioOpponentProtectionRead,
   scenarioOpponentRiskRead as getScenarioOpponentRiskRead,
@@ -12452,22 +12456,16 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     );
   }
   scenarioBatteryCardSummary(row: ScenarioBatteryRow, title: string): string {
-    const card = row.cards.find((item) => item.title === title);
-    return card ? `${card.label} - ${card.metrics}` : '-';
+    return getScenarioBatteryCardSummary(row, title);
   }
   scenarioBatteryCardDetail(row: ScenarioBatteryRow, title: string): string {
-    const card = row.cards.find((item) => item.title === title);
-    return card ? card.detail : 'Sin señal clara en esta batería.';
+    return getScenarioBatteryCardDetail(row, title);
   }
   scenarioBatteryRiskCardSummary(row: ScenarioBatteryRow): string {
-    const card = row.cards.find((item) => item.title === 'Riesgo ofensivo')
-      ?? row.cards.find((item) => item.title === 'Evitar');
-    return card ? `${card.label} - ${card.metrics}` : '-';
+    return getScenarioBatteryRiskCardSummary(row);
   }
   scenarioBatteryRiskCardDetail(row: ScenarioBatteryRow): string {
-    const card = row.cards.find((item) => item.title === 'Riesgo ofensivo')
-      ?? row.cards.find((item) => item.title === 'Evitar');
-    return card ? card.detail : 'Sin riesgo claro en esta batería.';
+    return getScenarioBatteryRiskCardDetail(row);
   }
   private scenarioBatteryExportRow(row: ScenarioBatteryRow): Record<string, unknown> {
     const summary = (title: string) => this.scenarioBatteryCardSummary(row, title);
