@@ -166,9 +166,12 @@ import {
   scenarioOpponentRiskRead as getScenarioOpponentRiskRead,
   scenarioShapeActionLabel as getScenarioShapeActionLabel,
   scenarioSummaryActionLabel as getScenarioSummaryActionLabel,
+  scenarioSummaryCoachReadPrefix as getScenarioSummaryCoachReadPrefix,
   scenarioSummaryFormationHint as getScenarioSummaryFormationHint,
   scenarioSummaryFormationLabel as getScenarioSummaryFormationLabel,
   scenarioSummaryIsFormationNoop as getScenarioSummaryIsFormationNoop,
+  scenarioSummaryIsOpponentRow as getScenarioSummaryIsOpponentRow,
+  scenarioSummaryIsShapeAction as getScenarioSummaryIsShapeAction,
   scenarioSummaryOpponentChannelRead as getScenarioSummaryOpponentChannelRead,
   scenarioSummaryOutcomeClass as getScenarioSummaryOutcomeClass,
   scenarioSummaryOutcomeSummaryFromOutcomes as getScenarioSummaryOutcomeSummaryFromOutcomes,
@@ -12431,18 +12434,10 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return `${prefix}: ${userChannel} / ${opponentChannel}`;
   }
   private scenarioSummaryCoachReadPrefix(row: ScenarioMatrixSummaryRow): string {
-    if (row.actionType === 'FORMATION') return 'formacion';
-    if (row.actionType === 'STYLE') return 'estilo';
-    if (row.actionType === 'SUBSTITUTION') return 'cambio';
-    if (row.actionType === 'POSITION') {
-      return this.isScenarioShapeAction(row.actionDetail) ? 'forma' : 'posicion';
-    }
-    if (this.isOpponentScenarioRow(row)) return 'rival';
-    if (row.actionType === 'NOOP_REPLAY' || row.actionType === 'NONE') return 'base';
-    return 'escenario';
+    return getScenarioSummaryCoachReadPrefix(row);
   }
   private isScenarioShapeAction(actionDetail: string | null | undefined): boolean {
-    return !!actionDetail && !!this.scenarioShapeActionLabel(actionDetail);
+    return getScenarioSummaryIsShapeAction(actionDetail);
   }
   scenarioSummaryCoachReadDetail(row: ScenarioMatrixSummaryRow): string {
     return [
@@ -12494,7 +12489,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return `xG ${this.fmtDeltaNumber(row.avgUserXgDelta)} / xGA ${this.fmtDeltaNumber(row.avgOpponentXgDelta)} / ${this.scenarioDecisionConfidence(row)}`;
   }
   private isOpponentScenarioRow(row: ScenarioMatrixSummaryRow): boolean {
-    return row.scenario.startsWith('m45-opponent-') || row.actionType === 'OPPONENT_STYLE';
+    return getScenarioSummaryIsOpponentRow(row);
   }
   private scenarioActionKey(row: ScenarioMatrixSummaryRow): string {
     return `${row.actionType}:${row.actionDetail || row.scenario}`;

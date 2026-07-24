@@ -232,6 +232,26 @@ export function scenarioSummaryIsFormationNoop(row: ScenarioMatrixSummaryRow): b
   return row.actionType === 'FORMATION' && !!row.sameFormationAsBaseline;
 }
 
+export function scenarioSummaryIsShapeAction(actionDetail: string | null | undefined): boolean {
+  return !!actionDetail && !!scenarioShapeActionLabel(actionDetail);
+}
+
+export function scenarioSummaryIsOpponentRow(row: ScenarioMatrixSummaryRow): boolean {
+  return row.scenario.startsWith('m45-opponent-') || row.actionType === 'OPPONENT_STYLE';
+}
+
+export function scenarioSummaryCoachReadPrefix(row: ScenarioMatrixSummaryRow): string {
+  if (row.actionType === 'FORMATION') return 'formacion';
+  if (row.actionType === 'STYLE') return 'estilo';
+  if (row.actionType === 'SUBSTITUTION') return 'cambio';
+  if (row.actionType === 'POSITION') {
+    return scenarioSummaryIsShapeAction(row.actionDetail) ? 'forma' : 'posicion';
+  }
+  if (scenarioSummaryIsOpponentRow(row)) return 'rival';
+  if (row.actionType === 'NOOP_REPLAY' || row.actionType === 'NONE') return 'base';
+  return 'escenario';
+}
+
 export function scenarioSummaryFormationLabel(row: ScenarioMatrixSummaryRow): string {
   const base = row.baselineFormation || '';
   const changed = row.changedFormation || (row.actionType === 'FORMATION' ? row.actionDetail : '');

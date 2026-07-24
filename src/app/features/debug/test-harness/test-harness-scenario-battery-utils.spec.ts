@@ -9,9 +9,12 @@ import {
   scenarioOpponentRiskRead,
   scenarioShapeActionLabel,
   scenarioSummaryActionLabel,
+  scenarioSummaryCoachReadPrefix,
   scenarioSummaryFormationHint,
   scenarioSummaryFormationLabel,
   scenarioSummaryIsFormationNoop,
+  scenarioSummaryIsOpponentRow,
+  scenarioSummaryIsShapeAction,
   scenarioSummaryOpponentChannelRead,
   scenarioSummaryOutcomeClass,
   scenarioSummaryOutcomeSummaryFromOutcomes,
@@ -171,6 +174,31 @@ describe('test-harness-scenario-battery-utils', () => {
     expect(scenarioSummaryFormationHint(base)).toContain('Cambio de formación');
     expect(scenarioSummaryIsFormationNoop(noop)).toBeTrue();
     expect(scenarioSummaryFormationLabel(noop)).toBe('4-4-2 = 4-4-2');
+  });
+
+  it('detects scenario summary shape and opponent rows', () => {
+    expect(scenarioSummaryIsShapeAction('right-overload')).toBeTrue();
+    expect(scenarioSummaryIsShapeAction('S1 -> S2')).toBeFalse();
+    expect(scenarioSummaryIsShapeAction(null)).toBeFalse();
+
+    expect(scenarioSummaryIsOpponentRow({ scenario: 'm45-opponent-wide', actionType: 'STYLE' } as ScenarioMatrixSummaryRow)).toBeTrue();
+    expect(scenarioSummaryIsOpponentRow({ scenario: 'custom', actionType: 'OPPONENT_STYLE' } as ScenarioMatrixSummaryRow)).toBeTrue();
+    expect(scenarioSummaryIsOpponentRow({ scenario: 'm45-wide', actionType: 'STYLE' } as ScenarioMatrixSummaryRow)).toBeFalse();
+  });
+
+  it('builds coach read prefixes from summary row type', () => {
+    const base = { scenario: 'scenario', actionDetail: null } as unknown as ScenarioMatrixSummaryRow;
+
+    expect(scenarioSummaryCoachReadPrefix({ ...base, actionType: 'FORMATION' })).toBe('formacion');
+    expect(scenarioSummaryCoachReadPrefix({ ...base, actionType: 'STYLE' })).toBe('estilo');
+    expect(scenarioSummaryCoachReadPrefix({ ...base, actionType: 'SUBSTITUTION' })).toBe('cambio');
+    expect(scenarioSummaryCoachReadPrefix({ ...base, actionType: 'POSITION', actionDetail: 'right-overload' })).toBe('forma');
+    expect(scenarioSummaryCoachReadPrefix({ ...base, actionType: 'POSITION', actionDetail: 'S1 -> S2' })).toBe('posicion');
+    expect(scenarioSummaryCoachReadPrefix({ ...base, scenario: 'm45-opponent-wide', actionType: 'STYLE' })).toBe('estilo');
+    expect(scenarioSummaryCoachReadPrefix({ ...base, scenario: 'custom', actionType: 'OPPONENT_STYLE' })).toBe('rival');
+    expect(scenarioSummaryCoachReadPrefix({ ...base, actionType: 'NOOP_REPLAY' })).toBe('base');
+    expect(scenarioSummaryCoachReadPrefix({ ...base, actionType: 'NONE' })).toBe('base');
+    expect(scenarioSummaryCoachReadPrefix({ ...base, actionType: 'MATCHUP' })).toBe('escenario');
   });
 
   it('reads user attacking channels from xG and shot volume', () => {
