@@ -19,9 +19,6 @@ import { MatchCreateComponent } from './features/matches/match-create/match-crea
 import { V24MatchDetailPageComponent } from './features/match-detail/pages/v24-match-detail-page.component';
 import { MatchComparePageComponent } from './features/match-detail/pages/match-compare-page.component';
 
-// V25D78-C55.2 phase 4 UI (b2): standalone /standings page reachable from
-// the dashboard. Reuses CareerService.getAllStandings() and the existing
-// DivisionStandings types.
 import { StandingsPageComponent } from './pages/standings/standings-page.component';
 
 import { GameDetailComponent } from './features/games/game-detail.component';
@@ -31,7 +28,6 @@ import { RoundLiveComponent } from './features/games/round-live.component';
 import { RoundSummaryComponent } from './features/games/round-summary.component';
 import { TournamentChampionComponent } from './features/games/tournament-champion.component';
 
-// V24D24: Test-Harness UI page (debug surface).
 import { TestHarnessPageComponent } from './features/debug/test-harness/test-harness-page.component';
 
 export const routes: Routes = [
@@ -48,17 +44,13 @@ export const routes: Routes = [
   { path: 'players/create', component: PlayerCreateComponent, canActivate: [authGuard] },
   { path: 'players/manage', component: PlayerManagementComponent, canActivate: [authGuard] },
   { path: 'squad', component: SquadManagementComponent, canActivate: [authGuard] },
-  // V25D78-C55.2 phase 4 UI (b2): standalone page version of the standings
-  // modal. Reachable from the dashboard; renders the same 3-tab PRIMERA /
-  // SEGUNDA / TERCERA view + green/red zone indicator + user-division pill.
   { path: 'standings', component: StandingsPageComponent, canActivate: [authGuard] },
   { path: 'matches', component: MatchListComponent, canActivate: [authGuard] },
   { path: 'matches/create', component: MatchCreateComponent, canActivate: [authGuard] },
   { path: 'matches/:id', component: MatchDetailComponent, canActivate: [authGuard] },
   { path: 'careers/:careerId/matches/:matchId/detail', component: V24MatchDetailPageComponent, canActivate: [authGuard] },
-  // F6 Sprint 2 (LIVE-MATCH-F6-MATCH-COMPARE): baseline vs live comparison page
   { path: 'careers/:careerId/matches/:matchId/compare', component: MatchComparePageComponent, canActivate: [authGuard] },
-  // V24D24: Test-Harness UI page (debug surface — profile-gated on backend).
+  // Debug surface for replay, scenario and match-engine QA.
   // No profile-guard here; the backend returns 404 in prod for the harness
   // endpoints, and the authGuard ensures the user is logged in.
   { path: 'debug/test-harness', component: TestHarnessPageComponent, canActivate: [authGuard] },
@@ -70,4 +62,3 @@ export const routes: Routes = [
   { path: 'games/:id/play-round', component: PlayRoundComponent, canActivate: [authGuard] },
   { path: '**', redirectTo: '/dashboard' }
 ];
-
