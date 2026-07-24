@@ -1,5 +1,6 @@
 import {
   scenarioActionLabel,
+  scenarioActionKey,
   scenarioBatteryCoachAdvice,
   scenarioBatteryCoachObjectiveLabel,
   scenarioBatteryGroupLabel,
@@ -10,6 +11,7 @@ import {
   scenarioShapeActionLabel,
   scenarioSummaryActionLabel,
   scenarioSummaryCoachReadPrefix,
+  scenarioDecisionConfidenceFromReadLevel,
   scenarioSummaryFormationHint,
   scenarioSummaryFormationLabel,
   scenarioSummaryIsFormationNoop,
@@ -21,6 +23,7 @@ import {
   scenarioSummaryRecommendationClass,
   scenarioSummaryRecommendationFromOutcome,
   scenarioSummaryUserChannelRead,
+  scenarioTwoWayScore,
 } from './test-harness-scenario-battery-utils';
 import { ScenarioBatteryRow, ScenarioMatrixSummaryRow, TeamStyleOption } from '../models/test-harness.model';
 
@@ -199,6 +202,29 @@ describe('test-harness-scenario-battery-utils', () => {
     expect(scenarioSummaryCoachReadPrefix({ ...base, actionType: 'NOOP_REPLAY' })).toBe('base');
     expect(scenarioSummaryCoachReadPrefix({ ...base, actionType: 'NONE' })).toBe('base');
     expect(scenarioSummaryCoachReadPrefix({ ...base, actionType: 'MATCHUP' })).toBe('escenario');
+  });
+
+  it('builds stable action keys and two-way scores for decision cards', () => {
+    const base = {
+      scenario: 'm45-wide',
+      actionType: 'POSITION',
+      actionDetail: 'right-overload',
+      avgUserXgDelta: 0.12,
+      avgOpponentXgDelta: -0.04,
+    } as ScenarioMatrixSummaryRow;
+
+    expect(scenarioActionKey(base)).toBe('POSITION:right-overload');
+    expect(scenarioActionKey({ ...base, actionDetail: '', scenario: 'm45-central' })).toBe('POSITION:m45-central');
+    expect(scenarioTwoWayScore(base)).toBeCloseTo(0.16, 5);
+    expect(scenarioTwoWayScore({ ...base, avgUserXgDelta: -0.03, avgOpponentXgDelta: 0.05 })).toBe(0);
+  });
+
+  it('maps scenario read levels into visible confidence labels', () => {
+    expect(scenarioDecisionConfidenceFromReadLevel('strong')).toBe('fuerte');
+    expect(scenarioDecisionConfidenceFromReadLevel('review')).toBe('fuerte');
+    expect(scenarioDecisionConfidenceFromReadLevel('visible')).toBe('media');
+    expect(scenarioDecisionConfidenceFromReadLevel('small')).toBe('leve');
+    expect(scenarioDecisionConfidenceFromReadLevel('noise')).toBe('marginal');
   });
 
   it('reads user attacking channels from xG and shot volume', () => {

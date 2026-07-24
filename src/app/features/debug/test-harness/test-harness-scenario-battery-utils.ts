@@ -252,6 +252,21 @@ export function scenarioSummaryCoachReadPrefix(row: ScenarioMatrixSummaryRow): s
   return 'escenario';
 }
 
+export function scenarioActionKey(row: ScenarioMatrixSummaryRow): string {
+  return `${row.actionType}:${row.actionDetail || row.scenario}`;
+}
+
+export function scenarioTwoWayScore(row: ScenarioMatrixSummaryRow): number {
+  return Math.max(0, row.avgUserXgDelta) + Math.max(0, -row.avgOpponentXgDelta);
+}
+
+export function scenarioDecisionConfidenceFromReadLevel(level: string): string {
+  if (level === 'strong' || level === 'review') return 'fuerte';
+  if (level === 'visible') return 'media';
+  if (level === 'small') return 'leve';
+  return 'marginal';
+}
+
 export function scenarioSummaryFormationLabel(row: ScenarioMatrixSummaryRow): string {
   const base = row.baselineFormation || '';
   const changed = row.changedFormation || (row.actionType === 'FORMATION' ? row.actionDetail : '');

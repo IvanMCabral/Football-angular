@@ -156,6 +156,7 @@ import {
 } from './test-harness-professional-qa-utils';
 import {
   scenarioActionLabel as getScenarioActionLabel,
+  scenarioActionKey as getScenarioActionKey,
   scenarioBatteryCoachAdvice as getScenarioBatteryCoachAdvice,
   scenarioBatteryCoachObjectiveLabel as getScenarioBatteryCoachObjectiveLabel,
   scenarioBatteryGroupLabel as getScenarioBatteryGroupLabel,
@@ -167,6 +168,7 @@ import {
   scenarioShapeActionLabel as getScenarioShapeActionLabel,
   scenarioSummaryActionLabel as getScenarioSummaryActionLabel,
   scenarioSummaryCoachReadPrefix as getScenarioSummaryCoachReadPrefix,
+  scenarioDecisionConfidenceFromReadLevel as getScenarioDecisionConfidenceFromReadLevel,
   scenarioSummaryFormationHint as getScenarioSummaryFormationHint,
   scenarioSummaryFormationLabel as getScenarioSummaryFormationLabel,
   scenarioSummaryIsFormationNoop as getScenarioSummaryIsFormationNoop,
@@ -178,6 +180,7 @@ import {
   scenarioSummaryRecommendationClass as getScenarioSummaryRecommendationClass,
   scenarioSummaryRecommendationFromOutcome as getScenarioSummaryRecommendationFromOutcome,
   scenarioSummaryUserChannelRead as getScenarioSummaryUserChannelRead,
+  scenarioTwoWayScore as getScenarioTwoWayScore,
   styleLabelFromActionDetail as getStyleLabelFromActionDetail,
 } from './test-harness-scenario-battery-utils';
 import {
@@ -12492,10 +12495,10 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return getScenarioSummaryIsOpponentRow(row);
   }
   private scenarioActionKey(row: ScenarioMatrixSummaryRow): string {
-    return `${row.actionType}:${row.actionDetail || row.scenario}`;
+    return getScenarioActionKey(row);
   }
   private scenarioTwoWayScore(row: ScenarioMatrixSummaryRow): number {
-    return Math.max(0, row.avgUserXgDelta) + Math.max(0, -row.avgOpponentXgDelta);
+    return getScenarioTwoWayScore(row);
   }
   private scenarioAttackCandidateIsCoachWorthy(row: ScenarioMatrixSummaryRow): boolean {
     const directAttackScenario = ['m45-central', 'm45-wide', 'm45-left', 'm45-right'].includes(row.scenario);
@@ -12518,11 +12521,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return row.avgUserXgDelta + shots + substitutionBonus - (risk * 0.45);
   }
   private scenarioDecisionConfidence(row: ScenarioMatrixSummaryRow): string {
-    const level = this.scenarioSummaryReadLevel(row);
-    if (level === 'strong' || level === 'review') return 'fuerte';
-    if (level === 'visible') return 'media';
-    if (level === 'small') return 'leve';
-    return 'marginal';
+    return getScenarioDecisionConfidenceFromReadLevel(this.scenarioSummaryReadLevel(row));
   }
   private scenarioProtectionCandidateIsCoachWorthy(row: ScenarioMatrixSummaryRow): boolean {
     const looksLikeSubstitution = row.actionType === 'SUBSTITUTION'
