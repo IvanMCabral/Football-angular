@@ -193,25 +193,6 @@ export class DashboardComponent implements OnInit {
     this.loadCareerStatus();
   }
 
-  /**
-   * C55.10 Item 1 — tier-real badge: map the {@code careerStatus.userDivision}
-   * label (whatever the backend sends) to a CSS class that styles the pill.
-   *
-   * <p>The backend now sends the literal display label
-   * (PRIMERA, SEGUNDA, TERCERA, CUARTA, QUINTA, SEXTA, …) instead of an enum
-   * ID. The front CONSUMES that label directly (no remapping) but needs a
-   * visual style for every possible tier. {@link tierCssClass} returns:
-   * <ul>
-   *   <li>{@code 'tier-primera'} for {@code 'PRIMERA'}</li>
-   *   <li>{@code 'tier-segunda'} for {@code 'SEGUNDA'}</li>
-   *   <li>{@code 'tier-tercera'} for {@code 'TERCERA'}</li>
-   *   <li>{@code 'tier-default'} for any other tier (CUARTA, QUINTA, …) or
-   *       null/undefined — neutral gray-indigo gradient so the pill is still
-   *       legible.</li>
-   * </ul>
-   * Used by the dashboard {@code .user-division-pill} for parity with the
-   * standings page (same component pattern, same CSS contract).
-   */
   tierCssClass(userDivision: string | null | undefined): string {
     if (userDivision === 'PRIMERA') return 'tier-primera';
     if (userDivision === 'SEGUNDA') return 'tier-segunda';
@@ -219,9 +200,6 @@ export class DashboardComponent implements OnInit {
     return 'tier-default';
   }
 
-  /**
-   * Load squad data for condition warnings (V24D6G5A)
-   */
   private loadSquadData(): void {
     this.http.get<SessionPlayer[]>(`${environment.apiUrl}/career/players/squad`).pipe(
       catchError(err => {
@@ -246,19 +224,16 @@ export class DashboardComponent implements OnInit {
   }
 
   injuredCount(): number {
-    // Exclude suspended players (suspended takes priority over injured)
     return this.getSquadPlayers().filter(p => p.injured === true && !this.isSuspended(p)).length;
   }
 
   exhaustedCount(): number {
-    // Exclude suspended and injured players (injury takes priority)
     return this.getSquadPlayers().filter(p =>
       !this.isSuspended(p) && p.injured !== true && (p.energy ?? 100) <= 19
     ).length;
   }
 
   veryTiredCount(): number {
-    // Exclude suspended and injured from very tired count
     return this.getSquadPlayers().filter(p => {
       const e = p.energy ?? 100;
       return !this.isSuspended(p) && p.injured !== true && e >= 20 && e <= 39;
@@ -302,25 +277,15 @@ export class DashboardComponent implements OnInit {
       shareReplay(1)
     );
 
-    // Cargar career status y emitir al BehaviorSubject
     this.loadCareerStatus();
 
-    // Load squad data for condition warnings
     this.loadSquadData();
 
     this.refreshUserStats();
 
-    // Inicializar Observables (async pipe se encarga del subscribe)
     this.refreshWorldStatus();
   }
 
-  /**
-   * C55.10 Item 2 — re-issue {@code /dashboard/user-stats}. Reassigns the
-   * {@link userStats$} field so any {@code (userStats$ | async)} consumer
-   * re-subscribes to the new (still cold) Observable. Safe to call
-   * multiple times; used by the (careerPhase, season) change handler in
-   * {@link loadCareerStatus}.
-   */
   private refreshUserStats(): void {
     this.userStats$ = this.http.get<UserStats>(`${environment.apiUrl}/dashboard/user-stats`).pipe(
       shareReplay(1),
@@ -330,11 +295,6 @@ export class DashboardComponent implements OnInit {
     );
   }
 
-  /**
-   * C55.10 Item 2 — re-issue {@code /dashboard/world-status}. Mirrors
-   * {@link refreshUserStats}: same pattern, independent HTTP call so a
-   * transient failure on one doesn't block the other.
-   */
   private refreshWorldStatus(): void {
     this.worldStatus$ = this.http.get<WorldStatus>(`${environment.apiUrl}/dashboard/world-status`).pipe(
       shareReplay(1),
