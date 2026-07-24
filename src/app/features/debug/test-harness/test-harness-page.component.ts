@@ -162,6 +162,7 @@ import {
   scenarioAttackPlanScore as getScenarioAttackPlanScore,
   scenarioBatteryCoachAdvice as getScenarioBatteryCoachAdvice,
   scenarioBatteryDecision as getScenarioBatteryDecision,
+  scenarioBatteryDecisionReview as getScenarioBatteryDecisionReview,
   scenarioBatteryCoachObjectiveLabel as getScenarioBatteryCoachObjectiveLabel,
   scenarioBatteryGroupLabel as getScenarioBatteryGroupLabel,
   scenarioBatteryReviewCount as getScenarioBatteryReviewCount,
@@ -12443,58 +12444,12 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     decisionLabel: string,
     cards: ScenarioDecisionCard[]
   ): { label: string; detail: string } {
-    const has = (title: string) => cards.some((card) => card.title === title);
-    const starts = (...prefixes: string[]) => prefixes.some((prefix) => decisionLabel.startsWith(prefix));
-    if (objective === 'NEED_GOAL') {
-      if (starts('Sin vía clara')) {
-        return {
-          label: 'OK: sin vía clara',
-          detail: `El objetivo es buscar gol y la batería confirmó que no hay Atacar, Riesgo ofensivo ni Doble ganancia; "${decisionLabel}" queda como diagnóstico, no como falso positivo.`,
-        };
-      }
-      if (starts('Cerrar partido', 'Cerrar amenaza', 'Proteger', 'No forzar', 'No arriesgar', 'Mantener equipo')) {
-        return {
-          label: 'Revisar: poco gol',
-          detail: `El objetivo es buscar gol, pero la decisión fue "${decisionLabel}". Revisar si faltan escenarios ofensivos claros o si el motor penaliza demasiado el riesgo.`,
-        };
-      }
-      if (!has('Atacar') && !has('Riesgo ofensivo') && !has('Doble ganancia')) {
-        return {
-          label: 'Revisar: sin vía',
-          detail: 'El objetivo es buscar gol, pero la batería no encontró Atacar, Riesgo ofensivo ni Doble ganancia. Puede ser correcto si no hay buen cambio, pero conviene auditar.',
-        };
-      }
-    }
-    if (objective === 'PROTECT_RESULT') {
-      if (starts('Atacar', 'Riesgo alto', 'Riesgo asumible', 'Aprovechar')) {
-        return {
-          label: 'Revisar: mucho riesgo',
-          detail: `El objetivo es cuidar resultado, pero la decisión fue "${decisionLabel}". Revisar si el escenario abre demasiado xGA o si falta una alternativa defensiva mejor.`,
-        };
-      }
-      if (!has('Cuidar') && !has('Amenaza rival') && !has('Evitar') && !has('Riesgo ofensivo')) {
-        return {
-          label: 'Revisar: sin cierre',
-          detail: 'El objetivo es cuidar resultado, pero la batería no encontró Cuidar, Amenaza rival, Evitar ni una acción ofensiva para descartar. Puede faltar cobertura defensiva en los escenarios.',
-        };
-      }
-    }
-    if (objective === 'NEUTRAL' && starts('Riesgo alto')) {
-      return {
-        label: 'Revisar: riesgo neutral',
-        detail: `El objetivo es neutral y la decisión fue "${decisionLabel}". Puede estar bien, pero conviene revisar si el beneficio ofensivo compensa el riesgo.`,
-      };
-    }
-    if (starts('Atacar con cuidado', 'Aprovechar con cuidado')) {
-      return {
-        label: 'OK: ataque contextual',
-        detail: `La decisión "${decisionLabel}" combina vía ofensiva con amenaza rival visible.`,
-      };
-    }
-    return {
-      label: 'OK',
-      detail: `La decisión "${decisionLabel}" es consistente con el objetivo ${this.scenarioBatteryCoachObjectiveLabel(objective)} y las señales disponibles.`,
-    };
+    return getScenarioBatteryDecisionReview(
+      objective,
+      decisionLabel,
+      cards,
+      this.scenarioBatteryCoachObjectiveLabel(objective)
+    );
   }
   scenarioBatteryCardSummary(row: ScenarioBatteryRow, title: string): string {
     const card = row.cards.find((item) => item.title === title);

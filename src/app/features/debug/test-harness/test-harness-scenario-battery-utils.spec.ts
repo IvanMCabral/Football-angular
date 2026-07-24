@@ -6,6 +6,7 @@ import {
   scenarioAttackPlanScore,
   scenarioBatteryCoachAdvice,
   scenarioBatteryDecision,
+  scenarioBatteryDecisionReview,
   scenarioBatteryCoachObjectiveLabel,
   scenarioBatteryGroupLabel,
   scenarioBatteryReviewHint,
@@ -489,6 +490,34 @@ describe('test-harness-scenario-battery-utils', () => {
     expect(scenarioBatteryDecision([], 'NEUTRAL')).toEqual({
       label: 'Mantener equipo',
       detail: 'No hay una señal suficientemente clara para recomendar un cambio de DT en esta batería.',
+    });
+  });
+
+  it('reviews scenario battery decisions against coach objective', () => {
+    const card = (title: string): ScenarioDecisionCard => ({
+      title,
+      label: title,
+      metrics: `${title} metrics`,
+      detail: `${title} detail`,
+      className: 'decision-test',
+    });
+
+    expect(scenarioBatteryDecisionReview('NEED_GOAL', 'Sin vía clara: 4-3-3', [card('Evitar')], 'Necesito gol')).toEqual({
+      label: 'OK: sin vía clara',
+      detail: 'El objetivo es buscar gol y la batería confirmó que no hay Atacar, Riesgo ofensivo ni Doble ganancia; "Sin vía clara: 4-3-3" queda como diagnóstico, no como falso positivo.',
+    });
+    expect(scenarioBatteryDecisionReview('NEED_GOAL', 'Cerrar partido: Bloque bajo', [card('Cuidar')], 'Necesito gol').label).toBe('Revisar: poco gol');
+    expect(scenarioBatteryDecisionReview('NEED_GOAL', 'Mantener equipo', [], 'Necesito gol').label).toBe('Revisar: poco gol');
+    expect(scenarioBatteryDecisionReview('PROTECT_RESULT', 'Riesgo asumible: Ataque total', [card('Riesgo ofensivo')], 'Cuidar resultado').label).toBe('Revisar: mucho riesgo');
+    expect(scenarioBatteryDecisionReview('PROTECT_RESULT', 'Mantener equipo', [], 'Cuidar resultado').label).toBe('Revisar: sin cierre');
+    expect(scenarioBatteryDecisionReview('NEUTRAL', 'Riesgo alto: Ataque total', [card('Riesgo ofensivo')], 'Neutral').label).toBe('Revisar: riesgo neutral');
+    expect(scenarioBatteryDecisionReview('NEUTRAL', 'Atacar con cuidado: A vs B', [card('Atacar'), card('Amenaza rival')], 'Neutral')).toEqual({
+      label: 'OK: ataque contextual',
+      detail: 'La decisión "Atacar con cuidado: A vs B" combina vía ofensiva con amenaza rival visible.',
+    });
+    expect(scenarioBatteryDecisionReview('NEUTRAL', 'Atacar: Banda izquierda', [card('Atacar')], 'Neutral')).toEqual({
+      label: 'OK',
+      detail: 'La decisión "Atacar: Banda izquierda" es consistente con el objetivo Neutral y las señales disponibles.',
     });
   });
 
