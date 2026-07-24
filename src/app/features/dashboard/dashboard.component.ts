@@ -36,18 +36,9 @@ interface CareerStatus {
   currentRound: number;
   totalRounds: number;
   isFinished: boolean;
-  careerPhase: string | null; // PRE_MATCH, IN_MATCH, POST_MATCH, WAITING_USER, FINISHED
+  careerPhase: string | null;
   season: number;
-  /**
-   * V25D78-C55.2 phase 4 UI (c): user's division tier from
-   * GET /api/v1/career/status. PRIMERA / SEGUNDA / TERCERA / null (legacy).
-   */
   userDivision?: string | null;
-  /**
-   * V25D78-C55.2 phase 4 UI (d2): true when a season just ended and the
-   * engine computed promotion/relegation movements. Front uses localStorage
-   * to mark 'viewed' so the dialog doesn't re-pop on every reload.
-   */
   promotionsAvailable?: boolean;
 }
 
@@ -73,45 +64,17 @@ export class DashboardComponent implements OnInit {
   private toastService = inject(ToastService);
   private dialog = inject(MatDialog);
 
-  // BehaviorSubject para career status reactivo
   private careerStatusSubject = new BehaviorSubject<CareerStatus | null | undefined>(undefined);
   careerStatus$ = this.careerStatusSubject.asObservable();
 
-  /**
-   * C55.10 Item 2 — dashboard refresh on (careerPhase, season) change.
-   *
-   * <p>Latched on the first successful {@code /career/status} emission.
-   * Subsequent emissions are compared against this snapshot; if either
-   * field differs (e.g. user finished a season → phase went from
-   * {@code 'WAITING_USER'} → {@code 'POST_SEASON'} → season bumped, OR
-   * the user just hit {@code /career/continue} → season went from
-   * {@code 1} → {@code 2}), the dashboard re-fetches the dependent
-   * datasets (squad, user-stats, world-status). Without this the page
-   * retains stale numbers even after the career advance on the back.
-   */
   private lastSeenPhase: string | null = null;
   private lastSeenSeason: number | null = null;
 
-  // Squad data for condition warnings
   private squadSubject = new BehaviorSubject<SessionPlayer[]>([]);
   squad$ = this.squadSubject.asObservable();
 
-  /**
- * V25D78-C55.7.7 BUG-L1: the welcome banner now resolves display name via
- * {@link #displayNameOf}, so we expose the full user info (UserInfo) instead
- * of the bare username string. Pre-fix the template only saw the username
- * which felt impersonal ("Welcome back, smoke-c55.7.4!").
- */
   user$?: Observable<UserInfo | null>;
-  /**
-   * V25D78-C55.7.7 BUG-L1: pick the best human-friendly name for the welcome
-   * banner. Order: {@code displayName} → {@code email} → {@code username}.
-   * Pre-fix the template hardcoded {@code username$} which surfaced the
-   * raw username (e.g. "smoke-c55.7.4") and felt impersonal.
-   *
-   * <p>Until the backend starts emitting {@code displayName}, the email is
-   * used as a friendlier fallback than the opaque username.
-   */
+
   displayNameOf(info: { displayName?: string | null; email?: string; username?: string } | null | undefined): string {
     if (!info) return 'manager';
     const dn = (info.displayName ?? '').trim();
@@ -126,18 +89,6 @@ export class DashboardComponent implements OnInit {
   loading = false;
   generatingPlayers = false;
 
-  /**
-   * V25D78-C55.7.7 BUG-M3: label for the "Jugar Próxima Fecha" button when
-   * career is in WAITING_USER phase.
-   *
-   * <p>Pre-fix: {@code `Jugar Fecha ${currentRound + 1}`} always added 1 to
-   * {@code currentRound}, which overshoots {@code totalRounds} at season end
-   * (T1 R10 finished → button said "Jugar Fecha 11", which doesn't exist).
-   *
-   * <p>Post-fix: when {@code currentRound >= totalRounds} (season just
-   * finished and the engine is waiting for the user to advance), show a
-   * "Continuar T{N+1}" label instead of an impossible round number.
-   */
   playNextRoundLabel(status: CareerStatus | null | undefined): string {
     if (!status) return 'Jugar Próxima Fecha';
     const nextRound = (status.currentRound ?? 0) + 1;
@@ -149,12 +100,6 @@ export class DashboardComponent implements OnInit {
     return `Jugar Fecha ${nextRound}`;
   }
 
-  /**
-   * V25D78-C55.7.7 BUG-M3: subtitle for the play-next button. Mirrors
-   * the season-end logic in {@link playNextRoundLabel} — when the season
-   * is finished we hint "Ver resultados finales" instead of "Confirmar
-   * para iniciar".
-   */
   playNextRoundSubtitle(status: CareerStatus | null | undefined): string {
     if (!status) return 'Confirmar para iniciar';
     const nextRound = (status.currentRound ?? 0) + 1;
@@ -170,9 +115,6 @@ export class DashboardComponent implements OnInit {
     this.loadDashboardData();
   }
 
-  /**
-   * Carga el career status y lo emite al BehaviorSubject
-   */
   private loadCareerStatus(): void {
     this.http.get<any>(`${environment.apiUrl}/career/status`).pipe(
       map(status => {
@@ -185,13 +127,7 @@ export class DashboardComponent implements OnInit {
             isFinished: status.isFinished || false,
             careerPhase: status.careerPhase || 'PRE_MATCH',
             season: status.season || 1,
-            // V25D78-C55.2 phase 4 UI (c) consume: tier the user is in.
-            // Backend may emit null for legacy careers; we surface it as-is.
             userDivision: status.userDivision ?? null,
-            // V25D78-C55.2 phase 4 UI (d2) auto-trigger: when true, the
-            // engine just finished a season and the promotion/relegation
-            // movements are queued. We'll auto-open the dialog below
-            // (gated by localStorage so it doesn't pop on every reload).
             promotionsAvailable: status.promotionsAvailable === true
           } as CareerStatus;
         }
@@ -203,13 +139,6 @@ export class DashboardComponent implements OnInit {
     ).subscribe(status => {
       this.careerStatusSubject.next(status);
 
-      // C55.10 Item 2 — detect (careerPhase, season) change and re-fetch
-      // the dependent datasets that were captured once at
-      // {@link loadDashboardData}. The first emission seeds the snapshot
-      // without triggering the refresh — that initial fetch already
-      // runs in ngOnInit. Subsequent emissions that change phase OR
-      // season force a refresh so the UI doesn't display stale numbers
-      // after the user finishes a season + advances to the next one.
       const phase = status?.careerPhase ?? null;
       const season = status?.season ?? 0;
       if (this.lastSeenPhase !== null) {
@@ -224,23 +153,12 @@ export class DashboardComponent implements OnInit {
       this.lastSeenPhase = phase;
       this.lastSeenSeason = season;
 
-      // V25D78-C55.2 phase 4 UI (d2): auto-trigger promotions dialog.
-      // localStorage key is per-career so when a brand-new career finishes
-      // its first season, the dialog opens exactly once. After the user
-      // closes it, we mark the season as 'viewed' so subsequent loads
-      // don't re-pop.
       if (status && status.promotionsAvailable && status.careerId) {
         this.maybeShowPromotionsDialog(status.careerId);
       }
     });
   }
 
-  /**
-   * V25D78-C55.2 phase 4 UI (d2): if the engine flagged promotions as
-   * available for this career and we haven't shown them yet this season,
-   * fetch the promotions list and pop the existing {@link PromotionsDialogComponent}.
-   * Marks the season as 'viewed' in localStorage so the dialog is one-shot.
-   */
   private maybeShowPromotionsDialog(careerId: string): void {
     const lastViewedSeasonKey = `c55.phase4.viewedSeason.${careerId}`;
     const lastViewedSeason = Number(localStorage.getItem(lastViewedSeasonKey) || '0');
@@ -254,7 +172,7 @@ export class DashboardComponent implements OnInit {
     this.http.get<PromotionResult[]>(`${environment.apiUrl}/career/promotions`).subscribe({
       next: (promotions) => {
         if (!promotions || promotions.length === 0) {
-          return; // engine flag was stale or no movements → don't pop
+          return;
         }
         this.dialog.open(PromotionsDialogComponent, {
           data: { promotions },
@@ -271,9 +189,6 @@ export class DashboardComponent implements OnInit {
     });
   }
 
-  /**
-   * Refresca el career status (usado después de delete)
-   */
   private refreshCareerStatus(): void {
     this.loadCareerStatus();
   }
@@ -428,17 +343,7 @@ export class DashboardComponent implements OnInit {
       })
     );
   }
-
-
-
-  // Obsoleto: ya no se usa subscribe manual
-  // loadCareerStatus(): void {}
-
-
-
-
   onPlayNow(): void {
-    // Este botón solo aparece cuando !careerStatus, así que siempre ir a setup
     this.router.navigate(['/career/setup']);
   }
 
@@ -446,11 +351,6 @@ export class DashboardComponent implements OnInit {
     this.router.navigate(['/squad']);
   }
 
-  /**
-   * NUEVO: Jugar Próxima Fecha
-   * Llama al endpoint POST /api/v1/career/{careerId}/next-round
-   * que avanza la fase de WAITING_USER a PRE_MATCH
-   */
   onPlayNextRound(): void {
     this.loading = true;
 
@@ -468,10 +368,6 @@ export class DashboardComponent implements OnInit {
           if (response.success) {
             this.toastService.success('📅 ' + response.message);
 
-            // LIVE-MATCH-F3-UI-LIVE F5.1 BUG-002: AdvanceRoundResponse
-            // does not include `careerId`, so reading `response.careerId`
-            // produced the literal string "undefined" in the round-live URL.
-            // Use the `careerId` we just posted (already validated above).
             const careerId = status.careerId!;
 
             if (response.currentRound && response.careerPhase === 'PRE_MATCH') {
@@ -499,9 +395,6 @@ export class DashboardComponent implements OnInit {
     });
   }
 
-  /**
-   * Verifica si el usuario puede jugar la próxima fecha
-   */
   canPlayNextRound(status: CareerStatus | null): boolean {
     return status !== null &&
            status.careerPhase === 'WAITING_USER' &&
@@ -527,7 +420,6 @@ export class DashboardComponent implements OnInit {
       }
       this.http.delete(`${environment.apiUrl}/career/reset`).subscribe({
         next: () => {
-          // Refrescar el observable para que el UI reaccione inmediatamente
           this.refreshCareerStatus();
         },
         error: () => {
@@ -543,13 +435,11 @@ export class DashboardComponent implements OnInit {
     this.generatingPlayers = true;
     const count = 10;
 
-    // Call backend to generate random players
     this.http.post('/api/v1/career/random-players', { count }).subscribe({
       next: () => {
         this.generatingPlayers = false;
-        this.toastService.success(`✨ ${count} random players generated successfully!`);
-        // Reinicializar Observable para refrescar stats
-    this.worldStatus$ = this.http.get<WorldStatus>(`${environment.apiUrl}/dashboard/world-status`).pipe(
+        this.toastService.success(`✨ ${count} jugadores generados correctamente`);
+        this.worldStatus$ = this.http.get<WorldStatus>(`${environment.apiUrl}/dashboard/world-status`).pipe(
           shareReplay(1),
           catchError(err => of({ clubs: 0, players: 0, matches: 0 }))
         );
