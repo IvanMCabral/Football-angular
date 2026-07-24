@@ -168,3 +168,85 @@ export function scenarioSummaryFormationHint(row: ScenarioMatrixSummaryRow): str
     ? `Formación base: ${row.baselineFormation}`
     : 'Sin cambio de formación en este escenario.';
 }
+
+export function scenarioSummaryUserChannelRead(row: ScenarioMatrixSummaryRow): string {
+  const central = row.avgUserCentralXgDelta;
+  const wide = row.avgUserWideXgDelta;
+  const left = row.avgUserLeftWideXgDelta;
+  const right = row.avgUserRightWideXgDelta;
+  const bestWideSide = Math.abs(left) >= Math.abs(right) ? 'izquierda' : 'derecha';
+  const bestWideValue = Math.abs(left) >= Math.abs(right) ? left : right;
+  if (Math.abs(central) >= Math.abs(wide) && Math.abs(central) >= 0.025) {
+    return central > 0 ? 'más peligro por centro' : 'menos peligro por centro';
+  }
+  if (Math.abs(wide) >= 0.025) {
+    if (Math.abs(bestWideValue) >= 0.018) {
+      return bestWideValue > 0 ? `más peligro por banda ${bestWideSide}` : `menos peligro por banda ${bestWideSide}`;
+    }
+    return wide > 0 ? 'más peligro por bandas' : 'menos peligro por bandas';
+  }
+  if (Math.abs(row.avgUserCentralDelta) > Math.abs(row.avgUserWideDelta) && Math.abs(row.avgUserCentralDelta) >= 0.5) {
+    return row.avgUserCentralDelta > 0 ? 'más volumen por centro' : 'menos volumen por centro';
+  }
+  if (Math.abs(row.avgUserWideDelta) >= 0.5) {
+    return row.avgUserWideDelta > 0 ? 'más volumen por bandas' : 'menos volumen por bandas';
+  }
+  return 'sin canal claro';
+}
+
+export function scenarioSummaryOpponentChannelRead(row: ScenarioMatrixSummaryRow): string {
+  const central = row.avgOpponentCentralXgDelta;
+  const wide = row.avgOpponentWideXgDelta;
+  const left = row.avgOpponentLeftWideXgDelta;
+  const right = row.avgOpponentRightWideXgDelta;
+  const exposedSide = Math.abs(left) >= Math.abs(right) ? 'izquierda' : 'derecha';
+  const exposedValue = Math.abs(left) >= Math.abs(right) ? left : right;
+  if (Math.abs(central) >= Math.abs(wide) && Math.abs(central) >= 0.025) {
+    return central > 0 ? 'rival entra más por centro' : 'rival contenido por centro';
+  }
+  if (Math.abs(wide) >= 0.025) {
+    if (Math.abs(exposedValue) >= 0.018) {
+      return exposedValue > 0 ? `rival entra más por banda ${exposedSide}` : `rival contenido por banda ${exposedSide}`;
+    }
+    return wide > 0 ? 'rival entra más por bandas' : 'rival contenido por bandas';
+  }
+  if (Math.abs(row.avgOpponentCentralDelta) > Math.abs(row.avgOpponentWideDelta) && Math.abs(row.avgOpponentCentralDelta) >= 0.5) {
+    return row.avgOpponentCentralDelta > 0 ? 'rival tira más por centro' : 'rival tira menos por centro';
+  }
+  if (Math.abs(row.avgOpponentWideDelta) >= 0.5) {
+    return row.avgOpponentWideDelta > 0 ? 'rival tira más por bandas' : 'rival tira menos por bandas';
+  }
+  return 'sin riesgo claro';
+}
+
+export function scenarioOpponentRiskRead(
+  row: ScenarioMatrixSummaryRow,
+  formatDeltaNumber: (value: number) => string,
+): string {
+  const channels = [
+    { label: 'centro', value: row.avgOpponentCentralXgDelta },
+    { label: 'banda izquierda', value: row.avgOpponentLeftWideXgDelta },
+    { label: 'banda derecha', value: row.avgOpponentRightWideXgDelta },
+  ].sort((a, b) => b.value - a.value);
+  const top = channels[0];
+  if (top.value >= 0.025) {
+    return `rival amenaza por ${top.label} (${formatDeltaNumber(top.value)} xG canal)`;
+  }
+  return scenarioSummaryOpponentChannelRead(row);
+}
+
+export function scenarioOpponentProtectionRead(
+  row: ScenarioMatrixSummaryRow,
+  formatDeltaNumber: (value: number) => string,
+): string {
+  const channels = [
+    { label: 'centro', value: row.avgOpponentCentralXgDelta },
+    { label: 'banda izquierda', value: row.avgOpponentLeftWideXgDelta },
+    { label: 'banda derecha', value: row.avgOpponentRightWideXgDelta },
+  ].sort((a, b) => a.value - b.value);
+  const best = channels[0];
+  if (best.value <= -0.025) {
+    return `rival contenido por ${best.label} (${formatDeltaNumber(best.value)} xG canal)`;
+  }
+  return scenarioSummaryOpponentChannelRead(row);
+}

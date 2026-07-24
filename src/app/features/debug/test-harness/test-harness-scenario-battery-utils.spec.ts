@@ -5,11 +5,15 @@ import {
   scenarioBatteryGroupLabel,
   scenarioBatteryReviewHint,
   scenarioBatteryReviewItems,
+  scenarioOpponentProtectionRead,
+  scenarioOpponentRiskRead,
   scenarioShapeActionLabel,
   scenarioSummaryActionLabel,
   scenarioSummaryFormationHint,
   scenarioSummaryFormationLabel,
   scenarioSummaryIsFormationNoop,
+  scenarioSummaryOpponentChannelRead,
+  scenarioSummaryUserChannelRead,
 } from './test-harness-scenario-battery-utils';
 import { ScenarioBatteryRow, ScenarioMatrixSummaryRow, TeamStyleOption } from '../models/test-harness.model';
 
@@ -92,5 +96,43 @@ describe('test-harness-scenario-battery-utils', () => {
     expect(scenarioSummaryFormationHint(base)).toContain('Cambio de formación');
     expect(scenarioSummaryIsFormationNoop(noop)).toBeTrue();
     expect(scenarioSummaryFormationLabel(noop)).toBe('4-4-2 = 4-4-2');
+  });
+
+  it('reads user attacking channels from xG and shot volume', () => {
+    const base = {
+      avgUserCentralXgDelta: 0,
+      avgUserWideXgDelta: 0,
+      avgUserLeftWideXgDelta: 0,
+      avgUserRightWideXgDelta: 0,
+      avgUserCentralDelta: 0,
+      avgUserWideDelta: 0,
+    } as ScenarioMatrixSummaryRow;
+
+    expect(scenarioSummaryUserChannelRead({ ...base, avgUserCentralXgDelta: 0.03 })).toBe('más peligro por centro');
+    expect(scenarioSummaryUserChannelRead({ ...base, avgUserCentralXgDelta: -0.03 })).toBe('menos peligro por centro');
+    expect(scenarioSummaryUserChannelRead({ ...base, avgUserWideXgDelta: 0.03, avgUserLeftWideXgDelta: 0.02 })).toBe('más peligro por banda izquierda');
+    expect(scenarioSummaryUserChannelRead({ ...base, avgUserWideXgDelta: -0.03, avgUserRightWideXgDelta: -0.02 })).toBe('menos peligro por banda derecha');
+    expect(scenarioSummaryUserChannelRead({ ...base, avgUserCentralDelta: 0.6 })).toBe('más volumen por centro');
+    expect(scenarioSummaryUserChannelRead({ ...base, avgUserWideDelta: -0.6 })).toBe('menos volumen por bandas');
+    expect(scenarioSummaryUserChannelRead(base)).toBe('sin canal claro');
+  });
+
+  it('reads opponent channels, risk and protection', () => {
+    const base = {
+      avgOpponentCentralXgDelta: 0,
+      avgOpponentWideXgDelta: 0,
+      avgOpponentLeftWideXgDelta: 0,
+      avgOpponentRightWideXgDelta: 0,
+      avgOpponentCentralDelta: 0,
+      avgOpponentWideDelta: 0,
+    } as ScenarioMatrixSummaryRow;
+    const formatDelta = (value: number) => value >= 0 ? `+${value.toFixed(2)}` : value.toFixed(2);
+
+    expect(scenarioSummaryOpponentChannelRead({ ...base, avgOpponentCentralXgDelta: 0.03 })).toBe('rival entra más por centro');
+    expect(scenarioSummaryOpponentChannelRead({ ...base, avgOpponentWideXgDelta: 0.03, avgOpponentRightWideXgDelta: 0.02 })).toBe('rival entra más por banda derecha');
+    expect(scenarioSummaryOpponentChannelRead({ ...base, avgOpponentCentralDelta: -0.6 })).toBe('rival tira menos por centro');
+    expect(scenarioSummaryOpponentChannelRead(base)).toBe('sin riesgo claro');
+    expect(scenarioOpponentRiskRead({ ...base, avgOpponentLeftWideXgDelta: 0.04 }, formatDelta)).toBe('rival amenaza por banda izquierda (+0.04 xG canal)');
+    expect(scenarioOpponentProtectionRead({ ...base, avgOpponentRightWideXgDelta: -0.04 }, formatDelta)).toBe('rival contenido por banda derecha (-0.04 xG canal)');
   });
 });
