@@ -364,6 +364,40 @@ export function scenarioSummaryCoherentSubstitutionSignal(row: ScenarioMatrixSum
   return false;
 }
 
+export function scenarioSummaryOutcome(
+  row: ScenarioMatrixSummaryRow,
+  isFormationNoop: boolean,
+  readLevel: string
+): string {
+  if (isFormationNoop) return 'Baseline/no-op';
+  if (readLevel === 'noise') return 'Neutral';
+  if (row.scenario.startsWith('m45-opponent-')) {
+    const defensiveGain = scenarioSummaryDefensiveGainScore(row);
+    const defensiveRisk = scenarioSummaryDefensiveRiskScore(row);
+    const wideChannelExposure = Math.max(row.avgOpponentLeftWideXgDelta, row.avgOpponentRightWideXgDelta);
+    const centralExposure = row.avgOpponentCentralXgDelta;
+    const wideContained = Math.min(row.avgOpponentLeftWideXgDelta, row.avgOpponentRightWideXgDelta);
+    const channelExposure = Math.max(wideChannelExposure, centralExposure);
+    if (channelExposure >= 0.10 && row.avgOpponentXgDelta >= 0.04) return 'Exposure';
+    if (channelExposure >= 0.08) return 'Channel shift';
+    if (wideContained <= -0.08 || centralExposure <= -0.08) return 'Contained';
+    if (defensiveRisk >= 1.15 && row.avgOpponentXgDelta >= 0.04) return 'Exposure';
+    if (defensiveGain >= 1.15) return 'Contained';
+    return 'Neutral';
+  }
+  const attackGain = scenarioSummaryAttackGainScore(row);
+  const attackLoss = scenarioSummaryAttackLossScore(row);
+  const defensiveGain = scenarioSummaryDefensiveGainScore(row);
+  const defensiveRisk = scenarioSummaryDefensiveRiskScore(row);
+  if (attackGain >= 1.15 && defensiveGain >= 0.85) return 'Upgrade';
+  if (attackLoss >= 1.15 && defensiveRisk >= 0.85) return 'Downgrade';
+  if (attackGain >= 1.0 && defensiveRisk >= 0.8) return 'Tradeoff';
+  if (defensiveGain >= 1.0 && attackLoss >= 0.8) return 'Tradeoff';
+  if (attackGain >= 1.15 || defensiveGain >= 1.15) return 'Lean up';
+  if (attackLoss >= 1.15 || defensiveRisk >= 1.15) return 'Risk';
+  return 'Neutral';
+}
+
 export function scenarioSummaryFormationLabel(row: ScenarioMatrixSummaryRow): string {
   const base = row.baselineFormation || '';
   const changed = row.changedFormation || (row.actionType === 'FORMATION' ? row.actionDetail : '');

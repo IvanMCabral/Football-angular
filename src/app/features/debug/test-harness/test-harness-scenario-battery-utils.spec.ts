@@ -25,6 +25,7 @@ import {
   scenarioSummaryIsShapeAction,
   scenarioSummaryNeedsReview,
   scenarioSummaryOpponentChannelRead,
+  scenarioSummaryOutcome,
   scenarioSummaryOutcomeClass,
   scenarioSummaryOutcomeSummaryFromOutcomes,
   scenarioSummaryRecommendationClass,
@@ -109,6 +110,55 @@ describe('test-harness-scenario-battery-utils', () => {
     expect(scenarioSummaryOutcomeClass('Risk')).toBe('read-check');
     expect(scenarioSummaryOutcomeClass('Exposure')).toBe('read-check');
     expect(scenarioSummaryOutcomeClass('Neutral')).toBe('read-stable');
+  });
+
+  it('maps scenario summary outcomes for own tactical changes', () => {
+    const base = {
+      scenario: 'm45-wide',
+      actionType: 'POSITION',
+      avgUserXgDelta: 0,
+      avgUserShotsDelta: 0,
+      avgUserPossessionDelta: 0,
+      avgUserCentralDelta: 0,
+      avgUserWideDelta: 0,
+      avgOpponentXgDelta: 0,
+      avgOpponentShotsDelta: 0,
+      avgOpponentCentralDelta: 0,
+      avgOpponentWideDelta: 0,
+      avgOpponentCentralXgDelta: 0,
+      avgOpponentWideXgDelta: 0,
+      avgOpponentLeftWideXgDelta: 0,
+      avgOpponentRightWideXgDelta: 0,
+    } as ScenarioMatrixSummaryRow;
+
+    expect(scenarioSummaryOutcome(base, true, 'strong')).toBe('Baseline/no-op');
+    expect(scenarioSummaryOutcome(base, false, 'noise')).toBe('Neutral');
+    expect(scenarioSummaryOutcome({ ...base, avgUserXgDelta: 0.092, avgOpponentXgDelta: -0.068 }, false, 'visible')).toBe('Upgrade');
+    expect(scenarioSummaryOutcome({ ...base, avgUserXgDelta: -0.092, avgOpponentXgDelta: 0.068 }, false, 'visible')).toBe('Downgrade');
+    expect(scenarioSummaryOutcome({ ...base, avgUserXgDelta: 0.08, avgOpponentXgDelta: 0.064 }, false, 'visible')).toBe('Tradeoff');
+    expect(scenarioSummaryOutcome({ ...base, avgUserXgDelta: 0.092 }, false, 'visible')).toBe('Lean up');
+    expect(scenarioSummaryOutcome({ ...base, avgOpponentXgDelta: 0.092 }, false, 'visible')).toBe('Risk');
+  });
+
+  it('maps scenario summary outcomes for opponent channel scenarios', () => {
+    const base = {
+      scenario: 'm45-opponent-wide',
+      actionType: 'OPPONENT_STYLE',
+      avgOpponentXgDelta: 0,
+      avgOpponentShotsDelta: 0,
+      avgOpponentCentralDelta: 0,
+      avgOpponentWideDelta: 0,
+      avgOpponentCentralXgDelta: 0,
+      avgOpponentWideXgDelta: 0,
+      avgOpponentLeftWideXgDelta: 0,
+      avgOpponentRightWideXgDelta: 0,
+    } as ScenarioMatrixSummaryRow;
+
+    expect(scenarioSummaryOutcome({ ...base, avgOpponentXgDelta: 0.04, avgOpponentRightWideXgDelta: 0.10 }, false, 'visible')).toBe('Exposure');
+    expect(scenarioSummaryOutcome({ ...base, avgOpponentRightWideXgDelta: 0.08 }, false, 'visible')).toBe('Channel shift');
+    expect(scenarioSummaryOutcome({ ...base, avgOpponentCentralXgDelta: -0.08 }, false, 'visible')).toBe('Contained');
+    expect(scenarioSummaryOutcome({ ...base, avgOpponentXgDelta: -0.092 }, false, 'visible')).toBe('Contained');
+    expect(scenarioSummaryOutcome(base, false, 'visible')).toBe('Neutral');
   });
 
   it('maps scenario summary recommendations from outcome context', () => {
