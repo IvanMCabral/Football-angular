@@ -1,4 +1,9 @@
-import { sideMirrorRealRead } from './side-mirror-read-utils';
+import {
+  formationPositionLane,
+  formationWidthReadFromPositions,
+  formationWingbackReadFromPositions,
+  sideMirrorRealRead,
+} from './side-mirror-read-utils';
 import { FormationWidthRead, FormationWingbackRead } from '../models/test-harness.model';
 
 describe('side-mirror-read-utils', () => {
@@ -22,6 +27,60 @@ describe('side-mirror-read-utils', () => {
     read: 'OK: bajos · sim 100%',
     className: 'read-visible',
   };
+
+  it('classifies formation lanes by role first and x position as fallback', () => {
+    expect(formationPositionLane({ role: 'LB', xPercent: 50, yPercent: 70 } as any)).toBe('LEFT');
+    expect(formationPositionLane({ role: 'RW', xPercent: 50, yPercent: 30 } as any)).toBe('RIGHT');
+    expect(formationPositionLane({ role: 'CM', xPercent: 30, yPercent: 50 } as any)).toBe('LEFT');
+    expect(formationPositionLane({ role: 'CM', xPercent: 70, yPercent: 50 } as any)).toBe('RIGHT');
+    expect(formationPositionLane({ role: 'CM', xPercent: 50, yPercent: 50 } as any)).toBe('CENTER');
+  });
+
+  it('reads formation width balance from outfield positions', () => {
+    const balancedWide = [
+      { role: 'GK' },
+      { role: 'LB' },
+      { role: 'RB' },
+      { role: 'LM' },
+      { role: 'RM' },
+      { role: 'CM' },
+      { role: 'ST' },
+    ] as any[];
+    const narrow = [
+      { role: 'GK' },
+      { role: 'CB', xPercent: 45 },
+      { role: 'CM', xPercent: 50 },
+      { role: 'ST', xPercent: 52 },
+    ] as any[];
+    const unbalanced = [
+      { role: 'GK' },
+      { role: 'LB' },
+      { role: 'LM' },
+      { role: 'LW' },
+      { role: 'CM' },
+    ] as any[];
+
+    expect(formationWidthReadFromPositions(balancedWide).verdict).toBe('OK');
+    expect(formationWidthReadFromPositions(narrow).verdict).toBe('Revisar ancho');
+    expect(formationWidthReadFromPositions(unbalanced).verdict).toBe('Revisar lado');
+  });
+
+  it('reads wingback symmetry and height from LWB/RWB positions', () => {
+    expect(formationWingbackReadFromPositions([{ role: 'LB' }, { role: 'RB' }] as any[]).verdict).toBe('Sin carrileros');
+    expect(formationWingbackReadFromPositions([{ role: 'LWB', xPercent: 20, yPercent: 55 }] as any[]).read).toBe('Solo LWB');
+    expect(formationWingbackReadFromPositions([
+      { role: 'LWB', xPercent: 18, yPercent: 55 },
+      { role: 'RWB', xPercent: 82, yPercent: 56 },
+    ] as any[]).verdict).toBe('OK');
+    expect(formationWingbackReadFromPositions([
+      { role: 'LWB', xPercent: 18, yPercent: 35 },
+      { role: 'RWB', xPercent: 82, yPercent: 35 },
+    ] as any[]).verdict).toBe('Revisar altura');
+    expect(formationWingbackReadFromPositions([
+      { role: 'LWB', xPercent: 28, yPercent: 55 },
+      { role: 'RWB', xPercent: 82, yPercent: 70 },
+    ] as any[]).verdict).toBe('Revisar lado');
+  });
 
   it('explains successful and partial side mirror reads', () => {
     expect(sideMirrorRealRead('OK', '4-4-2', 0.03, 0.03, wide, noWingbacks))

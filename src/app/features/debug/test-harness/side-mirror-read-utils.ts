@@ -3,6 +3,107 @@ import {
   FormationWingbackRead,
   SideMirrorSmokeRow,
 } from '../models/test-harness.model';
+import { FormationDTO } from '../../../shared/models/lineup/formation.dto';
+
+type FormationPosition = FormationDTO['positions'][number];
+type FormationLane = 'LEFT' | 'CENTER' | 'RIGHT';
+
+export function formationPositionLane(position: FormationPosition): FormationLane {
+  const role = String(position.role ?? '').toUpperCase();
+  if (['LB', 'LWB', 'LM', 'LW'].includes(role)) return 'LEFT';
+  if (['RB', 'RWB', 'RM', 'RW'].includes(role)) return 'RIGHT';
+  const x = Number(position.xPercent);
+  if (Number.isFinite(x)) {
+    if (x <= 42) return 'LEFT';
+    if (x >= 58) return 'RIGHT';
+  }
+  return 'CENTER';
+}
+
+export function formationWidthReadFromPositions(positions: FormationPosition[]): FormationWidthRead {
+  const outfield = positions.filter((position) => String(position.role ?? '').toUpperCase() !== 'GK');
+  let leftCount = 0;
+  let centerCount = 0;
+  let rightCount = 0;
+  for (const position of outfield) {
+    const lane = formationPositionLane(position);
+    if (lane === 'LEFT') leftCount++;
+    else if (lane === 'RIGHT') rightCount++;
+    else centerCount++;
+  }
+  const wideCount = leftCount + rightCount;
+  const widthScore = outfield.length > 0 ? (wideCount * 100) / outfield.length : 0;
+  const sideBalance = wideCount > 0 ? 100 - (Math.abs(leftCount - rightCount) * 100 / wideCount) : 0;
+  const verdict: FormationWidthRead['verdict'] = wideCount < 2
+    ? 'Revisar ancho'
+    : sideBalance < 45
+      ? 'Revisar lado'
+      : widthScore < 35
+        ? 'Estrecha'
+        : sideBalance < 70
+          ? 'Parcial'
+          : 'OK';
+  const className = verdict === 'OK'
+    ? 'read-strong'
+    : verdict === 'Parcial' || verdict === 'Estrecha'
+      ? 'read-visible'
+      : 'read-check';
+  return {
+    verdict,
+    className,
+    read: `${verdict}: I${leftCount}/C${centerCount}/D${rightCount} · ancho ${Math.round(widthScore)}% · bal ${Math.round(sideBalance)}%`,
+  };
+}
+
+export function formationWingbackReadFromPositions(positions: FormationPosition[]): FormationWingbackRead {
+  const left = positions.find((position) => String(position.role ?? '').toUpperCase() === 'LWB');
+  const right = positions.find((position) => String(position.role ?? '').toUpperCase() === 'RWB');
+  if (!left && !right) {
+    return {
+      verdict: 'Sin carrileros',
+      className: 'read-check',
+      read: 'Sin LWB/RWB',
+    };
+  }
+  if (!left || !right) {
+    return {
+      verdict: 'Revisar lado',
+      className: 'read-check',
+      read: left ? 'Solo LWB' : 'Solo RWB',
+    };
+  }
+  const leftX = Number(left.xPercent);
+  const rightX = Number(right.xPercent);
+  const leftY = Number(left.yPercent);
+  const rightY = Number(right.yPercent);
+  const avgY = [leftY, rightY].filter(Number.isFinite).reduce((sum, value) => sum + value, 0) / 2;
+  const symmetry = Number.isFinite(leftX) && Number.isFinite(rightX)
+    ? 100 - Math.abs((100 - rightX) - leftX)
+    : 0;
+  const yGap = Number.isFinite(leftY) && Number.isFinite(rightY) ? Math.abs(leftY - rightY) : 99;
+  const heightRead = Number.isFinite(avgY)
+    ? avgY >= 70
+      ? 'bajos'
+      : avgY >= 48
+        ? 'medios'
+        : 'altos'
+    : 'altura ?';
+  const verdict: FormationWingbackRead['verdict'] = symmetry < 88 || yGap > 8
+    ? 'Revisar lado'
+    : Number.isFinite(avgY) && (avgY < 44 || avgY > 82)
+      ? 'Revisar altura'
+      : 'OK';
+  const className = verdict === 'OK'
+    ? 'read-strong'
+    : verdict === 'Revisar altura'
+      ? 'read-visible'
+      : 'read-check';
+  return {
+    verdict,
+    className,
+    read: `${verdict}: ${heightRead} · sim ${Math.round(symmetry)}%`,
+  };
+}
 
 export function sideMirrorRealRead(
   verdict: SideMirrorSmokeRow['verdict'],
