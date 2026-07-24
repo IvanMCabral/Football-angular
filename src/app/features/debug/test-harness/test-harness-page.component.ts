@@ -169,6 +169,7 @@ import {
   scenarioSummaryActionLabel as getScenarioSummaryActionLabel,
   scenarioSummaryAttackGainScore as getScenarioSummaryAttackGainScore,
   scenarioSummaryAttackLossScore as getScenarioSummaryAttackLossScore,
+  scenarioSummaryCoachRead as getScenarioSummaryCoachRead,
   scenarioSummaryCoachReadPrefix as getScenarioSummaryCoachReadPrefix,
   scenarioSummaryCoherentSubstitutionSignal as getScenarioSummaryCoherentSubstitutionSignal,
   scenarioDecisionConfidenceFromReadLevel as getScenarioDecisionConfidenceFromReadLevel,
@@ -12388,39 +12389,14 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     ].join(' ? ');
   }
   scenarioSummaryCoachRead(row: ScenarioMatrixSummaryRow): string {
-    if (this.scenarioSummaryIsFormationNoop(row)) {
-      return `formacion: misma que la base (${row.baselineFormation || row.changedFormation || row.actionDetail || '?'})`;
-    }
-    const attackGain = this.scenarioSummaryAttackGainScore(row);
-    const attackLoss = this.scenarioSummaryAttackLossScore(row);
-    const defensiveGain = this.scenarioSummaryDefensiveGainScore(row);
-    const defensiveRisk = this.scenarioSummaryDefensiveRiskScore(row);
-    const userChannel = this.scenarioSummaryUserChannelRead(row);
-    const opponentChannel = this.scenarioSummaryOpponentChannelRead(row);
-    const prefix = this.scenarioSummaryCoachReadPrefix(row);
-    if (row.scenario.startsWith('m45-opponent-')) {
-      const strongestOpponentChannel = Math.max(
-        row.avgOpponentCentralXgDelta,
-        row.avgOpponentLeftWideXgDelta,
-        row.avgOpponentRightWideXgDelta
-      );
-      if ((defensiveRisk >= 0.85 || row.avgOpponentXgDelta > 0.04) && row.avgOpponentXgDelta >= 0.04) {
-        return `${prefix}: rival amenaza ${opponentChannel}`;
-      }
-      if (strongestOpponentChannel >= 0.08) return `${prefix}: rival cambia canal ${opponentChannel}`;
-      if (defensiveGain >= 0.85 || row.avgOpponentXgDelta < -0.04) return `${prefix}: rival contenido ${opponentChannel}`;
-      return `${prefix}: ${opponentChannel}`;
-    }
-    if (this.scenarioSummaryReadLevel(row) === 'noise') {
-      return userChannel !== 'sin canal claro' ? `${prefix}: leve ${userChannel}` : `${prefix}: sin señal fuerte`;
-    }
-    if (attackGain >= 1.15 && defensiveRisk >= 0.9) return `${prefix}: mas ataque, mas riesgo (${userChannel})`;
-    if (defensiveGain >= 1.15 && attackLoss >= 0.9) return `${prefix}: mas seguro, menos ataque (${opponentChannel})`;
-    if (attackGain >= 1.15) return `${prefix}: gana ataque ${userChannel}`;
-    if (attackLoss >= 1.15) return `${prefix}: pierde ataque ${userChannel}`;
-    if (defensiveRisk >= 1.15) return `${prefix}: abre riesgo ${opponentChannel}`;
-    if (defensiveGain >= 1.15) return `${prefix}: protege mejor ${opponentChannel}`;
-    return `${prefix}: ${userChannel} / ${opponentChannel}`;
+    return getScenarioSummaryCoachRead(
+      row,
+      this.scenarioSummaryIsFormationNoop(row),
+      this.scenarioSummaryReadLevel(row),
+      this.scenarioSummaryUserChannelRead(row),
+      this.scenarioSummaryOpponentChannelRead(row),
+      this.scenarioSummaryCoachReadPrefix(row)
+    );
   }
   private scenarioSummaryCoachReadPrefix(row: ScenarioMatrixSummaryRow): string {
     return getScenarioSummaryCoachReadPrefix(row);

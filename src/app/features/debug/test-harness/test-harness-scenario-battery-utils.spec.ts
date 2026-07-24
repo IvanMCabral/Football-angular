@@ -12,6 +12,7 @@ import {
   scenarioSummaryActionLabel,
   scenarioSummaryAttackGainScore,
   scenarioSummaryAttackLossScore,
+  scenarioSummaryCoachRead,
   scenarioSummaryCoachReadPrefix,
   scenarioSummaryCoherentSubstitutionSignal,
   scenarioDecisionConfidenceFromReadLevel,
@@ -159,6 +160,56 @@ describe('test-harness-scenario-battery-utils', () => {
     expect(scenarioSummaryOutcome({ ...base, avgOpponentCentralXgDelta: -0.08 }, false, 'visible')).toBe('Contained');
     expect(scenarioSummaryOutcome({ ...base, avgOpponentXgDelta: -0.092 }, false, 'visible')).toBe('Contained');
     expect(scenarioSummaryOutcome(base, false, 'visible')).toBe('Neutral');
+  });
+
+  it('builds scenario summary coach reads for own tactical changes', () => {
+    const base = {
+      scenario: 'm45-wide',
+      actionType: 'POSITION',
+      actionDetail: 'right-overload',
+      baselineFormation: '4-4-2',
+      changedFormation: '4-4-2',
+      avgUserXgDelta: 0,
+      avgUserShotsDelta: 0,
+      avgUserPossessionDelta: 0,
+      avgUserCentralDelta: 0,
+      avgUserWideDelta: 0,
+      avgOpponentXgDelta: 0,
+      avgOpponentShotsDelta: 0,
+      avgOpponentCentralDelta: 0,
+      avgOpponentWideDelta: 0,
+      avgOpponentCentralXgDelta: 0,
+      avgOpponentWideXgDelta: 0,
+      avgOpponentLeftWideXgDelta: 0,
+      avgOpponentRightWideXgDelta: 0,
+    } as ScenarioMatrixSummaryRow;
+
+    expect(scenarioSummaryCoachRead(base, true, 'strong', 'sin canal claro', 'sin riesgo claro', 'forma')).toBe('formacion: misma que la base (4-4-2)');
+    expect(scenarioSummaryCoachRead(base, false, 'noise', 'sin canal claro', 'sin riesgo claro', 'forma')).toBe('forma: sin señal fuerte');
+    expect(scenarioSummaryCoachRead(base, false, 'noise', 'más peligro por centro', 'sin riesgo claro', 'forma')).toBe('forma: leve más peligro por centro');
+    expect(scenarioSummaryCoachRead({ ...base, avgUserXgDelta: 0.092 }, false, 'visible', 'más peligro por centro', 'sin riesgo claro', 'forma')).toBe('forma: gana ataque más peligro por centro');
+    expect(scenarioSummaryCoachRead({ ...base, avgUserXgDelta: 0.092, avgOpponentXgDelta: 0.072, avgOpponentShotsDelta: 0.45 }, false, 'visible', 'más peligro por centro', 'rival entra más por centro', 'forma')).toBe('forma: mas ataque, mas riesgo (más peligro por centro)');
+    expect(scenarioSummaryCoachRead({ ...base, avgOpponentXgDelta: -0.092, avgUserXgDelta: -0.08 }, false, 'visible', 'menos peligro por centro', 'rival contenido por centro', 'forma')).toBe('forma: mas seguro, menos ataque (rival contenido por centro)');
+  });
+
+  it('builds scenario summary coach reads for opponent scenarios', () => {
+    const base = {
+      scenario: 'm45-opponent-wide',
+      actionType: 'OPPONENT_STYLE',
+      avgOpponentXgDelta: 0,
+      avgOpponentShotsDelta: 0,
+      avgOpponentCentralDelta: 0,
+      avgOpponentWideDelta: 0,
+      avgOpponentCentralXgDelta: 0,
+      avgOpponentWideXgDelta: 0,
+      avgOpponentLeftWideXgDelta: 0,
+      avgOpponentRightWideXgDelta: 0,
+    } as ScenarioMatrixSummaryRow;
+
+    expect(scenarioSummaryCoachRead({ ...base, avgOpponentXgDelta: 0.041, avgOpponentShotsDelta: 0.45 }, false, 'visible', 'sin canal claro', 'rival entra más por bandas', 'rival')).toBe('rival: rival amenaza rival entra más por bandas');
+    expect(scenarioSummaryCoachRead({ ...base, avgOpponentRightWideXgDelta: 0.08 }, false, 'visible', 'sin canal claro', 'rival entra más por banda derecha', 'rival')).toBe('rival: rival cambia canal rival entra más por banda derecha');
+    expect(scenarioSummaryCoachRead({ ...base, avgOpponentXgDelta: -0.05 }, false, 'visible', 'sin canal claro', 'rival contenido por bandas', 'rival')).toBe('rival: rival contenido rival contenido por bandas');
+    expect(scenarioSummaryCoachRead(base, false, 'visible', 'sin canal claro', 'sin riesgo claro', 'rival')).toBe('rival: sin riesgo claro');
   });
 
   it('maps scenario summary recommendations from outcome context', () => {

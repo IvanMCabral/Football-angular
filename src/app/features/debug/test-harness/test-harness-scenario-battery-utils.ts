@@ -398,6 +398,46 @@ export function scenarioSummaryOutcome(
   return 'Neutral';
 }
 
+export function scenarioSummaryCoachRead(
+  row: ScenarioMatrixSummaryRow,
+  isFormationNoop: boolean,
+  readLevel: string,
+  userChannel: string,
+  opponentChannel: string,
+  prefix: string
+): string {
+  if (isFormationNoop) {
+    return `formacion: misma que la base (${row.baselineFormation || row.changedFormation || row.actionDetail || '?'})`;
+  }
+  const attackGain = scenarioSummaryAttackGainScore(row);
+  const attackLoss = scenarioSummaryAttackLossScore(row);
+  const defensiveGain = scenarioSummaryDefensiveGainScore(row);
+  const defensiveRisk = scenarioSummaryDefensiveRiskScore(row);
+  if (row.scenario.startsWith('m45-opponent-')) {
+    const strongestOpponentChannel = Math.max(
+      row.avgOpponentCentralXgDelta,
+      row.avgOpponentLeftWideXgDelta,
+      row.avgOpponentRightWideXgDelta
+    );
+    if ((defensiveRisk >= 0.85 || row.avgOpponentXgDelta > 0.04) && row.avgOpponentXgDelta >= 0.04) {
+      return `${prefix}: rival amenaza ${opponentChannel}`;
+    }
+    if (strongestOpponentChannel >= 0.08) return `${prefix}: rival cambia canal ${opponentChannel}`;
+    if (defensiveGain >= 0.85 || row.avgOpponentXgDelta < -0.04) return `${prefix}: rival contenido ${opponentChannel}`;
+    return `${prefix}: ${opponentChannel}`;
+  }
+  if (readLevel === 'noise') {
+    return userChannel !== 'sin canal claro' ? `${prefix}: leve ${userChannel}` : `${prefix}: sin señal fuerte`;
+  }
+  if (attackGain >= 1.15 && defensiveRisk >= 0.9) return `${prefix}: mas ataque, mas riesgo (${userChannel})`;
+  if (defensiveGain >= 1.15 && attackLoss >= 0.9) return `${prefix}: mas seguro, menos ataque (${opponentChannel})`;
+  if (attackGain >= 1.15) return `${prefix}: gana ataque ${userChannel}`;
+  if (attackLoss >= 1.15) return `${prefix}: pierde ataque ${userChannel}`;
+  if (defensiveRisk >= 1.15) return `${prefix}: abre riesgo ${opponentChannel}`;
+  if (defensiveGain >= 1.15) return `${prefix}: protege mejor ${opponentChannel}`;
+  return `${prefix}: ${userChannel} / ${opponentChannel}`;
+}
+
 export function scenarioSummaryFormationLabel(row: ScenarioMatrixSummaryRow): string {
   const base = row.baselineFormation || '';
   const changed = row.changedFormation || (row.actionType === 'FORMATION' ? row.actionDetail : '');
