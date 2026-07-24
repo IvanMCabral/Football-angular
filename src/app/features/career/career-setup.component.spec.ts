@@ -100,14 +100,11 @@ describe('CareerSetupComponent — setup flow', () => {
       button.click();
 
       fixture.whenStable().then(() => {
-        // V25D78-C47 contract: POST must use queryParam userId from JWT (authInterceptor
-        // adds Authorization header automatically; here we verify the URL is correct).
         expect(httpSpy.post).toHaveBeenCalledWith(
           jasmine.stringMatching(/\/world\/seed-la-liga\?userId=11111111-1111-1111-1111-111111111111/),
           jasmine.any(Object)
         );
 
-        // seedingWorld must reset to false after success
         expect(component.seedingWorld).toBeFalse();
         done();
       });
@@ -115,24 +112,13 @@ describe('CareerSetupComponent — setup flow', () => {
   });
 
   it('re-fetches leagues after successful world initialization', (done: DoneFn) => {
-    // V25D78-C48.1 design: refreshLeaguesTrigger is a BehaviorSubject that, when
-    // emitted after seed success, causes leagues$ to re-fetch via combineLatest.
-    // This test verifies the mechanism by counting HTTP GET calls.
-
-    // First call: empty leagues
     httpSpy.get.and.returnValue(of([]));
     fixture.detectChanges();
 
     fixture.whenStable().then(() => {
       const initialGetCount = httpSpy.get.calls.count();
 
-      // Mock seed success
       httpSpy.post.and.returnValue(of({ status: 'ok' }));
-      // After refresh trigger fires, leagues$ re-fetches; we expect subsequent GET
-      // calls (we don't care about the return value here since the test only
-      // checks call count).
-
-      // Click seed
       component.seedWorld();
 
       fixture.whenStable().then(() => {
@@ -265,9 +251,6 @@ describe('CareerSetupComponent — setup flow', () => {
       }) as any);
       fixture.detectChanges();
 
-      // Subscribe to capture the transition. By the time we subscribe,
-      // the V25D82.2 preload (ngOnInit) has already fired and the chain
-      // is awaiting the (cold) HTTP — loadingTeams$ is true.
       const emissions: boolean[] = [];
       const sub = component.loadingTeams$.subscribe(v => emissions.push(v));
 
@@ -295,9 +278,6 @@ describe('CareerSetupComponent — setup flow', () => {
       }) as any);
       fixture.detectChanges();
 
-      // Pick LA_LIGA — fires the V25D82.2 preload path. The chain is
-      // awaiting TEAMS_SUBJECT (still cold → empty emission via the
-      // concat-of seed, so loadingTeams$ is true).
       component.selectedLeagueId = LA_LIGA.realLeagueId;
       component.onLeagueChange();
 
@@ -414,17 +394,10 @@ describe('CareerSetupComponent — setup flow', () => {
       });
     });
 
-    /**
-     * (a) source-of-truth: the template binding for the single-division
-     * team option MUST end with the `- PRIMERA` suffix. This is the visual
-     * contract (V25D78-C55.2 phase 4 UI a).
-     */
     it('single-division option template literal ends with "- PRIMERA"', () => {
       // Read the template source via the @Component decorator metadata. The
       // templateUrl points to the file; the resolved string is on the
       // component's ɵcmp definition.
-      const meta = (CareerSetupComponent as any).ɵcmp;
-      const tplUrl = meta?.templateUrl ?? '';
       // The test runner resolves the URL relative to the source file; in
       // Karma's environment the template is loaded over HTTP. To verify the
       // template binding text without a full HTTP fetch, we use a regex
