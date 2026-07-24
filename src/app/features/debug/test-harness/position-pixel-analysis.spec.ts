@@ -16,12 +16,16 @@ import {
   positionPixelImpactScore,
   positionPixelIsMicroVisualMismatch,
   positionPixelMovementConfidence,
+  positionPixelMatchSmokeVerdict,
+  positionPixelPlayerSmokeSeverity,
+  positionPixelPlayerSmokeVerdict,
   positionPixelReadLevel,
   positionPixelReadSeverity,
   positionPixelSignalClass,
   positionPixelSignalDetail,
   positionPixelSignalRead,
   positionPixelSignalScore,
+  positionPixelSmokeVerdictClass,
   positionPixelChannelLabel,
   positionPixelShapeDeltaText,
   positionPixelShapeMove,
@@ -196,6 +200,42 @@ describe('position-pixel-analysis', () => {
     expect(positionPixelReadSeverity({ ...baseRow, targetXPercent: 51, signalScore: 0.06 } as any)).toBe(4);
     expect(positionPixelReadLevel({ ...baseRow, targetXPercent: 56, deltaShotsFor: 2 } as any)).toBe('visible');
     expect(positionPixelReadLevel({ ...baseRow, targetXPercent: 60, deltaXgAgainst: 0.30 } as any)).toBe('strong');
+  });
+
+  it('summarizes match-level position pixel smoke without UI state', () => {
+    const counts = { stable: 0, visible: 0, strong: 0, check: 0 };
+
+    expect(positionPixelMatchSmokeVerdict(counts, 0, 0, 0, 0, 6, 0, 0, 0, 0.01, 0.02, 0.16, 0.08)).toBe('Repeated 5px bias');
+    expect(positionPixelMatchSmokeVerdict(counts, 0, 0, 0, 0, 3, 0, 0, 0, 0.01, 0.02, 0.12, 0.066)).toBe('5px visible pattern');
+    expect(positionPixelMatchSmokeVerdict(counts, 0, 0, 0, 0, 0, 0, 2, 2, 0.01, 0.02)).toBe('Big tactical move');
+    expect(positionPixelMatchSmokeVerdict({ ...counts, strong: 1 }, 0, 0, 0, 0, 0, 0, 0, 0, 0.01, 0.02)).toBe('Strong review');
+    expect(positionPixelMatchSmokeVerdict({ ...counts, check: 2 }, 0, 0, 0, 0, 0, 0, 0, 0, 0.01, 0.02)).toBe('Needs seeds');
+    expect(positionPixelMatchSmokeVerdict(counts, 0, 4, 0, 0, 0, 0, 0, 0, 0.01, 0.02)).toBe('Visible risk pattern');
+    expect(positionPixelMatchSmokeVerdict(counts, 0, 0, 0, 0, 0, 4, 0, 0, 0.01, 0.02)).toBe('Visible cost pattern');
+    expect(positionPixelMatchSmokeVerdict({ ...counts, visible: 1 }, 0, 0, 0, 0, 0, 0, 0, 0, 0.01, 0.02)).toBe('Playable variation');
+    expect(positionPixelMatchSmokeVerdict(counts, 0, 0, 0, 0, 0, 0, 1, 0, 0.01, 0.02)).toBe('Big neutral move');
+    expect(positionPixelMatchSmokeVerdict(counts, 0, 0, 0, 0, 0, 0, 0, 0, 0.01, 0.02)).toBe('Stable');
+  });
+
+  it('keeps smoke verdict classes and player severity stable', () => {
+    expect(positionPixelSmokeVerdictClass('Repeated 5px bias')).toBe('read-strong');
+    expect(positionPixelSmokeVerdictClass('5px visible pattern')).toBe('read-check');
+    expect(positionPixelSmokeVerdictClass('Big tactical move')).toBe('read-visible');
+    expect(positionPixelSmokeVerdictClass('Visible cost pattern')).toBe('read-visible');
+    expect(positionPixelSmokeVerdictClass('Big neutral move')).toBe('delta-neutral');
+    expect(positionPixelSmokeVerdictClass('Stable')).toBe('read-stable');
+
+    expect(positionPixelPlayerSmokeVerdict(6, 0, 0, 0.08, 0.10)).toBe('Repeated 5px bias');
+    expect(positionPixelPlayerSmokeVerdict(3, 0, 0, 0.066, 0.10)).toBe('5px visible pattern');
+    expect(positionPixelPlayerSmokeVerdict(0, 1, 1, 0.01, 0.02)).toBe('Big tactical move');
+    expect(positionPixelPlayerSmokeVerdict(0, 1, 0, 0.01, 0.02)).toBe('Big neutral move');
+    expect(positionPixelPlayerSmokeVerdict(0, 0, 0, 0.01, 0.02)).toBe('Stable');
+
+    expect(positionPixelPlayerSmokeSeverity('Repeated 5px bias')).toBe(5);
+    expect(positionPixelPlayerSmokeSeverity('5px visible pattern')).toBe(4);
+    expect(positionPixelPlayerSmokeSeverity('Strong review')).toBe(3);
+    expect(positionPixelPlayerSmokeSeverity('Big tactical move')).toBe(2);
+    expect(positionPixelPlayerSmokeSeverity('Stable')).toBe(1);
   });
 
   it('scores overall impact and decision direction from the same row', () => {

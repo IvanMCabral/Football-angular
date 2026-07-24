@@ -47,6 +47,18 @@ export interface PositionPixelVisualEngineTension {
   detail: string;
 }
 
+export type PositionPixelSmokeVerdict =
+  | 'Repeated 5px bias'
+  | '5px visible pattern'
+  | 'Big tactical move'
+  | 'Strong review'
+  | 'Needs seeds'
+  | 'Visible risk pattern'
+  | 'Visible cost pattern'
+  | 'Playable variation'
+  | 'Big neutral move'
+  | 'Stable';
+
 export type PositionPixelVisualChannel = 'L' | 'C' | 'R';
 export type PositionPixelVisualLine = 'ATT' | 'MID' | 'DEF';
 
@@ -822,6 +834,67 @@ export function positionPixelSignalClass(score: number, distance: number): strin
   if (score >= 0.050) return 'read-check';
   if (score >= 0.020) return 'read-stable';
   return 'delta-neutral';
+}
+
+export function positionPixelMatchSmokeVerdict(
+  readCounts: Record<PositionPixelReadLevel, number>,
+  microReview: number,
+  visibleRisk: number,
+  visibleAttackLoss: number,
+  bigBadTradeoff: number,
+  fivePxRiskRows: number,
+  fivePxCostRows: number,
+  bigMoveRows: number,
+  bigMoveStrongRows: number,
+  avgSignal: number,
+  worstSignal: number,
+  worstFivePxRiskSignal = worstSignal,
+  avgFivePxRiskSignal = avgSignal
+): PositionPixelSmokeVerdict {
+  if (fivePxRiskRows >= 6 && (avgFivePxRiskSignal >= 0.075 || worstFivePxRiskSignal >= 0.160)) return 'Repeated 5px bias';
+  if (fivePxRiskRows >= 3 && (avgFivePxRiskSignal >= 0.065 || worstFivePxRiskSignal >= 0.160)) return '5px visible pattern';
+  if (bigMoveRows > 0 && bigMoveStrongRows === bigMoveRows && readCounts.strong <= bigMoveStrongRows) return 'Big tactical move';
+  if (bigBadTradeoff > 0 || readCounts.strong > 0) return 'Strong review';
+  if (readCounts.check > 1 || microReview > 1) return 'Needs seeds';
+  if (visibleRisk >= 4) return 'Visible risk pattern';
+  if (fivePxCostRows >= 4 || visibleRisk + visibleAttackLoss >= 4) return 'Visible cost pattern';
+  if (readCounts.visible > 0) return 'Playable variation';
+  if (bigMoveRows > 0) return 'Big neutral move';
+  return 'Stable';
+}
+
+export function positionPixelSmokeVerdictClass(verdict: string): string {
+  if (verdict === 'Repeated 5px bias') return 'read-strong';
+  if (verdict === '5px visible pattern') return 'read-check';
+  if (verdict === 'Big tactical move') return 'read-visible';
+  if (verdict === 'Strong review') return 'read-strong';
+  if (verdict === 'Needs seeds' || verdict === 'Visible risk pattern') return 'read-check';
+  if (verdict === 'Visible cost pattern') return 'read-visible';
+  if (verdict === 'Playable variation') return 'read-visible';
+  if (verdict === 'Big neutral move') return 'delta-neutral';
+  return 'read-stable';
+}
+
+export function positionPixelPlayerSmokeVerdict(
+  fivePxRiskRows: number,
+  bigMoveRows: number,
+  bigMoveStrongRows: number,
+  avgSignal: number,
+  worstSignal: number
+): PositionPixelSmokeVerdict {
+  if (fivePxRiskRows >= 6 && (avgSignal >= 0.075 || worstSignal >= 0.160)) return 'Repeated 5px bias';
+  if (fivePxRiskRows >= 3 && (avgSignal >= 0.065 || worstSignal >= 0.160)) return '5px visible pattern';
+  if (bigMoveStrongRows > 0) return 'Big tactical move';
+  if (bigMoveRows > 0) return 'Big neutral move';
+  return 'Stable';
+}
+
+export function positionPixelPlayerSmokeSeverity(verdict: string): number {
+  if (verdict === 'Repeated 5px bias') return 5;
+  if (verdict === '5px visible pattern') return 4;
+  if (verdict === 'Strong review') return 3;
+  if (verdict === 'Big tactical move') return 2;
+  return 1;
 }
 
 export function positionPixelSignalDetail(

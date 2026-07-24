@@ -209,12 +209,16 @@ import {
   positionPixelDistance as getPositionPixelDistance,
   positionPixelImpactScore as getPositionPixelImpactScore,
   positionPixelMovementConfidence as getPositionPixelMovementConfidence,
+  positionPixelMatchSmokeVerdict as getPositionPixelMatchSmokeVerdict,
+  positionPixelPlayerSmokeSeverity as getPositionPixelPlayerSmokeSeverity,
+  positionPixelPlayerSmokeVerdict as getPositionPixelPlayerSmokeVerdict,
   positionPixelReadLevel as getPositionPixelReadLevel,
   positionPixelReadSeverity as getPositionPixelReadSeverity,
   positionPixelSignalClass as getPositionPixelSignalClass,
   positionPixelSignalDetail as getPositionPixelSignalDetail,
   positionPixelSignalRead as getPositionPixelSignalRead,
   positionPixelSignalScore as getPositionPixelSignalScore,
+  positionPixelSmokeVerdictClass as getPositionPixelSmokeVerdictClass,
   positionPixelChannelLabel as getPositionPixelChannelLabel,
   positionPixelShapeDeltaText as getPositionPixelShapeDeltaText,
   positionPixelShapeMove as getPositionPixelShapeMove,
@@ -13821,27 +13825,24 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     worstFivePxRiskSignal = worstSignal,
     avgFivePxRiskSignal = avgSignal
   ): string {
-    if (fivePxRiskRows >= 6 && (avgFivePxRiskSignal >= 0.075 || worstFivePxRiskSignal >= 0.160)) return 'Repeated 5px bias';
-    if (fivePxRiskRows >= 3 && (avgFivePxRiskSignal >= 0.065 || worstFivePxRiskSignal >= 0.160)) return '5px visible pattern';
-    if (bigMoveRows > 0 && bigMoveStrongRows === bigMoveRows && readCounts.strong <= bigMoveStrongRows) return 'Big tactical move';
-    if (bigBadTradeoff > 0 || readCounts.strong > 0) return 'Strong review';
-    if (readCounts.check > 1 || microReview > 1) return 'Needs seeds';
-    if (visibleRisk >= 4) return 'Visible risk pattern';
-    if (fivePxCostRows >= 4 || visibleRisk + visibleAttackLoss >= 4) return 'Visible cost pattern';
-    if (readCounts.visible > 0) return 'Playable variation';
-    if (bigMoveRows > 0) return 'Big neutral move';
-    return 'Stable';
+    return getPositionPixelMatchSmokeVerdict(
+      readCounts,
+      microReview,
+      visibleRisk,
+      visibleAttackLoss,
+      bigBadTradeoff,
+      fivePxRiskRows,
+      fivePxCostRows,
+      bigMoveRows,
+      bigMoveStrongRows,
+      avgSignal,
+      worstSignal,
+      worstFivePxRiskSignal,
+      avgFivePxRiskSignal
+    );
   }
   private positionPixelMatchSmokeVerdictClass(verdict: string): string {
-    if (verdict === 'Repeated 5px bias') return 'read-strong';
-    if (verdict === '5px visible pattern') return 'read-check';
-    if (verdict === 'Big tactical move') return 'read-visible';
-    if (verdict === 'Strong review') return 'read-strong';
-    if (verdict === 'Needs seeds' || verdict === 'Visible risk pattern') return 'read-check';
-    if (verdict === 'Visible cost pattern') return 'read-visible';
-    if (verdict === 'Playable variation') return 'read-visible';
-    if (verdict === 'Big neutral move') return 'delta-neutral';
-    return 'read-stable';
+    return getPositionPixelSmokeVerdictClass(verdict);
   }
   private toPositionPixelPlayerSmokeSummary(
     key: string,
@@ -13903,18 +13904,10 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     avgSignal: number,
     worstSignal: number
   ): string {
-    if (fivePxRiskRows >= 6 && (avgSignal >= 0.075 || worstSignal >= 0.160)) return 'Repeated 5px bias';
-    if (fivePxRiskRows >= 3 && (avgSignal >= 0.065 || worstSignal >= 0.160)) return '5px visible pattern';
-    if (bigMoveStrongRows > 0) return 'Big tactical move';
-    if (bigMoveRows > 0) return 'Big neutral move';
-    return 'Stable';
+    return getPositionPixelPlayerSmokeVerdict(fivePxRiskRows, bigMoveRows, bigMoveStrongRows, avgSignal, worstSignal);
   }
   private positionPixelPlayerSmokeSeverity(item: PositionPixelPlayerSmokeSummary): number {
-    if (item.verdict === 'Repeated 5px bias') return 5;
-    if (item.verdict === '5px visible pattern') return 4;
-    if (item.verdict === 'Strong review') return 3;
-    if (item.verdict === 'Big tactical move') return 2;
-    return 1;
+    return getPositionPixelPlayerSmokeSeverity(item.verdict);
   }
   private positionPixelDominantCause(rows: PositionPixelMatrixSummary[]): string {
     if (rows.length === 0) return 'No rows';
