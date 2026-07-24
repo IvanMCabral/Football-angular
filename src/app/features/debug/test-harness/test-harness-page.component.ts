@@ -171,6 +171,9 @@ import {
 } from './test-harness-scenario-battery-utils';
 import {
   backFiveFamilyClass as getBackFiveFamilyClass,
+  backFiveFamilyRead as getBackFiveFamilyRead,
+  backFiveTransitionClass as getBackFiveTransitionClass,
+  backFiveTransitionRead as getBackFiveTransitionRead,
   lowBlockLabClass as getLowBlockLabClass,
   lowBlockLabRead as getLowBlockLabRead,
 } from './tactical-lab-read-utils';
@@ -7960,14 +7963,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     deltaXgAgainst: number,
     deltaWideShotsFor: number
   ): string {
-    if (variant === 'base') return 'Referencia';
-    if (variant === 'high') {
-      if ((deltaXgFor > 0.03 || deltaWideShotsFor > 0.20) && deltaXgAgainst > 0.02) return 'Mas transición, mas riesgo';
-      if (deltaXgFor > 0.03 || deltaWideShotsFor > 0.20) return 'Mas transición';
-      return 'Revisar salida';
-    }
-    if (deltaXgAgainst < -0.02) return 'Mas cobertura';
-    return 'Cobertura similar';
+    return getBackFiveTransitionRead(variant, deltaXgFor, deltaXgAgainst, deltaWideShotsFor);
   }
   private backFiveTransitionClass(
     variant: BackFiveTransitionLabRow['variant'],
@@ -7975,9 +7971,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     deltaXgAgainst: number,
     deltaWideShotsFor: number
   ): string {
-    if (variant === 'base') return 'read-check';
-    if (variant === 'high') return deltaXgFor > 0.03 || deltaWideShotsFor > 0.20 ? 'read-visible' : 'read-check';
-    return deltaXgAgainst < -0.02 ? 'read-strong' : 'read-visible';
+    return getBackFiveTransitionClass(variant, deltaXgFor, deltaXgAgainst, deltaWideShotsFor);
   }
   private buildBackFiveFamilyLabRows(items: Array<{
     key: BackFiveFamilyLabRow['key'];
@@ -8187,18 +8181,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     deltaWideShotsFor: number,
     deltaWideShotsAgainst: number
   ): string {
-    if (key === 'transition') return 'Referencia transición';
-    if (key === 'low-block') {
-      if (deltaXgAgainst < -0.03 && deltaXgFor < -0.03) return 'Bloque bajo: protege, resigna salida';
-      if (deltaXgAgainst < -0.03) return 'Bloque bajo más seguro';
-      return 'Bloque bajo a revisar';
-    }
-    if ((deltaXgFor > 0.03 || deltaWideShotsFor > 0.20) && (deltaXgAgainst > 0.02 || deltaWideShotsAgainst > 0.15)) {
-      return 'Carrileros altos: más banda, más riesgo';
-    }
-    if (deltaXgFor > 0.03 || deltaWideShotsFor > 0.20) return 'Carrileros altos: más banda';
-    if (deltaXgAgainst > 0.12) return 'Carrileros altos: riesgo sin ventaja clara';
-    return 'Carrileros altos neutros';
+    return getBackFiveFamilyRead(key, deltaXgFor, deltaXgAgainst, deltaWideShotsFor, deltaWideShotsAgainst);
   }
   private backFiveFamilyClass(
     key: BackFiveFamilyLabRow['key'],

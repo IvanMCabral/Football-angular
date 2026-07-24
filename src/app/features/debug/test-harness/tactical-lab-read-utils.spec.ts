@@ -10,10 +10,10 @@ import {
 describe('tactical-lab-read-utils', () => {
   it('reads low-block variants from risk, output and possession deltas', () => {
     expect(lowBlockLabRead('base', 0, 0, 0, 0)).toBe('Referencia');
-    expect(lowBlockLabRead('high', 0.04, 0.03, 0, 0)).toBe('Mas salida, mas riesgo');
-    expect(lowBlockLabRead('high', 0.04, 0, 0, 0)).toBe('Mas salida');
+    expect(lowBlockLabRead('high', 0.04, 0.03, 0, 0)).toBe('Más salida, más riesgo');
+    expect(lowBlockLabRead('high', 0.04, 0, 0, 0)).toBe('Más salida');
     expect(lowBlockLabRead('high', 0, 0, 0, 0)).toBe('Revisar salida');
-    expect(lowBlockLabRead('low', 0, -0.03, 0, 0)).toBe('Mas bloque');
+    expect(lowBlockLabRead('low', 0, -0.03, 0, 0)).toBe('Más bloque');
     expect(lowBlockLabRead('low', 0, 0.03, 0.30, -1)).toBe('Demasiado hundido');
     expect(lowBlockLabRead('low', 0, 0, 0, 0)).toBe('Bloque similar');
   });
@@ -28,10 +28,10 @@ describe('tactical-lab-read-utils', () => {
 
   it('reads back-five transition variants from output and risk', () => {
     expect(backFiveTransitionRead('base', 0, 0, 0)).toBe('Referencia');
-    expect(backFiveTransitionRead('high', 0.04, 0.03, 0)).toBe('Mas transición, mas riesgo');
-    expect(backFiveTransitionRead('high', 0, 0, 0.30)).toBe('Mas transición');
+    expect(backFiveTransitionRead('high', 0.04, 0.03, 0)).toBe('Más transición, más riesgo');
+    expect(backFiveTransitionRead('high', 0, 0, 0.30)).toBe('Más transición');
     expect(backFiveTransitionRead('high', 0, 0, 0)).toBe('Revisar salida');
-    expect(backFiveTransitionRead('low', 0, -0.03, 0)).toBe('Mas cobertura');
+    expect(backFiveTransitionRead('low', 0, -0.03, 0)).toBe('Más cobertura');
     expect(backFiveTransitionRead('low', 0, 0, 0)).toBe('Cobertura similar');
   });
 

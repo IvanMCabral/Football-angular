@@ -14,12 +14,12 @@ export function lowBlockLabRead(
   if (variant === 'base') return 'Referencia';
   if (variant === 'high') {
     if (deltaXgFor > 0.03 && (deltaXgAgainst > 0.02 || deltaShotsAgainst > 0.20)) {
-      return 'Mas salida, mas riesgo';
+      return 'Más salida, más riesgo';
     }
-    if (deltaXgFor > 0.03) return 'Mas salida';
+    if (deltaXgFor > 0.03) return 'Más salida';
     return 'Revisar salida';
   }
-  if (deltaXgAgainst < -0.02 || deltaShotsAgainst < -0.20) return 'Mas bloque';
+  if (deltaXgAgainst < -0.02 || deltaShotsAgainst < -0.20) return 'Más bloque';
   if (deltaPossessionFor < -0.75 && (deltaXgAgainst > 0.02 || deltaShotsAgainst > 0.20)) {
     return 'Demasiado hundido';
   }
@@ -46,11 +46,11 @@ export function backFiveTransitionRead(
 ): string {
   if (variant === 'base') return 'Referencia';
   if (variant === 'high') {
-    if ((deltaXgFor > 0.03 || deltaWideShotsFor > 0.20) && deltaXgAgainst > 0.02) return 'Mas transición, mas riesgo';
-    if (deltaXgFor > 0.03 || deltaWideShotsFor > 0.20) return 'Mas transición';
+    if ((deltaXgFor > 0.03 || deltaWideShotsFor > 0.20) && deltaXgAgainst > 0.02) return 'Más transición, más riesgo';
+    if (deltaXgFor > 0.03 || deltaWideShotsFor > 0.20) return 'Más transición';
     return 'Revisar salida';
   }
-  if (deltaXgAgainst < -0.02) return 'Mas cobertura';
+  if (deltaXgAgainst < -0.02) return 'Más cobertura';
   return 'Cobertura similar';
 }
 
