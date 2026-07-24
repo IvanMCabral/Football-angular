@@ -181,6 +181,12 @@ import {
   sideMirrorRealRead as getSideMirrorRealRead,
 } from './side-mirror-read-utils';
 import {
+  allFormationsRoleSlotSmokeMarkdownReport as buildAllFormationsRoleSlotSmokeMarkdownReport,
+  allFormationsRoleSlotSmokeVerdictCounter as countAllFormationsRoleSlotSmokeVerdicts,
+  roleSlotImpactSmokeMarkdownReport as buildRoleSlotImpactSmokeMarkdownReport,
+  roleSlotImpactSmokeVerdictCounter as countRoleSlotImpactSmokeVerdicts,
+} from './role-slot-smoke-report-utils';
+import {
   backFiveContextClass as getBackFiveContextClass,
   backFiveContextRead as getBackFiveContextRead,
   backFiveFamilyClass as getBackFiveFamilyClass,
@@ -7207,43 +7213,15 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       seedStart: this.summarySeedStart(),
       seedCount: 10,
       generatedAt: new Date().toISOString(),
-      summary: this.roleSlotImpactSmokeVerdictCounter(rows),
+      summary: countRoleSlotImpactSmokeVerdicts(rows),
       rows,
     };
   }
   private roleSlotImpactSmokeMarkdownReport(): string {
-    const payload = this.roleSlotImpactSmokeExportPayload();
-    const rows = payload.rows;
-    const summaryText = Object.entries(payload.summary)
-      .map(([key, value]) => `${key}: ${value}`)
-      .join(' | ') || 'sin filas';
-    const lines = [
-      '# Role Slot Impact Smoke',
-      '',
-      `Match: ${payload.match}`,
-      `Formation: ${payload.formation ?? 'n/a'}`,
-      `Seeds: ${payload.seedStart}..${payload.seedStart + payload.seedCount - 1}`,
-      `Generated at: ${payload.generatedAt}`,
-      '',
-      `Summary: ${summaryText}`,
-      '',
-      '| Slot | Jugador | Mejor rol | Eff | Peor rol | Eff | Gap | Veredicto |',
-      '| --- | --- | --- | ---: | --- | ---: | ---: | --- |',
-      ...rows.map((row) =>
-        `| ${row.slotId} | ${row.player} | ${row.bestRole} | ${this.fmtPct(row.bestEff * 100)} | ${row.worstRole} | ${this.fmtPct(row.worstEff * 100)} | ${this.fmtPct(row.gap * 100)} | ${row.verdict} |`
-      ),
-      '',
-      'Lectura: si un slot defensivo prefiere DEF/LB/RB/CB y penaliza ATT, y un slot ofensivo prefiere ATT/WINGER/LW/RW y penaliza DEF, el modal esta llegando al motor. Si aparece "Revisar", ese slot necesita calibracion visual o de efectividad.',
-      '',
-    ];
-    return lines.join('\n');
-  }
-  private roleSlotImpactSmokeVerdictCounter(rows: RoleSlotImpactSmokeRow[]): Record<string, number> {
-    return rows.reduce<Record<string, number>>((acc, row) => {
-      const key = row.verdict || 'Sin veredicto';
-      acc[key] = (acc[key] ?? 0) + 1;
-      return acc;
-    }, {});
+    return buildRoleSlotImpactSmokeMarkdownReport(
+      this.roleSlotImpactSmokeExportPayload(),
+      (value) => this.fmtPct(value)
+    );
   }
   private allFormationsRoleSlotSmokeExportPayload(): {
     match: string;
@@ -7261,37 +7239,15 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       seedStart: this.summarySeedStart(),
       seedCount: 5,
       generatedAt: new Date().toISOString(),
-      summary: rows.reduce<Record<string, number>>((acc, row) => {
-        acc[row.verdict] = (acc[row.verdict] ?? 0) + 1;
-        return acc;
-      }, {}),
+      summary: countAllFormationsRoleSlotSmokeVerdicts(rows),
       rows,
     };
   }
   private allFormationsRoleSlotSmokeMarkdownReport(): string {
-    const payload = this.allFormationsRoleSlotSmokeExportPayload();
-    const summaryText = Object.entries(payload.summary)
-      .map(([key, value]) => `${key}: ${value}`)
-      .join(' | ') || 'sin filas';
-    const lines = [
-      '# All Formations Role Slot Smoke',
-      '',
-      `Match: ${payload.match}`,
-      `Seeds: ${payload.seedStart}..${payload.seedStart + payload.seedCount - 1}`,
-      `Generated at: ${payload.generatedAt}`,
-      '',
-      `Summary: ${summaryText}`,
-      '',
-      '| Formación | Slots | Claro | Visible | Revisar | Min gap | Avg gap | Slot débil | Veredicto |',
-      '| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |',
-      ...payload.rows.map((row) =>
-        `| ${row.formation} | ${row.slots} | ${row.clear} | ${row.visible} | ${row.review} | ${this.fmtPct(row.minGap * 100)} | ${this.fmtPct(row.avgGap * 100)} | ${row.weakestSlot} | ${row.verdict} |`
-      ),
-      '',
-      'Lectura: cada formación debe sostener gaps claros/visibles entre rol natural e improvisado. Si una formación cae en "Revisar", hay que abrir su detalle de slots y calibrar auto-select, coordenadas o efectividad.',
-      '',
-    ];
-    return lines.join('\n');
+    return buildAllFormationsRoleSlotSmokeMarkdownReport(
+      this.allFormationsRoleSlotSmokeExportPayload(),
+      (value) => this.fmtPct(value)
+    );
   }
   copyRoleSlotImpactSmokeJson(): void {
     const payload = JSON.stringify(this.roleSlotImpactSmokeExportPayload(), null, 2);
