@@ -149,6 +149,134 @@ export function buildScenarioDecisionCardsFromSummary(
   return cards.slice(0, 7);
 }
 
+export function scenarioBatteryDecision(
+  cards: ScenarioDecisionCard[],
+  objective: ScenarioBatteryCoachObjective = 'NEUTRAL'
+): { label: string; detail: string } {
+  const card = (title: string) => cards.find((item) => item.title === title);
+  const twoWay = card('Doble ganancia');
+  const protect = card('Cuidar');
+  const threat = card('Amenaza rival');
+  const offensiveRisk = card('Riesgo ofensivo');
+  const avoid = card('Evitar');
+  if (objective === 'PROTECT_RESULT' && twoWay) {
+    if (threat) {
+      return {
+        label: `Cerrar amenaza: ${threat.label} + ${twoWay.label}`,
+        detail: `La amenaza rival sigue visible. Cierre: ${twoWay.metrics}. Amenaza: ${threat.metrics}. ${twoWay.detail}`,
+      };
+    }
+    return {
+      label: `Controlar: ${twoWay.label}`,
+      detail: `${twoWay.label} da doble ganancia y encaja con cuidar resultado porque mejora el plan sin abrir xGA. ${twoWay.metrics}. ${twoWay.detail}`,
+    };
+  }
+  if (twoWay) {
+    if (threat) {
+      return {
+        label: `Aprovechar con cuidado: ${twoWay.label} vs ${threat.label}`,
+        detail: `${twoWay.label} da doble ganancia. Amenaza: ${threat.metrics}. ${twoWay.metrics}. ${twoWay.detail}`,
+      };
+    }
+    return {
+      label: `Aprovechar: ${twoWay.label}`,
+      detail: `${twoWay.label} da doble ganancia. ${twoWay.metrics}. ${twoWay.detail}`,
+    };
+  }
+  if (objective === 'PROTECT_RESULT') {
+    if (protect) {
+      if (threat) {
+        return {
+          label: `Cerrar amenaza: ${threat.label} + ${protect.label}`,
+          detail: `La amenaza rival pide cierre específico. Cierre: ${protect.metrics}. Amenaza: ${threat.metrics}. ${protect.detail}`,
+        };
+      }
+      return {
+        label: `Cerrar partido: ${protect.label}`,
+        detail: `${protect.label} es la mejor protección para cuidar resultado. ${protect.metrics}. ${protect.detail}`,
+      };
+    }
+    if (threat) {
+      return {
+        label: `Cerrar amenaza: ${threat.label}`,
+        detail: `${threat.label} es la amenaza principal si estás cuidando el partido. ${threat.metrics}. ${threat.detail}`,
+      };
+    }
+    if (offensiveRisk) {
+      return {
+        label: `No arriesgar: ${offensiveRisk.label}`,
+        detail: `${offensiveRisk.label} puede mejorar ataque, pero no encaja con cuidar resultado porque abre espacios. ${offensiveRisk.metrics}. ${offensiveRisk.detail}`,
+      };
+    }
+    if (avoid) {
+      return {
+        label: `No forzar: ${avoid.label}`,
+        detail: `${avoid.label} abre riesgo y no conviene si estás protegiendo resultado. ${avoid.metrics}. ${avoid.detail}`,
+      };
+    }
+  }
+  const attack = card('Atacar');
+  if (objective === 'NEED_GOAL' && offensiveRisk) {
+    return {
+      label: `Riesgo asumible: ${offensiveRisk.label}`,
+      detail: `${offensiveRisk.label} mejora el ataque y puede valer la pena si necesitás gol. Ojo: abre espacios. ${offensiveRisk.metrics}. ${offensiveRisk.detail}`,
+    };
+  }
+  if (objective === 'NEED_GOAL' && !attack && !offensiveRisk && !twoWay && avoid) {
+    return {
+      label: `Sin vía clara: ${avoid.label}`,
+      detail: `Necesitás gol, pero la batería no encontró una vía ofensiva clara; ${avoid.label} aparece como acción a evitar, no como solución. ${avoid.metrics}. ${avoid.detail}`,
+    };
+  }
+  if (attack) {
+    if (threat) {
+      return {
+        label: `Atacar con cuidado: ${attack.label} vs ${threat.label}`,
+        detail: `${attack.label} es la vía ofensiva, pero hay amenaza rival. Ataque: ${attack.metrics}. Amenaza: ${threat.metrics}. ${attack.detail}`,
+      };
+    }
+    return {
+      label: `Atacar: ${attack.label}`,
+      detail: `${attack.label} es el mejor plan ofensivo visible. ${attack.metrics}. ${attack.detail}`,
+    };
+  }
+  const shape = card('Forma');
+  if (shape) {
+    return {
+      label: `Ajustar forma: ${shape.label}`,
+      detail: `${shape.label} cambia la forma con impacto visible. ${shape.metrics}. ${shape.detail}`,
+    };
+  }
+  if (protect) {
+    return {
+      label: `Proteger: ${protect.label}`,
+      detail: `${protect.label} es la mejor protección detectada. ${protect.metrics}. ${protect.detail}`,
+    };
+  }
+  if (threat) {
+    return {
+      label: `Vigilar: ${threat.label}`,
+      detail: `${threat.label} es la amenaza principal del rival. ${threat.metrics}. ${threat.detail}`,
+    };
+  }
+  if (offensiveRisk) {
+    return {
+      label: `Riesgo alto: ${offensiveRisk.label}`,
+      detail: `${offensiveRisk.label} mejora el ataque pero abre espacios. Usarlo si necesitás gol o aceptás intercambio. ${offensiveRisk.metrics}. ${offensiveRisk.detail}`,
+    };
+  }
+  if (avoid) {
+    return {
+      label: `No forzar: ${avoid.label}`,
+      detail: `${avoid.label} abre riesgo y conviene evitarlo salvo necesidad. ${avoid.metrics}. ${avoid.detail}`,
+    };
+  }
+  return {
+    label: 'Mantener equipo',
+    detail: 'No hay una señal suficientemente clara para recomendar un cambio de DT en esta batería.',
+  };
+}
+
 export function scenarioBatteryGroupLabel(group: 'ALL' | 'OFFENSE' | 'DEFENSE' | 'OPPONENT'): string {
   switch (group) {
     case 'ALL':

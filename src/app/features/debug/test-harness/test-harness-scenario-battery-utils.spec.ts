@@ -5,6 +5,7 @@ import {
   scenarioAttackCandidateIsCoachWorthy,
   scenarioAttackPlanScore,
   scenarioBatteryCoachAdvice,
+  scenarioBatteryDecision,
   scenarioBatteryCoachObjectiveLabel,
   scenarioBatteryGroupLabel,
   scenarioBatteryReviewHint,
@@ -42,7 +43,7 @@ import {
   scenarioSummaryUserChannelRead,
   scenarioTwoWayScore,
 } from './test-harness-scenario-battery-utils';
-import { ScenarioBatteryRow, ScenarioMatrixSummaryRow, TeamStyleOption } from '../models/test-harness.model';
+import { ScenarioBatteryRow, ScenarioDecisionCard, ScenarioMatrixSummaryRow, TeamStyleOption } from '../models/test-harness.model';
 
 const styles: TeamStyleOption[] = [
   { value: 'BALANCED', label: 'Balanced', hint: 'balanced' },
@@ -454,6 +455,41 @@ describe('test-harness-scenario-battery-utils', () => {
     expect(cards[1].detail).toBe('canal wide / protege wide');
     expect(cards[3].detail).toBe('canal risky / riesgo risky');
     expect(cards[4].detail).toBe('riesgo wide-rival');
+  });
+
+  it('chooses scenario battery decisions from cards and coach objective', () => {
+    const card = (title: string, label = title): ScenarioDecisionCard => ({
+      title,
+      label,
+      metrics: `${title} metrics`,
+      detail: `${title} detail`,
+      className: 'decision-test',
+    });
+
+    expect(scenarioBatteryDecision([card('Doble ganancia', 'Plan doble')], 'NEUTRAL')).toEqual({
+      label: 'Aprovechar: Plan doble',
+      detail: 'Plan doble da doble ganancia. Doble ganancia metrics. Doble ganancia detail',
+    });
+    expect(scenarioBatteryDecision([card('Doble ganancia', 'Plan doble'), card('Amenaza rival', 'Banda rival')], 'PROTECT_RESULT')).toEqual({
+      label: 'Cerrar amenaza: Banda rival + Plan doble',
+      detail: 'La amenaza rival sigue visible. Cierre: Doble ganancia metrics. Amenaza: Amenaza rival metrics. Doble ganancia detail',
+    });
+    expect(scenarioBatteryDecision([card('Cuidar', 'Bloque bajo')], 'PROTECT_RESULT')).toEqual({
+      label: 'Cerrar partido: Bloque bajo',
+      detail: 'Bloque bajo es la mejor protección para cuidar resultado. Cuidar metrics. Cuidar detail',
+    });
+    expect(scenarioBatteryDecision([card('Riesgo ofensivo', 'Ataque total')], 'NEED_GOAL')).toEqual({
+      label: 'Riesgo asumible: Ataque total',
+      detail: 'Ataque total mejora el ataque y puede valer la pena si necesitás gol. Ojo: abre espacios. Riesgo ofensivo metrics. Riesgo ofensivo detail',
+    });
+    expect(scenarioBatteryDecision([card('Evitar', 'Mal cambio')], 'NEED_GOAL')).toEqual({
+      label: 'Sin vía clara: Mal cambio',
+      detail: 'Necesitás gol, pero la batería no encontró una vía ofensiva clara; Mal cambio aparece como acción a evitar, no como solución. Evitar metrics. Evitar detail',
+    });
+    expect(scenarioBatteryDecision([], 'NEUTRAL')).toEqual({
+      label: 'Mantener equipo',
+      detail: 'No hay una señal suficientemente clara para recomendar un cambio de DT en esta batería.',
+    });
   });
 
   it('scores scenario summary impact from the largest normalized signal', () => {

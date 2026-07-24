@@ -2995,7 +2995,7 @@ describe('TestHarnessPageComponent', () => {
 
     expect(neutral.label).toContain('Riesgo alto: CM -> x50/y40');
     expect(chasing.label).toContain('Riesgo asumible: CM -> x50/y40');
-    expect(chasing.detail).toContain('si necesitas gol');
+    expect(chasing.detail).toContain('si necesitás gol');
     expect(protecting.label).toContain('No arriesgar: CM -> x50/y40');
     expect(protecting.detail).toContain('cuidar resultado');
   });
