@@ -40,6 +40,7 @@ type PlayerSwapTacticalBreakdown = Pick<
 >;
 
 export type PlayerSwapCoachReadLevel = 'upgrade' | 'downgrade' | 'tradeoff' | 'neutral' | 'review';
+export type PlayerSwapPrecisionStability = 'Stable read' | 'Changed read' | 'Needs more seeds';
 
 export interface PlayerSwapRoleRiskRead {
   attack: number;
@@ -289,6 +290,26 @@ export function playerSwapDecisionScore(
       - (row.swapFit === 'Out of role' && row.deltaXgAgainst > 0 ? 0.12 : 0);
   }
   return base;
+}
+
+export function playerSwapPrecisionStability(
+  quick: PlayerSwapMatrixSummary,
+  balanced: PlayerSwapMatrixSummary,
+  objective: ScenarioBatteryCoachObjective,
+): PlayerSwapPrecisionStability {
+  if (quick.swapRead === balanced.swapRead) return 'Stable read';
+  const quickScore = playerSwapDecisionScore(quick, objective);
+  const balancedScore = playerSwapDecisionScore(balanced, objective);
+  if (Math.sign(quickScore) !== Math.sign(balancedScore) || Math.abs(quickScore - balancedScore) > 0.12) {
+    return 'Changed read';
+  }
+  return 'Needs more seeds';
+}
+
+export function playerSwapPrecisionStabilityClass(stability: string): string {
+  if (stability === 'Stable read') return 'delta-positive';
+  if (stability === 'Changed read') return 'delta-negative';
+  return 'read-check';
 }
 
 export function playerSwapProtectSpecialistScore(row: PlayerSwapMatrixSummary): number {

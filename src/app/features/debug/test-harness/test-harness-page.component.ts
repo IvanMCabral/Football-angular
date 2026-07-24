@@ -184,6 +184,8 @@ import {
   playerSwapDecisionScore as getPlayerSwapDecisionScore,
   playerSwapIsActionableRecommendation as getPlayerSwapIsActionableRecommendation,
   playerSwapProtectSpecialistScore as getPlayerSwapProtectSpecialistScore,
+  playerSwapPrecisionStability as getPlayerSwapPrecisionStability,
+  playerSwapPrecisionStabilityClass as getPlayerSwapPrecisionStabilityClass,
   playerSwapRoleTradeoff as getPlayerSwapRoleTradeoff,
   playerSwapSignalClass as getPlayerSwapSignalClass,
   playerSwapSignalRead as getPlayerSwapSignalRead,
@@ -10102,18 +10104,10 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return `${row.slotId}:${row.baselinePlayer}:${row.swapPlayer}`;
   }
   private playerSwapPrecisionStability(quick: PlayerSwapMatrixSummary, balanced: PlayerSwapMatrixSummary): string {
-    if (quick.swapRead === balanced.swapRead) return 'Stable read';
-    const quickScore = this.playerSwapDecisionScore(quick);
-    const balancedScore = this.playerSwapDecisionScore(balanced);
-    if (Math.sign(quickScore) !== Math.sign(balancedScore) || Math.abs(quickScore - balancedScore) > 0.12) {
-      return 'Changed read';
-    }
-    return 'Needs more seeds';
+    return getPlayerSwapPrecisionStability(quick, balanced, this.playerSwapEffectiveCoachObjective());
   }
   private playerSwapPrecisionStabilityClass(stability: string): string {
-    if (stability === 'Stable read') return 'delta-positive';
-    if (stability === 'Changed read') return 'delta-negative';
-    return 'read-check';
+    return getPlayerSwapPrecisionStabilityClass(stability);
   }
   onRunPositionPixelMatrix(): void {
     // Position movement is more sensitive than a simple smoke replay. Keep this

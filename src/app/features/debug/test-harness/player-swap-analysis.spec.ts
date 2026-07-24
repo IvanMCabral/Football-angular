@@ -8,6 +8,8 @@ import {
   playerSwapIsActionableRecommendation,
   playerSwapOverallDelta,
   playerSwapOverallDeltaText,
+  playerSwapPrecisionStability,
+  playerSwapPrecisionStabilityClass,
   playerSwapProtectSpecialistScore,
   playerSwapQualityWarning,
   playerSwapSignalClass,
@@ -280,6 +282,32 @@ describe('player-swap-analysis', () => {
       swapRead: 'Clear upgrade',
       deltaXgDiff: 0.04,
     })).toBeTrue();
+  });
+
+  it('compares quick vs balanced swap precision reads', () => {
+    expect(playerSwapPrecisionStability(
+      { ...baseSummaryRow, swapRead: 'Clear upgrade' },
+      { ...baseSummaryRow, swapRead: 'Clear upgrade' },
+      'NEUTRAL',
+    )).toBe('Stable read');
+
+    expect(playerSwapPrecisionStability(
+      { ...baseSummaryRow, swapRead: 'Clear upgrade', deltaXgDiff: 0.08 },
+      { ...baseSummaryRow, swapRead: 'Trade-off', deltaXgDiff: -0.08 },
+      'NEUTRAL',
+    )).toBe('Changed read');
+
+    expect(playerSwapPrecisionStability(
+      { ...baseSummaryRow, swapRead: 'Clear upgrade', deltaXgDiff: 0.04 },
+      { ...baseSummaryRow, swapRead: 'Trade-off', deltaXgDiff: 0.08 },
+      'NEUTRAL',
+    )).toBe('Needs more seeds');
+  });
+
+  it('maps swap precision stability to display classes', () => {
+    expect(playerSwapPrecisionStabilityClass('Stable read')).toBe('delta-positive');
+    expect(playerSwapPrecisionStabilityClass('Changed read')).toBe('delta-negative');
+    expect(playerSwapPrecisionStabilityClass('Needs more seeds')).toBe('read-check');
   });
 
   it('blocks large quality drops unless the evidence is strong and stable', () => {
