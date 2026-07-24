@@ -44,25 +44,9 @@ export class CareerSetupComponent implements OnInit {
   availableTeamsPerDivision$: Observable<number[]>;
   totalTeamsInLeague$: Observable<number>;
   loading$: Observable<boolean>;
-  /**
-   * V25D83 sprint: teams-loading indicator. True while a league is selected
-   * but {@code teamsWithOVR$} hasn't emitted its payload yet. Lets the UI
-   * show an inline spinner in the team dropdown (or the divisions-preview
-   * grid) while the /world/leagues/:id/teams-with-ovr HTTP is in flight.
-   *
-   * <p>Heuristic: we derive this from {@code combineLatest([leagueId,
-   * teams])} where {@code leagueId} comes from {@code leagueChangeSubject}
-   * and {@code teams} from {@code teamsWithOVR$}. Loading is when a
-   * league is selected AND the teams array is empty. Empty teams with no
-   * league selected is the initial state (no spinner).
-   */
   loadingTeams$: Observable<boolean>;
   error$ = new BehaviorSubject<string | null>(null);
 
-  // V25D78-C48.1: setup-flow UX gap fix. `seedingWorld` is true while POST
-  // /world/seed-la-liga is in flight; the UI uses it to disable the seed button
-  // and show a spinner. `refreshLeaguesTrigger` is a tick observable that, when
-  // emitted, re-fetches the leagues list (used after a successful seed).
   seedingWorld = false;
   private refreshLeaguesTrigger = new BehaviorSubject<void>(undefined);
 
@@ -106,24 +90,6 @@ export class CareerSetupComponent implements OnInit {
     private router: Router,
     private authService: AuthService
   ) {
-    /**
-     * V25D83.1 sprint 2 ajuste (pre-push): cachear la primera emission de
-     * leagues$ con {@code shareReplay(1)} para evitar HTTP requests duplicados.
-     *
-     * <p>Pre-fix: cada nuevo subscriber a {@code leagues$} disparaba un nuevo
-     * GET /world/leagues porque el pipe terminaba en un switchMap cold.
-     * En el template, el `(leagues$ | async)` dentro del seed-flow (line 21)
-     * Y el `(leagues$ | async)` dentro del select de Liga (line 46) creaban
-     * DOS suscripciones independientes, ambas con su propio HTTP request.
-     * Cuando Iván abría el dropdown, ya teníamos 2-3 requests en flight para
-     * la misma data (más el `take(1)` de ngOnInit que dispara otra).
-     *
-     * <p>Post-fix: {@code shareReplay({ bufferSize: 1, refCount: false })} cachea
-     * la primera emission exitosa y la re-emite a todos los subscribers
-     * sin refetch. {@code refCount: false} mantiene el source vivo aunque no
-     * haya subscribers (para que el `take(1)` de ngOnInit no desuscriba el
-     * cache antes de que los async pipes se suscriban).
-     */
     this.leagues$ = combineLatest([
       this.authService.getUserInfo(),
       this.refreshLeaguesTrigger
@@ -143,14 +109,7 @@ export class CareerSetupComponent implements OnInit {
         if (!leagueId) {
           return of([]);
         }
-        // V25D83 sprint: prepend an immediate empty-array emission so the
-        // loadingTeams$ derived observable flips to `true` synchronously
-        // on league-change (without waiting for the HTTP response). Before
-        // this fix, switching leagues kept the OLD teams in the async
-        // pipe until the new HTTP resolved, so loadingTeams$ would never
-        // see "empty teams + selected league" and the spinner would be
-        // skipped on the switch. Concat emits the seed `[]` first, then
-        // subscribes to the HTTP chain.
+        // Emit an empty list first so the UI can show the team-loading state immediately.
         return concat(
           of([] as TeamWithOVR[]),
           this.authService.getUserInfo().pipe(
@@ -202,26 +161,12 @@ export class CareerSetupComponent implements OnInit {
       map(teams => teams.length)
     );
 
-    /**
-     * V25D83 sprint: replace the broken `leagues === null` mapping (the
-     * leagues$ source emits `League[]`, never `null`, so loading$ was
-     * permanently `false` and the page-level spinner never rendered).
-     * The new derivation emits `true` on subscription and flips to `false`
-     * as soon as leagues$ emits its first value (success or empty). The
-     * downstream `distinctUntilChanged()` collapses no-op emissions.
-     */
     this.loading$ = this.leagues$.pipe(
       map(() => false),
       startWith(true),
       distinctUntilChanged()
     );
 
-    /**
-     * V25D83 sprint: teams-loading indicator. True while a league is
-     * selected AND teamsWithOVR$ has not yet delivered a non-empty payload.
-     * See the {@code loadingTeams$} JSDoc above for the heuristic and the
-     * empty-league edge case.
-     */
     this.loadingTeams$ = combineLatest([
       this.leagueChangeSubject,
       this.teamsWithOVR$
@@ -231,38 +176,6 @@ export class CareerSetupComponent implements OnInit {
     );
   }
 
-  /**
-   * V25D82.2 sprint UX fix: pre-load teams without auto-selecting a league.
-   *
-   * <p>Background: with only one league available (e.g. LaLiga after the
-   * C55.1 seed), the user can't easily tell the dropdown has an option to
-   * pick — it looks like the setup page is stuck. The previous V25D82 fix
-   * tried auto-selecting the first league, but Iván preferred to keep
-   * manual control. This version triggers the {@code leagueChangeSubject}
-   * with the first league's id so the {@code teamsWithOVR$} observable
-   * emits, populating the team dropdown, WITHOUT changing
-   * {@code selectedLeagueId}. The user still has to pick the league
-   * explicitly in the dropdown before {@code startCareer()} is allowed.
-   *
-   * <p>Behavior:
-   * <ul>
-   *   <li>If {@code leagues$} emits a non-empty array, fire
-   *       {@code leagueChangeSubject.next(leagues[0].realLeagueId)} so the
-   *       team dropdown is populated. Do NOT touch
-   *       {@code selectedLeagueId}.</li>
-   *   <li>If {@code leagues$} emits an empty array (new user, world not
-   *       seeded), nothing happens — the seed-world CTA already handles
-   *       that case.</li>
-   *   <li>If the user picks a different league manually, the dropdown's
-   *       own {@code (ngModelChange)} flow via {@link onLeagueChange}
-   *       re-fires {@code leagueChangeSubject} with the new id, and the
-   *       team dropdown re-emits.</li>
-   * </ul>
-   *
-   * <p>{@code take(1)} makes this a one-shot — we only want to react to
-   * the first emission. Subsequent emissions (e.g. after seed-world) are
-   * handled by the dropdown's own {@code (ngModelChange)} flow.
-   */
   ngOnInit(): void {
     this.leagues$.pipe(take(1)).subscribe(leagues => {
       if (leagues && leagues.length > 0 && !this.selectedLeagueId) {
@@ -295,20 +208,6 @@ export class CareerSetupComponent implements OnInit {
     this.selectedTeamId = teamId;
   }
 
-  /**
-   * V25D78-C48.1: setup-flow UX gap fix.
-   *
-   * <p>REVISOR C48 V7 found that a new user can register and reach /career/setup
-   * but the world has not been seeded yet (no leagues visible, dropdown empty).
-   * Before this fix the user was stuck: the backend exposes POST /world/seed-la-liga
-   * but no UI button or auto-trigger called it during the registration flow.
-   *
-   * <p>This handler is the UI-side trigger. The HTTP call sends the JWT of the
-   * authenticated user via the existing authInterceptor (no need to set the
-   * Authorization header manually). On 200 OK, we refresh the leagues$ observable
-   * by emitting on `refreshLeaguesTrigger` so the dropdown auto-populates with
-   * La Liga 2024/25 without requiring a page reload.
-   */
   seedWorld(): void {
     if (this.seedingWorld) {
       return; // debounce: ignore double-clicks while in flight
@@ -323,7 +222,6 @@ export class CareerSetupComponent implements OnInit {
         ).subscribe({
           next: () => {
             this.seedingWorld = false;
-            // Trigger leagues$ re-fetch so the dropdown updates with the new La Liga entry.
             this.refreshLeaguesTrigger.next();
           },
           error: (err) => {
@@ -364,7 +262,7 @@ export class CareerSetupComponent implements OnInit {
         payload.teamsPerDivision = this.selectedTeamsPerDivision;
       }
 
-      const response = await this.http.post<{ careerId: string }>(
+      await this.http.post<{ careerId: string }>(
         `${environment.apiUrl}/career/start`, 
         payload
       ).toPromise();
