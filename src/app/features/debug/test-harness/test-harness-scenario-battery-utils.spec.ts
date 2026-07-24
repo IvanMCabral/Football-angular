@@ -7,6 +7,7 @@ import {
   inferScenarioBatteryCoachObjective,
   scenarioBatteryCardDetail,
   scenarioBatteryCardSummary,
+  scenarioBatteryCandidateMatches,
   scenarioBatteryCoachAdvice,
   scenarioBatteryCoachContext,
   scenarioBatteryCoachObjectiveHint,
@@ -128,6 +129,15 @@ function matchRow(partial: Partial<TestHarnessMatchRow> = {}): TestHarnessMatchR
     },
     ...partial,
   };
+}
+
+function batteryCandidate(id: string, status: TestHarnessMatchRow['status'] = 'COMPLETED'): TestHarnessMatchRow {
+  return matchRow({
+    matchId: id,
+    homeTeamName: `Home ${id}`,
+    awayTeamName: `Away ${id}`,
+    status,
+  });
 }
 
 describe('test-harness-scenario-battery-utils', () => {
@@ -383,6 +393,33 @@ describe('test-harness-scenario-battery-utils', () => {
     expect(scenarioBatteryScenarioCountEstimate('DEFENSE')).toBe(7);
     expect(scenarioBatteryScenarioCountEstimate('OPPONENT')).toBe(5);
     expect(scenarioBatteryScenarioCountEstimate('OFFENSE')).toBe(19);
+  });
+
+  it('selects scenario battery candidate matches from completed fixtures', () => {
+    const rounds = [
+      {
+        round: 1,
+        byeTeam: null,
+        matches: [
+          batteryCandidate('m1'),
+          batteryCandidate('m2', 'PENDING'),
+          batteryCandidate('m3'),
+        ],
+      },
+      {
+        round: 2,
+        byeTeam: null,
+        matches: [
+          batteryCandidate('m4'),
+          batteryCandidate('m5'),
+        ],
+      },
+    ];
+
+    expect(scenarioBatteryCandidateMatches(rounds, null, 2).map((match) => match.matchId)).toEqual(['m1', 'm3']);
+    expect(scenarioBatteryCandidateMatches(rounds, 'm4', 3).map((match) => match.matchId)).toEqual(['m4', 'm1', 'm3']);
+    expect(scenarioBatteryCandidateMatches(rounds, 'm2', 3).map((match) => match.matchId)).toEqual(['m1', 'm3', 'm4']);
+    expect(scenarioBatteryCandidateMatches(rounds, 'missing', 2).map((match) => match.matchId)).toEqual(['m1', 'm3']);
   });
 
   it('reads scenario battery coach context from match state and squad strength', () => {

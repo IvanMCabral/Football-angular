@@ -1,5 +1,6 @@
 import {
   ControlledTeamSide,
+  RoundGroup,
   ScenarioBatteryCoachAdvice,
   ScenarioBatteryCoachObjective,
   ScenarioBatteryCoachObjectiveModel,
@@ -118,6 +119,27 @@ export function scenarioBatteryScenarioCountEstimate(group: 'ALL' | 'OFFENSE' | 
     default:
       return 19;
   }
+}
+
+export function scenarioBatteryCandidateMatches(
+  rounds: RoundGroup[],
+  selectedMatchId: string | null,
+  limit: number
+): TestHarnessMatchRow[] {
+  const completed = rounds
+    .flatMap((round) => round.matches)
+    .filter((match) => String(match.status).toUpperCase() === 'COMPLETED');
+  if (!selectedMatchId) {
+    return completed.slice(0, limit);
+  }
+  const selected = completed.find((match) => match.matchId === selectedMatchId);
+  if (!selected) {
+    return completed.slice(0, limit);
+  }
+  return [
+    selected,
+    ...completed.filter((match) => match.matchId !== selectedMatchId),
+  ].slice(0, limit);
 }
 
 export function scenarioBatteryMetricText(value: number | null | undefined, label: string): string {

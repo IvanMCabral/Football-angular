@@ -163,6 +163,7 @@ import {
   scenarioAttackPlanScore as getScenarioAttackPlanScore,
   scenarioBatteryCardDetail as getScenarioBatteryCardDetail,
   scenarioBatteryCardSummary as getScenarioBatteryCardSummary,
+  scenarioBatteryCandidateMatches as getScenarioBatteryCandidateMatches,
   scenarioBatteryCoachContext as getScenarioBatteryCoachContext,
   scenarioBatteryCoachAdvice as getScenarioBatteryCoachAdvice,
   scenarioBatteryCoachObjectiveHint as getScenarioBatteryCoachObjectiveHint,
@@ -5771,21 +5772,11 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     this.buildScenarioDecisionCards(this.scenarioMatrixSummaryResults())
   );
   scenarioBatteryCandidateMatches(): TestHarnessMatchRow[] {
-    const completed = this.rounds()
-      .flatMap((round) => round.matches)
-      .filter((match) => String(match.status).toUpperCase() === 'COMPLETED');
-    const selectedId = this.selectedMatchId();
-    if (!selectedId) {
-      return completed.slice(0, this.scenarioBatteryMatchLimit());
-    }
-    const selected = completed.find((match) => match.matchId === selectedId);
-    if (!selected) {
-      return completed.slice(0, this.scenarioBatteryMatchLimit());
-    }
-    return [
-      selected,
-      ...completed.filter((match) => match.matchId !== selectedId),
-    ].slice(0, this.scenarioBatteryMatchLimit());
+    return getScenarioBatteryCandidateMatches(
+      this.rounds(),
+      this.selectedMatchId(),
+      this.scenarioBatteryMatchLimit()
+    );
   }
   private buildScenarioDecisionCards(summaryRows: ScenarioMatrixSummaryRow[]): ScenarioDecisionCard[] {
     return buildScenarioDecisionCardsFromSummaryUtils(summaryRows, {
