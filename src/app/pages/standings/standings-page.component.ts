@@ -9,20 +9,8 @@ import { CareerService } from 'app/core/services/career.service';
 import { CareerStatus, DivisionStandings } from 'app/core/services/career.model';
 
 /**
- * V25D78-C55.2 phase 4 UI (b2): standalone {@code /standings} page.
- *
- * <p>Renders the same 3-tab PRIMERA/SEGUNDA/TERCERA standings view as
- * {@link StandingsModalComponent} but as a full page reachable from the
- * dashboard / navigation. The existing modal stays available for the
- * in-squad entry point (kept for compat); this page is the canonical
- * place to land when a user wants to inspect all 3 divisions at once.
- *
- * <p>Reuses {@link CareerService.getAllStandings()} (already in place for the
- * modal) and the same {@link DivisionStandings} / {@link CareerStatus} types.
- *
- * <p>(c2) green/red promotion/relegation zone indicator: top-3 rows of each
- * division are tinted green (ascend), bottom-3 rows tinted red (descend).
- * Constant mirrored from the modal so behavior stays consistent.
+ * Standalone standings page for inspecting all divisions at once.
+ * It shares the same standings data contract as the modal version.
  */
 @Component({
   selector: 'app-standings-page',
@@ -32,7 +20,7 @@ import { CareerStatus, DivisionStandings } from 'app/core/services/career.model'
   styleUrls: ['./standings-page.component.css']
 })
 export class StandingsPageComponent implements OnInit {
-  /** V25D78-C55.2 phase 4 UI (c2): top-3 ascend / bottom-3 descend. */
+  /** Top and bottom rows marked as promotion/relegation zones. */
   readonly TEAMS_PROMOTED_OR_RELEGATED = 3;
 
   loading$ = new BehaviorSubject<boolean>(true);

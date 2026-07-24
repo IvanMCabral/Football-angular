@@ -17,9 +17,8 @@ import { DivisionStandings, AllStandingsResponse } from 'app/core/services/caree
 })
 export class StandingsModalComponent implements OnInit {
   /**
-   * V25D78-C55.2 phase 4 UI (c2): number of teams promoted/relegated at the
-   * end of each season. Mirrors `PromotionRelegationService.TEAMS_PROMOTED_OR_RELEGATED`
-   * on the back. Top-3 of each division ascends, bottom-3 descends.
+   * Number of teams highlighted in the promotion/relegation zones.
+   * Keep this aligned with the backend promotion/relegation rules.
    */
   readonly TEAMS_PROMOTED_OR_RELEGATED = 3;
 
