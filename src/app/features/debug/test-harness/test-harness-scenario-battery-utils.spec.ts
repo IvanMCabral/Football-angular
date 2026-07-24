@@ -1,4 +1,5 @@
 import {
+  buildScenarioBatteryRow,
   buildScenarioDecisionCardsFromSummary,
   scenarioActionLabel,
   scenarioActionKey,
@@ -420,6 +421,59 @@ describe('test-harness-scenario-battery-utils', () => {
     expect(scenarioBatteryCandidateMatches(rounds, 'm4', 3).map((match) => match.matchId)).toEqual(['m4', 'm1', 'm3']);
     expect(scenarioBatteryCandidateMatches(rounds, 'm2', 3).map((match) => match.matchId)).toEqual(['m1', 'm3', 'm4']);
     expect(scenarioBatteryCandidateMatches(rounds, 'missing', 2).map((match) => match.matchId)).toEqual(['m1', 'm3']);
+  });
+
+  it('builds scenario battery rows from match, cards and coach reads', () => {
+    const cards: ScenarioDecisionCard[] = [
+      {
+        title: 'Atacar',
+        label: 'Banda izquierda',
+        metrics: 'xG +0.12',
+        detail: 'Ataca el lado débil.',
+        className: 'decision-attack',
+      },
+    ];
+    const rows = [
+      { scenario: 'baseline' },
+      { scenario: 'attack-left' },
+    ] as ScenarioMatrixSummaryRow[];
+
+    expect(buildScenarioBatteryRow(matchRow(), 'AWAY', 'OFFENSE', 123, 5, rows, {
+      buildDecisionCards: (summaryRows) => {
+        expect(summaryRows).toBe(rows);
+        return cards;
+      },
+      coachContext: () => ({ summary: 'ctx summary', detail: 'ctx detail' }),
+      coachObjective: () => 'NEED_GOAL',
+      decision: (decisionCards, objective) => {
+        expect(decisionCards).toBe(cards);
+        expect(objective).toBe('NEED_GOAL');
+        return { label: 'Atacar: Banda izquierda', detail: 'decision detail' };
+      },
+      review: (objective, decisionLabel, decisionCards) => {
+        expect(objective).toBe('NEED_GOAL');
+        expect(decisionLabel).toBe('Atacar: Banda izquierda');
+        expect(decisionCards).toBe(cards);
+        return { label: 'OK', detail: 'review detail' };
+      },
+    })).toEqual({
+      matchId: 'match-1',
+      matchLabel: 'Real Madrid vs Las Palmas',
+      controlledSide: 'AWAY',
+      controlledTeam: 'Las Palmas',
+      scenarioGroup: 'OFFENSE',
+      coachObjective: 'NEED_GOAL',
+      coachContext: 'ctx summary',
+      coachContextDetail: 'ctx detail',
+      seedStart: 123,
+      seedCount: 5,
+      scenarioCount: 2,
+      decision: 'Atacar: Banda izquierda',
+      decisionDetail: 'decision detail',
+      review: 'OK',
+      reviewDetail: 'review detail',
+      cards,
+    });
   });
 
   it('reads scenario battery coach context from match state and squad strength', () => {

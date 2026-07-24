@@ -15,6 +15,27 @@ import {
 type ScenarioBatteryControlledSide = Exclude<ControlledTeamSide, 'USER'>;
 type ScenarioBatteryStrength = TestHarnessMatchRow['homeStrength'] | null;
 
+export interface ScenarioBatteryRowBuilderDeps {
+  buildDecisionCards: (rows: ScenarioMatrixSummaryRow[]) => ScenarioDecisionCard[];
+  coachContext: (
+    match: TestHarnessMatchRow,
+    controlledSide: ScenarioBatteryControlledSide
+  ) => { summary: string; detail: string };
+  coachObjective: (
+    match: TestHarnessMatchRow,
+    controlledSide: ScenarioBatteryControlledSide
+  ) => ScenarioBatteryCoachObjective;
+  decision: (
+    cards: ScenarioDecisionCard[],
+    objective: ScenarioBatteryCoachObjective
+  ) => { label: string; detail: string };
+  review: (
+    objective: ScenarioBatteryCoachObjective,
+    decisionLabel: string,
+    cards: ScenarioDecisionCard[]
+  ) => { label: string; detail: string };
+}
+
 export interface ScenarioDecisionCardBuilderDeps {
   actionKey: (row: ScenarioMatrixSummaryRow) => string;
   attackCandidateIsCoachWorthy: (row: ScenarioMatrixSummaryRow) => boolean;
@@ -140,6 +161,40 @@ export function scenarioBatteryCandidateMatches(
     selected,
     ...completed.filter((match) => match.matchId !== selectedMatchId),
   ].slice(0, limit);
+}
+
+export function buildScenarioBatteryRow(
+  match: TestHarnessMatchRow,
+  controlledSide: ScenarioBatteryControlledSide,
+  scenarioGroup: 'ALL' | 'OFFENSE' | 'DEFENSE' | 'OPPONENT',
+  seedStart: number,
+  seedCount: number,
+  rows: ScenarioMatrixSummaryRow[],
+  deps: ScenarioBatteryRowBuilderDeps
+): ScenarioBatteryRow {
+  const cards = deps.buildDecisionCards(rows);
+  const coachObjective = deps.coachObjective(match, controlledSide);
+  const coachContext = deps.coachContext(match, controlledSide);
+  const decision = deps.decision(cards, coachObjective);
+  const review = deps.review(coachObjective, decision.label, cards);
+  return {
+    matchId: match.matchId,
+    matchLabel: `${match.homeTeamName} vs ${match.awayTeamName}`,
+    controlledSide,
+    controlledTeam: controlledSide === 'HOME' ? match.homeTeamName : match.awayTeamName,
+    scenarioGroup,
+    coachObjective,
+    coachContext: coachContext.summary,
+    coachContextDetail: coachContext.detail,
+    seedStart,
+    seedCount,
+    scenarioCount: rows.length,
+    decision: decision.label,
+    decisionDetail: decision.detail,
+    review: review.label,
+    reviewDetail: review.detail,
+    cards,
+  };
 }
 
 export function scenarioBatteryMetricText(value: number | null | undefined, label: string): string {

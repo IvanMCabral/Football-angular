@@ -155,6 +155,7 @@ import {
   professionalSmokeVerdictClass as getProfessionalSmokeVerdictClass,
 } from './test-harness-professional-qa-utils';
 import {
+  buildScenarioBatteryRow as buildScenarioBatteryRowUtils,
   buildScenarioDecisionCardsFromSummary as buildScenarioDecisionCardsFromSummaryUtils,
   inferScenarioBatteryCoachObjective as inferScenarioBatteryCoachObjectiveUtils,
   scenarioActionLabel as getScenarioActionLabel,
@@ -12266,29 +12267,13 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     seedCount: number,
     rows: ScenarioMatrixSummaryRow[]
   ): ScenarioBatteryRow {
-    const cards = this.buildScenarioDecisionCards(rows);
-    const coachObjective = this.scenarioBatteryEffectiveCoachObjective(match, controlledSide);
-    const coachContext = this.scenarioBatteryCoachContext(match, controlledSide);
-    const decision = this.scenarioBatteryDecision(cards, coachObjective);
-    const review = this.scenarioBatteryDecisionReview(coachObjective, decision.label, cards);
-    return {
-      matchId: match.matchId,
-      matchLabel: `${match.homeTeamName} vs ${match.awayTeamName}`,
-      controlledSide,
-      controlledTeam: controlledSide === 'HOME' ? match.homeTeamName : match.awayTeamName,
-      scenarioGroup,
-      coachObjective,
-      coachContext: coachContext.summary,
-      coachContextDetail: coachContext.detail,
-      seedStart,
-      seedCount,
-      scenarioCount: rows.length,
-      decision: decision.label,
-      decisionDetail: decision.detail,
-      review: review.label,
-      reviewDetail: review.detail,
-      cards,
-    };
+    return buildScenarioBatteryRowUtils(match, controlledSide, scenarioGroup, seedStart, seedCount, rows, {
+      buildDecisionCards: (summaryRows) => this.buildScenarioDecisionCards(summaryRows),
+      coachContext: (targetMatch, side) => this.scenarioBatteryCoachContext(targetMatch, side),
+      coachObjective: (targetMatch, side) => this.scenarioBatteryEffectiveCoachObjective(targetMatch, side),
+      decision: (cards, objective) => this.scenarioBatteryDecision(cards, objective),
+      review: (objective, decisionLabel, cards) => this.scenarioBatteryDecisionReview(objective, decisionLabel, cards),
+    });
   }
   private scenarioBatteryDecision(
     cards: ScenarioDecisionCard[],
