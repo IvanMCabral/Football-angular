@@ -1,4 +1,6 @@
 import {
+  playerSwapBatteryCoachRead,
+  playerSwapBatteryCounterText,
   playerSwapHasLargeQualityDrop,
   playerSwapCoachReadLevel,
   playerSwapCoachRead,
@@ -83,6 +85,68 @@ describe('player-swap-analysis', () => {
     signalDetail: '',
     timestamp: '',
   } satisfies PlayerSwapMatrixSummary;
+
+  it('formats player swap battery counters', () => {
+    expect(playerSwapBatteryCounterText({
+      'Clear upgrade': 2,
+      'Noise / neutral': 0,
+      'Needs review': 1,
+    })).toBe(`2 Clear upgrade ${String.fromCharCode(183)} 1 Needs review`);
+    expect(playerSwapBatteryCounterText({})).toBe('sin datos');
+  });
+
+  it('explains empty player swap battery runs', () => {
+    expect(playerSwapBatteryCoachRead({
+      total: 0,
+      reads: {},
+      fits: {},
+      mode: 'quick',
+      precision: 'quick',
+      confidence: 'low',
+      best: null,
+      worst: null,
+      bestAttack: null,
+      bestProtect: null,
+    } as any)).toContain('No hay swaps medidos');
+  });
+
+  it('explains clear player swap battery upgrades and downgrades', () => {
+    expect(playerSwapBatteryCoachRead({
+      total: 2,
+      reads: { 'Clear upgrade': 2 },
+      fits: {},
+      mode: 'balanced',
+      precision: 'balanced',
+      confidence: 'medium',
+    } as any)).toContain('favorece cambios positivos claros');
+    expect(playerSwapBatteryCoachRead({
+      total: 2,
+      reads: { 'Clear downgrade': 2 },
+      fits: { 'Out of role': 1 },
+      mode: 'reliable',
+      precision: 'reliable',
+      confidence: 'high',
+    } as any)).toContain('fuera de rol');
+  });
+
+  it('explains mixed or neutral player swap battery reads', () => {
+    expect(playerSwapBatteryCoachRead({
+      total: 4,
+      reads: { 'Clear upgrade': 1, 'Clear downgrade': 1, 'Needs review': 1, 'Noise / neutral': 1 },
+      fits: {},
+      mode: 'quick',
+      precision: 'quick',
+      confidence: 'low',
+    } as any)).toContain('señales mixtas');
+    expect(playerSwapBatteryCoachRead({
+      total: 3,
+      reads: { 'Noise / neutral': 3 },
+      fits: {},
+      mode: 'balanced',
+      precision: 'balanced',
+      confidence: 'medium',
+    } as any)).toContain('ruido o impacto menor');
+  });
 
   it('calculates the individual quality delta for a player swap', () => {
     expect(playerSwapOverallDelta({ baselinePlayerOverall: 72, swapPlayerOverall: 78 })).toBe(6);

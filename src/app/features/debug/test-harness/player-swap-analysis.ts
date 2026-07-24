@@ -1,4 +1,5 @@
 import {
+  PlayerSwapBatterySummary,
   PlayerSwapMatrixSummary,
   PlayerSwapMatrixSummaryRow,
   ScenarioBatteryCoachObjective,
@@ -47,6 +48,40 @@ export interface PlayerSwapRoleRiskRead {
   control: number;
   protection: number;
   detail?: string;
+}
+
+export function playerSwapBatteryCounterText(counts: Record<string, number>): string {
+  const entries = Object.entries(counts).filter(([, count]) => count > 0);
+  return entries.length > 0 ? entries.map(([label, count]) => `${count} ${label}`).join(` ${String.fromCharCode(183)} `) : 'sin datos';
+}
+
+export function playerSwapBatteryCoachRead(summary: PlayerSwapBatterySummary): string {
+  if (summary.total === 0) {
+    return 'No hay swaps medidos todavía. Ejecutar Batería cambio jugador antes de sacar conclusiones.';
+  }
+  const upgrades = summary.reads['Clear upgrade'] ?? 0;
+  const downgrades = summary.reads['Clear downgrade'] ?? 0;
+  const reviews = summary.reads['Needs review'] ?? 0;
+  const noise = summary.reads['Noise / neutral'] ?? 0;
+  const outOfRole = summary.fits['Out of role'] ?? 0;
+  const confidencePrefix = summary.precision === 'quick'
+    ? 'Smoke test de baja confianza: usar para detectar señales, no para decidir definitivo. '
+    : summary.precision === 'balanced'
+      ? 'Lectura balanceada: buena para decidir que casos repetir en Reliable. '
+      : 'Lectura reliable: apta para tomar decisiones de calibración si la señal es consistente. ';
+  const fitWarning = outOfRole > 0
+    ? `Hay ${outOfRole} cambio(s) fuera de rol; separar esos experimentos de los cambios naturales. `
+    : '';
+  if (upgrades > 0 && downgrades === 0 && reviews === 0) {
+    return `${confidencePrefix}${fitWarning}La batería favorece cambios positivos claros (${upgrades}/${summary.total}).`;
+  }
+  if (downgrades > 0 && upgrades === 0 && reviews === 0) {
+    return `${confidencePrefix}${fitWarning}La batería detecta riesgo de empeorar el equipo (${downgrades}/${summary.total}).`;
+  }
+  if (upgrades > 0 || downgrades > 0 || reviews > 0) {
+    return `${confidencePrefix}${fitWarning}Hay señales mixtas: ${upgrades} upgrade(s), ${downgrades} downgrade(s), ${reviews} para revisar y ${noise} neutro(s). Repetir los casos decisivos con más seeds.`;
+  }
+  return `${confidencePrefix}${fitWarning}No aparece una señal fuerte: los cambios medidos se comportan como ruido o impacto menor.`;
 }
 
 export function playerSwapOverallDelta(row: PlayerSwapOverallRead): number | null {
