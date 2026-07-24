@@ -174,6 +174,9 @@ import {
   styleLabelFromActionDetail as getStyleLabelFromActionDetail,
 } from './test-harness-scenario-battery-utils';
 import {
+  sideMirrorRealRead as getSideMirrorRealRead,
+} from './side-mirror-read-utils';
+import {
   backFiveContextClass as getBackFiveContextClass,
   backFiveContextRead as getBackFiveContextRead,
   backFiveFamilyClass as getBackFiveFamilyClass,
@@ -15119,7 +15122,8 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
           ? 'OK'
           : weakLeftOk || weakRightOk
             ? 'Parcial'
-            : 'Revisar';        const width = this.formationWidthRead(weakLeft.formation);
+            : 'Revisar';
+        const width = this.formationWidthRead(weakLeft.formation);
         const wingback = this.formationWingbackRead(weakLeft.formation);
         const read = this.sideMirrorRealRead(
           verdict,
@@ -15166,22 +15170,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     width: FormationWidthRead,
     wingback: FormationWingbackRead
   ): string {
-    if (verdict === 'OK') return 'El espejo lateral responde en ambos sentidos.';
-    if (verdict === 'Parcial') return 'Un lado responde; el otro puede estar tapado por sesgo de plantel/formación.';
-    const nearZero = Math.abs(weakLeftRightEdge) <= 0.012 && Math.abs(weakRightLeftEdge) <= 0.012;
-    if (nearZero) {
-      if (wingback.read.includes('bajos')) {
-        return formation + ': caso real sin adaptación lateral; carrileros bajos/plan conservador pueden tapar la banda débil.';
-      }
-      if (wingback.read === 'Sin LWB/RWB') {
-        return formation + ': caso real sin adaptación lateral; sin carrileros, depende de roles/jugadores de banda.';
-      }
-      if (width.read.includes('ancho 100%')) {
-        return formation + ': caso real ancho pero plano; revisar roles/química antes de tocar motor.';
-      }
-      return formation + ': caso real no cambia canal ante banda débil; revisar plantel, roles y estilo.';
-    }
-    return 'No hay señal lateral suficiente; revisar muestra y compararla contra el control sintético.';
+    return getSideMirrorRealRead(verdict, formation, weakLeftRightEdge, weakRightLeftEdge, width, wingback);
   }
   private mapSyntheticSideMirrorRows(rows: SideMirrorSyntheticLabRow[]): SideMirrorSmokeRow[] {
     return rows
