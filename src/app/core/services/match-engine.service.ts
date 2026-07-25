@@ -17,10 +17,8 @@ import {
 } from './match-engine.model';
 
 /**
- * LIVE-MATCH-F3-UI-LIVE FE1: configurable backoff schedule for SSE reconnection.
- * The schedule doubles the delay up to the cap; a jitter of ±20% is applied to
- * avoid thundering-herd reconnects. The schedule is reset to {@code next = 0}
- * on every successful onopen.
+ * Configurable backoff schedule for live stream reconnection.
+ * The delay grows up to the cap and applies jitter to avoid synchronized reconnects.
  */
 const RECONNECT_BACKOFF_MS = [1_000, 2_000, 5_000, 10_000, 30_000] as const;
 const RECONNECT_MAX_ATTEMPTS = RECONNECT_BACKOFF_MS.length;
@@ -28,14 +26,10 @@ const DEGRADED_GAP_MS = 5_000;
 const RECONNECT_JITTER = 0.2;
 
 /**
- * Servicio para controlar el motor de simulación de partidos.
- * El motor avanza automáticamente con tiempo virtual (1s real = 1 min virtual).
+ * Service used by the UI to control and observe the match simulation engine.
  *
- * <p>LIVE-MATCH-F3-UI-LIVE FE1: SSE consumers ({@link streamMatchState},
- * {@link streamRoundState}) now expose a per-stream {@code streamHealth$}
- * observable and use exponential backoff with jitter instead of aborting on
- * the first error. The {@code useSse} environment flag still gates between
- * SSE and polling — the polling path is unchanged.
+ * Live streams expose per-stream health and reconnect with exponential backoff.
+ * When SSE is disabled by environment config, callers keep using polling.
  */
 @Injectable({
   providedIn: 'root'
@@ -58,16 +52,8 @@ export class MatchEngineService {
   }
 
   /**
-   * 🚀 NUEVO: Inicia TODOS los partidos de una jornada con UN SOLO request.
-   *
-   * ANTES (MAL):
-   * - 6 requests POST para iniciar 6 motores
-   * - 6 MatchEngine individuales
-   * - 6 SSE streams
-   *
-   * AHORA (CORRECTO):
-   * - 1 request POST para iniciar 1 RoundEngine con 6 MatchEngine
-   * - 1 SSE stream
+   * Starts every match in a round with one backend request.
+   * The round engine owns all match engines and exposes a single live stream.
    */
   startRound(roundId: string, matches: Array<{matchId: string, homeTeamId: string, awayTeamId: string}>): Observable<RoundState> {
     return this.http.post<RoundState>(`${this.apiUrl}/rounds/start`, {
@@ -98,13 +84,10 @@ export class MatchEngineService {
   }
 
   /**
-   * LIVE-MATCH-F1-POC: Send a manual substitution to the backend.
+   * Sends a manual substitution to the backend.
    *
-   * <p>Returns the substitution result with substitutions remaining.
-   * The backend appends the SUBSTITUTION event to the live session's
-   * timeline and mutates player state, but does NOT alter the match result
-   * (D1=B). The proper engine refactor that lets user actions affect goals
-   * is deferred to Phase 2.
+   * <p>Returns the substitution result with substitutions remaining. The backend
+   * appends the substitution event and updates the live player state.
    *
    * @param matchId the match UUID
    * @param playerOffId sessionPlayerId of the player being substituted off
@@ -125,7 +108,7 @@ export class MatchEngineService {
   }
 
   /**
-   * LIVE-MATCH-F3-UI-LIVE FE5: Send a formation change to the backend.
+   * Sends a formation change to the backend.
    *
    * <p>Endpoint: {@code POST /api/v1/match-engine/matches/{matchId}/formation}.
    * The body is a list of {@code FormationSlotDTO} (10-11 player slots);
@@ -170,20 +153,19 @@ export class MatchEngineService {
   }
 
   /**
-   * LIVE-MATCH-F5.4: Send a tactical style change to the backend.
+   * Sends a tactical style change to the backend.
    *
    * <p>Endpoint: {@code POST /api/v1/match-engine/matches/{matchId}/style}.
    * <p>Body: {@code { newStyle: TeamStyle }}.
    * <p>Response: {@link StyleChangeResult} with {@code success}, {@code currentStyle},
    * {@code minuteApplied}, and an optional {@code error}.
    *
-   * <p>Triggers {@code V24LiveSession.mutateContext → withNewStyle(homeTeamId, newStyle)
-   * → replayFromMinute(currentMinute)} on the backend. The style change is
-   * destructive for the prefix from {@code currentMinute} onward (deterministic
-   * replay, same contract as formation change).
+   * <p>Triggers a deterministic replay from the current minute on the backend.
+   * The style change is destructive for the prefix from {@code currentMinute}
+   * onward, using the same deterministic replay contract as formation change.
    *
    * <p>Only the manager's home team can be changed. The rival (away) is out of
-   * scope for F5.4 — the back rejects away changes. The component is
+   * scope for this endpoint — the backend rejects away changes. The component is
    * responsible for filtering the UI to show only the home team's buttons.
    *
    * @param matchId  the match UUID
@@ -244,20 +226,10 @@ export class MatchEngineService {
   }
 
   /**
-   * 🚀 NUEVO: Streaming de TODOS los partidos de una jornada con UN SOLO SSE.
+   * Streams every match in a round through a single SSE connection.
    *
-   * ARQUITECTURA CORRECTA:
-   * - 1 Round → 1 SSE → Array con N estados de partidos
-   * - NO más 6 SSE (1 por partido) ❌
-   * - Ahora 1 SSE con array de 6 estados ✅
-   *
-   * VENTAJAS:
-   * - NO satura el event loop del navegador
-   * - HTTP POST (pause/tactic) se ejecutan inmediatamente
-   * - Escalable: funciona igual con 6, 20, o 100 partidos
-   *
-   * @param roundId UUID de la jornada
-   * @returns Observable que emite RoundState (array de MatchState) cada segundo
+   * @param roundId round UUID
+   * @returns Observable that emits the round state as the engine advances.
    */
   streamRoundState(roundId: string): Observable<RoundState> {
     return this.createSseStream<RoundState>(
@@ -267,7 +239,7 @@ export class MatchEngineService {
     );
   }
 
-  // ========== LIVE-MATCH-F3-UI-LIVE FE1: SSE backoff + health plumbing ==========
+  // SSE backoff and stream health plumbing
 
   /**
    * FE1: build an SSE stream with exponential-backoff reconnect and a
@@ -287,9 +259,7 @@ export class MatchEngineService {
    * {@link RECONNECT_MAX_ATTEMPTS} failed attempts the entry becomes
    * {@code CLOSED}.
    *
-   * <p>V25D85-SSE-AUTH: switched the transport from {@code EventSource} to
-   * {@code fetch + ReadableStream} so the {@code Authorization} header (and
-   * any other custom header the auth pipeline wants) can be attached. The
+   * Uses fetch instead of EventSource so authenticated streams can send headers.
    * {@code EventSource} browser API does NOT support custom request
    * headers, which broke the SSE link end-to-end once the backend hardened
    * the stream endpoint behind JWT. Behavior is otherwise unchanged: same
@@ -327,7 +297,7 @@ export class MatchEngineService {
         degradedTimer = setTimeout(() => {
           // Only flag DEGRADED if the connection is supposed to be open.
           if (connected && !closed) {
-            console.warn(`[SSE-${label}] [V25D85-SSE] DEGRADED — no event in ${DEGRADED_GAP_MS}ms`);
+            console.warn(`[SSE-${label}] DEGRADED — no event in ${DEGRADED_GAP_MS}ms`);
             setHealth('DEGRADED');
           }
         }, DEGRADED_GAP_MS);
@@ -338,8 +308,7 @@ export class MatchEngineService {
           return;
         }
 
-        // V25D85-SSE-AUTH: build headers including the Bearer token so the
-        // backend can authenticate the stream. Token is read fresh on every
+        // Attach the bearer token when available; anonymous streams still work without it.
         // (re)connect so token refresh / logout are picked up.
         const token = this.authService.getToken();
         const headers: Record<string, string> = {
@@ -382,7 +351,7 @@ export class MatchEngineService {
                 if (!closed) {
                   // Server closed the stream without us completing it —
                   // treat as a transient drop and reconnect.
-                  console.warn(`[SSE-${label}] [V25D85-SSE] Stream ended by server, reconnecting`);
+                  console.warn(`[SSE-${label}] Stream ended by server, reconnecting`);
                   connected = false;
                   scheduleReconnect();
                 }
@@ -400,8 +369,7 @@ export class MatchEngineService {
               buffer = events.pop() ?? '';
 
               for (const event of events) {
-                // V25D88-FRONT-F1: tolerate both Spring's wire format
-                // `data:{json}` (NO trailing space) and the legacy `data: {json}`
+                // Tolerate both Spring wire formats: 'data:{json}' and 'data: {json}'.
                 // (WITH space). Spring's default ServerSentEventHttpMessageWriter
                 // emits without the space, so a strict `'data: '` prefix missed
                 // every event. The regex now anchors on `'data:'` only and the
@@ -436,7 +404,7 @@ export class MatchEngineService {
             connected = false;
             return;
           }
-          console.warn(`[SSE-${label}] [V25D85-SSE] fetch error:`, err);
+          console.warn(`[SSE-${label}] fetch error:`, err);
           connected = false;
           scheduleReconnect();
         }
@@ -447,7 +415,7 @@ export class MatchEngineService {
           return;
         }
         if (attempt >= RECONNECT_MAX_ATTEMPTS) {
-          console.error(`[SSE-${label}] [V25D85-SSE] CLOSED — gave up after ${attempt} attempts`);
+          console.error(`[SSE-${label}] CLOSED — gave up after ${attempt} attempts`);
           setHealth('CLOSED');
           return;
         }
@@ -506,12 +474,11 @@ export class MatchEngineService {
    */
   readonly streamHealthByUrl = new Map<string, StreamHealth>();
 
-  // ========== LIVE-MATCH-F5.3.3 BUG-015: pause/resume round via matchId ==========
+  // Pause/resume round helpers scoped by match id
 
   /**
-   * LIVE-MATCH-F5.3.3 BUG-015: in-memory cache for the
-   * {@code matchId -> roundId} lookup so the modal doesn't hit the helper
-   * endpoint on every open. TTL of 5 minutes — the round is much shorter
+   * In-memory cache for the last known round id per match.
+   * This avoids hitting the helper endpoint on every modal open. TTL of 5 minutes — the round is much shorter
    * than that, but a stale cache would also surface as a 404 on the next
    * pause/resume call which is self-healing.
    */
@@ -548,8 +515,7 @@ export class MatchEngineService {
   }
 
   /**
-   * LIVE-MATCH-F5.3.3 BUG-015: pauses ALL matches of the round that the
-   * given {@code matchId} belongs to. Resolves roundId via
+   * Pauses the full round that contains the given match. Resolves roundId via
    * {@link getRoundIdForMatch} (cached) and then POSTs to the round-level
    * pause endpoint.
    *
@@ -572,10 +538,9 @@ export class MatchEngineService {
   }
 
   /**
-   * LIVE-MATCH-F5.3.3 BUG-015: mirror of {@link pauseRoundForMatch} for
-   * the resume side. Called from the modal's {@code afterClosed()} so the
-   * round re-runs whether the manager confirmed OR cancelled the
-   * substitution/formation. Idempotent on the backend.
+   * Resumes the round that contains the given match. Called from the modal's
+   * {@code afterClosed()} so the round re-runs whether the manager confirmed
+   * or cancelled. Idempotent on the backend.
    */
   resumeRoundForMatch(careerId: string, matchId: string): Observable<unknown> {
     return this.getRoundIdForMatch(matchId).pipe(
