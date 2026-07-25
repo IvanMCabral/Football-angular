@@ -27,75 +27,23 @@ export interface SubstitutionDialogData {
   startingXi: SubModalPlayer[];
   bench: SubModalPlayer[];
   substitutionsRemaining: number;
-  /**
-   * P0: map sessionPlayerId → effectiveness (0-1).
-   * Construido por desde
-   * formationEffectiveness.perPlayerEffectiveness (keyed subdivisionId)
-   * invertido via lineup.slots. Null cuando formationEffectiveness es
-   * null/undefined (legacy pre-lineup) — el modal renderiza sin
-   * feedback de effectiveness en ese caso.
-   */
+    /** Position effectiveness by player id, from 0 to 1. */
   effectivenessMap?: Record<string, number>;
-  /**
-   * : live formation of the manager team (e.g. "4-4-2"). Sourced
-   * from {@code state.homeFormation} (when manager team is home) or
-   * {@code state.awayFormation} (when away). The visual pitch uses
-   * this to determine the line counts (GK + DEF + MID + ATT lines).
-   * Optional — when missing, the pitch falls back to a flat
-   * positional grouping (1 GK row, DEF row, MID row, WINGER row, ATT row).
-   */
+    /** Live formation of the manager team, for example "4-4-2". */
   formation?: string;
-  /**
-   * : per-player live stats for the manager team. Sourced from
-   * {@code state.homePlayerRatings} or {@code state.awayPlayerRatings}
-   * depending on {@link managerSide}. Each dot in the visual pitch
-   * renders its chips (goals / keyPasses / yellowCards / fouls /
-   * injuries) sourced from this. Optional — empty / missing falls
-   * back to no chips on the dot (still renders the dot with position
-   * + name + rating).
-   */
+    /** Per-player live stats shown as chips on the visual pitch. */
   playerRatings?: V24LivePlayerRating[];
-  /**
-   * : which side of the match the manager team is playing on.
-   * Used by the modal to pick homePlayerRatings or awayPlayerRatings.
-   * Defaults to 'HOME' when not provided.
-   */
+    /** Side of the match controlled by the manager. */
   managerSide?: 'HOME' | 'AWAY';
-  /**
-   * #3: when set, the modal auto-selects this sessionPlayerId
-   * as the "OFF" player when it opens. Used by the round-live
-   * auto-modal listener to pre-populate the substitution modal after
-   * an INJURY event arrives for the manager team. The manager only
-   * needs to pick the "ON" bench player and confirm.
-   *
-   * <p>When set, {@link #playerOffId} is populated in {@code ngOnInit}
-   * (see the implementation below). If the id is not in
-   * {@code startingXi} (e.g. the injured player was already
-   * substituted off), the auto-select is a silent no-op and the
-   * manager can still pick manually.
-   */
+    /** Optional starter id to preselect as the player leaving the pitch. */
   preSelectedPlayerId?: string;
-  /**
-   * #3: reason the modal was opened. Surfaced in the modal
-   * header so the manager knows why they're being asked to substitute.
-   * Currently {@code 'INJURY_FORCED_SUBSTITUTION'} is the only trigger
-   * the auto-listener emits. Manual opens leave this undefined.
-   */
+    /** Reason shown in the modal header when it was opened automatically. */
   reason?: 'INJURY_FORCED_SUBSTITUTION' | 'MANUAL';
 }
 
 type CoachObjective = 'NEED_GOAL' | 'PROTECT_RESULT' | 'NEUTRAL';
 
-/**
- * visual pitch helper: one entry per dot-row in the substitution
- * modal's starting XI section. The `players` array is in SLOT ORDER (left
- * to right within the row) — the visual pitch renders them horizontally.
- *
- * <p>Layout rule: GK row always 1, then DEF / MID / WINGER / ATT rows by
- * position category. This is simpler than re-doing the formation-line parser
- * from {@code formation-modal.component.ts} and the visual is correct for
- * the manager's understanding (he sees his own XI grouped by role).
- */
+/** Row rendered on the visual pitch inside the substitution modal. */
 interface PitchLine {
   category: 'GK' | 'DEF' | 'MID' | 'WINGER' | 'ATT';
   players: SubModalPlayer[];
@@ -122,39 +70,10 @@ interface RecommendedSubstitution {
 }
 
 /**
- * FE4: substitution modal — refactor.
+ * Substitution modal used during live matches.
  *
- * <p>2-column visual layout: Visual pitch of the starting XI (left,
- * click-only, per-player stats chips sourced from the live SSE feed) and
- * a simple bench list (right) for the swap-in candidates. The "Confirmar"
- * button is disabled until both selections are made and the manager team
- * still has substitutions remaining. The "Cancelar" button closes the
- * dialog with success=false.
- *
- * <p>Validation (D-sub-validation): the modal refuses to enable "Confirmar"
- * until the off is in the starting XI and the on is in the bench — both
- * client-side checks before the round-trip. The backend re-validates
- * (F2 invariant) and returns a structured {@code success=false} result if
- * the in-memory state has changed.
- *
- * <p>Error UX: the backend's FLAG 1 {@code success=false} body is surfaced
- * in an inline {@code <mat-error>} block; the modal stays open so the user
- * can correct the selection.
- *
- * <p>changes:
- * <ul>
- *   <li>Replaced the 3-column "starter list / bench / actions" with a
- *       2-column visual pitch + bench list. The visual pitch reuses the
- *       dot pattern from {@code FormationModalComponent} (green pitch
- *       + colored dots per role) but binds (click) on each dot so the
- *       manager can click to select the player off (D4: click-only).</li>
- *   <li>Each dot shows: position label, name (truncated), overall rating,
- *       stats chips (goals / keyPasses / yellowCards / fouls /
- *       injuries, only when {@link SubstitutionDialogData#playerRatings}
- *       is non-empty for that player).</li>
- *   <li>Bench stays as a simple list (no canvas, no chips — chips would
- *       clutter the swap-in column).</li>
- * </ul>
+ * Shows the current XI on a visual pitch, lets the manager select the player
+ * leaving the pitch, and lists available bench players as swap-in candidates.
  */
 @Component({
   selector: 'app-substitution-modal',
@@ -168,11 +87,7 @@ interface RecommendedSubstitution {
   ],
   templateUrl: './substitution-modal.component.html',
   styleUrls: ['./substitution-modal.component.css'],
-  // : visual-pitch + chip styles inlined so `ɵcmp.styles` exposes the
-  // source to unit tests (external CSS via styleUrls is not reachable in
-  // @angular-devkit/build-angular per the angular-testing-patterns memory).
-  // The .css companion is kept for IDE hints; it only carries the legacy
-  // 3-column grid + dialog actions styling (untouched by ).
+  // Pitch and chip styles stay inline because visual tests inspect component styles.
   styles: [`
     .v25d79-pitch {
       position: relative;
