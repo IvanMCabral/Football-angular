@@ -210,7 +210,6 @@ export class DashboardComponent implements OnInit {
     });
   }
 
-  // V24D6G5A — Squad condition warning helpers
   private getSquadPlayers(): SessionPlayer[] {
     return this.squadSubject.value;
   }
@@ -268,8 +267,6 @@ export class DashboardComponent implements OnInit {
   }
 
   loadDashboardData(): void {
-    // V25D78-C55.7.7 BUG-L1: emit the full user info so the welcome banner
-    // can pick displayName → email → username via displayNameOf().
     this.user$ = this.authService.getUserInfo().pipe(
       catchError(err => {
         return of(null);
