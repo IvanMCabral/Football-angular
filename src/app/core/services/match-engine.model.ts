@@ -1,10 +1,5 @@
 /**
- * V25D79: per-player live stats used by the F4 substitution modal.
- *
- * <p>Mirrors {@code com.footballmanager.application.service.simulation.v24.V24PlayerMatchRatingDto}
- * field-for-field. Serialized as part of the SSE payload — the modal uses
- * this to render the chips (goals, keyPasses, yellowCards, fouls, injuries)
- * for each player on the visual pitch.
+ * Per-player live stats sent by the match engine for visual pitch cards.
  */
 export interface V24LivePlayerRating {
   playerId: string;
@@ -33,9 +28,7 @@ export interface LiveFormationSlot {
   customYPercent?: number | null;
 }
 
-/**
- * MatchState - Estado del partido en tiempo real
- */
+/** Live state for one match. */
 export interface MatchState {
   matchId: string;
   homeTeamId: string;
@@ -46,107 +39,54 @@ export interface MatchState {
     home: number;
     away: number;
   };
-  /**
-   * LIVE-MATCH-F3-UI-LIVE BE1: live possession percentages (0-100) per team.
-   * Source: V24LiveSnapshot.homePossession/awayPossession, propagated through
-   * MatchStateSnapshot. Defaults to 50 when the V24 path is not active.
-   */
+  /** Live possession percentages per team, 0-100. */
   homePossession?: number;
   awayPossession?: number;
-  /**
-   * LIVE-MATCH-F3-UI-LIVE BE1: live style (BALANCED/ATTACKING/DEFENSIVE/COUNTER/POSSESSION)
-   * per team. Source: V24LiveSnapshot.homeStyle/awayStyle, propagated through
-   * MatchStateSnapshot. Defaults to "BALANCED" when missing.
-   */
+  /** Current tactical style per team. Defaults to BALANCED when missing. */
   homeStyle?: string;
   awayStyle?: string;
-  /**
-   * LIVE-MATCH-F3-UI-LIVE BE1: live formation (e.g. "4-4-2") per team.
-   * Source: V24LiveSnapshot.homeFormation/awayFormation, propagated through
-   * MatchStateSnapshot. Defaults to "4-4-2" when missing.
-   */
+  /** Current formation code per team, for example "4-4-2". */
   homeFormation?: string;
   awayFormation?: string;
   homeSlots?: LiveFormationSlot[];
   awaySlots?: LiveFormationSlot[];
-  /** Legacy tactics field (ATTACK/DEFEND/BALANCED) — pre-F3 UI used it for buttons. */
+  /** Legacy tactic field kept for older live controls. */
   homeTactic?: string;
   awayTactic?: string;
   events: MatchEvent[];
   cards: any[];
   substitutions: any[];
   players: any[];
-  /**
-   * V25D79: per-player live stats for the home team. One entry per player
-   * (starter + bench combined). Computed by the backend on every SSE tick
-   * via {@code V24PlayerMatchStatsModel.computeRatings()} applied to the
-   * LIVE partial timeline (events up to currentMinute). The modal reads
-   * this when the manager team is the home side.
-   */
+  /** Per-player live stats for the home team. */
   homePlayerRatings?: V24LivePlayerRating[];
-  /**
-   * V25D79: per-player live stats for the away team. Mirrors
-   * {@code homePlayerRatings} for the away side. The modal reads this when
-   * the manager team is the away side.
-   */
+  /** Per-player live stats for the away team. */
   awayPlayerRatings?: V24LivePlayerRating[];
-  /**
-   * V25D79 (D5): subs the manager team can still make. Source of truth
-   * (the backend computes it from the SUBSTITUTION event count and the
-   * 5-per-match cap, floors at 0). Defaults to 5 when the SSE feed is
-   * not yet established or running on the legacy path.
-   */
+  /** Remaining manager substitutions, computed by the backend. */
   substitutionsRemaining?: number;
 }
 
-/**
- * MatchEvent - Evento ocurrido durante el partido
- */
+/** Event emitted during a match. */
 export interface MatchEvent {
   eventType: 'GOAL' | 'SHOT' | 'SHOT_ON_TARGET' | 'SAVE' | 'MISS' | 'BLOCK'
            | 'CHANCE_CREATED' | 'FOUL' | 'YELLOW_CARD' | 'RED_CARD'
            | 'INJURY' | 'CORNER' | 'OFFSIDE' | 'SUBSTITUTION' | 'CARD'
            | 'TACTICAL_CHANGE';
   minute: number;
-  /**
-   * V25D81-BUG #3: sessionPlayerId of the primary player. Backend's
-   * {@code com.footballmanager.domain.model.entity.MatchEvent} carries this
-   * on every V24 event (INJURY, GOAL, RED_CARD, etc.). The frontend
-   * previously only exposed {@code playerName}; the INJURY auto-modal
-   * needs the id to pre-select the dot in the substitution modal's
-   * visual pitch (matching by name is fragile — two players can share
-   * a surname in the seed).
-   *
-   * <p>Optional / undefined for events without an id (legacy V23
-   * synthetic events). Consumers that depend on it (auto-modal
-   * listener) should null-check.
-   */
+  /** Primary player session id when the event can be attributed to a player. */
   playerId?: string;
   /** Primary player (e.g. the goal scorer, the player who got a card). */
   playerName: string;
   description: string;
-  /**
-   * Team sessionTeamId (e.g. for the home team of a goal event). The F3
-   * timeline uses this to push the chip to the home or away rail.
-   * Optional — undefined for events without a team attribution.
-   */
+  /** Team session id for events that can be attributed to a side. */
   teamId?: string;
-  /**
-   * LIVE-MATCH-F3-UI-LIVE BE2: ON player name for SUBSTITUTION events.
-   * Undefined for non-SUBSTITUTION events.
-   */
+  /** Player entering the pitch for substitution events. */
   playerOnName?: string;
-  /**
-   * Backend V24 event field for the secondary player. For SUBSTITUTION,
-   * this is the player entering the pitch.
-   */
+  /** Secondary player id for events that involve two players. */
   relatedPlayerId?: string;
   relatedPlayerName?: string;
 }
 
-/**
- * MatchCommand - Comando para enviar al motor durante el partido
- */
+/** Command sent to the match engine while a match is running. */
 export interface MatchCommand {
   type: 'CHANGE_TACTIC' | 'SUBSTITUTE' | 'CHANGE_MENTALITY';
   targetTeam?: 'HOME' | 'AWAY';
@@ -155,16 +95,12 @@ export interface MatchCommand {
   playerIn?: string;
 }
 
-/**
- * EngineStatus - Estado del sistema de motores
- */
+/** Engine process status. */
 export interface EngineStatus {
   activeEngines: number;
 }
 
-/**
- * RoundState - Estado de una jornada completa con todos sus partidos
- */
+/** Live state for a full round. */
 export interface RoundState {
   roundId: string;
   timestamp: string;
@@ -172,17 +108,7 @@ export interface RoundState {
   status: 'NOT_STARTED' | 'IN_PROGRESS' | 'PAUSED' | 'FINISHED' | 'COMPLETED';
 }
 
-/**
- * LIVE-MATCH-F1-POC: response shape for POST /api/v1/match-engine/matches/{id}/substitutions.
- *
- * <p>Phase 1 POC (D1=B): manual substitutions are UI-only. The backend appends the
- * SUBSTITUTION event to the live session's timeline (so the UI/animation can render it),
- * mutates player state (substituteOn/substituteOff) for downstream consumers, but does
- * NOT recompute goals/xG. The proper engine refactor is deferred to Phase 2.
- *
- * <p>Returned alongside a 200 OK status. On 4xx/5xx the backend returns
- * {@code SubstitutionResultDTO} with {@code success=false} + error message.
- */
+/** Response returned after applying a substitution. */
 export interface SubstitutionResult {
   success: boolean;
   minuteApplied: number;
@@ -190,32 +116,10 @@ export interface SubstitutionResult {
   error?: string;
 }
 
-/**
- * LIVE-MATCH-F3-UI-LIVE FE1: SSE connection health.
- *
- * <p>The match engine service emits the current health through a per-stream
- * {@code BehaviorSubject<StreamHealth>} that components can subscribe to. The
- * UI renders a small dot (green/yellow/red) and a tooltip so the manager
- * knows whether the scoreboard is real-time or stale.
- *
- * <ul>
- *   <li>{@code HEALTHY} — the SSE connection is OPEN and emitting events.</li>
- *   <li>{@code RECONNECTING} — the connection dropped; a backoff timer is
- *       armed and a manual reconnect attempt is in flight.</li>
- *   <li>{@code DEGRADED} — the connection is open but the gap between two
- *       consecutive events exceeded the degraded threshold (5s). The UI
- *       still shows the latest state but warns the user.</li>
- *   <li>{@code CLOSED} — the connection is permanently closed (5+ failed
- *       reconnect attempts) and the user must retry manually.</li>
- * </ul>
- */
+/** Live stream connection health exposed to the UI. */
 export type StreamHealth = 'HEALTHY' | 'RECONNECTING' | 'DEGRADED' | 'CLOSED';
 
-/**
- * LIVE-MATCH-F3-UI-LIVE FE5: response shape for POST /api/v1/match-engine/matches/{id}/formation.
- *
- * <p>Mirrors the F5 {@code FormationChangeResultDTO} on the backend.
- */
+/** Response returned after applying a formation change. */
 export interface FormationChangeResult {
   success: boolean;
   minuteApplied?: number;
@@ -223,43 +127,21 @@ export interface FormationChangeResult {
   error?: string;
 }
 
-/**
- * LIVE-MATCH-F5.4: tactical style for the manager's team. Mirrors the
- * {@code TeamStyle} enum on the backend (5 values). Used to populate the
- * body of {@code POST /api/v1/match-engine/matches/{matchId}/style}.
- *
- * <p>Mapping with the legacy front enum ({@code 'ATTACK' | 'DEFEND' | 'BALANCED'}):
- * <ul>
- *   <li>BALANCED   — no modifier (default)</li>
- *   <li>ATTACKING  — slightly higher totalLambda, slight share boost</li>
- *   <li>DEFENSIVE  — slightly lower totalLambda, slight defensive share effect</li>
- *   <li>COUNTER    — lower totalLambda, better chance share when weaker than opponent</li>
- *   <li>POSSESSION — slightly lower totalLambda, slight possession share boost</li>
- * </ul>
- */
+/** Tactical style used by the manager team during a live match. */
 export type TeamStyle = 'BALANCED' | 'ATTACKING' | 'DEFENSIVE' | 'COUNTER' | 'POSSESSION';
 
-/**
- * LIVE-MATCH-F5.4: response shape for POST /api/v1/match-engine/matches/{matchId}/style.
- *
- * <p>Mirrors the F5 {@code StyleChangeResultDTO} on the backend. The current
- * style is echoed back as a {@link TeamStyle} string (the enum is serialized
- * as {@code .name()} by Jackson).
- */
+/** Response returned after applying a tactical style change. */
 export interface StyleChangeResult {
   success: boolean;
   /** Always present on success; reflects the style the engine is now using. */
   currentStyle: TeamStyle;
   /** Live minute at which the style was applied (drives the replay window). */
   minuteApplied: number;
-  /** Human-readable error message — present only when {@code success=false}. */
+  /** Human-readable error message when the change fails. */
   error?: string;
 }
 
-/**
- * LIVE-MATCH-F3-UI-LIVE FE4: shape of a player entry sent to the substitution
- * modal. Resolved from the match squad at modal open time.
- */
+/** Player entry shown by the substitution modal. */
 export interface SubModalPlayer {
   /** Backend sessionPlayerId (UUID as string). */
   sessionPlayerId: string;
