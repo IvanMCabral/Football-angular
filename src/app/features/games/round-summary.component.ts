@@ -295,14 +295,12 @@ export class RoundSummaryComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * V24D6O: Navigate to the V24 match detail page for a completed match.
-   * The view consumes GET /api/v1/careers/{careerId}/matches/{matchId}/detail
-   * and shows score, xG, timeline, playerRatings and shot map.
+   * Navigate to the detailed view for a completed match.
    */
   goToMatchDetail(matchId: string) {
     const vm = this.vmSubject.value;
     if (!vm.careerId || !matchId) {
-      console.warn('[SUMMARY] Missing careerId or matchId for V24 detail navigation', vm.careerId, matchId);
+      console.warn('[SUMMARY] Missing careerId or matchId for detail navigation', vm.careerId, matchId);
       return;
     }
     this.router.navigate(['/careers', vm.careerId, 'matches', matchId, 'detail']);
@@ -316,12 +314,9 @@ export class RoundSummaryComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // V24D14-LIVE-FIX-1.7 Bug #1: prefer the server-side currentRound from
-    // tournamentStatus (canonical source of truth), fall back to URL roundNumber + 1
-    // when tournamentStatus is unavailable (e.g. summary loaded before careerStatus).
-    // This prevents the "play next round" button from navigating to a stale round
-    // when the user opened a summary for round N but the career has already advanced
-    // to round M > N.
+    // Prefer the server-side current round and fall back to the URL round
+    // when status is unavailable. This avoids navigating from a stale summary
+    // if the career has already advanced elsewhere.
     const nextRound = (vm.tournamentStatus?.currentRound ?? vm.roundNumber) + 1;
 
     if (vm.tournamentStatus && nextRound > vm.tournamentStatus.totalRounds) {

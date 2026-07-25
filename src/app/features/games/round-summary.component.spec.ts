@@ -1,36 +1,19 @@
 /**
- * V24D14-LIVE-FIX-1.7 Bug #1: unit tests for {@link RoundSummaryComponent}'s
- * "play next round" navigation.
- *
- * <p>Validates the fix for the routing-stale bug: when the user opens the
- * summary for round N (e.g. {@code /games/G/round/2/summary}) but the career
- * has already advanced to round M (e.g. M=5 because the user played rounds 2-4
- * via another session or via a "play all rounds" action), clicking
- * "Siguiente Fecha" must navigate to {@code /games/G/round/M+1/live} —
- * NOT to {@code /games/G/round/N+1/live}.
- *
- * <p>The fix prefers {@code tournamentStatus.currentRound} (server-side
- * canonical source of truth) and falls back to {@code roundNumber + 1} only
- * when {@code tournamentStatus} is unavailable.
- *
- * <p>We avoid the constructor's async ngOnInit flow and inject the VM
- * directly via the private {@code vmSubject} (test-only access). This keeps
- * the test synchronous and isolated from the unrelated getCareerTeams /
- * getCareerStatus / getFixturesByRoundWithBye plumbing.
+ * Unit tests for RoundSummaryComponent navigation from the round summary.
  */
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, provideRouter, Router } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { BehaviorSubject } from 'rxjs';
+import { BehaviorSubject, of } from 'rxjs';
 import { RoundSummaryComponent } from './round-summary.component';
 import { CareerService } from '../../core/services/career.service';
 import { RoundSummaryViewModel } from './models/round-summary.model';
 
 const SAMPLE_GAME_ID = 'game-abc';
 
-describe('RoundSummaryComponent - V24D14-LIVE-FIX-1.7 Bug #1', () => {
+describe('RoundSummaryComponent navigation', () => {
   let fixture: ComponentFixture<RoundSummaryComponent>;
   let component: RoundSummaryComponent;
   let router: Router;
@@ -40,8 +23,21 @@ describe('RoundSummaryComponent - V24D14-LIVE-FIX-1.7 Bug #1', () => {
     careerServiceSpy = jasmine.createSpyObj<CareerService>('CareerService', [
       'getCareerTeams',
       'getCareerStatus',
-      'getFixturesByRoundWithBye'
+      'getFixturesByRoundWithBye',
+      'getStandings'
     ]);
+    careerServiceSpy.getCareerTeams.and.returnValue(of([]));
+    careerServiceSpy.getCareerStatus.and.returnValue(of({
+      careerId: SAMPLE_GAME_ID,
+      userSessionTeamId: '',
+      currentRound: 2,
+      totalRounds: 38,
+      canAdvanceRound: true,
+      careerPhase: 'WAITING_USER',
+      season: 1
+    } as any));
+    careerServiceSpy.getFixturesByRoundWithBye.and.returnValue(of({ matches: [], byeTeam: null } as any));
+    careerServiceSpy.getStandings.and.returnValue(of([]));
 
     await TestBed.configureTestingModule({
       imports: [RoundSummaryComponent, NoopAnimationsModule],
@@ -83,7 +79,7 @@ describe('RoundSummaryComponent - V24D14-LIVE-FIX-1.7 Bug #1', () => {
   }
 
   it('playNextRound navigates to tournamentStatus.currentRound + 1 when set', () => {
-    // URL round=2 but careerStatus.currentRound=5 → must navigate to round 6.
+    // URL round=2 but careerStatus.currentRound=5 -> must navigate to round 6.
     setVm({
       roundNumber: 2,
       tournamentStatus: {
