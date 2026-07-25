@@ -1,23 +1,8 @@
-/**
- * C55.10 Item 4 — tests for {@link CareerStatusBarComponent}'s newly added
- * División pill.
- *
- * <p>Coverage:
- * <ul>
- *   <li>Pill renders when {@code careerStatus.userDivision} is set (PRIMERA).</li>
- *   <li>Pill renders when userDivision is a non-PRIMERA/SEGUNDA/TERCERA tier
- *       (CUARTA) with the {@code tier-default} fallback class.</li>
- *   <li>Pill hides when userDivision is null / omitted (legacy back).</li>
- *   <li>The four action buttons (fixture / standings / palmares / promotions)
- *       still emit their respective EventEmitters.</li>
- *   <li>{@link tierCssClass} helper covers the four-class contract.</li>
- * </ul>
- */
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { CareerStatusBarComponent } from './career-status-bar.component';
 import { CareerStatus } from 'app/core/services/career.model';
 
-describe('CareerStatusBarComponent — V25D78-C55.10 Item 4 (División pill)', () => {
+describe('CareerStatusBarComponent', () => {
   let component: CareerStatusBarComponent;
   let fixture: ComponentFixture<CareerStatusBarComponent>;
 
@@ -61,10 +46,6 @@ describe('CareerStatusBarComponent — V25D78-C55.10 Item 4 (División pill)', (
   });
 
   it('renders the División pill with tier-default when userDivision=CUARTA (non-canonical tier)', () => {
-    // C55.10 Item 4 — same tier-real contract as the dashboard pill:
-    // backend sends the literal label, front CONSUMES it verbatim. CSS
-    // class falls back to tier-default for tiers outside the
-    // PRIMERA/SEGUNDA/TERCERA set.
     component.careerStatus = makeStatus({ userDivision: 'CUARTA' });
     fixture.detectChanges();
 
@@ -92,7 +73,7 @@ describe('CareerStatusBarComponent — V25D78-C55.10 Item 4 (División pill)', (
     expect(pill).toBeNull('status-division-pill must NOT render when userDivision is omitted');
   });
 
-  it('keeps emitting fixtureClick on the 📅 button', () => {
+  it('emits fixtureClick from the fixture button', () => {
     component.careerStatus = makeStatus({ userDivision: 'PRIMERA' });
     fixture.detectChanges();
 
@@ -103,7 +84,7 @@ describe('CareerStatusBarComponent — V25D78-C55.10 Item 4 (División pill)', (
     expect(component.fixtureClick.emit).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps emitting standingsClick on the 🏆 button', () => {
+  it('emits standingsClick from the standings button', () => {
     component.careerStatus = makeStatus({ userDivision: 'PRIMERA' });
     fixture.detectChanges();
 
@@ -114,7 +95,7 @@ describe('CareerStatusBarComponent — V25D78-C55.10 Item 4 (División pill)', (
     expect(component.standingsClick.emit).toHaveBeenCalledTimes(1);
   });
 
-  it('tierCssClass() helper covers PRIMERA/SEGUNDA/TERCERA/tier-default', () => {
+  it('maps known division labels to tier CSS classes', () => {
     expect(component.tierCssClass('PRIMERA')).toBe('tier-primera');
     expect(component.tierCssClass('SEGUNDA')).toBe('tier-segunda');
     expect(component.tierCssClass('TERCERA')).toBe('tier-tercera');
