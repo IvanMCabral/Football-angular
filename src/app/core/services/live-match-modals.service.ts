@@ -19,15 +19,10 @@ import { RivalCardInfoComponent, RivalCardInfoDialogData } from '../../features/
 import { MatchState } from './match-engine.model';
 
 /**
- * LIVE-MATCH-F3-UI-LIVE FE6: shared service for opening the substitution
- * and formation modals from any live-match view (match-live per-match or
- * round-live per-round).
+ * Coordinates the live-match tactical modals.
  *
- * <p>Centralizes the lineup/squad fetch + Modal opening so the round-live
- * match-card can emit {@code substitutionOpen} / {@code formationOpen} and
- * the round-live component just delegates to this service. Avoids
- * duplicating the ~30-line {@code openSubstitutionModal} / {@code openFormationModal}
- * code across both views.
+ * Centralizes lineup/squad loading, round pause/resume and dialog opening so
+ * the live screens can share the same substitution, formation and partido flows.
  */
 @Injectable({
   providedIn: 'root'
@@ -40,10 +35,8 @@ export class LiveMatchModalsService {
   private careerService = inject(CareerService);
   private teamService = inject(TeamService);
   private engineService = inject(MatchEngineService);
-  // LIVE-MATCH-F5.3.3 BUG-015: we need the careerId to call the
-  // round-level pause/resume endpoints (`/api/v1/career/{careerId}/round/...`).
-  // The careerId lives in the URL (`/games/{careerId}/...`), so we read it
-  // from the Router rather than threading it through every modal caller.
+  // Pause/resume endpoints are career-scoped; modal callers only pass matchId.
+  // Read the active career from the route to keep the public modal API small.
   private router = inject(Router);
 
   private readonly confirmedSubstitutionMemory = new Map<string, Array<{
@@ -55,11 +48,8 @@ export class LiveMatchModalsService {
   private roundResumeHoldCount = 0;
 
   /**
-   * V25D81-BUG #3: optional overrides for {@link openSubstitutionModal}.
-   * Currently used by the round-live INJURY auto-listener to pre-select
-   * the injured player and surface the reason in the modal header. Both
-   * fields are optional — manual opens pass `undefined` and get the
-   * legacy "click-to-pick" UX.
+   * Optional overrides used when the live screen opens a substitution modal
+   * for a specific reason, for example to pre-select an injured player.
    */
   openSubstitutionOptions?: {
     /**
@@ -83,9 +73,8 @@ export class LiveMatchModalsService {
    * Opens the substitution modal for the given match/state. Returns the
    * subscription so the caller can `takeUntil(destroy$)` if needed.
    *
-   * <p>V25D81-BUG #3: optional {@link openSubstitutionOptions} parameter
-   * for the INJURY auto-modal flow. Manual opens pass `undefined` and
-   * get the same UX as before (manager picks the OFF player themselves).
+   * Optional {@link openSubstitutionOptions} can pre-select a player when
+   * the modal is opened by an in-match event such as an injury.
    */
   openSubstitutionModal(
     matchId: string,
@@ -107,9 +96,8 @@ export class LiveMatchModalsService {
         }
         return forkJoin({
           lineup: this.http.get<LineupDTO>(`${environment.apiUrl}/career/lineup/current`),
-          // LIVE-MATCH-F3-UI-LIVE F5.1 BUG-001: use /teams/me/squad so the
-          // server resolves the manager's own team from the JWT instead of
-          // hitting the non-existent /session-teams/{id}/squad endpoint.
+          // Ask the API for the manager's current squad; the backend resolves
+          // the active team from the authenticated career/session.
           squad: this.teamService.getMyTeamSquad(),
           liveState: this.engineService.getMatchState(matchId).pipe(
             timeout(1500),
@@ -117,9 +105,8 @@ export class LiveMatchModalsService {
           )
         }).pipe(
           switchMap(({ lineup, squad, liveState }) => {
-            // V25D75-C40 B1: dedupe starting XI by playerId (some upstream
-            // paths can return duplicates — modal would show 22 entries per
-            // column). Same for bench by sessionPlayerId. Pick first occurrence.
+            // Protect the modal from duplicated live rows: each starter and
+            // bench player should appear once.
             const stateForModal = liveState ?? state;
             const livePlayers = this.applyLiveSubstitutionsToLineup(
               lineup,
@@ -149,12 +136,9 @@ export class LiveMatchModalsService {
               })
               .map(sp => this.toSubModalPlayerFromSession(sp, false));
 
-            // V25D63-C23 P0: construir effectivenessMap (sessionPlayerId → eff)
-            // invirtiendo formationEffectiveness.perPlayerEffectiveness (keyed
-            // subdivisionId) via lineup.slots. Si formationEffectiveness es null
-            // (legacy pre-V25D47) o slots está ausente, el map queda {} y el
-            // modal renderiza sin feedback de effectiveness (legacy fallback OK,
-            // replicando squad-editor-modal behavior).
+            // Build the slot effectiveness map used by the SALE/ENTRA chips.
+            // When the backend has no effectiveness data, the modal simply
+            // renders without that feedback.
             const slotToEff: Record<string, number> =
               lineup?.formationEffectiveness?.perPlayerEffectiveness ?? {};
             const slotToPlayerId: Record<string, string> = {};
@@ -175,19 +159,14 @@ export class LiveMatchModalsService {
               score: stateForModal.score,
               startingXi,
               bench,
-              // V25D79 (D5): substitutionsRemaining sourced from the live
-              // SSE snapshot. The backend computes it from the SUBSTITUTION
-              // event count with a 5-per-match cap (floored at 0). Falls
-              // back to the cap (5) when the feed hasn't arrived yet — the
-              // modal's isOutOfSubs gate will refuse to register selections
-              // when the counter is 0.
+              // The backend computes remaining substitutions from live events.
+              // If no live snapshot has arrived yet, keep the modal permissive
+              // and let the backend validate the final save.
               substitutionsRemaining: this.effectiveSubstitutionsRemaining(matchId, stateForModal, userTeamId),
-              // V25D63-C23 P0: position-effectiveness feedback para chips SALE/ENTRA.
+              // Position-effectiveness feedback for the SALE/ENTRA chips.
               effectivenessMap,
-              // V25D79: pass formation + per-player live stats + which side
-              // the manager team is playing on. The modal visual pitch and
-              // the per-dot chips consume these. Falls back to defaults when
-              // the SSE feed hasn't arrived yet (legacy pre-V25D79 snapshots).
+              // Give the modal the live formation, ratings and manager side so
+              // its pitch and chips reflect the current match state.
               formation: (userTeamId === stateForModal.homeTeamId)
                   ? (stateForModal.homeFormation ?? '4-4-2')
                   : (stateForModal.awayFormation ?? '4-4-2'),
@@ -195,24 +174,13 @@ export class LiveMatchModalsService {
                   ? (stateForModal.homePlayerRatings ?? [])
                   : (stateForModal.awayPlayerRatings ?? []),
               managerSide: (userTeamId === stateForModal.homeTeamId) ? 'HOME' : 'AWAY',
-              // V25D81-BUG #3: auto-modal pre-select + reason from the
-              // round-live INJURY listener. Both optional; manual opens
-              // pass undefined and get the legacy UX.
+              // Optional pre-selection used by injury-driven modal opens.
               preSelectedPlayerId: options?.preSelectedPlayerId,
               reason: options?.reason
             };
 
-            // LIVE-MATCH-F5.3.3 BUG-015: pause the round BEFORE the dialog
-            // opens so the `currentMinute` the manager saw when they clicked
-            // "Sustituir" is still current when they confirm. This prevents
-            // the `MINUTE_IN_PAST (X) must be >= currentMinute (Y)` error
-            // Iván hit on minute 81 → 73. We fire-and-forget the pause call:
-            // waiting for the response before opening the dialog would add
-            // ~50-100ms of perceived lag, and the backend is idempotent so
-            // a transient pause failure is recoverable (the next tick will
-            // re-pause if the modal is still open). We only pause if we
-            // could resolve a careerId from the URL — otherwise we log a
-            // warning and open the modal anyway.
+            // The round is paused before opening so the minute the manager saw
+            // remains valid when the substitution is confirmed.
             const dialogRef = this.dialog.open(SubstitutionModalComponent, {
               data,
               width: '920px',
@@ -221,8 +189,7 @@ export class LiveMatchModalsService {
               autoFocus: 'first-tabbable'
             });
 
-            // LIVE-MATCH-F5.3.3 BUG-015: resume the round when the modal
-            // closes (whether the manager confirmed OR cancelled).
+            // Resume the round when the modal closes, confirmed or cancelled.
             return merge(dialogRef.afterClosed().pipe(
               tap((closeResult: any) => {
                 if (closeResult?.success && Array.isArray(closeResult.substitutions)) {

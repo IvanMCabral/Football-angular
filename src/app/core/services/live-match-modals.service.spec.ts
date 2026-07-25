@@ -1,7 +1,7 @@
 /**
- * LIVE-MATCH-F5.3.4: unit tests for {@link LiveMatchModalsService}.
+ * Unit tests for {@link LiveMatchModalsService}.
  *
- * <p>Validates the F5.3 BUG-015 pause/resume wiring:
+ * <p>Validates the pause/resume wiring around live tactical modals:
  * <ul>
  *   <li>{@code openSubstitutionModal} calls
  *       {@code engineService.pauseRoundForMatch(careerId, matchId)} BEFORE
@@ -12,14 +12,14 @@
  *       round resumes whether the manager confirms OR cancels.</li>
  *   <li>{@code openFormationModal} has the same pause/resume wiring
  *       (F5.3.3 scope decision: "modal de sustitución O de formación").</li>
- *   <li>{@code openPartidoModal} (V25D89-FRONT-A) has the same pause/resume
+ *   <li>{@code openPartidoModal} has the same pause/resume
  *       wiring — the new dual-tab Partido modal (Mi Formación editable +
  *       Formación Rival read-only) freezes the round while open.</li>
  *   <li>If the URL doesn't match {@code /games/{careerId}/...} the service
  *       skips the pause call and logs a warning instead of crashing.</li>
  * </ul>
  *
- * <p>The rest of the F3-UI-LIVE FE6 service behavior (lineup/squad fetch
+ * <p>The rest of the service behavior (lineup/squad fetch
  * + dialog data shape) is exercised via {@link SubstitutionModalComponent}
  * and {@link FormationModalComponent} specs and is out of scope here.
  */
@@ -59,7 +59,7 @@ const RUNNING_STATE: MatchState = {
   players: []
 };
 
-describe('LiveMatchModalsService — LIVE-MATCH-F5.3 BUG-015 (pause on modal open)', () => {
+describe('LiveMatchModalsService pause/resume around tactical modals', () => {
   let service: LiveMatchModalsService;
   let dialogSpy: jasmine.SpyObj<MatDialog>;
   let dialogRefSpy: jasmine.SpyObj<MatDialogRef<unknown>>;
@@ -86,7 +86,7 @@ describe('LiveMatchModalsService — LIVE-MATCH-F5.3 BUG-015 (pause on modal ope
     careerServiceSpy = jasmine.createSpyObj('CareerService', ['getCareerStatus']);
     teamServiceSpy = jasmine.createSpyObj('TeamService', ['getMyTeamSquad']);
 
-    // The new F5.3.3 methods we want to assert on.
+    // Round control calls we assert on.
     engineServiceSpy = jasmine.createSpyObj('MatchEngineService', [
       'pauseRoundForMatch',
       'resumeRoundForMatch',
@@ -417,7 +417,7 @@ describe('LiveMatchModalsService — LIVE-MATCH-F5.3 BUG-015 (pause on modal ope
     });
   });
 
-  // ========== openPartidoModal (V25D89-FRONT-A) ==========
+  // ========== openPartidoModal ==========
 
   it('openPartidoModal — calls engineService.pauseRoundForMatch BEFORE dialog.open', (done) => {
     const callOrder: string[] = [];
