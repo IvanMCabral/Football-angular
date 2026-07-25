@@ -159,10 +159,7 @@ mat-dialog-content {
   background: rgba(102, 126, 234, 0.1);
 }
 
-/* C55.10 Item 3 — user-team row highlight, prominent version.
-   Mirrors the standings-page CSS contract: 6px gold border + stronger
-   gradient + bold font-weight + gold team cell so the user always spots
-   their team regardless of which tier / zone they land in. */
+/* User team row highlight */
 .standings-table tbody tr.highlight {
   background: linear-gradient(90deg, rgba(255, 215, 0, 0.25) 0%, rgba(255, 215, 0, 0.08) 100%);
   border-left: 6px solid #ffd700;
@@ -226,11 +223,7 @@ mat-dialog-actions {
   color: white !important;
 }
 
-/* V25D78-C55.2 phase 4 UI (c2): green/red zone indicator for promotion /
-   relegation. Top-3 rows get a green left-border + tint; bottom-3 rows get
-   red. The user's own row (`.highlight`) overrides the zone tint with gold
-   so the user always sees themselves clearly, but the zone border still
-   remains visible. */
+/* Promotion and relegation zones */
 .standings-table tbody tr.zone-promotion {
   background: rgba(72, 187, 120, 0.12);
   border-left: 3px solid #48bb78;
@@ -241,7 +234,6 @@ mat-dialog-actions {
 }
 
 .standings-table tbody tr.zone-promotion.highlight {
-  /* User row in promotion zone: gold + green combined, prominent. */
   background: linear-gradient(90deg, rgba(255, 215, 0, 0.28) 0%, rgba(72, 187, 120, 0.14) 100%);
   border-left: 6px solid #ffd700;
   font-weight: 700;
@@ -257,7 +249,6 @@ mat-dialog-actions {
 }
 
 .standings-table tbody tr.zone-relegation.highlight {
-  /* User row in relegation zone: gold + red combined, prominent. */
   background: linear-gradient(90deg, rgba(255, 215, 0, 0.28) 0%, rgba(245, 101, 101, 0.14) 100%);
   border-left: 6px solid #ffd700;
   font-weight: 700;

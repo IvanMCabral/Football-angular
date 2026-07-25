@@ -83,15 +83,7 @@
   box-shadow: 0 4px 12px rgba(76, 175, 76, 0.4);
 }
 
-/* =============================================================
-   C55.10 Item 4 — División pill (gap A1 reaparecido)
-
-   Reuses the same tier-* CSS class names as the dashboard pill
-   (tier-primera / tier-segunda / tier-tercera / tier-default) so a
-   single visual language identifies the user's tier across /dashboard,
-   /squad, /standings. Sized down to fit the denser horizontal status
-   bar (gradient pill instead of pill-on-card).
-   ============================================================= */
+/* User division */
 .status-item-division {
   padding: 0 1rem;
 }

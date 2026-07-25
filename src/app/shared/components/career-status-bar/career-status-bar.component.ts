@@ -33,14 +33,6 @@ export class CareerStatusBarComponent {
     this.promotionsClick.emit();
   }
 
-  /**
-   * C55.10 Item 4 — tier-real badge helper. Same contract as the dashboard
-   * pill ({@link tierCssClass} on {@code DashboardComponent} and
-   * {@link StandingsPageComponent}): maps the {@code careerStatus.userDivision}
-   * literal label from the back into one of the tier-* CSS classes, with
-   * {@code 'tier-default'} as fallback for tiers outside
-   * PRIMERA / SEGUNDA / TERCERA.
-   */
   tierCssClass(userDivision: string | null | undefined): string {
     if (userDivision === 'PRIMERA') return 'tier-primera';
     if (userDivision === 'SEGUNDA') return 'tier-segunda';

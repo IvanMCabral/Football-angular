@@ -6,11 +6,6 @@
   </div>
   <div class="status-divider" *ngIf="careerStatus.season"></div>
 
-  <!-- C55.10 Item 4 — División pill prominent (gap A1 reaparecido).
-       Same tier-real contract as the dashboard pill: consumes the backend
-       label verbatim and picks the CSS class via {@link tierCssClass} so any
-       tier (CUARTA, QUINTA, SEXTA, …) renders with the tier-default fallback
-       instead of unstyled text. -->
   <div class="status-item status-item-division" *ngIf="careerStatus.userDivision">
     <span class="status-label">División</span>
     <span class="status-division-pill" [class]="tierCssClass(careerStatus.userDivision)">

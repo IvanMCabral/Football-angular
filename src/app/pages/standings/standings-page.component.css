@@ -1,7 +1,3 @@
-/* V25D78-C55.2 phase 4 UI (b2): /standings page styles. Mirrors the visual
-   language of standings-modal but as a full page (top-level route, not a
-   dialog) so it can be linked from the dashboard. */
-
 .standings-page {
   min-height: calc(100vh - 60px);
   padding: 2rem;
@@ -53,7 +49,7 @@
   font-size: 28px;
 }
 
-/* (c) consume — user's division pill in the page header */
+/* User division */
 .user-division-pill {
   display: inline-flex;
   align-items: center;
@@ -80,14 +76,12 @@
   background: linear-gradient(135deg, #10b981 0%, #059669 100%);
 }
 
-/* C55.10 Item 1 — fallback for any tier not explicitly styled above
-   (CUARTA, QUINTA, SEXTA, …). Neutral gray-indigo so the pill still
-   reads as a tier badge. Mirrors the dashboard pill contract exactly. */
+/* Fallback for lower divisions */
 .tier-default {
   background: linear-gradient(135deg, #64748b 0%, #475569 100%);
 }
 
-/* (c2) — legend above the tab group, same as the modal. */
+/* Zone legend */
 .zone-legend {
   display: flex;
   justify-content: center;
@@ -157,7 +151,7 @@
   font-size: 48px;
 }
 
-/* Tab group — re-uses the same dark theme tokens from the modal. */
+/* Tab group */
 ::ng-deep .standings-page .mat-mdc-tab-group {
   --mdc-tab-indicator-active-indicator-color: #ffd700;
   --mat-tab-header-active-label-text-color: #ffd700;
@@ -251,11 +245,7 @@
   background: rgba(102, 126, 234, 0.1);
 }
 
-/* C55.10 Item 3 — user-team row highlight, prominent version.
-   Was a subtle 3px gold border + 15% gold tint before (gap A3/B5 — easy
-   to miss when scanning the table). Now: 6px gold border + stronger
-   gradient + bold font-weight + gold text-color on the team cell so the
-   user always spots their team in any tier. */
+/* User team row highlight */
 .standings-table tbody tr.highlight {
   background: linear-gradient(90deg, rgba(255, 215, 0, 0.25) 0%, rgba(255, 215, 0, 0.08) 100%);
   border-left: 6px solid #ffd700;
@@ -307,7 +297,7 @@
   font-style: italic;
 }
 
-/* (c2) — green/red zone indicator on rows */
+/* Promotion and relegation zones */
 .standings-table tbody tr.zone-promotion {
   background: rgba(72, 187, 120, 0.12);
   border-left: 3px solid #48bb78;
