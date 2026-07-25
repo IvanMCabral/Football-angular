@@ -42,11 +42,9 @@ import { MatchState, RoundState } from '../../core/services/match-engine.model';
 import { RoundLiveViewModel, RoundMatchVM } from './models/round-live.model';
 
 const SAMPLE_GAME_ID = 'game-abc';
-// V25D86 sprint: the roundId returned by the backend's
-// POST /api/v1/match-engine/rounds/start response is NOT
-// necessarily equal to the frontend's gameId. Tests use this
-// value to drive the SSE stream with the registry key the
-// backend actually registered.
+// The roundId returned by the backend can differ from the frontend gameId.
+// Tests use this value to drive the SSE stream with the registry key that
+// the backend registered.
 const SAMPLE_BACKEND_ROUND_ID = 'round-uuid-1234-abcd-5678-efgh';
 const SAMPLE_MATCH_ID = 'match-xyz';
 const SAMPLE_HOME_TEAM_ID = 'team-home-1';
@@ -118,12 +116,9 @@ describe('RoundLiveComponent live round behavior', () => {
       'pauseRoundForMatch',
       'resumeRoundForMatch'
     ]);
-    // V25D86 sprint: the default mock now returns a RoundState with the
-    // backend-resolved roundId (NOT equal to SAMPLE_GAME_ID). This lets
-    // startRoundEngine's `switchMap(() => resolvedRoundId$...)` chain
-    // find a non-null roundId and open the SSE stream. Per-test overrides
-    // can pin this to other fixtures (e.g. a state without a roundId to
-    // exercise the defensive null path).
+    // The default mock returns a backend-resolved roundId so startRoundEngine
+    // can open the SSE stream. Individual tests can override this fixture for
+    // defensive paths, including states without a roundId.
     engineServiceSpy.startRound.and.returnValue(of(makeRoundState([])));
     engineServiceSpy.streamRoundState.and.returnValue(roundStateSubject.asObservable());
     engineServiceSpy.pauseRoundForMatch.and.returnValue(of({}));
@@ -147,7 +142,7 @@ describe('RoundLiveComponent live round behavior', () => {
       'openSubstitutionModal',
       'openFormationModal',
       'openPartidoModal',
-      // V25D81.1 BUG #3: rival RED_CARD awareness modal.
+      // Rival red-card awareness modal.
       'openRivalCardInfoModal',
       'wasPlayerConfirmedSubstitutedOff',
       'holdRoundResumeAfterModalClose'
@@ -189,7 +184,7 @@ describe('RoundLiveComponent live round behavior', () => {
       errorMsg: '',
       isRoundPaused: false,
       byeTeam: null,
-      anyStarted: false // V25D82 sprint 2 UX fix: false by default in test fixtures
+      anyStarted: false // False by default in test fixtures.
     };
     (component as any).vmSubject.next(vm);
   }
@@ -281,7 +276,7 @@ describe('RoundLiveComponent live round behavior', () => {
     expect(vm.matches[0].match.status).toBe('SCHEDULED');
   });
 
-  // ========== V25D81.1 BUG #3 rival RED_CARD awareness tests ==========
+  // ========== Rival red-card awareness tests ==========
 
   /**
    * Helper: set up a match with a home-team user + away rival. Returns the
@@ -305,7 +300,7 @@ describe('RoundLiveComponent live round behavior', () => {
     return matches;
   }
 
-  it('BUG #3 (1/5): RED_CARD on rival while RUNNING queues awareness without interrupting', (done) => {
+  it('RED_CARD on rival while RUNNING queues awareness without interrupting', (done) => {
     setVm([{ match: makeMatch('SCHEDULED'), isUserMatch: true }]);
     (component as any).startRoundEngine(SAMPLE_GAME_ID, (component as any).vmSubject.value.matches);
 
@@ -332,7 +327,7 @@ describe('RoundLiveComponent live round behavior', () => {
     });
   });
 
-  it('BUG #3 (2/5): RED_CARD on manager team does NOT trigger awareness modal', (done) => {
+  it('RED_CARD on manager team does not trigger awareness modal', (done) => {
     setVm([{ match: makeMatch('SCHEDULED'), isUserMatch: true }]);
     (component as any).startRoundEngine(SAMPLE_GAME_ID, (component as any).vmSubject.value.matches);
 
@@ -359,7 +354,7 @@ describe('RoundLiveComponent live round behavior', () => {
     });
   });
 
-  it('BUG #3 (1b/5): RED_CARD on rival while PAUSED opens awareness modal', (done) => {
+  it('RED_CARD on rival while PAUSED opens awareness modal', (done) => {
     setVm([{ match: makeMatch('SCHEDULED'), isUserMatch: true }]);
     (component as any).startRoundEngine(SAMPLE_GAME_ID, (component as any).vmSubject.value.matches);
 
@@ -390,7 +385,7 @@ describe('RoundLiveComponent live round behavior', () => {
     });
   });
 
-  it('BUG #3 (3/5): RED_CARD on FINISHED match does NOT trigger awareness modal', (done) => {
+  it('RED_CARD on FINISHED match does not trigger awareness modal', (done) => {
     setVm([{ match: makeMatch('SCHEDULED'), isUserMatch: true }]);
     (component as any).startRoundEngine(SAMPLE_GAME_ID, (component as any).vmSubject.value.matches);
 
@@ -416,7 +411,7 @@ describe('RoundLiveComponent live round behavior', () => {
     });
   });
 
-  it('BUG #3 (4/5): repeated rival RED_CARD for same eventId does NOT re-trigger', (done) => {
+  it('Repeated rival RED_CARD for the same eventId does not reopen the modal', (done) => {
     setVm([{ match: makeMatch('SCHEDULED'), isUserMatch: true }]);
     (component as any).startRoundEngine(SAMPLE_GAME_ID, (component as any).vmSubject.value.matches);
 
@@ -452,7 +447,7 @@ describe('RoundLiveComponent live round behavior', () => {
     });
   });
 
-  it('BUG #3 (5/5): rival RED_CARD queues when previous awareness modal still open', (done) => {
+  it('Rival RED_CARD queues when a previous awareness modal is still open', (done) => {
     // Make the first openRivalCardInfoModal call return an Observable that
     // doesn't complete until we resolve it (simulates "still open").
     let resolveFirst: () => void = () => {};
@@ -531,7 +526,7 @@ describe('RoundLiveComponent live round behavior', () => {
     });
   });
 
-  it('V25D99.20.3.36: skips a queued injury modal when that injured player was already substituted', (done) => {
+  it('Skips a queued injury modal when that injured player was already substituted', (done) => {
     const firstModalClosed$ = new Subject<unknown>();
     modalsSpy.openPartidoModal.and.returnValue(firstModalClosed$.asObservable());
 
@@ -565,7 +560,7 @@ describe('RoundLiveComponent live round behavior', () => {
     }, 10);
   });
 
-  it('V25D99.20.3.36: opens a queued injury modal when that player still needs attention', (done) => {
+  it('Opens a queued injury modal when that player still needs attention', (done) => {
     const firstModalClosed$ = new Subject<unknown>();
     modalsSpy.openPartidoModal.and.callFake(() => {
       if (modalsSpy.openPartidoModal.calls.count() === 1) {
@@ -600,7 +595,7 @@ describe('RoundLiveComponent live round behavior', () => {
     }, 10);
   });
 
-  it('V25D99.24: does not reopen an injury modal when that injured player already left the pitch', () => {
+  it('Does not reopen an injury modal when that injured player already left the pitch', () => {
     const state = makeMatchState({
       status: 'PAUSED',
       currentMinute: 31,
@@ -639,7 +634,7 @@ describe('RoundLiveComponent live round behavior', () => {
       .not.toHaveBeenCalled();
   });
 
-  it('V25D99.22: drains multiple queued injury modals in FIFO order', (done) => {
+  it('Drains multiple queued injury modals in FIFO order', (done) => {
     const firstModalClosed$ = new Subject<unknown>();
     const secondModalClosed$ = new Subject<unknown>();
     const firstResumeHoldRelease = jasmine.createSpy('firstResumeHoldRelease');
@@ -706,7 +701,7 @@ describe('RoundLiveComponent live round behavior', () => {
     }, 10);
   });
 
-  it('V25D99.22: skips a queued injury modal if that player was already substituted from the first modal', (done) => {
+  it('Skips a queued injury modal if that player was already substituted from the first modal', (done) => {
     const firstModalClosed$ = new Subject<unknown>();
     modalsSpy.openPartidoModal.and.callFake(() => {
       if (modalsSpy.openPartidoModal.calls.count() === 1) {
@@ -746,7 +741,7 @@ describe('RoundLiveComponent live round behavior', () => {
     }, 20);
   });
 
-  it('V25D99.21.1: queues an injury modal behind an open Partido modal', (done) => {
+  it('Queues an injury modal behind an open Partido modal', (done) => {
     const partidoClosed$ = new Subject<unknown>();
     modalsSpy.openPartidoModal.and.returnValue(partidoClosed$.asObservable());
     modalsSpy.openSubstitutionModal.calls.reset();
@@ -784,7 +779,7 @@ describe('RoundLiveComponent live round behavior', () => {
     }, 10);
   });
 
-  it('V25D99.21.11: local debug can suppress automatic injury modals for clean Partido QA', () => {
+  it('Local debug can suppress automatic injury modals for clean Partido QA', () => {
     modalsSpy.openSubstitutionModal.calls.reset();
     component.debugSuppressAutoInjuryModals = true;
     const state = makeMatchState({
@@ -815,7 +810,7 @@ describe('RoundLiveComponent live round behavior', () => {
     expect(component.pendingLiveModalNotice).toBeNull();
   });
 
-  it('V25D99.21.12: local debug can create a manager-side Partido injury state without opening substitution modal', () => {
+  it('Local debug can create a manager-side Partido injury state without opening substitution modal', () => {
     modalsSpy.openSubstitutionModal.calls.reset();
     const state = makeMatchState({
       status: 'PAUSED',
@@ -853,7 +848,7 @@ describe('RoundLiveComponent live round behavior', () => {
     expect(modalsSpy.openSubstitutionModal).not.toHaveBeenCalled();
   });
 
-  it('V25D99.21.12: local Partido injury debug uses career manager team when user match vm lacks userTeamId', () => {
+  it('Local Partido injury debug uses career manager team when user match vm lacks userTeamId', () => {
     (component as any).currentUserSessionTeamId = SAMPLE_AWAY_TEAM_ID;
     const state = makeMatchState({
       status: 'PAUSED',
@@ -888,7 +883,7 @@ describe('RoundLiveComponent live round behavior', () => {
     }));
   });
 
-  it('V25D99.21.13: local Partido injury debug does not stack over an active debug injury', () => {
+  it('Local Partido injury debug does not stack over an active debug injury', () => {
     const state = makeMatchState({
       status: 'PAUSED',
       currentMinute: 45,
@@ -921,7 +916,7 @@ describe('RoundLiveComponent live round behavior', () => {
     expect(vm.matches[0].state?.events?.length).toBe(1);
   });
 
-  it('V25D99.21.13: local Partido injury debug refuses incomplete XI to avoid fake AUTO slots', () => {
+  it('Local Partido injury debug refuses incomplete XI to avoid fake AUTO slots', () => {
     const state = makeMatchState({
       status: 'PAUSED',
       currentMinute: 45,
@@ -947,7 +942,7 @@ describe('RoundLiveComponent live round behavior', () => {
     expect(vm.matches[0].state?.events?.length).toBe(0);
   });
 
-  it('V25D99.21.13: local Partido injury debug normalizes 11 players mapped to incomplete tactical slots', () => {
+  it('Local Partido injury debug normalizes 11 players mapped to incomplete tactical slots', () => {
     const dirtySlots = Array.from({ length: 11 }, (_, index) => ({
       sessionPlayerId: index === 0 ? 'gk-1' : `home-${index}`,
       position: index === 0 ? 'GK' : 'CM',
@@ -977,7 +972,7 @@ describe('RoundLiveComponent live round behavior', () => {
     expect(vm.matches[0].state?.events?.length).toBe(1);
   });
 
-  it('V25D99.21.13: local Partido injury debug surfaces skipped reason in the live page notice', () => {
+  it('Local Partido injury debug surfaces skipped reason in the live page notice', () => {
     spyOn(console, 'warn');
     const state = makeMatchState({
       status: 'PAUSED',
@@ -1001,7 +996,7 @@ describe('RoundLiveComponent live round behavior', () => {
     expect(component.pendingLiveModalNotice).toContain('XI del usuario ya está incompleto');
   });
 
-  it('V25D99.21.1: queues rival red-card awareness behind an open Partido modal', (done) => {
+  it('Queues rival red-card awareness behind an open Partido modal', (done) => {
     const partidoClosed$ = new Subject<unknown>();
     modalsSpy.openPartidoModal.and.returnValue(partidoClosed$.asObservable());
     modalsSpy.openRivalCardInfoModal.calls.reset();
@@ -1038,7 +1033,7 @@ describe('RoundLiveComponent live round behavior', () => {
     }, 10);
   });
 
-  it('BUG #3 (6/7): RED_CARD in a non-user match does NOT interrupt the manager', (done) => {
+  it('RED_CARD in a non-user match does not interrupt the manager', (done) => {
     const otherMatchId = 'match-other-red';
     setVm([
       { match: makeMatch('SCHEDULED'), isUserMatch: true, userTeamId: SAMPLE_HOME_TEAM_ID },
@@ -1079,7 +1074,7 @@ describe('RoundLiveComponent live round behavior', () => {
     });
   });
 
-  it('BUG #3 (7/7): when the manager is away, HOME red card is rival and AWAY red card is own team', (done) => {
+  it('When the manager is away, HOME red card is rival and AWAY red card is own team', (done) => {
     setVm([{
       match: makeMatch('SCHEDULED'),
       isUserMatch: true,
@@ -1123,10 +1118,10 @@ describe('RoundLiveComponent live round behavior', () => {
     });
   });
 
-  // ========== V25D82 sprint 2 UX fix: "Iniciar Todos" button + anyStarted flag ==========
+  // ========== Start-all button and anyStarted flag ==========
 
   /**
-   * V25D82 sprint 2: explicit "Iniciar Todos" trigger for the round-live
+   * Explicit "Iniciar Todos" trigger for the round-live
    * header. This is the manager's fallback when the auto-start in
    * {@code startRoundEngine} did not visibly transition the matches to
    * RUNNING. The button calls
@@ -1146,8 +1141,8 @@ describe('RoundLiveComponent live round behavior', () => {
    *       CANCELLED, false when all are NOT_STARTED.</li>
    * </ol>
    */
-  describe('V25D82 sprint 2 UX fix: iniciarTodos + anyStarted flag', () => {
-    it('V25D82 #1: iniciarTodos calls engineService.startRound with NOT_STARTED matches (roundId = gameId)', () => {
+  describe('Start-all button and anyStarted flag', () => {
+    it('iniciarTodos calls engineService.startRound with NOT_STARTED matches', () => {
       // Build a VM with TWO matches: one NOT_STARTED, one without state yet
       // (the "no state" branch is also covered by the filter).
       const notStartedMatch: RoundMatchVM = {
@@ -1162,7 +1157,7 @@ describe('RoundLiveComponent live round behavior', () => {
       };
       setVm([notStartedMatch, noStateMatch]);
 
-      // V25D84 sprint: setVm() above triggers the auto-start
+      // setVm() above triggers the auto-start
       // subscription (vm$.pipe(take(1))), which calls
       // engineService.startRound as part of the round auto-init. Reset
       // the spy here so the assertion below counts ONLY the
@@ -1187,7 +1182,7 @@ describe('RoundLiveComponent live round behavior', () => {
       expect(matchesArg[1].matchId).toBe('match-no-state');
     });
 
-    it('V25D82 #2: iniciarTodos is a no-op when all matches already started (no backend call)', () => {
+    it('iniciarTodos is a no-op when all matches already started', () => {
       engineServiceSpy.startRound.calls.reset();
 
       // All matches are RUNNING — nothing left to start.
@@ -1204,7 +1199,7 @@ describe('RoundLiveComponent live round behavior', () => {
       expect(engineServiceSpy.startRound).not.toHaveBeenCalled();
     });
 
-    it('V25D82 #3: iniciarTodos handles empty matches list gracefully (no crash, no backend call)', () => {
+    it('iniciarTodos handles an empty matches list gracefully', () => {
       engineServiceSpy.startRound.calls.reset();
 
       // No matches in the VM at all.
@@ -1217,7 +1212,7 @@ describe('RoundLiveComponent live round behavior', () => {
       expect(engineServiceSpy.startRound).not.toHaveBeenCalled();
     });
 
-    it('V25D82 #4: anyStarted flag is true when any match is RUNNING/HALF_TIME/PAUSED/FINISHED/CANCELLED (SSE-driven)', () => {
+    it('anyStarted flag is true when any match has already started', () => {
       // Build a VM with one NOT_STARTED match, then push an SSE update that
       // flips it to RUNNING. anyStarted MUST become true. Note: MatchState
       // uses 'RUNNING' (the live status), not 'IN_PROGRESS' (which is the
@@ -1292,10 +1287,10 @@ describe('RoundLiveComponent live round behavior', () => {
     });
   });
 
-  // ========== V25D83 sprint: initial-load spinner (loading$) ==========
+  // ========== Initial-load spinner ==========
 
   /**
-   * V25D83 sprint: the constructor's combineLatest (routeParams + teams +
+   * The constructor's combineLatest (routeParams + teams +
    * careerStatus + fixtures) used to render an empty round-live-container
    * immediately because the vmSubject initial value was empty. The user
    * saw a blank page until all four HTTP fetches resolved. We added a
@@ -1318,8 +1313,8 @@ describe('RoundLiveComponent live round behavior', () => {
    * the constructor — we control the emissions from the test body and
    * can observe the {@code loading$} transitions in order.
    */
-  describe('V25D83 sprint: loading$ (initial-load spinner)', () => {
-    it('V25D83 #1: loading$ starts true and flips to false after combineLatest emits', (done: DoneFn) => {
+  describe('Initial-load spinner', () => {
+    it('loading$ starts true and flips to false after combineLatest emits', (done: DoneFn) => {
       // Cold subjects so combineLatest blocks until we push.
       const teamsSub = new Subject<any[]>();
       const statusSub = new Subject<any>();
@@ -1354,7 +1349,7 @@ describe('RoundLiveComponent live round behavior', () => {
       });
     });
 
-    it('V25D83 #2: loading$ flips to false on the error path (catchError)', (done: DoneFn) => {
+    it('loading$ flips to false on the error path', (done: DoneFn) => {
       // Use cold Subjects so the constructor's combineLatest chain does
       // not emit during construction (loading$ stays at its initial value
       // `true`). We then manually fire an error on the status subject to
@@ -1387,10 +1382,10 @@ describe('RoundLiveComponent live round behavior', () => {
     });
   });
 
-  // ========== V25D84 sprint: auto-start round on first vm$ emission ==========
+  // ========== Auto-start round on first vm$ emission ==========
 
   /**
-   * V25D84 sprint: round-live should auto-start the round as soon as
+   * Round-live should auto-start the round as soon as
    * the first vm$ emission shows NOT_STARTED matches, so the manager
    * doesn't have to click the "Iniciar Todos" button every time. The
    * button remains as a manual fallback for refresh / failed-auto-start
@@ -1421,8 +1416,8 @@ describe('RoundLiveComponent live round behavior', () => {
    *       auto-start fired — the manager can re-trigger if needed.</li>
    * </ol>
    */
-  describe('V25D84 sprint: round auto-start on first vm$ emission', () => {
-    it('V25D84 #1: auto-start fires when first vm$ has NOT_STARTED matches (calls engineService.startRound)', () => {
+  describe('Round auto-start on first vm$ emission', () => {
+    it('auto-start fires when first vm$ has NOT_STARTED matches', () => {
       // Spy on engineService.startRound calls. Note: the constructor's
       // startRoundEngine call would normally happen too, but in this
       // test the cold Subject spies for career service prevent
@@ -1455,7 +1450,7 @@ describe('RoundLiveComponent live round behavior', () => {
       expect(matchesArg[1].matchId).toBe('match-no-state-2');
     });
 
-    it('V25D84 #2: auto-start no-ops on empty matches VM (no backend POST)', () => {
+    it('auto-start no-ops on empty matches VM', () => {
       engineServiceSpy.startRound.calls.reset();
 
       // VM has no matches at all — round can't be started.
@@ -1465,7 +1460,7 @@ describe('RoundLiveComponent live round behavior', () => {
       expect(engineServiceSpy.startRound).not.toHaveBeenCalled();
     });
 
-    it('V25D84 #3: auto-start no-ops when VM has errorMsg set (e.g. "No hay partidos para la fecha N")', () => {
+    it('auto-start no-ops when VM has errorMsg set', () => {
       engineServiceSpy.startRound.calls.reset();
 
       // Build VM with an error message AND matches (covers the
@@ -1488,7 +1483,7 @@ describe('RoundLiveComponent live round behavior', () => {
       expect(engineServiceSpy.startRound).not.toHaveBeenCalled();
     });
 
-    it('V25D84 #4: auto-start no-ops when all matches already started (refresh case)', () => {
+    it('auto-start no-ops when all matches already started', () => {
       engineServiceSpy.startRound.calls.reset();
 
       // All matches RUNNING — backend round is already ticking. This
@@ -1505,7 +1500,7 @@ describe('RoundLiveComponent live round behavior', () => {
       expect(engineServiceSpy.startRound).not.toHaveBeenCalled();
     });
 
-    it('V25D84 #5: startRoundEngine skips duplicate POST when autoStartTriggered=true', () => {
+    it('startRoundEngine skips duplicate POST when autoStartTriggered is true', () => {
       // First: fire the auto-start via setVm.
       const notStartedMatch: RoundMatchVM = {
         match: makeMatch('SCHEDULED'),
@@ -1526,7 +1521,7 @@ describe('RoundLiveComponent live round behavior', () => {
       expect(engineServiceSpy.startRound).not.toHaveBeenCalled();
     });
 
-    it('V25D84 #6: auto-start fires only once per component instance (take(1) guard)', () => {
+    it('auto-start fires only once per component instance', () => {
       engineServiceSpy.startRound.calls.reset();
 
       // First emission: NOT_STARTED matches — should fire auto-start.
@@ -1562,7 +1557,7 @@ describe('RoundLiveComponent live round behavior', () => {
       expect(engineServiceSpy.startRound).not.toHaveBeenCalled();
     });
 
-    it('V25D84 #7: Iniciar Todos button still works as fallback after auto-start fires', () => {
+    it('Iniciar Todos button still works as fallback after auto-start fires', () => {
       // Fire the auto-start via setVm.
       const notStartedMatch: RoundMatchVM = {
         match: makeMatch('SCHEDULED'),
@@ -1589,10 +1584,10 @@ describe('RoundLiveComponent live round behavior', () => {
     });
   });
 
-  // ========== V25D86 sprint: SSE roundId resolution ==========
+  // ========== SSE roundId resolution ==========
 
   /**
-   * V25D86 sprint: the frontend was passing {@code gameId} (careerId) as
+   * The frontend must use the backend roundId rather than {@code gameId} as
    * the SSE {@code roundId}. The backend registers the RoundEngine
    * under the value the POST response's {@code state.roundId} returns,
    * which can differ from the request body (e.g. careerId may not be a
@@ -1627,7 +1622,7 @@ describe('RoundLiveComponent live round behavior', () => {
    *       (no streamRoundState call with an empty id).</li>
    * </ol>
    */
-  describe('V25D86 sprint: streamRoundState uses POST roundId, not gameId', () => {
+  describe('streamRoundState uses POST roundId, not gameId', () => {
     /**
      * Helper: trigger the auto-start + startRoundEngine the same way the
      * production flow does, without going through the constructor's
@@ -1650,7 +1645,7 @@ describe('RoundLiveComponent live round behavior', () => {
       (component as any).startRoundEngine(SAMPLE_GAME_ID, (component as any).vmSubject.value.matches);
     }
 
-    it('V25D86 #1: streamRoundState receives roundId from POST response, NOT gameId', () => {
+    it('streamRoundState receives roundId from POST response, not gameId', () => {
       // Configure startRound to return a RoundState whose roundId is
       // explicitly DIFFERENT from SAMPLE_GAME_ID — this is the bug
       // scenario: frontend posts gameId, backend resolves to a real UUID,
@@ -1669,19 +1664,19 @@ describe('RoundLiveComponent live round behavior', () => {
       // into resolvedRoundId$ (the side effect that the SSE chain
       // consumes)...
       expect((component as any).resolvedRoundId$.value).toBe(realRoundId,
-          'V25D86: tryAutoStartRound must capture state.roundId into resolvedRoundId$');
+          'tryAutoStartRound must capture state.roundId into resolvedRoundId$');
 
       // ...and the SSE URL was opened with that backend-resolved roundId,
-      // NOT gameId. Before V25D86 this assertion would fail: args[0]
+      // It must use the POST response roundId rather than the frontend gameId.
       // was SAMPLE_GAME_ID and the SSE went idle because the registry
       // had no entry for the careerId.
       expect(engineServiceSpy.streamRoundState).toHaveBeenCalledTimes(1);
       expect(engineServiceSpy.streamRoundState.calls.mostRecent().args[0]).toBe(realRoundId,
-          'V25D86: streamRoundState must receive the roundId from the POST response, not the frontend gameId');
+          'streamRoundState must receive the roundId from the POST response, not the frontend gameId');
       expect(engineServiceSpy.streamRoundState.calls.mostRecent().args[0]).not.toBe(SAMPLE_GAME_ID);
     });
 
-    it('V25D86 #2: iniciarTodos pushes its POST roundId into resolvedRoundId$ (so an SSE retry sees the new key)', () => {
+    it('iniciarTodos pushes its POST roundId into resolvedRoundId$', () => {
       const realRoundId = 'iniciar-todos-round-uuid-cccc-dddd';
       engineServiceSpy.startRound.and.returnValue(of(makeRoundState([], 'IN_PROGRESS', realRoundId)));
       engineServiceSpy.startRound.calls.reset();
@@ -1706,10 +1701,10 @@ describe('RoundLiveComponent live round behavior', () => {
       // by reading the private BehaviorSubject.
       expect(engineServiceSpy.startRound).toHaveBeenCalledTimes(1);
       expect((component as any).resolvedRoundId$.value).toBe(realRoundId,
-          'V25D86: iniciarTodos must publish its POST response roundId so the SSE rendezvous sees it');
+          'iniciarTodos must publish its POST response roundId so the SSE rendezvous sees it');
     });
 
-    it('V25D86 #3: defensive — when POST returns a state with no roundId, streamRoundState is NOT called', () => {
+    it('defensive path does not call streamRoundState when POST returns no roundId', () => {
       // Backend response without roundId (e.g. malformed body, future
       // API drift). The SSE filter `id !== null` must block the empty
       // id and prevent a `streamRoundState('')` call that would 404.
