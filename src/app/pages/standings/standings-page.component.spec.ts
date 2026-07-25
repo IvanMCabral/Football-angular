@@ -1,15 +1,3 @@
-/**
- * V25D78-C55.2 phase 4 UI (b2) + (c) + (c2): tests for {@link StandingsPageComponent}.
- *
- * <p>Coverage:
- * <ul>
- *   <li>Page renders 3 tabs (PRIMERA / SEGUNDA / TERCERA) from
- *       {@code CareerService.getAllStandings()}.</li>
- *   <li>User-division pill renders from {@code careerStatus.userDivision} (c).</li>
- *   <li>Green/red zone indicator applied to rows by position (c2).</li>
- *   <li>Loading and error states handled.</li>
- * </ul>
- */
 import { Component, NO_ERRORS_SCHEMA } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
@@ -26,7 +14,7 @@ import { AllStandingsResponse, CareerStatus } from '../../core/services/career.m
 })
 class StubComponent {}
 
-describe('StandingsPageComponent — V25D78-C55.2 phase 4 UI (b2)', () => {
+describe('StandingsPageComponent', () => {
   let component: StandingsPageComponent;
   let fixture: ComponentFixture<StandingsPageComponent>;
   let careerServiceSpy: jasmine.SpyObj<CareerService>;
@@ -63,7 +51,6 @@ describe('StandingsPageComponent — V25D78-C55.2 phase 4 UI (b2)', () => {
     careerServiceSpy = jasmine.createSpyObj('CareerService', ['getAllStandings', 'getCareerStatus']);
     httpSpy = jasmine.createSpyObj('HttpClient', ['get']);
 
-    // Default mocks — happy path.
     careerServiceSpy.getAllStandings.and.returnValue(of(ALL_STANDINGS));
     careerServiceSpy.getCareerStatus.and.returnValue(of({
       careerId: 'career-1',
@@ -110,7 +97,7 @@ describe('StandingsPageComponent — V25D78-C55.2 phase 4 UI (b2)', () => {
     });
   });
 
-  it('renders the user-division pill from careerStatus.userDivision (c)', (done: DoneFn) => {
+  it('renders the user-division pill from careerStatus.userDivision', (done: DoneFn) => {
     fixture.detectChanges();
     fixture.whenStable().then(() => {
       const pill = fixture.nativeElement.querySelector('.user-division-pill');
@@ -137,7 +124,6 @@ describe('StandingsPageComponent — V25D78-C55.2 phase 4 UI (b2)', () => {
       careerPhase: 'WAITING_USER',
       squadSize: 11,
       freePlayersCount: 0
-      // userDivision omitted → legacy backend
     } as any));
     fixture.detectChanges();
     fixture.whenStable().then(() => {
@@ -147,12 +133,7 @@ describe('StandingsPageComponent — V25D78-C55.2 phase 4 UI (b2)', () => {
     });
   });
 
-  it('(C55.10 Item 1): tier-real — pill renders CUARTA verbatim with tier-default fallback', (done: DoneFn) => {
-    // C55.10 Item 1: backend sends the literal tier label (CUARTA, QUINTA,
-    // …) — the front must consume it AS-IS without remapping. CSS contract:
-    // the unknown-tier pill gets `tier-default` styling so it stays visually
-    // distinct from PRIMERA/SEGUNDA/TERCERA instead of falling back to
-    // unstyled text. Same contract as the dashboard pill.
+  it('renders lower-division labels verbatim with tier-default fallback', (done: DoneFn) => {
     careerServiceSpy.getCareerStatus.and.returnValue(of({
       careerId: 'career-1',
       season: 3,
@@ -185,10 +166,7 @@ describe('StandingsPageComponent — V25D78-C55.2 phase 4 UI (b2)', () => {
     });
   });
 
-  it('(C55.10 Item 1): tierCssClass() helper covers PRIMERA/SEGUNDA/TERCERA/tier-default', () => {
-    // Unit test of the tier-class helper. Same contract as the dashboard
-    // pill, duplicated here so each component can extend independently
-    // (e.g. additional tier color schemes) without silently diverging.
+  it('maps known division labels to tier CSS classes', () => {
     expect(component.tierCssClass('PRIMERA')).toBe('tier-primera');
     expect(component.tierCssClass('SEGUNDA')).toBe('tier-segunda');
     expect(component.tierCssClass('TERCERA')).toBe('tier-tercera');
@@ -198,7 +176,7 @@ describe('StandingsPageComponent — V25D78-C55.2 phase 4 UI (b2)', () => {
     expect(component.tierCssClass(undefined)).toBe('tier-default');
   });
 
-  it('renders the green/red zone legend (c2)', (done: DoneFn) => {
+  it('renders the promotion and relegation zone legend', (done: DoneFn) => {
     fixture.detectChanges();
     fixture.whenStable().then(() => {
       const legend = fixture.nativeElement.querySelector('.zone-legend');
@@ -242,7 +220,7 @@ describe('StandingsPageComponent — V25D78-C55.2 phase 4 UI (b2)', () => {
     });
   });
 
-  it('exposes TEAMS_PROMOTED_OR_RELEGATED = 3 constant (c2 contract)', () => {
+  it('exposes TEAMS_PROMOTED_OR_RELEGATED = 3 constant', () => {
     expect(component.TEAMS_PROMOTED_OR_RELEGATED).toBe(3,
       'TEAMS_PROMOTED_OR_RELEGATED must mirror PromotionRelegationService.TEAMS_PROMOTED_OR_RELEGATED');
   });
@@ -255,21 +233,12 @@ describe('StandingsPageComponent — V25D78-C55.2 phase 4 UI (b2)', () => {
     });
   });
 
-  it('(C55.10 Item 3): user team row has `.highlight` class and the ⭐ marker', (done: DoneFn) => {
-    // C55.10 Item 3 — gap A3/B5: previously the user's row used a subtle
-    // 3px gold border + 15% tint which was easy to miss when scanning the
-    // table. The CSS now adds 6px border + gradient + bold font-weight.
-    // This test verifies the structural wiring is in place (the .highlight
-    // class is applied to the right <tr>). Visual prominence (gradient +
-    // bold) is a CSS concern covered by the smoke review.
+  it('marks the user team row with highlight class and star marker', (done: DoneFn) => {
     fixture.detectChanges();
     fixture.whenStable().then(() => {
       const highlightedRows = fixture.nativeElement.querySelectorAll('tr.highlight');
       expect(highlightedRows.length).toBeGreaterThan(0, 'at least one tr.highlight must render');
 
-      // Exactly one row should be highlighted (the user's team) across all
-      // visible divisions. The page auto-selects the user's division tab,
-      // so only the active tab's table is in the DOM.
       expect(highlightedRows.length).toBe(1,
         `expected exactly 1 highlighted row, got ${highlightedRows.length}`);
 
@@ -284,12 +253,8 @@ describe('StandingsPageComponent — V25D78-C55.2 phase 4 UI (b2)', () => {
     });
   });
 
-  it('(C55.10 Item 3): highlight survives promotion/relegation zones (zone-promotion.highlight class still applies)', (done: DoneFn) => {
-    // C55.10 Item 3 — when the user's team lands inside a promotion zone
+  it('keeps user-team highlight when the row is also in a promotion zone', (done: DoneFn) => {
     // (top-3) the highlighted row must still be visible. The new CSS
-    // bumps the gold border-left from 3px → 6px and adds font-weight: 700
-    // so the override is obvious even when stacked with the green zone
-    // background.
     const PRIMERA_PROMO_USER = [
       { teamId: 'bottom-1', teamName: 'Bottom PRIMERA', division: 'PRIMERA', played: 5, won: 0, drawn: 0, lost: 5, goalsFor: 1, goalsAgainst: 10, goalDifference: -9, points: 0 },
       { teamId: 'bot-2', teamName: 'Bot2 PRIMERA', division: 'PRIMERA', played: 5, won: 0, drawn: 0, lost: 5, goalsFor: 1, goalsAgainst: 10, goalDifference: -9, points: 0 },
@@ -304,9 +269,6 @@ describe('StandingsPageComponent — V25D78-C55.2 phase 4 UI (b2)', () => {
     fixture.detectChanges();
     fixture.whenStable().then(() => {
       const rows = fixture.nativeElement.querySelectorAll('tr');
-      // Find the user row by data (Real Madrid (us) → index 2 of reverse-sorted? no,
-      // it's at index 2 in array order = 3rd row, which is in promotion zone).
-      // We assert the row has BOTH highlight AND zone-promotion classes.
       const userRow = Array.from(rows).find((r: any) =>
         r.textContent.includes('Real Madrid (us)')
       ) as HTMLElement | undefined;

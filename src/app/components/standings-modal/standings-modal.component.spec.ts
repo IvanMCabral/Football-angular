@@ -1,14 +1,3 @@
-/**
- * V25D78-C55.2 phase 4 UI (c2): tests for {@link StandingsModalComponent}.
- *
- * <p>Coverage:
- * <ul>
- *   <li>Constant {@code TEAMS_PROMOTED_OR_RELEGATED} exposed (= 3).</li>
- *   <li>Green/red zone legend renders (c2 contract).</li>
- *   <li>Divisions loaded from CareerService.getAllStandings().</li>
- *   <li>User's tab auto-selected based on {@code isUserDivision}.</li>
- * </ul>
- */
 import { Component, NO_ERRORS_SCHEMA } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
@@ -24,7 +13,7 @@ import { AllStandingsResponse } from '../../core/services/career.model';
 })
 class StubComponent {}
 
-describe('StandingsModalComponent — V25D78-C55.2 phase 4 UI (c2)', () => {
+describe('StandingsModalComponent', () => {
   let component: StandingsModalComponent;
   let fixture: ComponentFixture<StandingsModalComponent>;
   let careerServiceSpy: jasmine.SpyObj<CareerService>;
@@ -109,12 +98,7 @@ describe('StandingsModalComponent — V25D78-C55.2 phase 4 UI (c2)', () => {
     });
   });
 
-  it('(C55.10 Item 3): user team row has `.highlight` class and the ⭐ marker (gap A3/B5)', (done: DoneFn) => {
-    // C55.10 Item 3 — same fix as standings-page: the modal used the same
-    // subtle 3px gold border + 15% tint before. Now 6px + gradient + bold.
-    // Visual prominence is verified via smoke; this spec asserts the
-    // structural wiring (.highlight + .user-team-marker) lands on the
-    // user's row.
+  it('marks the user team row with highlight class and star marker', (done: DoneFn) => {
     fixture.detectChanges();
     fixture.whenStable().then(() => {
       const highlightedRows = fixture.nativeElement.querySelectorAll('tr.highlight');
