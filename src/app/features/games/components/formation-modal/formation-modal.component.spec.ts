@@ -1,21 +1,8 @@
 /**
- * LIVE-MATCH-F3-UI-LIVE FE5: unit tests for {@link FormationModalComponent}.
+ * Unit tests for {@link FormationModalComponent}.
  *
- * <p>Validates the formation-selection flow without involving a real backend
- * (HttpClient is mocked via a Spy).
- *
- * <p>V25D54-C15 P3.2: agregados tests para las 5 formations nuevas
- * (3-5-2-CDM, 5-4-1, 3-4-1-2, 4-2-2-2, 4-1-2-3) — verifican que el
- * dropdown las incluye, que formationLines devuelve el shape correcto,
- * y que getDotLabel retorna los role labels específicos (LWB, RWB, CDM,
- * CAM, etc.) en lugar de los genéricos anteriores.
- *
- * <p>V25D55-C16 P0.1 + P1.3+4: agregados tests para verificar que el HTML
- * aplica las clases CSS correctas (is-gk, is-def, is-mid, is-att) para
- * formations con 4, 5 y 6 líneas. Antes los bindings
- * `[class.is-gk]="last && i === 0"` y `[class.is-att]="i === length - 1 && !last"`
- * eran siempre false, dejando dots ATT y GK sin styling diferenciado.
- * Además se valida que la constante compartida tenga 12 formations.
+ * Covers formation selection, tactical slot mapping, visual pitch classes,
+ * responsive layout, auto-fill behavior, and backend auto-selection.
  */
 
 import { ComponentFixture, TestBed } from '@angular/core/testing';
@@ -37,7 +24,7 @@ const SAMPLE_DATA: FormationDialogData = {
     { sessionPlayerId: 'p3', position: 'MID',  slotIndex: 2 },
     { sessionPlayerId: 'p4', position: 'ATT',  slotIndex: 3 }
   ],
-  // V25D81-BUG #4: 4 starters (p1-p4) + 3 bench (b1-b3) so the
+  // Four starters plus bench players keep the drag-drop UX testable, so the
   // bench column has players to render. Without this, the bench
   // is empty and the drag-drop UX is untestable.
   squad: [
@@ -59,7 +46,7 @@ const ALL_FORMATIONS = [
   '4-1-2-3'
 ];
 
-describe('FormationModalComponent — LIVE-MATCH-F3-UI-LIVE FE5', () => {
+describe('FormationModalComponent', () => {
   let component: FormationModalComponent;
   let fixture: ComponentFixture<FormationModalComponent>;
   let engineServiceSpy: jasmine.SpyObj<MatchEngineService>;
@@ -72,12 +59,9 @@ describe('FormationModalComponent — LIVE-MATCH-F3-UI-LIVE FE5', () => {
     dialogRefSpy = jasmine.createSpyObj('MatDialogRef', ['close']);
     snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
     httpClientSpy = jasmine.createSpyObj('HttpClient', ['get', 'post']);
-    // V25D99.20.3-FRONT BUG-1: onFormationChange POSTs /career/lineup/auto-select
-    // and refreshes slotAssignments from the response. The existing tests
-    // don't care about the auto-select response — make the spy return a
-    // no-op observable by default so the .subscribe() call doesn't blow
-    // up. Specific tests (the V25D99.20.3-FRONT BUG-1 describe) override
-    // this with their own returnValue.
+    // onFormationChange posts to /career/lineup/auto-select and refreshes
+    // slotAssignments from the response. Most tests only need a safe default
+    // response; the backend-specific suite overrides this spy.
     httpClientSpy.post.and.returnValue(of({ formation: '4-4-2', slots: [] }));
 
     await TestBed.configureTestingModule({
@@ -110,7 +94,7 @@ describe('FormationModalComponent — LIVE-MATCH-F3-UI-LIVE FE5', () => {
     expect(ALL_FORMATIONS).toContain(component.selectedFormation());
   });
 
-  it('formationLines returns the correct counts per formation (7 originales)', () => {
+  it('formationLines returns the correct counts for the original formations', () => {
     component.onFormationChange('4-4-2');
     expect(component.formationLines).toEqual([1, 4, 4, 2]);
     component.onFormationChange('4-3-3');
@@ -127,14 +111,14 @@ describe('FormationModalComponent — LIVE-MATCH-F3-UI-LIVE FE5', () => {
     expect(component.formationLines).toEqual([1, 3, 4, 3]);
   });
 
-  it('V25D54-C15 P3.2: formations list includes the 12 formations (7 + 5 nuevas)', () => {
+  it('formations list includes all 12 supported formations', () => {
     expect(component.formations.length).toBe(12);
     for (const f of ALL_FORMATIONS) {
       expect(component.formations).toContain(f);
     }
   });
 
-  it('V25D54-C15 P3.2: formationLines counts correctos para 5 formations nuevas', () => {
+  it('formationLines returns the correct counts for the added formations', () => {
     component.onFormationChange('3-5-2-CDM');
     expect(component.formationLines).toEqual([1, 3, 1, 2, 2, 2]); // GK + 3CB + CDM + 2CM + 2WB + 2ST
     component.onFormationChange('5-4-1');
@@ -147,7 +131,7 @@ describe('FormationModalComponent — LIVE-MATCH-F3-UI-LIVE FE5', () => {
     expect(component.formationLines).toEqual([1, 4, 1, 2, 3]);    // GK + 4DEF + 1CDM + 2CM + 3ATT
   });
 
-  it('V25D54-C15 P3.2: getDotLabel devuelve role labels específicos (no genéricos)', () => {
+  it('getDotLabel returns specific tactical role labels', () => {
     // 3-5-2 (P0 fixed): pos #4 = LWB (no LM), pos #8 = RWB (no RM).
     component.onFormationChange('3-5-2');
     // Lines: [GK], [CB,CB,CB], [LWB,CM,CM,CM,RWB], [ST,ST]
@@ -186,7 +170,7 @@ describe('FormationModalComponent — LIVE-MATCH-F3-UI-LIVE FE5', () => {
     expect(component.getDotLabel(4, 2, 3, true)).toBe('RW');
   });
 
-  it('V25D54-C15 P3.2: getDotLabel devuelve string vacío si el índice está fuera de rango', () => {
+  it('getDotLabel returns an empty string when indexes are out of range', () => {
     component.onFormationChange('4-4-2');
     expect(component.getDotLabel(99, 0, 1, false)).toBe(''); // lineIdx fuera de rango
     expect(component.getDotLabel(0, 99, 1, false)).toBe(''); // n fuera de rango
@@ -208,12 +192,8 @@ describe('FormationModalComponent — LIVE-MATCH-F3-UI-LIVE FE5', () => {
   });
 
   it('confirm with a different formation calls changeFormation with the new slot list', () => {
-    // V25D81-BUG #4: pre-F5 the modal sent the same currentSlots
-    // regardless of the new formation. With the drag-drop fix, the
-    // modal sends the full slot list for the new formation (11
-    // entries for 4-3-3 with positions LB/CB/CB/RB/CM/CM/CM/LW/ST/RW
-    // + the GK at index 0). The backend's auto-fill re-derives the
-    // roster from these positions.
+    // The modal sends the full slot list for the selected formation.
+    // The backend auto-fill re-derives the roster from these tactical positions.
     engineServiceSpy.changeFormation.and.returnValue(of({ success: true, minuteApplied: 35 }));
     component.onFormationChange('4-3-3');
     component.confirm();
@@ -269,7 +249,7 @@ describe('FormationModalComponent — LIVE-MATCH-F3-UI-LIVE FE5', () => {
     );
   });
 
-  it('confirm backend success=false → inline error, no close', () => {
+  it('confirm backend success=false shows inline error and keeps the modal open', () => {
     engineServiceSpy.changeFormation.and.returnValue(of({
       success: false, error: 'Invalid formation'
     }));
@@ -279,7 +259,8 @@ describe('FormationModalComponent — LIVE-MATCH-F3-UI-LIVE FE5', () => {
     expect(dialogRefSpy.close).not.toHaveBeenCalled();
   });
 
-  it('confirm backend error → "Error de red" message, no close', () => {
+  it('confirm backend error shows "Error de red" message and keeps the modal open', () => {
+    spyOn(console, 'error').and.stub();
     engineServiceSpy.changeFormation.and.returnValue(throwError(() => new Error('network')));
     component.onFormationChange('4-3-3');
     component.confirm();
@@ -296,28 +277,28 @@ describe('FormationModalComponent — LIVE-MATCH-F3-UI-LIVE FE5', () => {
   });
 
   // ============================================================
-  // V25D99.20.3.1-FRONT BUG-2 pinning test: Escape key closes the
+  // Escape key handling.
   // dialog through the cancel() method (consistent with the
   // "Cancelar" button), instead of using MatDialog's default
   // dialogRef.close(undefined) which would surface a different
   // close reason to the parent.
   // ============================================================
 
-  it('V25D99.20.3.1-FRONT BUG-2: Escape key triggers cancel() with success=false, reason=cancelled', () => {
+  it('Escape key closes the modal as an explicit cancel result', () => {
     component.onEscape();
     expect(dialogRefSpy.close).toHaveBeenCalledWith(
       jasmine.objectContaining({ success: false, reason: 'cancelled' })
     );
   });
 
-  it('V25D99.20.3.1-FRONT BUG-2: Escape ignored when isSubmitting=true (avoid mid-save close)', () => {
+  it('Escape is ignored while a save is in progress', () => {
     component.isSubmitting = true;
     component.onEscape();
     expect(dialogRefSpy.close).not.toHaveBeenCalled();
   });
 
   // ============================================================================
-  // V25D55 (Sprint C16) P0.1 + P1.3+4 — HTML CSS class bindings
+  // Visual pitch CSS class bindings.
   // ============================================================================
 
   /**
@@ -337,7 +318,7 @@ describe('FormationModalComponent — LIVE-MATCH-F3-UI-LIVE FE5', () => {
     return counts;
   }
 
-  it('V25D55-C16 P0.1: ALL_FORMATIONS (shared constant) has exactly 12 entries', async () => {
+  it('ALL_FORMATIONS has exactly 12 entries', async () => {
     // Re-import to ensure the source-of-truth constant matches what the
     // component renders.
     const { ALL_FORMATIONS: shared } = await import(
@@ -352,7 +333,7 @@ describe('FormationModalComponent — LIVE-MATCH-F3-UI-LIVE FE5', () => {
     expect(shared).toContain('4-1-2-3');
   });
 
-  it('V25D55-C16 P1.3+4: GK dot has class is-gk (was always false before the fix)', () => {
+  it('GK dot has class is-gk', () => {
     // 4-4-2: GK is the first dot on the first line.
     component.onFormationChange('4-4-2');
     fixture.detectChanges();
@@ -363,7 +344,7 @@ describe('FormationModalComponent — LIVE-MATCH-F3-UI-LIVE FE5', () => {
     expect(dots.slice(1).every(d => !d.classList.contains('is-gk'))).toBeTrue();
   });
 
-  it('V25D55-C16 P1.3+4: ATT dots have class is-att (was always false before the fix)', () => {
+  it('ATT dots have class is-att', () => {
     // 4-4-2: ATT is the last line with 2 dots (indices 9, 10).
     component.onFormationChange('4-4-2');
     fixture.detectChanges();
@@ -376,7 +357,7 @@ describe('FormationModalComponent — LIVE-MATCH-F3-UI-LIVE FE5', () => {
     }
   });
 
-  it('V25D55-C16 P1.3+4: 3-5-2-CDM (6 lines) — every MID line gets is-mid (CDM + 2CM + 2WB)', () => {
+  it('3-5-2-CDM applies is-mid to every midfield line', () => {
     // 3-5-2-CDM shape: GK(1) + 3CB(3) + CDM(1) + 2CM(2) + 2WB(2) + 2ST(2) = 11
     // Cumulative offsets: line 0 → dots[0], line 1 → dots[1..3], line 2 →
     // dots[4], line 3 → dots[5..6], line 4 → dots[7..8], line 5 → dots[9..10].
@@ -402,7 +383,7 @@ describe('FormationModalComponent — LIVE-MATCH-F3-UI-LIVE FE5', () => {
     expect(dots[10].classList.contains('is-att')).toBeTrue();
   });
 
-  it('V25D55-C16 P1.3+4: 5-4-1 (4 lines) — only line 2 is MID, lines 1 is DEF, line 3 is ATT', () => {
+  it('5-4-1 applies defensive, midfield, and attacking line classes correctly', () => {
     component.onFormationChange('5-4-1');
     fixture.detectChanges();
     expect(dotsPerLine()).toEqual([1, 5, 4, 1]);
@@ -425,7 +406,7 @@ describe('FormationModalComponent — LIVE-MATCH-F3-UI-LIVE FE5', () => {
     expect(dots[10].classList.contains('is-att')).toBeTrue();
   });
 
-  it('V25D55-C16 P1.3+4: 4-2-3-1 (5 lines) — lines 2 and 3 are MID (2 CDM + 3 CAM wide)', () => {
+  it('4-2-3-1 applies midfield classes to CDM and CAM lines', () => {
     component.onFormationChange('4-2-3-1');
     fixture.detectChanges();
     expect(dotsPerLine()).toEqual([1, 4, 2, 3, 1]);
@@ -445,7 +426,7 @@ describe('FormationModalComponent — LIVE-MATCH-F3-UI-LIVE FE5', () => {
     expect(dots[10].classList.contains('is-att')).toBeTrue();
   });
 
-  // ========== V25D81-BUG #4: drag-drop re-arrangement ==========
+  // ========== Drag-drop re-arrangement ==========
 
   it('initial slotAssignments mirror the currentSlots from the dialog data', () => {
     expect(component.slotAssignments.get(0)).toBe('p1');
@@ -615,7 +596,7 @@ function makeDragEvent(plainText: string): Partial<DragEvent> {
 };
 
 /**
- * V25D56 (Sprint C17) — formation-modal responsive breakpoints.
+ * Formation modal responsive breakpoints.
  *
  * <p>Pre-C17 the modal had no @media queries, so on phones the pitch
  * overflowed horizontally and dots got clipped. The fix adds the same
@@ -629,10 +610,10 @@ function makeDragEvent(plainText: string): Partial<DragEvent> {
  * regressions that drop the breakpoints or restore a hard-coded dot
  * size that overflows on mobile.
  */
-describe('FormationModalComponent — V25D56 (C17) responsive breakpoints', () => {
+describe('FormationModalComponent responsive breakpoints', () => {
   /**
    * Reads the @Component.styles source. Formation-modal now uses inline
-   * styles (V25D56) so ɵcmp.styles returns the original CSS strings —
+   * styles so the component metadata returns the original CSS strings,
    * though Angular's emulated encapsulation still rewrites every
    * selector with [_ngcontent-%COMP%] (or the hashed version at
    * runtime), so {@link #stripEncapsulation} is applied first.
@@ -718,9 +699,9 @@ describe('FormationModalComponent — V25D56 (C17) responsive breakpoints', () =
   });
 });
 
-// ========== V25D81.1 BUG #4 (opción c): auto-fill empty slots ==========
+// ========== Auto-fill empty slots ==========
 
-describe('FormationModalComponent — V25D81.1 BUG #4 auto-fill empty slots', () => {
+describe('FormationModalComponent auto-fill empty slots', () => {
   let component: FormationModalComponent;
   let fixture: ComponentFixture<FormationModalComponent>;
   let engineServiceSpy: jasmine.SpyObj<MatchEngineService>;
@@ -759,12 +740,10 @@ describe('FormationModalComponent — V25D81.1 BUG #4 auto-fill empty slots', ()
     engineServiceSpy.changeFormation.and.returnValue(of({ success: true, formation: '4-4-2' }));
     dialogRefSpy = jasmine.createSpyObj('MatDialogRef', ['close']);
     snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
-    // V25D99.20.3-FRONT BUG-1: onFormationChange POSTs /career/lineup/auto-select
-    // via HttpClient. The test suite for V25D81.1 doesn't care about the
-    // auto-select response, so make the spy return a no-op observable
-    // by default (the conservative response handler in the component
-    // keeps the local slotAssignments on empty response).
     const httpSpy = jasmine.createSpyObj('HttpClient', ['get', 'post']);
+    // onFormationChange posts to /career/lineup/auto-select and refreshes
+    // slotAssignments from the response. Most tests only need a safe default
+    // response; the backend-specific suite overrides this spy.
     httpSpy.post.and.returnValue(of({ formation: '4-4-2', slots: [] }));
 
     await TestBed.configureTestingModule({
@@ -784,13 +763,13 @@ describe('FormationModalComponent — V25D81.1 BUG #4 auto-fill empty slots', ()
   });
 
   /**
-   * BUG #4 (1/5): empty slot auto-fill. The 7 empty 4-4-2 slots
+   * Empty slot auto-fill. The 7 empty 4-4-2 slots
    * (indices 4..10) get processed: slots 4 (DEF), 5 (MID) and 9
    * (ATT) get filled from the bench (b1, b2, b3 in matching
    * groups). The remaining 4 slots stay empty because the 3 bench
    * players are exhausted — the warning banner surfaces that gap.
    */
-  it('BUG #4 (1/5): autoFillEmptySlots fills compatible slots and warns on the rest', () => {
+  it('autoFillEmptySlots fills compatible slots and warns on the rest', () => {
     // Sanity: 7 slots empty before.
     let emptyBefore = 0;
     for (let i = 0; i < 11; i++) {
@@ -828,14 +807,14 @@ describe('FormationModalComponent — V25D81.1 BUG #4 auto-fill empty slots', ()
   });
 
   /**
-   * BUG #4 (2/5): no compatible bench. A squad with only 1 GK and
+   * No compatible bench. A squad with only one GK and
    * no DEF bench player cannot fill the 4 DEF slots — the
    * auto-fill pass sets warningMsg instead of throwing or silently
    * dropping the request. The last-resort fallback (any bench
    * player) is intentionally NOT engaged in this case (no bench
    * players at all).
    */
-  it('BUG #4 (2/5): no compatible bench triggers warningMsg', async () => {
+  it('no compatible bench triggers warningMsg', async () => {
     // Reconfigure the dialog data with a tiny squad: 1 GK (assigned)
     // and 1 ATT on the bench. No DEF bench → 4 DEF slots stay empty.
     await TestBed.resetTestingModule();
@@ -883,12 +862,12 @@ describe('FormationModalComponent — V25D81.1 BUG #4 auto-fill empty slots', ()
   });
 
   /**
-   * BUG #4 (3/5): manual override clears the auto-fill marker.
+   * Manual override clears the auto-fill marker.
    * Run autoFillEmptySlots, then drag a different bench player into
    * one of the auto-filled slots. The isAutoFilledSlot() flag must
    * flip to false for that slot.
    */
-  it('BUG #4 (3/5): manual drag into an auto-filled slot clears the marker', () => {
+  it('manual drag into an auto-filled slot clears the marker', () => {
     component.autoFillEmptySlots();
     // Slot 4 was auto-filled with b1 (DEF).
     expect(component.isAutoFilledSlot(4)).toBe(true);
@@ -908,13 +887,13 @@ describe('FormationModalComponent — V25D81.1 BUG #4 auto-fill empty slots', ()
   });
 
   /**
-   * BUG #4 (4/5): auto-filled slots are tracked so the template can
+   * Auto-filled slots are tracked so the template can
    * render the lock badge. isAutoFilledSlot() returns true only for
    * slots filled by autoFillEmptySlots (3 in our seed data), not for
    * the originally assigned ones (4 in seed) nor for the slots that
    * stayed empty (4 in seed).
    */
-  it('BUG #4 (4/5): only auto-filled slots carry the marker', () => {
+  it('only auto-filled slots carry the marker', () => {
     // The 4 originally-assigned slots must NEVER carry the marker.
     for (let i = 0; i < 4; i++) {
       expect(component.isAutoFilledSlot(i)).toBe(false,
@@ -945,12 +924,12 @@ describe('FormationModalComponent — V25D81.1 BUG #4 auto-fill empty slots', ()
   });
 
   /**
-   * BUG #4 (5/5): confirm() runs autoFillEmptySlots() before POSTing
+   * confirm() runs autoFillEmptySlots() before POSTing
    * to the backend. The slot list received by
    * MatchEngineService.changeFormation must have the auto-filled
    * entries the algorithm computed (NOT a stale all-empty list).
    */
-  it('BUG #4 (5/5): confirm() runs autoFill and sends the filled slot list', () => {
+  it('confirm() runs autoFill and sends the filled slot list', () => {
     component.onFormationChange('4-3-3');
     // 4-3-3 = 1 GK + 4 DEF + 3 MID + 3 ATT = 11 slots, but
     // onFormationChange preserves the original 4 (slotIndex 0..3)
@@ -981,7 +960,7 @@ describe('FormationModalComponent — V25D81.1 BUG #4 auto-fill empty slots', ()
   });
 
   // ============================================================
-  // V25D99.20.3-FRONT BUG-1 pinning tests: onFormationChange must
+  // Backend auto-selection tests: onFormationChange must
   // POST /career/lineup/auto-select so the backend re-runs the
   // HELPER-BASED slot assignment with the new formation. Pre-fix,
   // the modal only updated local slotAssignments and the squad
@@ -992,7 +971,7 @@ describe('FormationModalComponent — V25D81.1 BUG #4 auto-fill empty slots', ()
 
   let httpClientSpy: jasmine.SpyObj<HttpClient>;
 
-  describe('V25D99.20.3-FRONT BUG-1: onFormationChange posts to backend', () => {
+  describe('onFormationChange posts to backend auto-select', () => {
     beforeEach(() => {
       httpClientSpy = TestBed.inject(HttpClient) as jasmine.SpyObj<HttpClient>;
     });
