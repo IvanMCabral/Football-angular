@@ -1,5 +1,5 @@
 /**
- * LIVE-MATCH-F3-UI-LIVE FE4: unit tests for {@link SubstitutionModalComponent}.
+ * Unit tests for {@link SubstitutionModalComponent}.
  *
  * <p>Validates the validation contract and the substitution flow without
  * involving a real backend (HttpClient is mocked via a Spy).
@@ -33,7 +33,7 @@ const SAMPLE_DATA: SubstitutionDialogData = {
   substitutionsRemaining: 3
 };
 
-describe('SubstitutionModalComponent — LIVE-MATCH-F3-UI-LIVE FE4', () => {
+describe('SubstitutionModalComponent', () => {
   let component: SubstitutionModalComponent;
   let fixture: ComponentFixture<SubstitutionModalComponent>;
   let engineServiceSpy: jasmine.SpyObj<MatchEngineService>;
@@ -495,7 +495,7 @@ describe('SubstitutionModalComponent — LIVE-MATCH-F3-UI-LIVE FE4', () => {
   });
 });
 
-describe('V25D63-C23 P0: substitution modal shows effectiveness feedback', () => {
+describe('Substitution modal effectiveness feedback', () => {
   let component: SubstitutionModalComponent;
   let fixture: ComponentFixture<SubstitutionModalComponent>;
   let engineServiceSpy: jasmine.SpyObj<MatchEngineService>;
@@ -540,7 +540,7 @@ describe('V25D63-C23 P0: substitution modal shows effectiveness feedback', () =>
     dialogRefSpy = jasmine.createSpyObj('MatDialogRef', ['close']);
     snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
 
-    // V25D63-C23 P0: resetTestingModule antes de re-configurar para que el
+    // Reset the testing module before reconfiguring it so the
     // MAT_DIALOG_DATA del describe anterior (SAMPLE_DATA) no contamine este.
     TestBed.resetTestingModule();
     await TestBed.configureTestingModule({
@@ -580,10 +580,10 @@ describe('V25D63-C23 P0: substitution modal shows effectiveness feedback', () =>
   });
 
   it('renders eff-good class on starting XI dot for p1', () => {
-    // V25D79: starting XI is rendered as a click-only visual pitch (not a
+    // The starting XI is rendered as a click-only visual pitch (not a
     // list). The eff-good / eff-warning / eff-bad classes move from the
-    // <li> to the corresponding .v25d79-pitch-dot so the V25D63 / V25D64
-    // effectiveness-feedback chain keeps working visually.
+    // <li> to the corresponding pitch dot so the
+    // effectiveness-feedback flow keeps working visually.
     const dots = fixture.nativeElement.querySelectorAll('.v25d79-pitch-dot') as NodeListOf<HTMLElement>;
     const p1Dot = Array.from(dots).find((dot: HTMLElement) =>
       dot.querySelector('.v25d79-dot-name')?.textContent?.includes('GK') ?? false);
@@ -615,12 +615,12 @@ describe('V25D63-C23 P0: substitution modal shows effectiveness feedback', () =>
   });
 
   // V25D64 (Sprint C24) P0: eff-good border verde (#10b981 emerald-500) para
-  // simetria visual con eff-warning (amber) y eff-bad (red). El color real se
-  // valida en smoke REVISOR; aca validamos que el class eff-good sigue bindeando
+  // visual symmetry with eff-warning (amber) and eff-bad (red). The actual color is
+  // covered by visual smoke tests; here we verify that eff-good remains bound
   // en el DOM para los SALE dots con eff >= 0.9 (consistency check).
   //
-  // V25D79: query changed from `.col-starter .player-list li` to
-  // `.v25d79-pitch-dot` because the starting XI is now a pitch, not a list.
+  // Query uses pitch dots instead of the old starter list selector
+  // because the starting XI is now a pitch, not a list.
   it('eff-good class is applied to SALE dot with eff >= 0.9 (green border symmetry check)', () => {
     const dots = fixture.nativeElement.querySelectorAll('.v25d79-pitch-dot') as NodeListOf<HTMLElement>;
     // p1 (eff=1.0) y p2 (eff=0.95) deben tener eff-good. p3 (eff=0.75) eff-warning.
@@ -637,7 +637,7 @@ describe('V25D63-C23 P0: substitution modal shows effectiveness feedback', () =>
 });
 
 /**
- * V25D79: visual pitch + per-player stats chips + substitutionsRemaining
+ * Visual pitch, per-player stats chips, and remaining substitutions
  * derived from the SSE-fed MatchState (D3 + D5).
  *
  * <p>3 tests per task spec:
@@ -652,10 +652,10 @@ describe('V25D63-C23 P0: substitution modal shows effectiveness feedback', () =>
  *   <li>{@code substitutionsRemaining_isSourcedFromData} — the modal
  *       derives the canConfirm + isOutOfSubs gates from
  *       {@code data.substitutionsRemaining}, which the service
- *       propagates from the SSE state's V25D79 field (D5).</li>
+ *       propagates from the live match state.</li>
  * </ol>
  */
-describe('V25D79: visual pitch + stats chips + substitutionsRemaining', () => {
+describe('Substitution modal visual pitch, stats chips, and remaining substitutions', () => {
   let component: SubstitutionModalComponent;
   let fixture: ComponentFixture<SubstitutionModalComponent>;
   let engineServiceSpy: jasmine.SpyObj<MatchEngineService>;
@@ -687,7 +687,7 @@ describe('V25D79: visual pitch + stats chips + substitutionsRemaining', () => {
       bench: [
         { sessionPlayerId: 'b1', displayName: 'Bench CB', position: 'CB', rating: 70, isStarter: false }
       ],
-      // V25D79 (D5): 3 subs remaining (2 already used).
+      // Three substitutions remaining (two already used).
       substitutionsRemaining: 3,
       formation: '4-3-3',
       playerRatings: [
@@ -721,8 +721,8 @@ describe('V25D79: visual pitch + stats chips + substitutionsRemaining', () => {
     dialogRefSpy = jasmine.createSpyObj('MatDialogRef', ['close']);
     snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
 
-    // V25D79: resetTestingModule para que el MAT_DIALOG_DATA del describe
-    // anterior (SAMPLE_DATA / buildDataWithEffectiveness) no contamine este.
+    // Reset the testing module so MAT_DIALOG_DATA from the previous describe
+    // does not leak into this scenario.
     TestBed.resetTestingModule();
     await TestBed.configureTestingModule({
       imports: [SubstitutionModalComponent, NoopAnimationsModule],
@@ -868,7 +868,7 @@ describe('V25D79: visual pitch + stats chips + substitutionsRemaining', () => {
       .withContext('is-zero class must be applied when substitutionsRemaining = 0').toBeTrue();
   });
 
-  // ========== V25D81-BUG #3: preSelectedPlayerId auto-select on INJURY ==========
+  // ========== Injury preselection ==========
 
   it('preSelectedPlayerId matching a starter auto-selects that player in ngOnInit', () => {
     TestBed.resetTestingModule();
