@@ -1,5 +1,5 @@
 /**
- * V25D89-FRONT-A: unit tests for {@link PartidoModalComponent}.
+ * Unit tests for {@link PartidoModalComponent}.
  *
  * <p>Scope:
  * <ul>
@@ -99,13 +99,13 @@ function stripEncapsulation(css: string): string {
   return css.replace(/\[[_]?ngcontent-[^\]]*\]/g, '');
 }
 
-/** V25D89-FRONT-A: helper to read the component's inlined CSS source. */
+/** Reads the component's inlined CSS source. */
 function stylesSource(): string {
   const styles = (PartidoModalComponent as any).ɵcmp?.styles ?? [];
   return Array.isArray(styles) ? styles.join('\n') : String(styles);
 }
 
-describe('PartidoModalComponent (V25D89-FRONT-A)', () => {
+describe('PartidoModalComponent', () => {
   let fixture: ComponentFixture<PartidoModalComponent>;
   let component: PartidoModalComponent;
   let dialogRefSpy: jasmine.SpyObj<MatDialogRef<PartidoModalComponent>>;
@@ -209,7 +209,7 @@ describe('PartidoModalComponent (V25D89-FRONT-A)', () => {
     expect(rivalPitch.classList.contains('rival-pitch')).toBeTrue();
   });
 
-  it('rival pitch dots have the AI-managed class (visual de-emphasis)', () => {
+  it('rival pitch dots have the read-only class', () => {
     component.onTabChange(1);
     fixture.detectChanges();
     const rivalDots = fixture.nativeElement.querySelectorAll('[data-testid="rival-pitch"] .player-dot');
@@ -219,7 +219,7 @@ describe('PartidoModalComponent (V25D89-FRONT-A)', () => {
     // is present and the source CSS targets them.
   });
 
-  it('rival AI banner is visible when activeTab is "rival"', () => {
+  it('rival banner is visible when activeTab is "rival"', () => {
     component.onTabChange(1);
     fixture.detectChanges();
     const banner = fixture.nativeElement.querySelector('[data-testid="rival-ai-banner"]');
