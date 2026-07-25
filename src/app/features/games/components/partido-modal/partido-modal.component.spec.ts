@@ -4,8 +4,8 @@
  * <p>Scope:
  * <ul>
  *   <li>Tab state: default = 'mine', click handler flips to 'rival'.</li>
- *   <li>Tab 1 (Mi Formación) renders the formation select + pitch dots.</li>
- *   <li>Tab 2 (Formación Rival) renders the AI banner + rival pitch dots,
+ *   <li>Tab 1 (Mi Formaci?n) renders the formation select + pitch dots.</li>
+ *   <li>Tab 2 (Formaci?n Rival) renders the rival banner + pitch dots,
  *       all dots have pointer-events disabled (no drag).</li>
  *   <li>Footer: "Descartar" enabled; "Guardar" disabled when no pending
  *       changes; enabled when formation string OR slots change.</li>
@@ -73,9 +73,7 @@ function makeData(overrides: Partial<PartidoDialogData> = {}): PartidoDialogData
     squad: SQUAD,
     startingIds: STARTING_IDS,
     rivalFormation: '4-3-3',
-    // V25D89.2 defaults — makeData provides safe defaults so the existing
-    // 22 tests don't need to be touched (their baseline asserts on Tab
-    // state + formation flow, not on stats).
+    // Safe defaults keep baseline tests focused on tab and formation flow.
     awayTeamId: 'team-a',
     currentMinute: 0,
     score: { home: 0, away: 0 },
@@ -90,11 +88,7 @@ function makeData(overrides: Partial<PartidoDialogData> = {}): PartidoDialogData
 }
 
 /**
- * V25D89-FRONT-A: helper to strip Angular's emulated encapsulation suffix
- * `[_ngcontent-%COMP%]` (or hashed at runtime) from CSS selectors so the
- * ɵcmp.styles source matches what was written in the {@code styles: [...]}
- * array. Same pattern as angular-testing-patterns memory.
- */
+/** Removes Angular's emulated encapsulation suffix from component CSS selectors. */
 function stripEncapsulation(css: string): string {
   return css.replace(/\[[_]?ngcontent-[^\]]*\]/g, '');
 }
@@ -870,10 +864,10 @@ describe('PartidoModalComponent', () => {
     expect(rule![0]).toContain('translate(-50%, -50%)');
   });
 
-  // ========== V25D89.4-FRONT: full-width modal CSS source ==========
+  // ========== Full-width modal CSS source ==========
 
   it('ɵcmp.styles expands .partido-modal-root to max-width: 100% (full-width modal)', () => {
-    // V25D89.4: V25D89.3 capped the modal at max-width: 540px which made
+    // The modal used to be capped at max-width: 540px, which made
     // it look pegged to the left on wide viewports. The new base rule
     // lets the modal content fill the dialog container (which itself is
     // 95vw via the :host override below).
@@ -882,7 +876,7 @@ describe('PartidoModalComponent', () => {
   });
 
   it('ɵcmp.styles sets the MDC dialog container to 95vw + align-self: center', () => {
-    // V25D89.4: the :host ::ng-deep override on .mat-mdc-dialog-container
+    // the :host ::ng-deep override on .mat-mdc-dialog-container
     // is what actually expands the modal beyond the Material default
     // content-size. Both width AND max-width must be set (Material's
     // default with only max-width stays at content-size). align-self
@@ -897,8 +891,8 @@ describe('PartidoModalComponent', () => {
     expect(ruleSrc).toContain('align-self: center');
   });
 
-  it('ɵcmp.styles caps .mat-mdc-dialog-content at 80vh with overflow-y: auto (V25D89.4 scroll safety)', () => {
-    // V25D89.4: with the modal expanded to 95vw, the inner content
+  it('ɵcmp.styles caps .mat-mdc-dialog-content at 80vh with overflow-y: auto (scroll safety)', () => {
+    // with the modal expanded to 95vw, the inner content
     // (pitch + bench + stats + events) can exceed 100vh on shorter
     // laptop screens. The content area needs a max-height + internal
     // scroll so the dialog footer stays visible without overflowing
@@ -912,7 +906,7 @@ describe('PartidoModalComponent', () => {
   });
 
   it('ɵcmp.styles mobile breakpoint (<600px) caps the MDC container at 100vw (overrides 95vw base)', () => {
-    // V25D89.4: the mobile @media block must override the 95vw base
+    // the mobile @media block must override the 95vw base
     // rule on the .mat-mdc-dialog-container so phones don't show a
     // 95vw modal with horizontal scrollbars. CSS cascade picks the
     // later rule (the @media one), so this is the safety net.
@@ -934,7 +928,7 @@ describe('PartidoModalComponent', () => {
     expect(component['destroy$'].complete).toHaveBeenCalled();
   });
 
-  // ========== V25D89.2: stats live (derived from events list) ==========
+  // ========== Live stats derived from events ==========
 
   it('statsRows() derives shots + shots-on-target + corners + fouls + offsides + cards from events with teamId attribution', () => {
     TestBed.resetTestingModule();
@@ -1127,19 +1121,19 @@ describe('PartidoModalComponent', () => {
     expect(emptyEvents.textContent).toContain('no hay eventos');
   });
 
-  // ========== V25D90-FRONT: pitch readability (4 fixes F1-F4) ==========
+  // ========== Pitch readability ==========
 
-  // ========== F1: role label always visible below player name ==========
+  // ========== Role label always visible below player name ==========
 
   it('F1: every filled player-dot renders BOTH the player name AND a .dot-role label (not just empty slots)', () => {
-    // V25D90-F1: the role label was previously only rendered inside
+    // the role label was previously only rendered inside
     // the #emptyDot branch. Now it lives INSIDE the player branch too
     // (rendered via getDotLabel(...) which returns "GK", "CB", "ST", etc.).
     // Every filled dot should therefore contain 2 spans:
     //   <span class="dot-player-name">Player Name</span>
     //   <span class="dot-role">GK</span>
     // Every empty dot should contain exactly 1 span:
-    //   <span class="dot-label">CM</span> (V25D89.x legacy)
+    //   <span class="dot-label">CM</span> (previous empty-slot markup)
     const filledDots = Array.from(
       fixture.nativeElement.querySelectorAll('.player-dot:not(.is-empty)')
     );
@@ -1206,7 +1200,7 @@ describe('PartidoModalComponent', () => {
   });
 
   it('auto-fills an empty tactical slot on open when a compatible bench player exists', () => {
-    // V25D99.21: after injury/rebuild the live modal could open with an
+    // after injury/rebuild the live modal could open with an
     // empty RM slot even though the bench had a compatible midfielder.
     // The modal now repairs that immediately so the DT always sees a full XI.
     TestBed.resetTestingModule();
@@ -1510,10 +1504,10 @@ describe('PartidoModalComponent', () => {
     ]);
   });
 
-  // ========== F2: bigger dots + full-name render ==========
+  // ========== Bigger dots and readable player names ==========
 
   it('F2: ɵcmp.styles sets .player-dot to 56px (was 30px) so full names fit without ellipsis', () => {
-    // V25D90-F2: the player-dot grew from 30x30 to 56x56. We assert on
+    // the player-dot grew from 30x30 to 56x56. We assert on
     // the inlined CSS source (ɵcmp.styles) because jsdom doesn't compute
     // styles, but the inlined array is what gets applied at runtime
     // (per angular-testing-patterns memory: only styles:[...] works, no
@@ -1528,7 +1522,7 @@ describe('PartidoModalComponent', () => {
   });
 
   it('F2: ɵcmp.styles removes the aggressive text-overflow: ellipsis on .dot-player-name (was truncating "Mbappé" → "Mb")', () => {
-    // V25D90-F2: the .dot-player-name rule went from max-width:26px +
+    // the .dot-player-name rule went from max-width:26px +
     // white-space:nowrap + text-overflow:ellipsis to max-width:50px +
     // white-space:normal + overflow-wrap:anywhere. The aggressive
     // truncation is gone — long names wrap to 2 lines instead of being
@@ -1551,10 +1545,10 @@ describe('PartidoModalComponent', () => {
     expect(src).toContain('min-height: min(48vh, 340px)');
   });
 
-  // ========== F3: real score in header + stats row ==========
+  // ========== Live score in header and stats row ==========
 
   it('F3: homeScore() / awayScore() return data.score values (with 0 fallback for missing snapshot)', () => {
-    // V25D90-F3: two new accessors on the component that the template
+    // two new accessors on the component that the template
     // binds to for the score chip + stats score-cell. Defaults to 0
     // when the SSE feed hasn't reached tick 1 (score is undefined).
     expect(component.homeScore()).toBe(0);  // makeData default score = {0,0}
@@ -1578,7 +1572,7 @@ describe('PartidoModalComponent', () => {
   });
 
   it('F3: the score chip is rendered in the modal title bar with the live scoreline', () => {
-    // V25D90-F3: .score-chip span between the title-icon and the minute-tag.
+    // .score-chip span between the title-icon and the minute-tag.
     // data-testid="partido-score-chip" lets the smoke test grab it without
     // depending on text content (which changes with the live score).
     const chip = fixture.nativeElement.querySelector('[data-testid="partido-score-chip"]');
@@ -1587,8 +1581,8 @@ describe('PartidoModalComponent', () => {
     expect(chip.textContent.trim()).toBe('0 - 0');
   });
 
-  it('F3: the stats-header-row shows the score in the .score-cell (replaces V25D89.2 dash placeholder)', () => {
-    // V25D90-F3: the FIRST <span> in the stats-header-row used to render
+  it('F3: the stats-header-row shows the score in the .score-cell (replaces dash placeholder)', () => {
+    // the FIRST <span> in the stats-header-row used to render
     // a literal "—" (em-dash) as a column spacer. Now it renders the
     // live scoreline in a .score-cell (data-testid="stats-score-cell").
     // Both the manager tab AND the rival tab get the same treatment.
@@ -1605,7 +1599,7 @@ describe('PartidoModalComponent', () => {
   });
 
   it('F3: ɵcmp.styles defines a .score-chip rule (green gradient pill for the title-bar score)', () => {
-    // V25D90-F3: the score-chip styling lives in the inlined styles
+    // the score-chip styling lives in the inlined styles
     // array. We assert on the source so we know the rule is present
     // even though jsdom doesn't compute background-image.
     const src = stripEncapsulation(stylesSource());
@@ -1618,10 +1612,10 @@ describe('PartidoModalComponent', () => {
     expect(ruleSrc).toContain('border-radius: 999px');
   });
 
-  // ========== F4: z-index for formation dropdown over partido modal ==========
+  // ========== Formation dropdown layering ==========
 
   it('F4: ɵcmp.styles bumps .cdk-overlay-pane.partido-modal-pane to z-index 1050 (above Material default 1000)', () => {
-    // V25D90-F4: the formation mat-select dropdown renders inside the
+    // the formation mat-select dropdown renders inside the
     // cdk-overlay-container at the same z-index as the partido modal by
     // default. Without this override the modal backdrop absorbs the
     // dropdown's pointer events. The partido modal pane gets z-index
@@ -1637,12 +1631,12 @@ describe('PartidoModalComponent', () => {
   });
 
   it('F4: the formation <mat-select> has panelClass="formation-select-panel" (the z-index hook)', () => {
-    // V25D90-F4: the dropdown panel needs the .formation-select-panel
+    // the dropdown panel needs the .formation-select-panel
     // class so the CSS rule above can target it. The class is set via
     // the panelClass input on <mat-select>, NOT via a CSS-only change.
     // Verify the template binding by checking the compiled template
     // for the literal "formation-select-panel" string (the same pattern
-    // V25D89.2 used to verify panelClass wiring).
+    // the earlier test used to verify panelClass wiring).
     // Note: this is a template-source assertion, not a runtime DOM
     // assertion (the dropdown is not opened in the test fixture, so
     // the panel isn't rendered).
