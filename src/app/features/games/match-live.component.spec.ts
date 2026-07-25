@@ -1,31 +1,8 @@
 /**
- * LIVE-MATCH-F5.4-FIX-MATCH-LIVE-RENDER: unit tests for {@link MatchLiveComponent}.
+ * Unit tests for {@link MatchLiveComponent}.
  *
- * <p>Validates the BUG_F5.4_MATCH_LIVE_BLANK fix: the component must connect to
- * the RoundEngine V24 SSE (round-level) instead of the legacy per-match endpoints
- * that no longer exist on the backend.
- *
- * <p>Coverage:
- * <ol>
- *   <li>ngOnInit triggers {@code getRoundIdForMatch(matchId)}.</li>
- *   <li>ngOnInit does NOT call the removed {@code MatchService.getMatch}.</li>
- *   <li>ngOnInit does NOT call the removed {@code MatchEngineService.startEngine}.</li>
- *   <li>When the round SSE emits a {@code RoundState} containing our matchId, the
- *       component pushes the matching {@code MatchState} into {@code matchStateSubject}.</li>
- *   <li>When {@code getRoundIdForMatch} 404s, {@code errorMsgSubject} receives
- *       a clear, non-breaking message (decision B4).</li>
- * </ol>
- *
- * <p>What we deliberately do NOT test here (covered elsewhere or out of scope):
- * <ul>
- *   <li>{@code changeStyle}/{@code pauseMatch}/{@code resumeMatch}/{@code stopMatch}
- *       — unchanged from the F5.4 wire (commit {@code 6814b9c}) and covered by
- *       the smoke test in {@code C:\Users\ichu_\.mavis\agents\revisor-football\workspace\smoke-f5-4-no-go.md}.</li>
- *   <li>Goal-detection pairwise + snackbar — preserved verbatim from the deleted
- *       {@code startSseStream}; covered manually via the round SSE in smoke.</li>
- *   <li>{@code openSubstitutionModal}/{@code openFormationModal} — delegated to
- *       {@code LiveMatchModalsService}, tested at the modal spec level.</li>
- * </ul>
+ * Covers route initialization, round stream subscription, state extraction,
+ * and non-breaking error handling for the live match view.
  */
 
 import { ComponentFixture, TestBed } from '@angular/core/testing';
@@ -79,7 +56,7 @@ function sampleRoundState(matches: MatchState[]): RoundState {
   };
 }
 
-describe('MatchLiveComponent — LIVE-MATCH-F5.4-FIX-MATCH-LIVE-RENDER', () => {
+describe('MatchLiveComponent', () => {
   let component: MatchLiveComponent;
   let fixture: ComponentFixture<MatchLiveComponent>;
   let engineServiceSpy: jasmine.SpyObj<MatchEngineService>;
@@ -205,6 +182,7 @@ describe('MatchLiveComponent — LIVE-MATCH-F5.4-FIX-MATCH-LIVE-RENDER', () => {
   });
 
   it('should set errorMsg when getRoundIdForMatch errors (e.g. 404 — match not in any active round)', () => {
+    spyOn(console, 'error').and.stub();
     engineServiceSpy.getRoundIdForMatch.and.returnValue(throwError(() => new Error('404 Not Found')));
     fixture.detectChanges();
 

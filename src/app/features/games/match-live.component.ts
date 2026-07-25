@@ -20,27 +20,10 @@ import { LiveMatchModalsService } from '../../core/services/live-match-modals.se
 import { ConfirmActionDialogComponent } from '../../shared/components/confirm-action-dialog/confirm-action-dialog.component';
 
 /**
- * LIVE-MATCH-F3-UI-LIVE FE2 (partial): live match view.
+ * Live match view.
  *
- * <p>FE2 changes (this PR):
- * <ul>
- *   <li>OnPush + async pipe everywhere — the previous default-CD assignment
- *       (`this.matchState = state` 60×/min) was a saturation risk.</li>
- *   <li>Barra de posesión con dos flex divs (home/away) + label numérico.</li>
- *   <li>Score grande animado con {@code @keyframes scoreFlash} via Angular
- *       Animations (FE2 uses CSS keyframes for the flash effect).</li>
- *   <li>Indicador de salud SSE (punto verde/amarillo/rojo) vía
- *       {@code engineService.streamHealth$}.</li>
- *   <li>Toast de goal con {@code MatSnackBar} disparado en {@code pairwise()}.</li>
- *   <li>Reemplazo del {@code .event-list} plano por el componente nuevo
- *       {@code <app-live-timeline>} (FE3).</li>
- * </ul>
- *
- * <p>FE3 backlog (covered in F3.3, NOT this PR):
- * <ul>
- *   <li>Botón "Sustituir" que abre {@code <app-substitution-modal>}.</li>
- *   <li>Botón "Cambiar Formación" que abre {@code <app-formation-modal>}.</li>
- * </ul>
+ * Shows the scoreboard, possession, timeline, stream health, and manager
+ * actions for an in-progress match.
  */
 @Component({
   selector: 'app-match-live',
@@ -48,7 +31,6 @@ import { ConfirmActionDialogComponent } from '../../shared/components/confirm-ac
   imports: [CommonModule, AsyncPipe, RouterLink, MatDialogModule, LiveTimelineComponent],
   templateUrl: './match-live.component.html',
   styleUrls: ['./match-live.component.css'],
-  // LIVE-MATCH-F3-UI-LIVE FE2: OnPush + async pipe
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class MatchLiveComponent implements OnInit, OnDestroy {
@@ -87,13 +69,8 @@ export class MatchLiveComponent implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
 
   ngOnInit() {
-    // BUG_F5.4_MATCH_LIVE_BLANK fix: route param resolution + per-match state
-    // stream are decoupled. MatchLiveComponent now connects to the RoundEngine
-    // V24 SSE (already running in back since V24D6M11) instead of three legacy
-    // per-match endpoints (`GET /matches/{matchId}`, `POST /matches/{matchId}/start`,
-    // `GET /matches/{matchId}/stream`) which no longer exist on the backend.
-    // Reference: round-level endpoints are documented in
-    // `MatchEngineController.java:42` (stream) and `:156` (roundId lookup).
+    // Route parameters and round-level state are resolved separately so this
+    // view can subscribe to the current round stream and extract its match.
     this.route.paramMap
       .pipe(takeUntil(this.destroy$))
       .subscribe(params => {
@@ -105,8 +82,7 @@ export class MatchLiveComponent implements OnInit, OnDestroy {
           return;
         }
 
-        // (1) Team-name lookup — unchanged from prior F5.4 wire. Pure HTTP GET,
-        // feeds the `teamNameMap` consumed by the template header + goal toasts.
+        // Team-name lookup for the header and goal toasts.
         this.careerService.getCareerTeams(this.gameId)
           .pipe(takeUntil(this.destroy$))
           .subscribe({
@@ -124,20 +100,11 @@ export class MatchLiveComponent implements OnInit, OnDestroy {
             error: (err) => console.error('[MATCH-LIVE] teams error', err)
           });
 
-        // (2) State stream — resolve the round this match belongs to (cached
-        // helper, TTL 5min via `getRoundIdForMatch`) and subscribe to the
-        // round-level SSE. Each emission carries the full `RoundState` with
-        // `matches: MatchState[]`; we filter for OUR matchId and push the
-        // resulting `MatchState` into `matchStateSubject`. The template's
-        // `*ngIf="matchState$ | async as state"` then renders the scoreboard,
-        // possession bar, timeline and 5 F5.4 buttons.
-        //
-        // Decision B5: the engine only exposes round-level SSE, so the legacy
-        // `useSse` polling branch is no longer reachable. We force SSE round
-        // here and log a one-shot warning if the env flag is off, but never
-        // route to a non-existent per-match polling path.
+        // Resolve the round this match belongs to and subscribe to the
+        // round-level stream. Each emission carries all match states; this
+        // view filters the one requested by the route.
         if (!environment.useSse) {
-          console.warn('[MATCH-LIVE] environment.useSse is false; forcing round-level SSE — per-match polling endpoint was removed in V24D6M11.');
+          console.warn('[MATCH-LIVE] environment.useSse is false; forcing round-level SSE.');
         }
 
         this.engineService.getRoundIdForMatch(this.matchId)
@@ -166,11 +133,8 @@ export class MatchLiveComponent implements OnInit, OnDestroy {
             }
           });
 
-        // (3) Goal-detection pipe — preserved verbatim from the deleted
-        // `startSseStream` private method so the goal snackbar still fires
-        // when a GOAL event appears in the round SSE for our match. Runs on
-        // `matchState$` so it sees exactly the post-filter MatchState we
-        // pushed above.
+        // Goal detection runs on the filtered match state so the snackbar
+        // only reacts to goals from this match.
         this.matchState$
           .pipe(
             map(s => s?.events ?? []),
@@ -252,17 +216,7 @@ export class MatchLiveComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * LIVE-MATCH-F5.4: change the manager's home team tactical style mid-match.
-   * Wires to {@code POST /api/v1/match-engine/matches/{matchId}/style} via
-   * {@link MatchEngineService.changeStyle}.
-   *
-   * <p>Only the home team is editable. The rival (away) block was removed
-   * from the template because the back does not support rival changes in F5.
-   * The new style is reflected on the next SSE tick via {@code s.homeStyle}.
-   *
-   * <p>Replaces the legacy {@code changeTactic('HOME'|'AWAY', 'ATTACK'|'DEFEND'|'BALANCED')}
-   * method which called the pre-V24 {@code sendCommand('CHANGE_TACTIC', ...)}
-   * path and did NOT trigger the new {@code TeamStyle}-aware engine effects.
+   * Change the manager team's tactical style mid-match.
    */
   changeStyle(style: TeamStyle): void {
     this.engineService.changeStyle(this.matchId, style)
@@ -286,9 +240,7 @@ export class MatchLiveComponent implements OnInit, OnDestroy {
   // ========== F3.3 — substitution + formation modals (delegated to LiveMatchModalsService) ==========
 
   /**
-   * FE4: open the substitution modal. The actual lineup/squad fetch + dialog
-   * opening is centralized in {@link LiveMatchModalsService} so the same
-   * flow is reusable from the round-live view (FE6).
+   * Open the substitution modal through the shared live-match modal service.
    */
   openSubstitutionModal(state: MatchState): void {
     this.modals.openSubstitutionModal(this.matchId, state)
