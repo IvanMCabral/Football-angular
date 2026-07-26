@@ -1694,17 +1694,15 @@ describe('SquadEditorModalComponent green marker effectiveness', () => {
 });
 
 /**
- * V25D66-C26 (Sprint C26): bench display fix. Previously the modal used
- * `response.players` (the 11 from /career/lineup/current) as the bench source,
- * which meant bench always rendered 0 when lineup had 11 players. After the
- * fix, the modal accepts `data.squad` from the caller (squad-management) and
- * uses it as the source of truth. This block verifies:
+ * Bench display: the modal prefers the full squad passed by the caller over
+ * the current lineup response, so available substitutes are not lost.
+ * This block verifies:
  *
- *   - with squad of 22 + lineup of 11 → benchPlayers.length === 11
- *   - with squad of 7 + lineup of 7 (short-handed) → benchPlayers.length === 0
- *   - with no squad in dialog data → fallback to response.players (legacy)
+ *   - with squad of 22 + lineup of 11 -> benchPlayers.length === 11
+ *   - with squad of 7 + lineup of 7 (short-handed) -> benchPlayers.length === 0
+ *   - with no squad in dialog data -> fallback to response.players
  */
-describe('SquadEditorModalComponent — V25D66-C26 bench display', () => {
+describe('SquadEditorModalComponent bench display', () => {
   let component: SquadEditorModalComponent;
   let fixture: ComponentFixture<SquadEditorModalComponent>;
   let httpClientSpy: jasmine.SpyObj<HttpClient>;
@@ -1712,7 +1710,7 @@ describe('SquadEditorModalComponent — V25D66-C26 bench display', () => {
 
   /**
    * 4-4-2 formation: 1 GK + 2 CB + 1 LB + 1 RB + 2 CM + 2 ST = 10 outfield + 1 GK = 11.
-   * Positions dictadas por la formación devuelta por /editor/formations.
+   * Positions come from /editor/formations.
    */
   const FORMATIONS_RESPONSE = [
     {
@@ -1737,7 +1735,7 @@ describe('SquadEditorModalComponent — V25D66-C26 bench display', () => {
 
   /**
    * Build a SessionPlayer-shaped object compatible with the modal's
-   * {@code data.squad} mapping (sessionPlayerId → playerId). 22 players:
+   * Build SessionPlayer-shaped objects compatible with `data.squad`.
    * 11 starters + 11 bench, all from the same team (no overlap by playerId).
    */
   function buildSquad22(): any[] {
@@ -1835,8 +1833,8 @@ describe('SquadEditorModalComponent — V25D66-C26 bench display', () => {
     component = fixture.componentInstance;
   });
 
-  it('C26 P0: with squad=22 and lineup=11, benchPlayers.length === 11 (squad − lineup)', (done) => {
-    // Mock /career/lineup/current → 11 players con slots persistidos
+  it('with squad=22 and lineup=11, benchPlayers.length === 11', (done) => {
+    // Mock /career/lineup/current with 11 persisted players and slots.
     httpClientSpy.get.and.callFake(((url: string) => {
       if (url.includes('/editor/subdivisions')) {
         return of([{
@@ -1870,11 +1868,9 @@ describe('SquadEditorModalComponent — V25D66-C26 bench display', () => {
     }, 50);
   });
 
-  it('C26 P0: with squad=7 (short-handed) and lineup=7, benchPlayers.length === 0 (no extras)', (done) => {
-    // Short-handed: squad tiene 7 players que cubren las 7 slots del lineup
-    // (formación 4-4-2 mínimo = 7 jugadores; el auto-select con squad corto
-    // puede no llegar a 11, pero el bench no debería mostrar más jugadores
-    // que los que existen).
+  it('with squad=7 and lineup=7, benchPlayers.length === 0', (done) => {
+    // Short-handed squad: lineup uses every available player, so the
+    // bench should remain empty and should not invent unavailable players.
     const shortSquad: any[] = Array.from({ length: 7 }, (_, i) => ({
       sessionPlayerId: `short-${i}`,
       name: `Short ${i}`,
@@ -1884,7 +1880,7 @@ describe('SquadEditorModalComponent — V25D66-C26 bench display', () => {
       injured: false, injuryType: null, injuryRemainingMatches: 0,
       origin: 'CLONED'
     }));
-    // Reconfigure TestBed con squad corto
+    // Reconfigure TestBed with a short squad.
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       imports: [SquadEditorModalComponent, NoopAnimationsModule],
@@ -1895,7 +1891,7 @@ describe('SquadEditorModalComponent — V25D66-C26 bench display', () => {
       ]
     }).compileComponents();
 
-    // Mock lineup con 7 players (todos short-*)
+    // Mock lineup with the same seven short-squad players.
     httpClientSpy.get.and.callFake(((url: string) => {
       if (url.includes('/editor/subdivisions')) {
         return of([{
@@ -1943,13 +1939,13 @@ describe('SquadEditorModalComponent — V25D66-C26 bench display', () => {
     }, 50);
   });
 
-  it('C26 P0 fallback: with no squad in dialog data, benchPlayers.length === 0 (legacy behavior)', (done) => {
-    // Reconfigure TestBed sin squad en MAT_DIALOG_DATA → fallback a playersList.
+  it('with no squad in dialog data, benchPlayers.length === 0', (done) => {
+    // Reconfigure TestBed without squad in MAT_DIALOG_DATA: fallback to playersList.
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       imports: [SquadEditorModalComponent, NoopAnimationsModule],
       providers: [
-        // NOTA: squad ausente. El fallback debe usar response.players (11 del lineup).
+        // No squad source: fallback must use response.players from the lineup.
         { provide: MAT_DIALOG_DATA, useValue: { careerId: 'c1', matchId: null } },
         { provide: MatDialogRef, useValue: dialogRefSpy },
         { provide: HttpClient, useValue: httpClientSpy }
@@ -1976,8 +1972,8 @@ describe('SquadEditorModalComponent — V25D66-C26 bench display', () => {
     const legacyComponent = legacyFixture.componentInstance;
     legacyFixture.detectChanges();
     setTimeout(() => {
-      // Legacy fallback: bench = filter !slotId sobre playersList → 0
-      // (porque los 11 players del lineup reciben slotId via persistedSlots/role-match).
+      // Fallback: bench filters players without slotId, so a fully slotted
+      // lineup yields 0 bench players.
       expect(legacyComponent.benchPlayers.length).toBe(0,
         'legacy fallback should produce bench=0 (no squad source)');
       expect(legacyComponent.homePlayers.length).toBe(11,
@@ -1986,9 +1982,8 @@ describe('SquadEditorModalComponent — V25D66-C26 bench display', () => {
     }, 50);
   });
 
-  it('C26 P0 fallback: with squad=[] empty, behaves like no squad (fallback to playersList)', (done) => {
-    // Reconfigure TestBed con squad=[] (vacío, distinto de ausente).
-    // El fallback debe dispararse también en este caso (length === 0).
+  it('with empty squad in dialog data, uses fallback lineup players', (done) => {
+    // Reconfigure TestBed with squad=[]; empty squad should use the same fallback path.
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       imports: [SquadEditorModalComponent, NoopAnimationsModule],
@@ -2027,22 +2022,13 @@ describe('SquadEditorModalComponent — V25D66-C26 bench display', () => {
   });
 
   /**
-   * V25D78-C55.7.7.1 BUG_L4 (continuation from C55.7.7 squad-management.component.html
-   * commit 31822e3): the squad-editor-modal still used the wording "Mínimo 7 jugadores
-   * para guardar" without clarification. The C55.7.7 fix only touched squad-management,
-   * so users hitting the modal confirm with <7 players still saw the ambiguous text.
-   *
-   * Post-fix: error message reads
-   *   "Mínimo 7 jugadores para guardar (puedes tener más)"
-   * so the 7 is clearly a FLOOR (you can have 8, 9, 10, or 11), NOT a ceiling.
-   *
-   * Test strategy: push the player list through homePlayers$.next() (homePlayers
-   * itself is a getter over the BehaviorSubject, see component.ts:1436) and read
-   * the resulting error via errorMessage$.value (the matching getter). assertContains,
-   * NOT exact match — future copy edits must not require a code review of this spec.
+   * Minimum-player wording: when the user tries to save fewer than seven
+   * players, the modal must make clear that seven is the floor, not the
+   * maximum. The assertion checks important fragments rather than the
+   * exact sentence so future copy edits stay cheap.
    */
-  describe('squad-editor-modal — V25D78-C55.7.7.1 BUG_L4 (Mínimo 7 wording)', () => {
-    it('L4 happy path: error message includes "(puedes tener más)" clarification', () => {
+  describe('squad-editor-modal minimum-player wording', () => {
+    it('error message includes the floor clarification', () => {
       const threePlayerFixture = TestBed.createComponent(SquadEditorModalComponent);
       const threePlayerComponent = threePlayerFixture.componentInstance;
       threePlayerFixture.detectChanges();
@@ -2055,11 +2041,11 @@ describe('SquadEditorModalComponent — V25D66-C26 bench display', () => {
       expect(captured).toContain('Mínimo 7',
         'error must still mention the 7-player floor (no copy regression)');
       expect(captured).toContain('(puedes tener más)',
-        'BUG_L4 fix: the clarification "(puedes tener más)" must be present so users '
+        'the clarification "(puedes tener más)" must be present so users '
           + 'understand 7 is a floor, not a ceiling');
     });
 
-    it('L4 regression: 7 ≤ playerCount ≤ 11 path does NOT emit the Mínimo 7 message', () => {
+    it('valid player counts do not emit the minimum-player message', () => {
       // The clarification only applies to the < 7 branch; the save path with enough
       // players must clear the error instead of re-emitting the Mínimo 7 message.
       const okFixture = TestBed.createComponent(SquadEditorModalComponent);
