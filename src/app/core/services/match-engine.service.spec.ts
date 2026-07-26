@@ -1,37 +1,5 @@
-/**
- * LIVE-MATCH-F3-UI-LIVE FE1: unit tests for the SSE backoff + health plumbing
- * in {@link MatchEngineService}.
- *
- * <p>Karma + Jasmine setup is wired in {@link ../../../karma.conf.js} and the
- * test target in `angular.json`. This spec validates:
- * <ul>
- *   <li>Initial streamHealth$ is CLOSED.</li>
- *   <li>After the fetch resolves and the first message arrives, the health
- *       becomes HEALTHY.</li>
- *   <li>After a stream drop, the service schedules a backoff reconnect and
- *       transitions to RECONNECTING.</li>
- *   <li>After {@link RECONNECT_MAX_ATTEMPTS} failed attempts the health is
- *       CLOSED.</li>
- *   <li>No event in {@code DEGRADED_GAP_MS} → health becomes DEGRADED.</li>
- *   <li>A payload with {@code status=FINISHED} completes the stream.</li>
- * </ul>
- *
- * <p>V25D85-SSE-AUTH: the underlying transport switched from
- * {@code EventSource} (which does NOT support custom request headers) to
- * {@code fetch + ReadableStream}, so the Authorization header can flow to
- * the backend. Tests use a tiny fetch mock that captures the request
- * options (URL + headers + AbortController signal) and exposes a scriptable
- * reader so we can drive events deterministically.
- *
- * <p>Timer-based tests use `jasmine.clock()` to mock `setTimeout` instead of
- * `fakeAsync(tick(...))` — this avoids the ProxyZone bootstrapping pain and
- * keeps the spec independent of zone.js internals. Microtask flushing uses
- * a handful of `await Promise.resolve()` calls between the synchronous
- * trigger and the assertion.
- *
- * <p>LIVE-MATCH-F5.3.4: extends the spec with BUG-015 pause/resume plumbing
- * (helper roundId lookup + per-round pause/resume with 5-minute cache).
- */
+// Unit tests for MatchEngineService streaming, auth headers, reconnect health and round pause/resume.
+// The fetch mock below lets each spec drive SSE chunks deterministically.
 
 import { TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
@@ -40,7 +8,7 @@ import { MatchEngineService } from './match-engine.service';
 import { AuthService } from './auth.service';
 import { MatchState, StreamHealth } from './match-engine.model';
 
-// ---------- fetch + ReadableStream mock (V25D85-SSE-AUTH) ----------
+// ---------- fetch + ReadableStream mock ----------
 
 interface QueuedReader {
   resolve: (r: { done: boolean; value?: Uint8Array }) => void;
@@ -148,14 +116,7 @@ class MockFetchSse {
     this.rejectFetch(new Error(message));
   }
 
-  /**
-   * V25D88-FRONT-F1: push one SSE data event into the open stream using the
-   * REAL Spring `ServerSentEventHttpMessageWriter` wire format
-   * {@code `data:${JSON.stringify(payload)}\n\n`} — NO trailing space after
-   * {@code data:}. The pre-V25D88 mock used {@code `data: ${...}`} (WITH space),
-   * which matched the front's stale regex but NOT what the backend actually
-   * emits in production, so the parser bug slipped through unit tests.
-   */
+  // Push one SSE data event using Spring's data:{json} wire format.
   emit(payload: unknown): void {
     const data = `data:${JSON.stringify(payload)}\n\n`;
     this.readerQueue.push({ done: false, value: new TextEncoder().encode(data) });
@@ -220,7 +181,7 @@ function installMockFetch(): () => void {
   };
 }
 
-describe('MatchEngineService — LIVE-MATCH-F3-UI-LIVE FE1 + V25D85-SSE-AUTH', () => {
+describe('MatchEngineService - streaming, auth and reconnect behavior', () => {
   let service: MatchEngineService;
   let httpSpy: jasmine.SpyObj<HttpClient>;
   let authServiceStub: { getToken: () => string | null };
@@ -373,9 +334,9 @@ describe('MatchEngineService — LIVE-MATCH-F3-UI-LIVE FE1 + V25D85-SSE-AUTH', (
     expect(completed).toBe(true);
   });
 
-  // ========== V25D85-SSE-AUTH: new tests for the fetch-based transport ==========
+  // ========== new tests for the fetch-based transport ==========
 
-  it('V25D85-SSE-AUTH: streamRoundState sends Authorization Bearer header on fetch', async () => {
+  it('streamRoundState sends Authorization Bearer header on fetch', async () => {
     service.streamRoundState('r1').subscribe();
     await flushMicrotasks();
     expect(MockFetchSse.instances.length).toBe(1);
@@ -388,7 +349,7 @@ describe('MatchEngineService — LIVE-MATCH-F3-UI-LIVE FE1 + V25D85-SSE-AUTH', (
     await flushMicrotasks();
   });
 
-  it('V25D85-SSE-AUTH: does NOT attach Authorization header when no token is present', async () => {
+  it('does NOT attach Authorization header when no token is present', async () => {
     authServiceStub.getToken = () => null;
     service.streamRoundState('r2').subscribe();
     await flushMicrotasks();
@@ -399,7 +360,7 @@ describe('MatchEngineService — LIVE-MATCH-F3-UI-LIVE FE1 + V25D85-SSE-AUTH', (
     await flushMicrotasks();
   });
 
-  it('V25D85-SSE-AUTH: parses SSE data events into JSON payloads', async () => {
+  it('parses SSE data events into JSON payloads', async () => {
     const received: unknown[] = [];
     service.streamRoundState('r3').subscribe(p => received.push(p));
     await flushMicrotasks();
@@ -413,13 +374,13 @@ describe('MatchEngineService — LIVE-MATCH-F3-UI-LIVE FE1 + V25D85-SSE-AUTH', (
     expect((received[1] as { currentMinute: number }).currentMinute).toBe(6);
   });
 
-  it('V25D85-SSE-AUTH: handles partial SSE chunks split across reads', async () => {
+  it('handles partial SSE chunks split across reads', async () => {
     const received: unknown[] = [];
     service.streamRoundState('r4').subscribe(p => received.push(p));
     await flushMicrotasks();
     MockFetchSse.instances[0].respondOk();
     await flushMicrotasks();
-    // V25D88-FRONT-F1: use the real Spring wire format `data:${json}` (NO
+    // use the real Spring wire format `data:${json}` (NO
     // trailing space) instead of the legacy `data: ${json}` (WITH space).
     // The split-across-reads behavior is the same; only the wire format
     // changes to reflect what the backend actually sends in production.
@@ -431,24 +392,15 @@ describe('MatchEngineService — LIVE-MATCH-F3-UI-LIVE FE1 + V25D85-SSE-AUTH', (
     expect((received[1] as { matchId: string }).matchId).toBe('y');
   });
 
-  // ========== V25D88-FRONT-F1: tolerance for both wire formats ==========
+  // ========== tolerance for both wire formats ==========
 
-  /**
-   * V25D88-FRONT-F1: defense-in-depth regression test. The parser now matches
-   * any line that starts with {@code 'data:'} (without requiring the trailing
-   * space the previous regex needed). This test verifies both conventions are
-   * accepted in the same stream so a future change to the backend encoder —
-   * or an intermediary proxy that re-wraps the chunks — won't silently break
-   * the round-live UI again.
-   */
-  it('V25D88-FRONT-F1: tolerates both "data:" (no space) and "data: " (with space) SSE formats', async () => {
+  it('tolerates both "data:" (no space) and "data: " (with space) SSE formats', async () => {
     const received: unknown[] = [];
     service.streamRoundState('r-v25d88').subscribe(p => received.push(p));
     await flushMicrotasks();
     MockFetchSse.instances[0].respondOk();
     await flushMicrotasks();
-    // Spring wire format (no space), legacy format (with space), and one chunk
-    // that mixes both — the parser must surface all four JSON payloads.
+    // Spring wire format, legacy format, and one chunk that mixes both.
     const wire =
       `data:${JSON.stringify({ matchId: 'no-space-1', currentMinute: 1 })}\n\n` +
       `data: ${JSON.stringify({ matchId: 'with-space-2', currentMinute: 2 })}\n\n` +
@@ -465,7 +417,7 @@ describe('MatchEngineService — LIVE-MATCH-F3-UI-LIVE FE1 + V25D85-SSE-AUTH', (
     expect(received.map(p => (p as { currentMinute: number }).currentMinute)).toEqual([1, 2, 3, 4]);
   });
 
-  it('V25D85-SSE-AUTH: signals abort on the request signal when unsubscribed', async () => {
+  it('signals abort on the request signal when unsubscribed', async () => {
     const sub = service.streamRoundState('r5').subscribe();
     await flushMicrotasks();
     MockFetchSse.instances[0].respondOk();
@@ -479,7 +431,7 @@ describe('MatchEngineService — LIVE-MATCH-F3-UI-LIVE FE1 + V25D85-SSE-AUTH', (
     expect(inst.signal.aborted).toBe(true);
   });
 
-  it('V25D85-SSE-AUTH: triggers RECONNECTING when fetch returns non-2xx (e.g. 401)', async () => {
+  it('triggers RECONNECTING when fetch returns non-2xx (e.g. 401)', async () => {
     jasmine.clock().install();
     service.streamRoundState('r6').subscribe();
     await flushMicrotasks();
@@ -489,9 +441,9 @@ describe('MatchEngineService — LIVE-MATCH-F3-UI-LIVE FE1 + V25D85-SSE-AUTH', (
   });
 });
 
-// ========== LIVE-MATCH-F5.3.4 BUG-015: pause/resume plumbing ==========
+// ========== pause/resume plumbing ==========
 
-describe('MatchEngineService — LIVE-MATCH-F5.3 BUG-015 (pause/resume per round)', () => {
+describe('MatchEngineService - pause/resume per round', () => {
   let service: MatchEngineService;
   let httpSpy: jasmine.SpyObj<HttpClient>;
   let authServiceStub: { getToken: () => string | null };
