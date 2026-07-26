@@ -47,25 +47,11 @@ export class LiveMatchModalsService {
   private readonly partidoSavedFormationMemory = new Map<string, string>();
   private roundResumeHoldCount = 0;
 
-  /**
-   * Optional overrides used when the live screen opens a substitution modal
-   * for a specific reason, for example to pre-select an injured player.
-   */
+  // Optional context for event-driven substitution modals.
   openSubstitutionOptions?: {
-    /**
-     * sessionPlayerId to pre-select as the OFF player when the modal
-     * opens. The modal auto-fills the OFF field; the manager only picks
-     * the ON (bench) player and confirms. If the id is not in the
-     * starting XI (e.g. already substituted off), the auto-select is a
-     * silent no-op.
-     */
+    // Starter to pre-select as the outgoing player.
     preSelectedPlayerId?: string;
-    /**
-     * Why the modal is opening. When set, the modal renders a small
-     * reason banner in the header. Currently only
-     * `INJURY_FORCED_SUBSTITUTION` is emitted by the auto-listener;
-     * manual opens leave this `undefined` (renders the bare title).
-     */
+    // Lets the modal explain why it opened.
     reason?: 'INJURY_FORCED_SUBSTITUTION' | 'MANUAL';
   };
 
@@ -215,17 +201,7 @@ export class LiveMatchModalsService {
     );
   }
 
-  /**
-   * V25D81.1 BUG #3: opens a small awareness dialog when the rival receives
-   * a red card. The dialog carries only display info (player name + minute)
-   * and does NOT trigger any auto-substitution — the manager still has to
-   * explicitly open the substitution modal if they want to react. This is
-   * the "awareness without action" UX path Iván asked for after F0 #3.
-   *
-   * <p>Returns an Observable that completes when the manager closes the
-   * dialog. The component does not pause/resume the round — the modal is
-   * informational and should not interfere with the live ticker.
-   */
+  // Informational dialog when the rival gets a red card. It does not pause the round.
   openRivalCardInfoModal(
     matchId: string,
     state: MatchState,
@@ -253,9 +229,6 @@ export class LiveMatchModalsService {
       return new Observable(sub => sub.complete());
     }
     const careerId = this.getCurrentCareerId();
-    // V25D81-BUG #4: also fetch the squad so the drag-drop modal can
-    // render player names + a bench list. Same pattern as
-    // openSubstitutionModal (lineup + squad forkJoin).
     return this.pauseBeforeModal(careerId, matchId, 'formation', state.status === 'PAUSED').pipe(
       switchMap(() => this.careerService.getCareerStatus()),
       switchMap(status => forkJoin({
@@ -296,10 +269,7 @@ export class LiveMatchModalsService {
           ),
           squadForModal
         );
-        // V25D81-BUG #4: startingIds = sessionPlayerIds in the current
-        // lineup. The modal uses this to split the squad into
-        // "on pitch" (in currentSlots) and "bench" (squad minus
-        // starting) when the drag-drop bench column is rendered.
+        // Used by the modal to split players on the pitch from the bench.
         const startingIds = new Set<string>(
           currentSlots.map(s => s.sessionPlayerId).filter(id => !!id)
         );
@@ -312,22 +282,15 @@ export class LiveMatchModalsService {
           startingIds
         };
 
-        // LIVE-MATCH-F5.3.3 BUG-015: pause the round BEFORE the dialog
-        // opens. Same wire as openSubstitutionModal — see that method
-        // for the full rationale (the `currentMinute` the manager saw at
-        // click time must still be current when they confirm).
         const dialogRef = this.dialog.open(FormationModalComponent, {
           data,
-          width: '720px',           // V25D81-BUG #4: wider for the drag-drop bench column
+          width: '720px',
           maxWidth: '95vw',
           disableClose: false,
           autoFocus: 'first-tabbable'
         });
 
-        // LIVE-MATCH-F5.3.3 BUG-015: resume on afterClosed (confirm or cancel).
-        // V25D99.20.3.2: keep the legacy immediate emission for callers/tests
-        // and then emit the actual close result so round-live can patch the
-        // visible match card immediately after a confirmed formation.
+        // Emit initial data for callers, then the actual close result.
         return merge(dialogRef.afterClosed().pipe(
           tap(() => {
             if (careerId && this.shouldResumeRoundAfterModalClose()) {
@@ -342,37 +305,11 @@ export class LiveMatchModalsService {
     );
   }
 
-  /**
-   * V25D89-FRONT-A: opens the Partido modal for the given match/state.
-   * The Partido modal is the new dual-tab entry point (Mi Formación editable
-   * + Formación Rival read-only) that supersedes neither the F5 formation
-   * modal nor the F4 substitution modal — those two modals stay available
-   * per parent direction (KEEP existing Formación button OK). The Partido
-   * modal is the single "match view" the manager opens when they want to
-   * see the tactical matchup at a glance.
-   *
-   * <p>Data wiring mirrors {@link openFormationModal}: lineup + squad
-   * forkJoin, then build the dialog data with the addition of
-   * {@code rivalFormation} sourced from
-   * {@code state.awayFormation}. Pause/resume round follows the same
-   * F5.3.3 BUG-015 pattern: pause BEFORE the dialog opens so the
-   * `currentMinute` the manager saw at click time is still current when
-   * they confirm; resume on afterClosed() whether the manager confirmed
-   * OR discarded.
-   */
+  // Opens the full DT match modal: editable manager formation plus rival view.
   openPartidoModal(
     matchId: string,
     state: MatchState,
-    /**
-     * V25D89.2: optional human-readable team names. The round-live
-     * component already builds a {@code teamNameMap} (sourced from
-     * {@link CareerService.getCareerTeams}) and passes it down so the
-     * modal's stats section shows "REAL MADRID 55% | 45% BARCELONA"
-     * instead of the raw teamIds. When omitted the modal falls back to
-     * the teamIds (less readable but the stats still compute correctly
-     * — the teamId match is what drives the event attribution, the
-     * names are display-only).
-     */
+    // Optional display names; ids still drive event attribution.
     teamNames?: { home: string; away: string },
     options?: {
       preSelectedPlayerId?: string;
@@ -432,26 +369,15 @@ export class LiveMatchModalsService {
         const currentFormation = this.partidoSavedFormationMemory.get(matchId) || stateCurrentFormation;
         const data: PartidoDialogData = {
           matchId,
-          // V25D89-FRONT-A: same currentFormation source as openFormationModal
-          // (home formation when the manager team is home, else away).
-          // The Partido modal uses this to seed the dropdown + slot re-flow.
           currentFormation,
           homeTeamId: userTeamId ?? stateForModal.homeTeamId,
-          // V25D89.2: awayTeamId drives event attribution in the stats
-          // derivation (without it we cannot tell which team a SHOT
-          // belongs to). Sourced from state.awayTeamId — the SSE feed
-          // exposes this on every MatchState tick.
           awayTeamId: stateForModal.awayTeamId,
           currentSlots,
           squad: squadForModal,
           startingIds,
           preSelectedPlayerId: options?.preSelectedPlayerId,
           reason: options?.reason,
-          // V25D89-FRONT-A: rival formation comes from state.awayFormation
-          // (the only rival-side data the SSE feed exposes). Falls back to
-          // '4-4-2' defensively so the rival tab always renders.
           rivalFormation: stateForModal.awayFormation || '4-4-2',
-          // ========== V25D89.2: stats live data ==========
           currentMinute: stateForModal.currentMinute ?? 0,
           score: stateForModal.score ?? { home: 0, away: 0 },
           homePossession: stateForModal.homePossession ?? 50,
@@ -462,39 +388,17 @@ export class LiveMatchModalsService {
           substitutionsRemaining: this.effectiveSubstitutionsRemaining(matchId, stateForModal, userTeamId)
         };
 
-        // LIVE-MATCH-F5.3.3 BUG-015: pause the round BEFORE the dialog
-        // opens (same wire as openFormationModal — see that method for
-        // the full rationale).
         const dialogRef = this.dialog.open(PartidoModalComponent, {
           data,
-          // V25D89.4-FRONT: full-width modal. The V25D89.3 720px cap
-          // produced a modal that felt pegged to the left side of
-          // the viewport on desktop (see partido-modal.component.ts
-          // styles:[] for the matching 95vw MDC container override).
-          // The dialog config width sets the inline style on the MDC
-          // container — kept consistent with the CSS rule so both
-          // layers (config + CSS) request the same width.
           width: '95vw',
           maxWidth: '95vw',
-          // V25D90-FRONT-F4: panelClass used by partido-modal.component.ts
-          // to bump the cdk-overlay-pane z-index above Material's default
-          // 1000. Without this, the partido modal's backdrop absorbs the
-          // formation mat-select dropdown's pointer events (the dropdown
-          // renders in the SAME cdk-overlay-container as the modal but at
-          // the SAME z-index by default — so the modal wins). Setting
-          // panelClass = 'partido-modal-pane' gives us a hook to scope
-          // the z-index override to this specific dialog.
+          // Keeps nested Material overlays clickable above the modal backdrop.
           panelClass: 'partido-modal-pane',
           disableClose: false,
           autoFocus: 'first-tabbable'
         });
 
-        // LIVE-MATCH-F5.3.3 BUG-015: resume on afterClosed (confirm or discard).
-        //
-        // Keep a service-owned close listener active immediately. The public
-        // observable still completes on close (so round-live keeps its modal
-        // gate), but saving/reopening Partido no longer depends on the caller's
-        // subscription timing.
+        // Keep a service-owned close listener active immediately.
         const close$ = dialogRef.afterClosed();
         close$.pipe(tap((closeResult) => {
             this.rememberClosedModalSubstitutions(matchId, closeResult);
@@ -510,28 +414,14 @@ export class LiveMatchModalsService {
     );
   }
 
-  /**
-   * LIVE-MATCH-F5.3.3 BUG-015: extracts the careerId from the current
-   * router URL. We expect URLs of the form
-   * {@code /games/{careerId}/round/{round}/live} (or
-   * {@code /games/{careerId}/...}); any other route returns null and the
-   * caller logs a warning instead of pausing.
-   */
+  // The route carries the career id used by round-level pause/resume endpoints.
   private getCurrentCareerId(): string | null {
     const url = this.router.url || '';
     const match = url.match(/\/games\/([^/]+)/);
     return match ? match[1] : null;
   }
 
-  /**
-   * V25D99.21.10: hard-freeze live rounds before preparing DT modals.
-   *
-   * Previously the service paused after loading career status, lineup, squad
-   * and fresh live state. In the real browser that delay was enough for the
-   * match to jump many minutes before the modal became interactive. Pausing
-   * first makes the modal minute, the displayed state and the eventual save
-   * belong to the same tactical moment.
-   */
+  // Freeze the round before loading modal data so the decision uses one tactical moment.
   private pauseBeforeModal(
     careerId: string | null,
     matchId: string,
@@ -553,17 +443,7 @@ export class LiveMatchModalsService {
     );
   }
 
-  /**
-   * V25D99.20.3.31: live DT decisions must be cumulative.
-   *
-   * <p>The persisted career lineup is the pre-match base XI. During a live
-   * match, confirmed substitutions live in the match-state timeline first.
-   * If the next DT modal reads only `/career/lineup/current`, it reopens with
-   * the old XI (e.g. Aurelien still on the pitch after Aurelien → Luka), which
-   * makes the manager controls feel cosmetic. This helper overlays confirmed
-   * SUBSTITUTION events for the manager team onto the base lineup before the
-   * substitution / formation / partido modals build their data.</p>
-   */
+  // Apply live substitutions over the saved pre-match lineup before opening DT modals.
   private applyLiveSubstitutionsToLineup(
     lineup: LineupDTO,
     squad: SessionPlayer[] | null | undefined,
@@ -676,12 +556,7 @@ export class LiveMatchModalsService {
     return remainingFromUserEvents;
   }
 
-  /**
-   * V25D99.20.3.36: exposes the small live-session memory used by queued
-   * injury modals. If an injury modal was waiting behind another modal, the
-   * round component must re-check whether that injured player was already
-   * substituted before opening the queued dialog.
-   */
+  // Queued injury modals re-check this before opening.
   wasPlayerConfirmedSubstitutedOff(matchId: string, playerOffId: string): boolean {
     return (this.confirmedSubstitutionMemory.get(matchId) ?? [])
       .some(s => s.playerOffId === playerOffId);
