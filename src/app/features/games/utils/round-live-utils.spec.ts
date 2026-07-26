@@ -15,6 +15,8 @@ import {
   normalizeTerminalLiveState,
   readStorageFlag,
   ROUND_LIVE_DEBUG_STORAGE_KEYS,
+  shouldQueueInjuryAutoModal,
+  shouldQueueRivalCardModal,
   wasPlayerSubstitutedOffInState,
   writeStorageFlag
 } from './round-live-utils';
@@ -103,6 +105,44 @@ describe('round-live-utils', () => {
         awayTeamId: 'pending-away'
       }
     ]);
+  });
+
+  it('queues rival red-card notices while the round is running or another live modal is open', () => {
+    expect(shouldQueueRivalCardModal({
+      status: 'RUNNING',
+      isRivalCardModalOpen: false,
+      isCriticalLiveModalOpen: false
+    })).toBeTrue();
+    expect(shouldQueueRivalCardModal({
+      status: 'PAUSED',
+      isRivalCardModalOpen: true,
+      isCriticalLiveModalOpen: false
+    })).toBeTrue();
+    expect(shouldQueueRivalCardModal({
+      status: 'PAUSED',
+      isRivalCardModalOpen: false,
+      isCriticalLiveModalOpen: true
+    })).toBeTrue();
+    expect(shouldQueueRivalCardModal({
+      status: 'PAUSED',
+      isRivalCardModalOpen: false,
+      isCriticalLiveModalOpen: false
+    })).toBeFalse();
+  });
+
+  it('queues injury auto-modals while another critical live modal is open', () => {
+    expect(shouldQueueInjuryAutoModal({
+      isAutoModalOpen: true,
+      isCriticalLiveModalOpen: false
+    })).toBeTrue();
+    expect(shouldQueueInjuryAutoModal({
+      isAutoModalOpen: false,
+      isCriticalLiveModalOpen: true
+    })).toBeTrue();
+    expect(shouldQueueInjuryAutoModal({
+      isAutoModalOpen: false,
+      isCriticalLiveModalOpen: false
+    })).toBeFalse();
   });
 
   it('falls back to any active match as round-control anchor', () => {

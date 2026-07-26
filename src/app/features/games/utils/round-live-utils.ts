@@ -141,6 +141,21 @@ export function buildPendingLiveModalNotice(input: {
   return null;
 }
 
+export function shouldQueueRivalCardModal(input: {
+  status: string | undefined;
+  isRivalCardModalOpen: boolean;
+  isCriticalLiveModalOpen: boolean;
+}): boolean {
+  return input.status === 'RUNNING' || input.isRivalCardModalOpen || input.isCriticalLiveModalOpen;
+}
+
+export function shouldQueueInjuryAutoModal(input: {
+  isAutoModalOpen: boolean;
+  isCriticalLiveModalOpen: boolean;
+}): boolean {
+  return input.isAutoModalOpen || input.isCriticalLiveModalOpen;
+}
+
 export function findInjuryAutoModalCandidates(input: {
   matches: RoundMatchVM[];
   userTeamId: string | null;

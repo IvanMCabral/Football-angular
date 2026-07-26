@@ -27,6 +27,8 @@ import {
   normalizeTerminalLiveState,
   readStorageFlag,
   ROUND_LIVE_DEBUG_STORAGE_KEYS,
+  shouldQueueInjuryAutoModal,
+  shouldQueueRivalCardModal,
   wasPlayerSubstitutedOffInState,
   writeStorageFlag
 } from './utils/round-live-utils';
@@ -622,12 +624,11 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
    * older queued entry.
    */
   private queueOrOpenRivalCardModal(payload: RivalCardModalPayload): void {
-    if (payload.state.status === 'RUNNING') {
-      this.queuedRivalCardModal = payload;
-      this.updatePendingLiveModalNotice();
-      return;
-    }
-    if (this.isRivalCardModalOpen || this.isCriticalLiveModalOpen) {
+    if (shouldQueueRivalCardModal({
+      status: payload.state.status,
+      isRivalCardModalOpen: this.isRivalCardModalOpen,
+      isCriticalLiveModalOpen: this.isCriticalLiveModalOpen
+    })) {
       this.queuedRivalCardModal = payload;
       this.updatePendingLiveModalNotice();
       return;
@@ -672,7 +673,10 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
    * most recent injury is the most important).
    */
   private queueOrOpenAutoModal(payload: InjuryAutoModalPayload): void {
-    if (this.isAutoModalOpen || this.isCriticalLiveModalOpen) {
+    if (shouldQueueInjuryAutoModal({
+      isAutoModalOpen: this.isAutoModalOpen,
+      isCriticalLiveModalOpen: this.isCriticalLiveModalOpen
+    })) {
       this.enqueueAutoModal(payload);
       this.updatePendingLiveModalNotice();
       return;
