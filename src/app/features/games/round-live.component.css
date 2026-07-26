@@ -2,17 +2,11 @@
   padding: 2rem;
   max-width: 1400px;
   margin: 0 auto;
-  /* V25D83 sprint: position the container relative so the loading-state
-     absolute overlay covers it (instead of pushing the layout down). */
   position: relative;
   min-height: 320px;
 }
 
-/* V25D83 sprint: full-container loading overlay. Sits above the empty
-   round-live-container while the four initial HTTP fetches are in
-   flight (route params + teams + career status + fixtures). Uses
-   absolute positioning so it does not shift the surrounding layout
-   when it appears or disappears. */
+/* Loading overlay while the round state is fetched. */
 .loading-state {
   position: absolute;
   inset: 0;
@@ -96,10 +90,7 @@
   box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.18);
 }
 
-/* V25D82 sprint 2 UX fix: green "Iniciar Todos" button mirrors btn-resume
-   visually but anchors the explicit-start action. Uses a slightly darker
-   green so the manager can distinguish "start fresh" from "resume from
-   pause" at a glance. */
+/* Explicit action to start pending matches. */
 .btn-start {
   background: #2e7d32;
   color: white;
@@ -161,7 +152,7 @@
   margin-bottom: 2rem;
 }
 
-/* V24D11 UX-5: seccion destacada del partido del user + divider para los demas */
+/* Highlight the manager match above the rest of the round. */
 .user-match-section {
   margin-bottom: 1rem;
   padding-bottom: 1rem;
@@ -197,7 +188,7 @@
   margin: 0 0 1rem 0;
 }
 
-/* UX-6: BYE indicator */
+/* BYE indicator */
 .bye-badge {
   background: #e9ecef;
   color: #495057;

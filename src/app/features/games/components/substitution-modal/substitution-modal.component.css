@@ -1,5 +1,4 @@
-/* LIVE-MATCH-F5.2 BUG-014: CSS grid 3-col layout (Starting XI | Bench | Acciones).
-   Responsive: en mobile (< 768px) las 3 columnas colapsan a 1 vertical. */
+/* Substitution modal layout */
 
 .sub-modal-root {
   min-width: 860px;
@@ -363,15 +362,7 @@
   }
 }
 
-/* ========== V25D63-C23 P0: chip-level effectiveness feedback ==========
-   Replica squad-editor-modal classes (eff-good/eff-warning/eff-bad + eff-badge)
-   para que el modal de sustitución muestre el mismo feedback visual que
-   ya existe en /squad. Mismos thresholds: eff >= 0.9 good (default look,
-   no border), 0.7 <= eff < 0.9 warning (orange border), eff < 0.7 bad
-   (red border). El badge muestra el porcentaje rounded (e.g. "95%").
-
-   Scope local (NO global styles.scss) — Angular aplica encapsulation
-   automáticamente. */
+/* Slot effectiveness feedback */
 
 .player-list li {
   /* position:relative necesario para que .eff-badge (position:absolute)
@@ -379,13 +370,9 @@
   position: relative;
 }
 
-/* eff-good: default look, sin border override (no se aplica ninguna
-   regla explícita — el chip mantiene el estilo base del .player-list li).
-   Documentado acá para simetría con eff-warning/eff-bad. */
+/* The default card already represents a good effectiveness state. */
 
-/* eff-warning + eff-bad: usan !important para override del
-   border-bottom existente en .player-list li (línea ~100) y de cualquier
-   border que pueda venir del .selected state. */
+/* Warning and bad states must override the base card border. */
 
 .player-list li.eff-warning {
   border: 2px solid #f59e0b !important; /* amber-500 */
@@ -397,9 +384,7 @@
   box-sizing: border-box;
 }
 
-/* V25D64 (Sprint C24): eff-good border verde distintivo para simetria
-   visual con eff-warning (amber) y eff-bad (red). Mismo patron que en
-   squad-editor-modal.component.ts. */
+/* Good effectiveness state */
 .player-list li.eff-good {
   border: 2px solid #10b981 !important; /* emerald-500 */
   box-sizing: border-box;
