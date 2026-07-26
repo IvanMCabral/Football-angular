@@ -333,7 +333,7 @@ describe('SquadEditorModalComponent backend formation loading', () => {
 
     fixture.detectChanges();
 
-    // Esperar a que termine la inicialización (loadSquadFromBackend + formations + current)
+    // Wait for initialization to finish before driving the formation change.
     setTimeout(() => {
       const starters = elevenPlayers.map((player, index) => ({
         ...player,
@@ -354,8 +354,7 @@ describe('SquadEditorModalComponent backend formation loading', () => {
       (component as any).isInitializing = false;
       component.onFormationChange('4-3-3');
 
-      // Esperar a que el Promise de executeFormationChange se resuelva
-      // y saveLineup dispare los POSTs a /manual-select y /confirm
+      // Wait for saveLineup to fire /manual-select and /confirm.
       setTimeout(() => {
         const allPostUrls = httpClientSpy.post.calls.allArgs()
           .map(args => String(args[0]));
@@ -2072,20 +2071,10 @@ describe('SquadEditorModalComponent bench display', () => {
 });
 
 /**
- * V25D91-FRONT-F1: marker cards render squad number + player name + role
- * badge color-coded by family (yellow GK / blue DEF / green MID / red ATT).
- *
- * <p>Pre-V25D91 the marker was a 32x32 circle showing only the squad
- * number. Post-F1 it is a 70x56 card with three stacked rows. The color
- * family comes from {@link SquadEditorModalComponent.getMarkerRoleClasses}
- * via [ngClass].
- *
- * <p>Strategy: drive the component through the same setup as the V25D51
- * chip-level tests (5 slots + 5 players + formationEffectiveness) so the
- * marker DOM is fully populated, then assert the marker elements + class
- * bindings render correctly per role.
+ * Player markers render as compact cards: squad number, player name,
+ * and a role badge colored by family (GK, DEF, MID, ATT).
  */
-describe('SquadEditorModalComponent — V25D91-FRONT-F1 marker cards (name + role badge)', () => {
+describe('SquadEditorModalComponent marker cards', () => {
   let component: SquadEditorModalComponent;
   let fixture: ComponentFixture<SquadEditorModalComponent>;
   let httpClientSpy: jasmine.SpyObj<HttpClient>;
@@ -2102,9 +2091,8 @@ describe('SquadEditorModalComponent — V25D91-FRONT-F1 marker cards (name + rol
 
   // Each player has the position that will end up in its corresponding slot
   // via role-match (since the /current response carries no persistedSlots).
-  // Positions match the formation slot roles 1:1 (GK → GK-1, DEF → S22-1,
-  // MID → S13-2, ATT → S05-2, MID → S05-3). The marker .player-role-label
-  // will render player.role which equals player.position here.
+  // Positions match formation slot roles one-to-one here: GK, DEF,
+  // MID, ATT, MID. The marker role label renders player.role.
   const PLAYERS = [
     { playerId: 'p-gk',   name: 'Courtois',         position: 'GK',  overall: 90, energy: 100, injured: false, role: 'GK' },
     { playerId: 'p-def',  name: 'Fran Garcia',      position: 'DEF', overall: 82, energy: 100, injured: false, role: 'DEF' },
@@ -2213,8 +2201,8 @@ describe('SquadEditorModalComponent — V25D91-FRONT-F1 marker cards (name + rol
   // ---- template bindings: marker renders name + role badge ----
 
   it('renders one .player-marker per occupied slot, with .player-number + .player-name-label + .player-role-label', (done) => {
-    // V25D91-FRONT-F1: 5 players → 5 markers. Each marker has 3 inner
-    // spans/divs: number (top), name-label (middle), role-label (bottom).
+    // Five players should render as five marker cards, each with number,
+    // name and role label.
     setTimeout(() => {
       fixture.detectChanges();
       const markers = fixture.nativeElement.querySelectorAll('.player-marker') as NodeListOf<HTMLElement>;
@@ -2235,9 +2223,7 @@ describe('SquadEditorModalComponent — V25D91-FRONT-F1 marker cards (name + rol
       fixture.detectChanges();
       const labels = fixture.nativeElement.querySelectorAll('.player-marker .player-name-label') as NodeListOf<HTMLElement>;
       const names = Array.from(labels).map(l => (l.textContent || '').trim());
-      // The 5 players in PLAYERS (after role-match against the formation):
-      // GK-1 → GK (Courtois), S22-1 → LB (Fran Garcia), S13-2 → CM (Modric),
-      // S05-2 → LW (Vinicius Jr), S05-3 → CM (Bellingham).
+      // The five players in PLAYERS after role-match against the formation.
       expect(names).toContain('Courtois');
       expect(names).toContain('Fran Garcia');
       expect(names).toContain('Modric');
@@ -2300,9 +2286,7 @@ describe('SquadEditorModalComponent — V25D91-FRONT-F1 marker cards (name + rol
   // ---- CSS smoke check ----
 
   it('CSS source defines the role-color rules for all 4 families', () => {
-    // The companion CSS source-parse pattern (used by V25D56/V25D58 specs
-    // for @media + field rule checks) works on inline `styles:`. We re-use
-    // it to assert the 4 color rules exist with the expected palette.
+    // Assert the four role color rules exist with the expected palette.
     const styles = (SquadEditorModalComponent as any).ɵcmp?.styles ?? [];
     const src = (Array.isArray(styles) ? styles.join('\n') : String(styles))
       .replace(/\[[_]?ngcontent-[^\]]*\]/g, '');
@@ -2314,24 +2298,10 @@ describe('SquadEditorModalComponent — V25D91-FRONT-F1 marker cards (name + rol
 });
 
 /**
- * V25D91.6-FRONT F6 P0 regression: role-match by family.
- *
- * <p>Pre-V25D91.6 the component used `player.position === posRole` for the
- * role-match fallback. That failed because formations return SPECIFIC roles
- * (CB/LB/RB/CM/ST) while the squad returns GENERIC roles (GK/DEF/MID/ATT/
- * WINGER). Only GK matched exactly, so only 1 marker rendered after a
- * formation change.
- *
- * <p>V25D91.6 introduces {@link SquadEditorModalComponent.rolesMatch}
- * which compares by family (GK/DEF/MID/ATT) — so a player with position
- * "DEF" matches a formation slot with role "CB", etc. WINGER falls into
- * ATT family (lateral attacker).
- *
- * <p>Strategy: pure unit tests on the helper method. The full
- * formation-change flow is covered by R1-R6 (V25D91.5) and the V25D91.6
- * integration smoke (Playwright self-test in workspace).
+ * Role matching compares tactical roles by family, so generic squad roles
+ * like DEF, MID, ATT, or WINGER still fit specific formation slots.
  */
-describe('SquadEditorModalComponent — V25D91.6-FRONT F6 P0 role-match by family', () => {
+describe('SquadEditorModalComponent role-match by family', () => {
   let component: SquadEditorModalComponent;
   let fixture: ComponentFixture<SquadEditorModalComponent>;
   let httpClientSpy: jasmine.SpyObj<HttpClient>;
@@ -2421,10 +2391,8 @@ describe('SquadEditorModalComponent — V25D91.6-FRONT F6 P0 role-match by famil
   });
 
   // ---- getRoleFamily() (private, exercised via rolesMatch coverage) ----
-  // Family classification is implicitly covered by the matrix tests above.
-  // Adding explicit spot checks here for the WINGER edge case (V25D91.6
-  // explicit decision: WINGER is ATT family, not its own family).
-
+  // The matrix tests above cover the family classification. These spot
+  // checks keep the WINGER edge case explicit.
   it('getRoleFamily: WINGER maps to ATT (lateral attacker classification)', () => {
     expect((component as any).getRoleFamily('WINGER')).toBe('ATT');
   });
@@ -2438,42 +2406,13 @@ describe('SquadEditorModalComponent — V25D91.6-FRONT F6 P0 role-match by famil
   });
 });
 
-/**
- * V25D91.6-FRONT F6 P0 regression: role-match by family.
- *
- * <p>Pre-V25D91.6 the component used `player.position === posRole` for the
- * role-match fallback. That failed because formations return SPECIFIC roles
- * (CB/LB/RB/CM/ST) while the squad returns GENERIC roles (GK/DEF/MID/ATT/
- * WINGER). Only GK matched exactly, so only 1 marker rendered after a
- * formation change.
- *
- * <p>V25D91.6 introduces {@link SquadEditorModalComponent.rolesMatch}
- * which compares by family (GK/DEF/MID/ATT) — so a player with position
- * "DEF" matches a formation slot with role "CB", etc. WINGER falls into
- * ATT family (lateral attacker).
- *
- * <p>Strategy: pure unit tests on the helper method. The full
- * formation-change flow is covered by R1-R6 (V25D91.5) and the V25D91.6
- * integration smoke (Playwright self-test in workspace).
- */
 
 /**
- * V25D91.5-FRONT F6 regression: changing formation via the `<select>` updates
- * BOTH the header (selectedFormation + homeFormation$ observable) AND the
- * markers on the pitch (homePlayers$ gets the new positions). Also asserts
- * that {@code isFormationChanging} resets to {@code false} after the HTTP
- * completes — pre-V25D91.5 it stayed {@code true} forever because the reset
- * lived in {@code onFormationChange.then()} and depended on the parent
- * (squad-management) listening to {@code formationChangeComplete}, which it
- * never did.
- *
- * <p>Strategy: drive {@code component.onFormationChange('X-Y-Z')} directly
- * (the production HTML now wires it via {@code (ngModelChange)} which
- * guarantees NgModel has already updated the model before the handler runs).
- * Use the same 11-player setup as the F4 spec (line ~270) so role-match
- * assigns all players to the new formation's slots.
+ * Changing formation from the selector must update the selected formation,
+ * keep the same starters, refresh marker positions, and reset the loading
+ * flag after the backend response completes.
  */
-describe('SquadEditorModalComponent — V25D91.5-FRONT F6 formation change updates header + markers', () => {
+describe('SquadEditorModalComponent formation change updates header and markers', () => {
   let component: SquadEditorModalComponent;
   let fixture: ComponentFixture<SquadEditorModalComponent>;
   let httpClientSpy: jasmine.SpyObj<HttpClient>;
@@ -2484,7 +2423,7 @@ describe('SquadEditorModalComponent — V25D91.5-FRONT F6 formation change updat
   ];
 
   // 11 players positioned GK + LB + CB + CB + RB + CM + CM + CM + CM + ST + ST
-  // (4-4-2 shape). For F6 we only care that the HTTP fires with the right
+  // In this suite we only care that the HTTP fires with the right
   // formation arg; the per-slot mapping is tested elsewhere.
   const ELEVEN_PLAYERS = [
     { playerId: 'p-gk',  name: 'GK',  position: 'GK', overall: 80, energy: 100, injured: false },
@@ -2500,7 +2439,7 @@ describe('SquadEditorModalComponent — V25D91.5-FRONT F6 formation change updat
     { playerId: 'p-st2', name: 'ST2', position: 'ST', overall: 80, energy: 100, injured: false }
   ];
 
-  // 4-4-2 formation response — used for /current and as the initial selectedFormation.
+  // 4-4-2 formation response: used for /current and as the initial selectedFormation.
   const FORMATIONS_RESPONSE = [
     {
       name: '4-4-2', description: '4-4-2',
@@ -2574,14 +2513,11 @@ describe('SquadEditorModalComponent — V25D91.5-FRONT F6 formation change updat
       return of(null);
     }) as any);
 
-    // /auto-select returns the same 11 players. The F6 fix doesn't depend
-    // on the response shape beyond applyLineupToSlots() running.
+    // /auto-select returns the same 11 players; the response shape only
+    // needs to let applyLineupToSlots() run.
     //
-    // V25D91.5 spec note: usamos timer(0).pipe(map(...)) en lugar de of(...)
-    // para que la respuesta HTTP sea ASÍNCRONA. of(...) emite sincrónicamente
-    // y eso rompe los tests R2/R6 que necesitan observar el flag
-    // isFormationChanging=true mientras la llamada está en vuelo (antes de
-    // que el callback HTTP lo resetee).
+    // Use timer(0) so the mocked HTTP response is async. That lets
+    // tests observe isFormationChanging=true while the request is in flight.
     httpClientSpy.post.and.callFake(((url: string, body: any) => {
       if (url.includes('/career/lineup/auto-select')) {
         return timer(0).pipe(map(() => ({ formation: body?.formation || '4-4-2', players: ELEVEN_PLAYERS, warnings: [] })));
@@ -2609,13 +2545,11 @@ describe('SquadEditorModalComponent — V25D91.5-FRONT F6 formation change updat
     fixture.detectChanges();
   });
 
-  // ---- F6 regression suite ----
+  // ---- formation-change regression suite ----
 
-  it('F6 R1: onFormationChange(3-5-2) saves the same XI with formation=3-5-2', (done) => {
-    // V25D91.5 F6 fix: ngModelChange() guarantees the model is updated before
-    // the handler runs, so passing the new formation explicitly avoids the
-    // (change)-vs-NgModel ordering bug that pre-F6 sometimes sent the OLD
-    // formation to the backend.
+  it('onFormationChange(3-5-2) saves the same XI with formation=3-5-2', (done) => {
+    // Passing the new formation explicitly matches the production
+    // ngModelChange flow and prevents sending the old formation value.
     setTimeout(() => {
       component.onFormationChange('3-5-2');
 
@@ -2634,7 +2568,7 @@ describe('SquadEditorModalComponent — V25D91.5-FRONT F6 formation change updat
     }, 30);
   });
 
-  it('F6 R1b: homeFormation$ observable reflects the new formation after change', (done) => {
+  it('homeFormation$ observable reflects the new formation after change', (done) => {
     setTimeout(() => {
       component.onFormationChange('3-5-2');
       // homeFormation$ is updated synchronously inside onFormationChange
@@ -2646,7 +2580,7 @@ describe('SquadEditorModalComponent — V25D91.5-FRONT F6 formation change updat
     }, 30);
   });
 
-  it('F6 R1c: selectedFormation is updated to the new formation', (done) => {
+  it('selectedFormation is updated to the new formation', (done) => {
     // The (ngModelChange) wiring in the production template sets
     // selectedFormation before invoking the handler. We simulate that by
     // passing the new value through the handler arg (which is what the
@@ -2659,12 +2593,9 @@ describe('SquadEditorModalComponent — V25D91.5-FRONT F6 formation change updat
     }, 30);
   });
 
-  it('F6 R2: isFormationChanging resets to false after HTTP completes (not stuck true)', (done) => {
-    // V25D91.5 F6 fix: previously isFormationChanging stayed true because
-    // the reset depended on the parent (squad-management) listening to
-    // formationChangeCompleteSubject via the (formationChangeComplete) Output,
-    // which it never did. Now the reset lives inside the HTTP callback of
-    // executeFormationChange, independent of any parent listener.
+  it('isFormationChanging resets to false after HTTP completes', (done) => {
+    // The loading flag resets inside the HTTP callback so the modal
+    // does not depend on any parent listener to become interactive again.
     setTimeout(() => {
       expect(component.isFormationChanging).withContext(
         'precondition: flag must start false after init').toBeFalse();
@@ -2676,16 +2607,16 @@ describe('SquadEditorModalComponent — V25D91.5-FRONT F6 formation change updat
       // Wait for HTTP callback to flush + reset the flag.
       setTimeout(() => {
         expect(component.isFormationChanging).withContext(
-          'flag must reset to false after HTTP completes (F6 fix)').toBeFalse();
+          'flag must reset to false after HTTP completes').toBeFalse();
         done();
       }, 30);
     }, 30);
   });
 
-  it('F6 R3: changing formation TWICE in a row — second call NOT blocked by stuck flag', (done) => {
-    // Pre-F6: after the first formation change, isFormationChanging was true
-    // forever, so the second change early-returned and never hit the backend.
-    // Post-F6: the flag resets after each HTTP, so 2nd/3rd/Nth changes work.
+  it('changing formation twice in a row is not blocked by the loading flag', (done) => {
+    // After the first formation change completes, the second change
+    // must still reach the backend.
+    // The flag resets after each HTTP response, so repeated changes work.
     setTimeout(() => {
       component.onFormationChange('3-5-2');
       setTimeout(() => {
@@ -2698,7 +2629,7 @@ describe('SquadEditorModalComponent — V25D91.5-FRONT F6 formation change updat
           const callsAfterSecond = httpClientSpy.post.calls.allArgs()
             .filter(args => String(args[0]).includes('/career/lineup/manual-select')).length;
           expect(callsAfterSecond - callsAfterFirst).withContext(
-            'second formation change must trigger a SECOND /manual-select call (pre-F6 it would be blocked)').toBe(1);
+            'second formation change must trigger a SECOND /manual-select call').toBe(1);
 
           // Last call's body must have formation=4-3-3 (the second target),
           // not 3-5-2 (the first target).
@@ -2712,17 +2643,15 @@ describe('SquadEditorModalComponent — V25D91.5-FRONT F6 formation change updat
     }, 30);
   });
 
-  it('F6 R4: no-op when target formation equals current formation (early-return)', (done) => {
-    // V25D91.5 F6 optimization: if user re-selects the same formation
-    // (e.g., opens the dropdown and clicks the active option), we should
-    // NOT make a redundant HTTP call. The early-return short-circuits
-    // before setting isFormationChanging.
+  it('does not call backend when target formation equals current formation', (done) => {
+    // Re-selecting the current formation should be a no-op and should
+    // not set the loading flag.
     setTimeout(() => {
       const callsBefore = httpClientSpy.post.calls.allArgs()
         .filter(args => String(args[0]).includes('/career/lineup/manual-select')).length;
 
       // selectedFormation starts as '4-4-2' (from /current).
-      // homeFormation$ also '4-4-2'. Same value → no-op.
+      // Same value: no-op.
       component.onFormationChange('4-4-2');
       setTimeout(() => {
         const callsAfter = httpClientSpy.post.calls.allArgs()
@@ -2736,28 +2665,22 @@ describe('SquadEditorModalComponent — V25D91.5-FRONT F6 formation change updat
     }, 30);
   });
 
-  it('F6 R5: <select> in the DOM is wired with (ngModelChange), not (change) — guard against accidental revert', (done) => {
-    // V25D91.5 F6 fix: production HTML switched from (change) to (ngModelChange)
-    // to guarantee listener ordering. R1 ya cubre el comportamiento funcional
-    // (HTTP call con la formación correcta), este test es un guard adicional
-    // contra un revert accidental del HTML. Leemos el source file directo
-    // porque el @Component.template compilado de Angular no preserva la fuente
-    // original como string — viene como function expressions, no como texto.
+  it('formation select is wired through ngModelChange', (done) => {
+    // Static guard against accidentally wiring the select through the
+    // native change event instead of ngModelChange.
     setTimeout(() => {
       fixture.detectChanges();
       const compiled = (fixture.nativeElement as HTMLElement).querySelector('.formation-selector select') as HTMLSelectElement;
       expect(compiled).withContext('.formation-selector select must exist in DOM').toBeTruthy();
-      // Leemos el .ts del componente para verificar el source HTML.
-      // En karma, __dirname apunta al directorio del spec compilado, así que
-      // subimos hasta encontrar el .ts.
+      // Read the component source to verify the template wiring.
+      // In Karma, search a couple of likely component source paths.
       const fs = (window as any).require ? (window as any).require('fs') : null;
-      // fs puede no estar disponible en jsdom; si no, este test es un no-op
-      // (los demás tests cubren el comportamiento).
+      // If fs is unavailable, the behavioral tests above still cover the flow.
       if (!fs) {
-        pending('fs not available in this karma runtime — relying on R1 to cover functional behavior');
+        pending('fs not available in this karma runtime: relying on behavioral coverage');
         return;
       }
-      // Buscar el component.ts relativo al spec.
+      // Find component.ts relative to the spec runtime.
       const candidates = [
         'src/app/components/squad-editor-modal/squad-editor-modal.component.ts',
         '../squad-editor-modal.component.ts'
@@ -2772,32 +2695,26 @@ describe('SquadEditorModalComponent — V25D91.5-FRONT F6 formation change updat
         }
       }
       if (!source) {
-        pending('could not locate component .ts source for static check — relying on R1');
+        pending('could not locate component source: relying on behavioral coverage');
         return;
       }
-      // Verificar (ngModelChange) en el bloque formation-selector.
+      // Verify (ngModelChange) within the formation-selector block.
       const ngModelChangeMatch = /formation-selector[\s\S]{0,500}\(ngModelChange\)/.test(source);
       expect(ngModelChangeMatch).withContext(
-        'template source must wire the formation <select> with (ngModelChange) (F6 fix)').toBeTrue();
+        'template source must wire the formation <select> with (ngModelChange)').toBeTrue();
       // Negative guard.
       const oldStyleChange = /formation-selector[\s\S]{0,500}\(change\)\s*=\s*[\"\']onFormationChange/.test(source);
       expect(oldStyleChange).withContext(
-        'template source must NOT use (change)="onFormationChange()" on the formation select (F6 regression guard)').toBeFalse();
+        'template source must NOT use (change)="onFormationChange()" on the formation select').toBeFalse();
       done();
     }, 30);
   });
 
-  it('F6 R6: isFormationChanging toggles true→false around HTTP lifecycle (was stuck true pre-F6)', (done) => {
-    // V25D91.5 F6 fix: antes el flag quedaba en true para siempre porque
-    // el reset dependia del padre escuchando formationChangeCompleteSubject.
-    // Ahora el reset vive en el callback HTTP de executeFormationChange.
-    //
-    // Verificamos el estado del flag en lugar del DOM disabled attribute
-    // porque el [disabled] binding depende de change detection schedules
-    // que pueden tener timing fragil en jsdom; el flag JS es la fuente
-    // de verdad y lo que el template lee.
+  it('isFormationChanging toggles true-to-false around the HTTP lifecycle', (done) => {
+    // Check the JS flag directly: it is the source of truth for the
+    // disabled binding and avoids fragile DOM timing in jsdom.
     setTimeout(() => {
-      // Precondicion: flag debe arrancar en false despues de init.
+      // Precondition: flag starts false after init.
       expect(component.isFormationChanging).withContext(
         'precondition: flag must start false after init').toBeFalse();
 
@@ -2805,10 +2722,10 @@ describe('SquadEditorModalComponent — V25D91.5-FRONT F6 formation change updat
       expect(component.isFormationChanging).withContext(
         'flag must be true synchronously after handler runs (HTTP in flight)').toBeTrue();
 
-      // Esperar a que el timer(0) del mock emita y el callback HTTP corra.
+      // Wait for the async mock response and callback.
       setTimeout(() => {
         expect(component.isFormationChanging).withContext(
-          'flag must reset to false after HTTP completes (F6 fix)').toBeFalse();
+          'flag must reset to false after HTTP completes').toBeFalse();
         done();
       }, 30);
     }, 30);
