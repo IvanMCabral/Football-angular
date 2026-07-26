@@ -2732,30 +2732,12 @@ describe('SquadEditorModalComponent formation change updates header and markers'
   });
 
   /**
-   * V25D95-FRONT: pitch visual profesional (TV-broadcast quality).
-   *
-   * <p>Spec dividio el V25D95 en F1-F4 visuales + F6 (tests) + F7 (build):
-   * <ul>
-   *   <li>F1: grass texture mejorada (stripes + radial gradient)</li>
-   *   <li>F2: markings reforzadas (outer border 2.5px, halfway 2.5px,
-   *         center circle 18% diam, penalty areas 60%×16%, goal areas
-   *         25%×6%, penalty spots 0.6%, penalty arcs 14%, corner arcs 2.5%)</li>
-   *   <li>F3: tactical number badge en cada player-marker (14×14 absolute
-   *         top:-10 right:-8)</li>
-   *   <li>F4: goal posts (2 mini-arcos en top/bottom con net pattern)</li>
-   *   <li>F6: ng test nuevos (este describe block)</li>
-   * </ul>
-   *
-   * <p>Por consistencia con V25D94 specs, leemos CSS source via
-   * {@link stylesSource} + {@link stripEncapsulation} para validar
-   * regras declarativas, y para los nuevos elementos estructurales
-   * (corner-arc, goal-post, tactical-number) usamos querySelector sobre
-   * el fixture para verificar que el markup efectivamente los incluye.
+   * Professional pitch visual smoke tests: grass texture, stronger field
+   * markings, corner arcs, goal posts, and tactical number badges.
    */
-  describe('SquadEditorModalComponent — V25D95-FRONT pitch professional visual', () => {
+  describe('SquadEditorModalComponent professional pitch visual', () => {
     /**
-     * Reads @Component.styles source (inline-styled component). Duplicate
-     * helper from V25D58 describe block (each describe has own scope).
+     * Reads the inline component styles.
      */
     function stylesSource(): string {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -2781,73 +2763,73 @@ describe('SquadEditorModalComponent formation change updates header and markers'
     }
 
     /* ----------------------------------------------------------------------- */
-    /* F1 — Grass texture                                                      */
+    /* Grass texture */
     /* ----------------------------------------------------------------------- */
 
-    it('F1 — pitch: .field background uses repeating-linear-gradient (TV-broadcast stripes)', () => {
+    it('.field background uses repeating-linear-gradient (TV-broadcast stripes)', () => {
       const src = stripEncapsulation(stylesSource());
       const fieldRule = extractRule(src, 'field');
       expect(fieldRule).withContext('.field CSS rule must exist').toBeTruthy();
-      // V25D95 F1 spec: stripes alternados cada 5% via repeating-linear-gradient.
+      // Alternating stripes every 5% through a repeating-linear-gradient.
       expect(fieldRule).toMatch(/repeating-linear-gradient/);
-      // Step 0px → 5% (alpha 0.015) marca el stripe pattern.
+      // 0px -> 5% marks the stripe pattern.
       expect(fieldRule).toMatch(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.015\s*\)\s*5%/);
-      // Step 5% → 10% transparent alterna.
+      // 5% -> 10% alternates to transparent.
       expect(fieldRule).toMatch(/transparent\s+5%\s*,\s*transparent\s+10%/);
     });
 
-    it('F1 — pitch: .field background uses radial-gradient center-to-edge + overlay blend', () => {
+    it('.field background uses radial-gradient center-to-edge + overlay blend', () => {
       const src = stripEncapsulation(stylesSource());
       const fieldRule = extractRule(src, 'field');
       expect(fieldRule).toMatch(/radial-gradient\(/);
-      // Center #3a8159 → #2d6a3e (50%) → #235534 (100%) per spec.
+      // Center gradient runs from #3a8159 to #2d6a3e and #235534.
       expect(fieldRule).toMatch(/#3a8159\s+0%/);
       expect(fieldRule).toMatch(/#2d6a3e\s+50%/);
       expect(fieldRule).toMatch(/#235534\s+100%/);
-      // background-blend-mode: overlay es la "magia" que mezcla stripes + radial.
+      // Overlay blends the stripes with the radial grass gradient.
       expect(fieldRule).toMatch(/background-blend-mode:\s*overlay/);
     });
 
     /* ----------------------------------------------------------------------- */
-    /* F2 — Markings reforzadas (per spec TV-broadcast)                        */
+    /* Field markings */
     /* ----------------------------------------------------------------------- */
 
-    it('F2 — pitch: outer border (frame) is 2.5px solid rgba white alpha 0.95', () => {
+    it('outer border (frame) is 2.5px solid rgba white alpha 0.95', () => {
       const src = stripEncapsulation(stylesSource());
       const fieldRule = extractRule(src, 'field');
       expect(fieldRule).toMatch(/border:\s*2\.5px\s+solid\s+rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.95\s*\)/);
     });
 
-    it('F2 — pitch: .center-line height 2.5px + alpha 0.95 background', () => {
+    it('.center-line height 2.5px + alpha 0.95 background', () => {
       const src = stripEncapsulation(stylesSource());
       const rule = extractRule(src, 'center-line');
       expect(rule).toMatch(/height:\s*2\.5px/);
       expect(rule).toMatch(/background:\s*rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.95\s*\)/);
     });
 
-    it('F2 — pitch: .center-circle diameter 18% del field width', () => {
+    it('.center-circle diameter 18% of the field width', () => {
       const src = stripEncapsulation(stylesSource());
       const rule = extractRule(src, 'center-circle');
-      // V25D95 spec: width 18% (vs old 13%). aspect-ratio:1 mantiene circular.
+      // Width 18% plus aspect-ratio keeps the center circle round.
       expect(rule).toMatch(/width:\s*18%/);
       expect(rule).toMatch(/aspect-ratio:\s*1/);
       expect(rule).toMatch(/border-radius:\s*50%/);
     });
 
-    it('F2 — pitch: penalty areas now 60% w x 16% h (TV-broadcast)', () => {
+    it('penalty areas now 60% w x 16% h (TV-broadcast)', () => {
       const src = stripEncapsulation(stylesSource());
-      // .left-penalty-area y .right-penalty-area ambos deben tener 60%/16%.
+      // Both penalty areas use the same size.
       const left = extractRule(src, 'left-penalty-area');
       const right = extractRule(src, 'right-penalty-area');
       expect(left).toMatch(/width:\s*60%/);
       expect(left).toMatch(/height:\s*16%/);
       expect(right).toMatch(/width:\s*60%/);
       expect(right).toMatch(/height:\s*16%/);
-      // Border 2px solid rgba(255,255,255,0.9) per spec.
+      // Border matches the pitch-marking palette.
       expect(left).toMatch(/border:\s*2px\s+solid\s+rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.9\s*\)/);
     });
 
-    it('F2 — pitch: goal areas now 25% w x 6% h (TV-broadcast)', () => {
+    it('goal areas now 25% w x 6% h (TV-broadcast)', () => {
       const src = stripEncapsulation(stylesSource());
       const left = extractRule(src, 'left-goal-area');
       const right = extractRule(src, 'right-goal-area');
@@ -2857,7 +2839,7 @@ describe('SquadEditorModalComponent formation change updates header and markers'
       expect(right).toMatch(/height:\s*6%/);
     });
 
-    it('F2 — pitch: penalty spots are border-radius:50% (circular dots)', () => {
+    it('penalty spots are border-radius:50% (circular dots)', () => {
       const src = stripEncapsulation(stylesSource());
       const left = extractRule(src, 'left-penalty-spot');
       const right = extractRule(src, 'right-penalty-spot');
@@ -2867,21 +2849,21 @@ describe('SquadEditorModalComponent formation change updates header and markers'
       expect(left).toMatch(/background:\s*rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.95\s*\)/);
     });
 
-    it('F2 — pitch: penalty arcs now 14% w', () => {
+    it('penalty arcs now 14% w', () => {
       const src = stripEncapsulation(stylesSource());
       const left = extractRule(src, 'left-penalty-arc');
       const right = extractRule(src, 'right-penalty-arc');
-      // V25D95 spec: width 14% (vs old 10%).
+      // Penalty arcs use the larger 14% width.
       expect(left).toMatch(/width:\s*14%/);
       expect(right).toMatch(/width:\s*14%/);
     });
 
     /* ----------------------------------------------------------------------- */
-    /* F2 — Corner arcs NEW structural element (DOM query)                    */
+    /* Corner arcs */
     /* ----------------------------------------------------------------------- */
 
-    it('F2 — pitch: 4 corner-arc elements exist (corner-tl/tr/bl/br)', () => {
-      // Structural: query DOM (modal is fully rendered after detectChanges).
+    it('4 corner-arc elements exist (corner-tl/tr/bl/br)', () => {
+      // Structural check: query the rendered modal DOM.
       fixture.detectChanges();
       const tl = fixture.nativeElement.querySelector('.corner-arc.corner-tl');
       const tr = fixture.nativeElement.querySelector('.corner-arc.corner-tr');
@@ -2893,26 +2875,26 @@ describe('SquadEditorModalComponent formation change updates header and markers'
       expect(br).withContext('.corner-br must exist').toBeTruthy();
     });
 
-    it('F2 — pitch: corner-arc positioned absolutely with 2.5% size + 100% radius on outer corner', () => {
+    it('corner-arc positioned absolutely with 2.5% size + 100% radius on outer corner', () => {
       const src = stripEncapsulation(stylesSource());
-      // Base .corner-arc: width 2.5%, height 2.5%, border 2px white alpha 0.9.
+      // Base corner arc: 2.5% square with a white border.
       const base = extractRule(src, 'corner-arc');
       expect(base).toMatch(/width:\s*2\.5%/);
       expect(base).toMatch(/height:\s*2\.5%/);
       expect(base).toMatch(/border:\s*2px\s+solid\s+rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.9\s*\)/);
-      // .corner-tl debe tener border-top-left-radius: 100% (corner redondeado).
+      // Top-left corner has the outer radius.
       const tl = extractRule(src, 'corner-tl');
       expect(tl).toMatch(/border-top-left-radius:\s*100%/);
-      // Y border-bottom/border-right:none (los lados que apuntan al centro del field).
+      // Inner-facing borders are hidden.
       expect(tl).toMatch(/border-bottom:\s*none/);
       expect(tl).toMatch(/border-right:\s*none/);
     });
 
     /* ----------------------------------------------------------------------- */
-    /* F4 — Goal posts NEW structural element                                  */
+    /* Goal posts */
     /* ----------------------------------------------------------------------- */
 
-    it('F4 — pitch: 2 goal-post elements exist (top + bottom)', () => {
+    it('2 goal-post elements exist (top + bottom)', () => {
       fixture.detectChanges();
       const top = fixture.nativeElement.querySelector('.goal-post.goal-post-top');
       const bottom = fixture.nativeElement.querySelector('.goal-post.goal-post-bottom');
@@ -2920,25 +2902,25 @@ describe('SquadEditorModalComponent formation change updates header and markers'
       expect(bottom).withContext('.goal-post-bottom must exist').toBeTruthy();
     });
 
-    it('F4 — pitch: .goal-post 8% w × 4% h + top corner rounded for top (bottom for bottom)', () => {
+    it('.goal-post 8% w x 4% h + correct rounded corners', () => {
       const src = stripEncapsulation(stylesSource());
       const base = extractRule(src, 'goal-post');
       expect(base).toMatch(/width:\s*8%/);
       expect(base).toMatch(/height:\s*4%/);
       expect(base).toMatch(/border:\s*2px\s+solid\s+rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.85\s*\)/);
-      // Top goal: rounded BOTTOM corners (net cuelga hacia abajo).
+      // Top goal has rounded bottom corners.
       const top = extractRule(src, 'goal-post-top');
       expect(top).toMatch(/border-radius:\s*0\s+0\s+8%\s+8%/);
-      // Bottom goal: rounded TOP corners (net cuelga hacia arriba).
+      // Bottom goal has rounded top corners.
       const bottom = extractRule(src, 'goal-post-bottom');
       expect(bottom).toMatch(/border-radius:\s*8%\s+8%\s+0\s+0/);
     });
 
     /* ----------------------------------------------------------------------- */
-    /* F3 — Tactical number badge                                              */
+    /* Tactical number badge */
     /* ----------------------------------------------------------------------- */
 
-    it('F3 — marker: .tactical-number is absolute, 14x14, top:-10 right:-8, border-radius 50%', () => {
+    it('.tactical-number is absolute, 14x14, top:-10 right:-8, border-radius 50%', () => {
       const src = stripEncapsulation(stylesSource());
       const rule = extractRule(src, 'tactical-number');
       expect(rule).toMatch(/position:\s*absolute/);
@@ -2947,10 +2929,8 @@ describe('SquadEditorModalComponent formation change updates header and markers'
       expect(rule).toMatch(/width:\s*14px/);
       expect(rule).toMatch(/height:\s*14px/);
       expect(rule).toMatch(/border-radius:\s*50%/);
-      // z-index:11 encima del marker (z:10) para no ser cortado por el
-      // border-radius:6px del .player-marker. V25D95.1-FRONT F4 spec
-      // cambio el hierarchy a .field-slots=1 / .field-line=2 /
-      // .player-marker=10 / .tactical-number=11 (era 5/0/20/21 pre-fix).
+      // Keep the tactical number above the marker card so it is not
+      // clipped by the marker border radius.
       expect(rule).toMatch(/z-index:\s*11/);
     });
   });
