@@ -1084,12 +1084,6 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     return 'DEF';
   }
 
-  private getColumn(player: PlayerOnFieldDto): 'L' | 'C' | 'R' {
-    // when the panel switched to engine-derived ratings. Keeping the
-    // method around (private, no callers) would be dead code; removed.
-    return 'C';
-  }
-
   private formationPositions: { [key: string]: FormationPositionDTO[] } = {};
 
   private slotPlayerMap: { [slotId: string]: PlayerOnFieldDto } = {};
@@ -1130,7 +1124,6 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
-    // Formation changes are now immediate (backend is fast)
     this.loadSubdivisions();
   }
 
@@ -1225,20 +1218,6 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
         this.errorMessage$.next('Error al cargar las subdivisiones del campo');
         this.cdr.detectChanges();
       }
-    });
-  }
-
-  private loadFormationPositions(): Promise<void> {
-    return new Promise((resolve) => {
-      this.http.get<FormationDTO[]>(`${environment.apiUrl}/editor/formations`).subscribe({
-        next: (formations) => {
-          formations.forEach(f => {
-            this.formationPositions[f.name] = f.positions;
-          });
-          resolve();
-        },
-        error: () => resolve()
-      });
     });
   }
 
@@ -1522,23 +1501,16 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   getSlotCenterX(slotId: string): number {
     const sub = this.subdivisions.find(s => s.subdivisionId === slotId);
     if (!sub) return 50;
-    // Centro = left + width/2
     return sub.left + (sub.width / 2);
   }
 
   getSlotCenterY(slotId: string): number {
     const sub = this.subdivisions.find(s => s.subdivisionId === slotId);
     if (!sub) return 50;
-    // Centro = top + height/2
     return sub.top + (sub.height / 2);
   }
 
   onSlotClick(sub: FieldSubdivisionDTO): void {
-    // Free-position players are inert on slot click: their card already represents a manual field position.
-    // Slot popups are reserved for tactical slots that can still be assigned directly.
-    // slot queda como un rectángulo visual sin función hasta que el
-    // user drag-dropee al player de vuelta (handleSlotDrop restaura el
-    // slotPlayerMap y el slot vuelve a ser clickeable con player info).
     if (this.isSlotAbandonedByOverride(sub)) {
       return;
     }
@@ -1562,10 +1534,8 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // Mostrar warning si el jugador tiene condición de riesgo
     this.showConditionWarning(player);
 
-    // Quitar jugador de su slot anterior si tenía uno
     if (player.slotId) {
       delete this.slotPlayerMap[player.slotId];
     }
@@ -1583,12 +1553,10 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
       );
     }
 
-    // Asignar al nuevo slot
     const slotId = this.selectedSlot.subdivisionId;
     player.slotId = slotId;
     this.slotPlayerMap[slotId] = player;
 
-    // Actualizar listas
     const newBench = this.benchPlayers$.value.filter(p => p.playerId !== player.playerId);
     this.benchPlayers$.next(newBench);
     this.homePlayers$.next([...this.homePlayers$.value, player]);
@@ -1597,9 +1565,6 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     this.selectedPlayerToAssign = '';
     this.saveLineup();
     this.triggerChemistryPreview();
-    // handleSlotDrop: if click-assign puts a player into an off-role
-    // slot (e.g. assigning a CB to a MID slot via the assign panel), we want
-    // the dropdown + marker visibility to flip into user-formation mode.
     this.updateFormationDetection();
     this.cdr.detectChanges();
   }
@@ -1617,13 +1582,9 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     this.selectedSlot = null;
     this.saveLineup();
     this.triggerChemistryPreview();
-    // incomplete < 11 -> flips to user-formation mode automatically).
     this.updateFormationDetection();
     this.cdr.detectChanges();
   }
-
-  // ============================================================================
-  // ============================================================================
 
   get slotDropListIds(): string[] {
     return (this.subdivisions || []).map(s => 'slot-' + s.subdivisionId);
@@ -1644,11 +1605,6 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   }
 
   handleSlotDrop(event: CdkDragDrop<any>): void {
-    // CDK slot drops are not the primary path; handleMarkerDragEnd owns field positioning.
-    // Keep this method only for backward-compatible drag/drop integrations.
-    // compat with the unit-test suite (5 specs still call handleSlotDrop
-    // directly with mock events). The runtime binding is gone but the
-    // logic lives on in assignPlayerToSlot.
     const player = event.item.data as PlayerOnFieldDto | undefined;
     if (!player) { return; }
 
@@ -1657,7 +1613,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
 
     const sourceDropListId = event.previousContainer.id;
     if (sourceDropListId === 'slot-' + targetSubdivisionId) {
-      return; // same slot -> no-op
+      return;
     }
 
     const sourceSlotId = sourceDropListId === this.BENCH_DROP_LIST_ID
@@ -1669,8 +1625,6 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   }
 
   handleBenchDrop(event: CdkDragDrop<any>): void {
-    // bench drops via the bench area hit-test). Kept for unit-test
-    // backward compat.
     const player = event.item.data as PlayerOnFieldDto | undefined;
     if (!player || !player.slotId) { return; }
     if (event.previousContainer.id === this.BENCH_DROP_LIST_ID) { return; }
@@ -1819,13 +1773,6 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
         rootEl.style.webkitTransform = '';
       }
     }
-  }
-
-  private findSlotAtPosition(xPct: number, yPct: number): FieldSubdivisionDTO | null {
-    return this.subdivisions.find(s =>
-      xPct >= s.left && xPct <= s.left + s.width
-      && yPct >= s.top && yPct <= s.top + s.height
-    ) ?? null;
   }
 
   private applySlotAssignment(
@@ -2308,31 +2255,17 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // formación. En producción vía (ngModelChange) NgModel ya lo escribió,
-    // Programmatic calls used by tests and QA flows still need the same completion signal.
-    // nosotros para que el getter y el template queden consistentes.
     if (this.selectedFormation !== targetFormation) {
       this.selectedFormation = targetFormation;
     }
 
-    // formación. En producción vía (ngModelChange) NgModel ya lo escribió,
-    // Programmatic calls used by tests and QA flows still need the same completion signal.
-    // nosotros para que el getter y el template queden consistentes.
-    if (this.selectedFormation !== targetFormation) {
-      this.selectedFormation = targetFormation;
-    }
-
-    // No-op si la formación no cambió realmente
     if (targetFormation === this.homeFormation$.value) {
       return;
     }
 
-    // Bloquear nuevos cambios mientras carga
     this.isFormationChanging = true;
     this.cdr.markForCheck();
 
-    // Emit the update for parent components that may listen to squad changes.
-    // otro caller en el futuro lo hace).
     this.formationChangeCompleteSubject = new Subject<void>();
 
     this.homeFormation$.next(targetFormation);
