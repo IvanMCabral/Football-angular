@@ -160,7 +160,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
     errorMsg: '',
     isRoundPaused: false,
     byeTeam: null, // UX-6: BYE indicator
-    anyStarted: false // UX fix: drives "Iniciar Todos" button visibility
+    anyStarted: false // drives "Iniciar Todos" button visibility
   });
 
   vm$: Observable<RoundLiveViewModel>;
@@ -467,14 +467,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
   }
 
   private startRoundEngine(gameId: string, matches: RoundMatchVM[]) {
-    // Round id is not a local alias for game id.
-    // The backend registers the RoundEngine under whatever
-    // `state.roundId` it returns from the POST response  -  frontend
-    // cannot assume gameId is a parseable UUID or that the backend
-    // uses it 1:1. We keep gameId as the POST body parameter (so the
-    // idempotency key matches what the upstream auto-start sent) and
-    // capture the server-resolved roundId into resolvedRoundId$ for
-    // the SSE stream to consume.
+    // Keep the requested id for start, but stream with the id resolved by the server.
     const requestRoundId = gameId;
     const matchData = matches.map(rm => ({
       matchId: String(rm.match.id),
@@ -513,11 +506,6 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
           const normalizedMatchState = matchState
             ? this.normalizeTerminalLiveState(matchState)
             : undefined;
-          // propagate the live state status into the
-          // embedded Match.status so post-FINISHED snapshots don't show stale
-          // "En Juego"  -  mapFixtureStatus now handles both fixture statuses
-          // (PENDING/SIMULATING/COMPLETED/CANCELLED) and live state statuses
-          // (NOT_STARTED/RUNNING/PAUSED/FINISHED/CANCELLED).
           const match = normalizedMatchState
             ? { ...rm.match, status: this.mapFixtureStatus(normalizedMatchState.status) }
             : rm.match;
@@ -540,16 +528,8 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
         this.applyDeFreezeIfNeeded(newVm);
         this.restorePersistedInjuryAutoModals(updatedMatches);
 
-        // Scan for new injury events on the manager team
-        // and auto-open the substitution modal. Runs AFTER the VM is
-        // updated so the modal receives the latest matchState (with
-        // currentMinute + playerRatings already populated by the SSE
-        // tick).
+        // Update the screen first; then react to tactical events from the latest tick.
         this.maybeOpenInjuryAutoModal(updatedMatches);
-        // scan ALL matches (user + rival) for RED_CARD
-        // events on a non-user team and auto-open the awareness modal.
-        // Same pattern as the injury flow but the modal is informational
-        // only  -  no pre-select, no round pause.
         this.maybeOpenRivalCardInfoModal(updatedMatches);
       },
       error: (err) => {
@@ -848,21 +828,12 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
     });
   }
 
-  /**
-   * Header pause/resume controls operate on the whole RoundEngine, not on
-   * individual MatchEngines. The backend helper only needs one matchId from
-   * the active round to resolve the real roundId, so prefer the user's match
-   * and fall back to any non-terminal match.
-   */
+  // Prefer the manager match when choosing an anchor for round-level controls.
   private findRoundControlAnchorMatch(vm: RoundLiveViewModel): RoundMatchVM | null {
     return findRoundControlAnchorMatch(vm);
   }
 
-  /**
-   * Defensive UI guard for live streams that reach 90' but keep reporting
-   * RUNNING for one or more ticks. The backend should ideally emit FINISHED;
-   * this keeps the manager flow from getting visually stuck on "En Juego".
-   */
+  // Avoid showing "En Juego" for a match that already reached full time.
   private normalizeTerminalLiveState(state: MatchState): MatchState {
     return normalizeTerminalLiveState(state);
   }
@@ -873,21 +844,12 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
     const pending = buildPendingRoundStartMatches(vm.matches);
 
     if (pending.length === 0) {
-      // No NOT_STARTED matches left  -  button should already be hidden via
-      // the *ngIf="!vm.anyStarted" guard, but guard defensively here.
       return;
     }
 
     const roundId = vm.gameId;
     this.engineService.startRound(roundId, pending).subscribe({
       next: (state) => {
-        // Capture the backend-resolved round id so any
-        // subsequent SSE subscription (including a fresh mount via
-        // tryAutoStartRound) uses the same registry key the backend
-        // registered. Without this, a "Iniciar Todos" retry after a
-        // failed auto-start can return a different roundId than the
-        // one already resolved (e.g. when the backend re-issued a
-        // new round under a new UUID).
         if (state && state.roundId) {
           this.resolvedRoundId$.next(state.roundId);
         }
@@ -901,45 +863,27 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
   // Primary auto-start path; "Iniciar Todos" remains as a manual fallback.
   private tryAutoStartRound(vm: RoundLiveViewModel): void {
     if (this.autoStartTriggered) {
-      // Defensive: take(1) should already guarantee single-fire, but
-      // explicit guard so future refactors (e.g. lifting the take(1))
-      // don't accidentally POST twice.
       return;
     }
     this.autoStartTriggered = true;
 
     if (vm.errorMsg || vm.matches.length === 0) {
-      // Nothing to start  -  round can't be played (error or empty).
       return;
     }
 
     const pending = buildPendingRoundStartMatches(vm.matches);
 
     if (pending.length === 0) {
-      // All matches already started (e.g. user refreshed an in-flight
-      // round). Nothing to POST  -  the SSE stream from
-      // startRoundEngine will catch up via polling/SSE reconnect.
       return;
     }
 
     this.engineService.startRound(vm.gameId, pending).subscribe({
       next: (state) => {
-        // Capture the backend-resolved round id so the
-        // SSE subscription started later by startRoundEngine (which
-        // sees autoStartTriggered=true and short-circuits its own POST)
-        // uses the SAME roundId as the registry key. Before this fix
-        // the SSE chain did `streamRoundState(vm.gameId)`, but the
-        // backend roundEngineRegistry.get(vm.gameId) returned null
-        // and MatchEngineController returned Flux.empty()  -  silent
-        // idle SSE.
         if (state && state.roundId) {
           this.resolvedRoundId$.next(state.roundId);
         }
       },
       error: (err) => {
-        // A failed auto-start leaves the round stuck on
-        // NOT_STARTED. The "Iniciar Todos" button stays visible (no
-        // anyStarted flip) and the manager can re-trigger manually.
         this.logDevError('[ROUND-LIVE] Auto-start failed; user can retry with Iniciar Todos', err);
       }
     });
