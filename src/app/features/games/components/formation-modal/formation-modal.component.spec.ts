@@ -132,14 +132,14 @@ describe('FormationModalComponent', () => {
   });
 
   it('getDotLabel returns specific tactical role labels', () => {
-    // 3-5-2 (P0 fixed): pos #4 = LWB (no LM), pos #8 = RWB (no RM).
+    // 3-5-2 uses wing-backs on both sides.
     component.onFormationChange('3-5-2');
     // Lines: [GK], [CB,CB,CB], [LWB,CM,CM,CM,RWB], [ST,ST]
     expect(component.getDotLabel(0, 0, 1, false)).toBe('GK');
     expect(component.getDotLabel(1, 0, 3, false)).toBe('CB');
-    expect(component.getDotLabel(2, 0, 5, false)).toBe('LWB'); // P0 fixed
+    expect(component.getDotLabel(2, 0, 5, false)).toBe('LWB');
     expect(component.getDotLabel(2, 1, 5, false)).toBe('CM');
-    expect(component.getDotLabel(2, 4, 5, false)).toBe('RWB'); // P0 fixed
+    expect(component.getDotLabel(2, 4, 5, false)).toBe('RWB');
     expect(component.getDotLabel(3, 0, 2, true)).toBe('ST');
 
     // 4-2-3-1: 2 CDM anchors, 3 CAM (LW/CAM/RW), 1 ST top.
@@ -183,7 +183,7 @@ describe('FormationModalComponent', () => {
     expect(component.errorMsg).toBe('');
   });
 
-  it('confirm with same formation as current — no round-trip, no close success', () => {
+  it('confirm with same formation as current does not call the backend', () => {
     component.confirm();
     expect(engineServiceSpy.changeFormation).not.toHaveBeenCalled();
     expect(dialogRefSpy.close).toHaveBeenCalledWith(
@@ -595,29 +595,9 @@ function makeDragEvent(plainText: string): Partial<DragEvent> {
   };
 };
 
-/**
- * Formation modal responsive breakpoints.
- *
- * <p>Pre-C17 the modal had no @media queries, so on phones the pitch
- * overflowed horizontally and dots got clipped. The fix adds the same
- * 3-breakpoint system used by squad-editor-modal (mobile <=600px,
- * tablet 601-1024px, desktop default >=1025px, large >=1600px).
- *
- * <p>Strategy: Karma/jsdom doesn't evaluate @media or compute viewport
- * styles, so we assert the styles source contains the expected
- * breakpoint blocks AND the dot keeps `aspect-ratio: 1` (circular)
- * via min-width/max-width bounds. This guards against future
- * regressions that drop the breakpoints or restore a hard-coded dot
- * size that overflows on mobile.
- */
+// Responsive layout guard for the formation modal.
 describe('FormationModalComponent responsive breakpoints', () => {
-  /**
-   * Reads the @Component.styles source. Formation-modal now uses inline
-   * styles so the component metadata returns the original CSS strings,
-   * though Angular's emulated encapsulation still rewrites every
-   * selector with [_ngcontent-%COMP%] (or the hashed version at
-   * runtime), so {@link #stripEncapsulation} is applied first.
-   */
+  // Reads the inline styles from Angular component metadata.
   function stylesSource(): string {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const styles = (FormationModalComponent as any).ɵcmp?.styles ?? [];
@@ -630,20 +610,12 @@ describe('FormationModalComponent responsive breakpoints', () => {
     return '';
   }
 
-  /**
-   * Strips Angular's emulated-encapsulation attribute selectors so the
-   * regex assertions can match the original class names without
-   * having to know about [_ngcontent-%COMP%]. Runs on both the full
-   * source (for simple @media query checks) and on extracted blocks.
-   */
+  // Normalizes Angular's emulated-encapsulation selectors before assertions.
   function stripEncapsulation(css: string): string {
     return css.replace(/\[[_]?ngcontent-[^\]]*\]/g, '');
   }
 
-  /**
-   * Extracts the body of the @media block whose query matches {@code query}.
-   * Walks the brace stack to handle nested rule blocks.
-   */
+  // Extracts a media-query block while preserving nested CSS rules.
   function extractMediaBlock(query: string): string {
     const src = stripEncapsulation(stylesSource());
     const re = new RegExp(
@@ -1021,3 +993,4 @@ describe('FormationModalComponent auto-fill empty slots', () => {
     });
   });
 });
+
