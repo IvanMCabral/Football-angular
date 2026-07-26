@@ -27,6 +27,15 @@ import {
   getRoleFamily as resolveRoleFamily,
   rolesMatch as roleFamiliesMatch
 } from '../../shared/utils/player-role-utils';
+import {
+  TacticalChannel,
+  TacticalLine,
+  buildTacticalChannelBreakdown,
+  buildTacticalShapeMatrix,
+  buildTacticalShapeSummary,
+  tacticalChannelFromX,
+  tacticalLineFromY
+} from '../../shared/utils/tactical-shape-utils';
 
 @Component({
   selector: 'app-squad-editor-modal',
@@ -401,45 +410,20 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   }
 
   get tacticalShapeMatrix(): Array<{ zone: 'ATT' | 'MID' | 'DEF'; left: number; center: number; right: number }> {
-    const rows: Array<{ zone: 'ATT' | 'MID' | 'DEF'; left: number; center: number; right: number }> = [
-      { zone: 'ATT', left: 0, center: 0, right: 0 },
-      { zone: 'MID', left: 0, center: 0, right: 0 },
-      { zone: 'DEF', left: 0, center: 0, right: 0 },
-    ];
-    const byZone = new Map(rows.map(r => [r.zone, r]));
-    for (const player of this.getUniqueValidHomePlayers()) {
-      if (this.isGoalkeeperPlayer(player)) { continue; }
-      const zone = this.getVisualLine(player);
-      const channel = this.getVisualChannel(player);
-      const row = byZone.get(zone);
-      if (!row) { continue; }
-      if (channel === 'L') { row.left += 1; }
-      else if (channel === 'R') { row.right += 1; }
-      else { row.center += 1; }
-    }
-    return rows;
+    return buildTacticalShapeMatrix(this.tacticalOutfieldPoints);
+  }
+
+  private get tacticalOutfieldPoints(): Array<{ x: number; y: number }> {
+    return this.getUniqueValidHomePlayers()
+      .filter(player => !this.isGoalkeeperPlayer(player))
+      .map(player => ({
+        x: this.getMarkerX(player),
+        y: this.getMarkerY(player),
+      }));
   }
 
   get tacticalShapeSummary(): { width: number; compactness: number; blockHeight: number; defensiveDepth: number } {
-    const players = this.getUniqueValidHomePlayers().filter(p => !this.isGoalkeeperPlayer(p));
-    if (players.length === 0) {
-      return { width: 0, compactness: 0, blockHeight: 0, defensiveDepth: 0 };
-    }
-    const xs = players.map(p => this.getMarkerX(p));
-    const ys = players.map(p => this.getMarkerY(p));
-    const widthSpan = Math.max(...xs) - Math.min(...xs);
-    const heightSpan = Math.max(...ys) - Math.min(...ys);
-    const avgY = ys.reduce((acc, y) => acc + y, 0) / ys.length;
-    const defenders = players.filter(p => this.getVisualLine(p) === 'DEF');
-    const defensiveDepth = defenders.length === 0
-      ? 0
-      : defenders.reduce((acc, p) => acc + this.getMarkerY(p), 0) / defenders.length;
-    return {
-      width: Math.round(widthSpan),
-      compactness: Math.max(0, Math.min(100, Math.round(100 - heightSpan))),
-      blockHeight: Math.max(0, Math.min(100, Math.round(100 - avgY))),
-      defensiveDepth: Math.max(0, Math.min(100, Math.round(defensiveDepth))),
-    };
+    return buildTacticalShapeSummary(this.tacticalOutfieldPoints);
   }
 
   get tacticalChannelBreakdown(): Array<{
@@ -448,31 +432,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     connection: number;
     coverage: number;
   }> {
-    const players = this.getUniqueValidHomePlayers().filter(p => !this.isGoalkeeperPlayer(p));
-    return (['L', 'C', 'R'] as const).map((channel) => {
-      const channelPlayers = players.filter(p => this.getVisualChannel(p) === channel);
-      const att = channelPlayers.filter(p => this.getVisualLine(p) === 'ATT').length;
-      const mid = channelPlayers.filter(p => this.getVisualLine(p) === 'MID').length;
-      const def = channelPlayers.filter(p => this.getVisualLine(p) === 'DEF').length;
-      const highWide = channelPlayers.filter(p => this.getMarkerY(p) < 55).length;
-      const lowCover = channelPlayers.filter(p => this.getMarkerY(p) >= 58).length;
-      const support = channelPlayers.length;
-
-      const threat = this.clampPercent(att * 34 + highWide * 18 + Math.min(2, mid) * 10);
-      const connection = this.clampPercent(
-        Math.min(1, att) * 28
-        + Math.min(2, mid) * 22
-        + Math.min(1, def) * 18
-        + Math.min(3, support) * 4
-      );
-      const coverage = this.clampPercent(def * 30 + lowCover * 14 + Math.min(2, mid) * 10);
-
-      return { label: channel, threat, connection, coverage };
-    });
-  }
-
-  private clampPercent(value: number): number {
-    return Math.max(0, Math.min(99, Math.round(value)));
+    return buildTacticalChannelBreakdown(this.tacticalOutfieldPoints);
   }
 
   get tacticalShapeWarnings(): string[] {
@@ -732,7 +692,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   private pushCoachChannelDelta(
     parts: string[],
     magnitudes: number[],
-    label: 'L' | 'C' | 'R',
+    label: TacticalChannel,
     before: number | null,
     after: number | null,
     baseBody = ''
@@ -753,7 +713,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   }
 
   private buildCoachVisualChannelDeltas(
-    baseline: Array<{ label: 'L' | 'C' | 'R'; threat: number; connection: number; coverage: number }>,
+    baseline: Array<{ label: TacticalChannel; threat: number; connection: number; coverage: number }>,
     magnitudes: number[]
   ): string[] {
     const current = this.tacticalChannelBreakdown;
@@ -771,7 +731,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   private pushCoachVisualMetricDelta(
     parts: string[],
     magnitudes: number[],
-    channel: 'L' | 'C' | 'R',
+    channel: TacticalChannel,
     label: 'Amenaza' | 'Conexion' | 'Cobertura',
     before: number,
     after: number
@@ -791,7 +751,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   }
 
   private buildVisualEngineTension(
-    baseline: Array<{ label: 'L' | 'C' | 'R'; threat: number; connection: number; coverage: number }>,
+    baseline: Array<{ label: TacticalChannel; threat: number; connection: number; coverage: number }>,
     attackDelta: number,
     defenseDelta: number
   ): string {
@@ -875,7 +835,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     return ` Zona: ${notes.join(' · ')}.`;
   }
 
-  private coachChannelLabel(channel: 'L' | 'C' | 'R'): string {
+  private coachChannelLabel(channel: TacticalChannel): string {
     if (channel === 'L') { return 'izquierda'; }
     if (channel === 'R') { return 'derecha'; }
     return 'centro';
@@ -1065,30 +1025,20 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     };
   }
 
-  private visualChannelFromCoords(x: number): 'L' | 'C' | 'R' {
-    if (x < 33) { return 'L'; }
-    if (x > 67) { return 'R'; }
-    return 'C';
+  private visualChannelFromCoords(x: number): TacticalChannel {
+    return tacticalChannelFromX(x);
   }
 
-  private visualLineFromCoords(y: number): 'ATT' | 'MID' | 'DEF' {
-    if (y < 34) { return 'ATT'; }
-    if (y < 67) { return 'MID'; }
-    return 'DEF';
+  private visualLineFromCoords(y: number): TacticalLine {
+    return tacticalLineFromY(y);
   }
 
-  private getVisualChannel(player: PlayerOnFieldDto): 'L' | 'C' | 'R' {
-    const x = this.getMarkerX(player);
-    if (x < 33) { return 'L'; }
-    if (x > 67) { return 'R'; }
-    return 'C';
+  private getVisualChannel(player: PlayerOnFieldDto): TacticalChannel {
+    return tacticalChannelFromX(this.getMarkerX(player));
   }
 
-  private getVisualLine(player: PlayerOnFieldDto): 'ATT' | 'MID' | 'DEF' {
-    const y = this.getMarkerY(player);
-    if (y < 34) { return 'ATT'; }
-    if (y < 67) { return 'MID'; }
-    return 'DEF';
+  private getVisualLine(player: PlayerOnFieldDto): TacticalLine {
+    return tacticalLineFromY(this.getMarkerY(player));
   }
 
   private formationPositions: { [key: string]: FormationPositionDTO[] } = {};
