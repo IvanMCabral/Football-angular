@@ -13,6 +13,8 @@ import { RoundLiveViewModel, RoundMatchVM } from './models/round-live.model';
 import { MatchState, RoundState } from '../../core/services/match-engine.model';
 import {
   buildPendingLiveModalNotice,
+  findInjuryAutoModalCandidates,
+  findRivalRedCardModalCandidate,
   findRoundControlAnchorMatch,
   getLastRoundEvents,
   getRoundEventIcon,
@@ -795,54 +797,19 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
       return;
     }
 
-    for (const rm of matches) {
-      if (!rm.state || !rm.state.events) {
-        continue;
-      }
-      // Only the user match drives the auto-modal  -  injuries on the
-      // rival are not actionable.
-      const matchHomeId = String(rm.state.homeTeamId ?? '');
-      const matchAwayId = String(rm.state.awayTeamId ?? '');
-      const isUserMatch = (matchHomeId === userTeamIdStr) || (matchAwayId === userTeamIdStr);
-      if (!isUserMatch) {
-        continue;
-      }
-      // Skip if the match is finished / cancelled (replays of past
-      // matches shouldn't auto-pop the modal).
-      if (rm.state.status === 'FINISHED' || rm.state.status === 'CANCELLED') {
-        continue;
-      }
+    const candidates = findInjuryAutoModalCandidates({
+      matches,
+      userTeamId: userTeamIdStr,
+      shownEventIds: this.autoModalShownEventIds
+    });
 
-      for (const ev of rm.state.events) {
-        if (!ev || ev.eventType !== 'INJURY') {
-          continue;
-        }
-        if (!ev.playerId) {
-          // No id  ->  can't pre-select the visual pitch dot. Skip.
-          continue;
-        }
-        const eventTeamId = ev.teamId ? String(ev.teamId) : null;
-        if (eventTeamId !== userTeamIdStr) {
-          // Injury on the rival  -  not actionable for the manager.
-          continue;
-        }
-        const eventId = `${rm.state.matchId}|${ev.minute}|${ev.playerId}`;
-        if (this.autoModalShownEventIds.has(eventId)) {
-          continue;
-        }
-        if (this.wasPlayerSubstitutedOffInState(rm.state, String(ev.playerId))) {
-          // Reload/SSE snapshots keep historical INJURY events. If the
-          // injured player already left the pitch, reopening the forced modal
-          // creates an empty/ghost dialog instead of a useful decision.
-          this.autoModalShownEventIds.add(eventId);
-          continue;
-        }
-        // First-time-seen INJURY on the manager team.
-        this.autoModalShownEventIds.add(eventId);
+    for (const candidate of candidates) {
+      this.autoModalShownEventIds.add(candidate.eventId);
+      if (!candidate.alreadyResolved) {
         this.queueOrOpenAutoModal({
-          matchId: String(rm.state.matchId),
-          state: rm.state,
-          preSelectedPlayerId: ev.playerId
+          matchId: candidate.matchId,
+          state: candidate.state,
+          preSelectedPlayerId: candidate.preSelectedPlayerId
         });
       }
     }
@@ -875,51 +842,21 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
    * closes the queued one fires (if any).
    */
   private maybeOpenRivalCardInfoModal(matches: RoundMatchVM[]): void {
-    const userMatch = matches.find(m => m.isUserMatch);
-    const userTeamId = userMatch?.userTeamId ?? userMatch?.match.homeTeamId;
-    const userTeamIdStr = userTeamId ? String(userTeamId) : null;
-    if (!userTeamIdStr) {
+    const candidate = findRivalRedCardModalCandidate({
+      matches,
+      shownEventIds: this.rivalCardShownEventIds
+    });
+    if (!candidate) {
       return;
     }
 
-    for (const rm of userMatch ? [userMatch] : []) {
-      if (!rm.state || !rm.state.events) {
-        continue;
-      }
-      if (rm.state.status === 'FINISHED' || rm.state.status === 'CANCELLED') {
-        continue;
-      }
-      for (const ev of rm.state.events) {
-        if (!ev || ev.eventType !== 'RED_CARD') {
-          continue;
-        }
-        const eventTeamId = ev.teamId ? String(ev.teamId) : null;
-        // Skip when the event has no team attribution (can't tell if
-        // it's the rival) or when the team IS the manager team (those
-        // red cards aren't "rival" events).
-        if (!eventTeamId || eventTeamId === userTeamIdStr) {
-          continue;
-        }
-        const dedupKey = ev.playerId
-          ? `${rm.state.matchId}|${ev.minute}|${ev.playerId}`
-          : `${rm.state.matchId}|${ev.minute}|${eventTeamId}`;
-        if (this.rivalCardShownEventIds.has(dedupKey)) {
-          continue;
-        }
-        this.rivalCardShownEventIds.add(dedupKey);
-        this.queueOrOpenRivalCardModal({
-          matchId: String(rm.state.matchId),
-          state: rm.state,
-          playerName: ev.playerName || 'Jugador rival',
-          minute: ev.minute
-        });
-        // Only the FIRST new rival red card per tick opens the modal,
-        // same dedup pattern as maybeOpenInjuryAutoModal. Subsequent
-        // rival red cards on the same tick are recorded but the
-        // manager can dismiss or wait for the next tick.
-        return;
-      }
-    }
+    this.rivalCardShownEventIds.add(candidate.dedupKey);
+    this.queueOrOpenRivalCardModal({
+      matchId: candidate.matchId,
+      state: candidate.state,
+      playerName: candidate.playerName,
+      minute: candidate.minute
+    });
   }
 
   /**

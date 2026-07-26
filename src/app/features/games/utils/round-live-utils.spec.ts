@@ -1,5 +1,7 @@
 import {
   buildPendingLiveModalNotice,
+  findInjuryAutoModalCandidates,
+  findRivalRedCardModalCandidate,
   findRoundControlAnchorMatch,
   getLastRoundEvents,
   getRoundEventIcon,
@@ -152,9 +154,125 @@ describe('round-live-utils', () => {
       isCriticalLiveModalOpen: false
     })).toBeNull();
   });
+
+  it('finds actionable manager injury modal candidates', () => {
+    const state = matchState({
+      matchId: 'match-injury',
+      homeTeamId: 'manager',
+      awayTeamId: 'rival',
+      events: [
+        { eventType: 'INJURY', playerId: 'p9', teamId: 'manager', minute: 22 }
+      ] as any[]
+    });
+    const matches = [roundMatchWithState('match-injury', true, state, 'manager')];
+
+    const candidates = findInjuryAutoModalCandidates({
+      matches,
+      userTeamId: 'manager',
+      shownEventIds: new Set()
+    });
+
+    expect(candidates.length).toBe(1);
+    expect(candidates[0].eventId).toBe('match-injury|22|p9');
+    expect(candidates[0].preSelectedPlayerId).toBe('p9');
+    expect(candidates[0].alreadyResolved).toBeFalse();
+  });
+
+  it('skips injury candidates from the rival team or already shown events', () => {
+    const state = matchState({
+      matchId: 'match-injury',
+      homeTeamId: 'manager',
+      awayTeamId: 'rival',
+      events: [
+        { eventType: 'INJURY', playerId: 'r7', teamId: 'rival', minute: 11 },
+        { eventType: 'INJURY', playerId: 'p9', teamId: 'manager', minute: 22 }
+      ] as any[]
+    });
+    const matches = [roundMatchWithState('match-injury', true, state, 'manager')];
+
+    const candidates = findInjuryAutoModalCandidates({
+      matches,
+      userTeamId: 'manager',
+      shownEventIds: new Set(['match-injury|22|p9'])
+    });
+
+    expect(candidates).toEqual([]);
+  });
+
+  it('marks injury candidates as already resolved when the player left the pitch', () => {
+    const state = matchState({
+      matchId: 'match-injury',
+      homeTeamId: 'manager',
+      awayTeamId: 'rival',
+      events: [
+        { eventType: 'INJURY', playerId: 'p9', teamId: 'manager', minute: 22 },
+        { eventType: 'SUBSTITUTION', playerId: 'p9', minute: 24 }
+      ] as any[]
+    });
+    const matches = [roundMatchWithState('match-injury', true, state, 'manager')];
+
+    const candidates = findInjuryAutoModalCandidates({
+      matches,
+      userTeamId: 'manager',
+      shownEventIds: new Set()
+    });
+
+    expect(candidates.length).toBe(1);
+    expect(candidates[0].alreadyResolved).toBeTrue();
+  });
+
+  it('finds the first actionable rival red-card candidate for the user match', () => {
+    const state = matchState({
+      matchId: 'match-card',
+      homeTeamId: 'manager',
+      awayTeamId: 'rival',
+      events: [
+        { eventType: 'RED_CARD', playerId: 'r4', playerName: 'Rival CB', teamId: 'rival', minute: 55 }
+      ] as any[]
+    });
+    const matches = [roundMatchWithState('match-card', true, state, 'manager')];
+
+    const candidate = findRivalRedCardModalCandidate({
+      matches,
+      shownEventIds: new Set()
+    });
+
+    expect(candidate?.dedupKey).toBe('match-card|55|r4');
+    expect(candidate?.playerName).toBe('Rival CB');
+    expect(candidate?.minute).toBe(55);
+  });
+
+  it('skips manager red cards and already shown rival red cards', () => {
+    const state = matchState({
+      matchId: 'match-card',
+      homeTeamId: 'manager',
+      awayTeamId: 'rival',
+      events: [
+        { eventType: 'RED_CARD', playerId: 'm2', teamId: 'manager', minute: 40 },
+        { eventType: 'RED_CARD', playerId: 'r4', teamId: 'rival', minute: 55 }
+      ] as any[]
+    });
+    const matches = [roundMatchWithState('match-card', true, state, 'manager')];
+
+    const candidate = findRivalRedCardModalCandidate({
+      matches,
+      shownEventIds: new Set(['match-card|55|r4'])
+    });
+
+    expect(candidate).toBeNull();
+  });
 });
 
 function roundMatch(id: string, isUserMatch: boolean, status: LiveStatus): RoundMatchVM {
+  return roundMatchWithState(id, isUserMatch, matchState({ status }), isUserMatch ? `${id}-home` : undefined);
+}
+
+function roundMatchWithState(
+  id: string,
+  isUserMatch: boolean,
+  state: MatchState,
+  userTeamId?: string
+): RoundMatchVM {
   return {
     match: {
       id,
@@ -168,8 +286,8 @@ function roundMatch(id: string, isUserMatch: boolean, status: LiveStatus): Round
       simulatedAt: null
     },
     isUserMatch,
-    userTeamId: isUserMatch ? `${id}-home` : undefined,
-    state: matchState({ status })
+    userTeamId,
+    state
   };
 }
 

@@ -3,6 +3,22 @@ import { RoundMatchVM } from '../models/round-live.model';
 
 export type FixtureStatus = 'SCHEDULED' | 'SIMULATED' | 'CANCELLED';
 
+export interface InjuryAutoModalCandidate {
+  eventId: string;
+  matchId: string;
+  state: MatchState;
+  preSelectedPlayerId: string;
+  alreadyResolved: boolean;
+}
+
+export interface RivalCardModalCandidate {
+  dedupKey: string;
+  matchId: string;
+  state: MatchState;
+  playerName: string;
+  minute: number;
+}
+
 const STATUS_LABELS: Record<string, string> = {
   NOT_STARTED: 'Por Iniciar',
   RUNNING: 'En Juego',
@@ -92,6 +108,98 @@ export function buildPendingLiveModalNotice(input: {
     return input.isCriticalLiveModalOpen
       ? 'Evento pendiente: roja rival. Al cerrar el modal actual verás el aviso táctico.'
       : 'Evento pendiente: roja rival. Pausá el partido o abrí Partido para revisarlo sin cortar el juego.';
+  }
+
+  return null;
+}
+
+export function findInjuryAutoModalCandidates(input: {
+  matches: RoundMatchVM[];
+  userTeamId: string | null;
+  shownEventIds: ReadonlySet<string>;
+}): InjuryAutoModalCandidate[] {
+  if (!input.userTeamId) {
+    return [];
+  }
+
+  const candidates: InjuryAutoModalCandidate[] = [];
+  for (const match of input.matches) {
+    const state = match.state;
+    if (!state?.events || isTerminalRoundState(state.status)) {
+      continue;
+    }
+
+    const matchHomeId = String(state.homeTeamId ?? '');
+    const matchAwayId = String(state.awayTeamId ?? '');
+    const isUserMatch = matchHomeId === input.userTeamId || matchAwayId === input.userTeamId;
+    if (!isUserMatch) {
+      continue;
+    }
+
+    for (const event of state.events) {
+      if (!event || event.eventType !== 'INJURY' || !event.playerId) {
+        continue;
+      }
+
+      const eventTeamId = event.teamId ? String(event.teamId) : null;
+      if (eventTeamId !== input.userTeamId) {
+        continue;
+      }
+
+      const eventId = `${state.matchId}|${event.minute}|${event.playerId}`;
+      if (input.shownEventIds.has(eventId)) {
+        continue;
+      }
+
+      candidates.push({
+        eventId,
+        matchId: String(state.matchId),
+        state,
+        preSelectedPlayerId: String(event.playerId),
+        alreadyResolved: wasPlayerSubstitutedOffInState(state, String(event.playerId))
+      });
+    }
+  }
+
+  return candidates;
+}
+
+export function findRivalRedCardModalCandidate(input: {
+  matches: RoundMatchVM[];
+  shownEventIds: ReadonlySet<string>;
+}): RivalCardModalCandidate | null {
+  const userMatch = input.matches.find(match => match.isUserMatch);
+  const userTeamId = userMatch?.userTeamId ?? userMatch?.match.homeTeamId;
+  const userTeamIdStr = userTeamId ? String(userTeamId) : null;
+  const state = userMatch?.state;
+  if (!userTeamIdStr || !state?.events || isTerminalRoundState(state.status)) {
+    return null;
+  }
+
+  for (const event of state.events) {
+    if (!event || event.eventType !== 'RED_CARD') {
+      continue;
+    }
+
+    const eventTeamId = event.teamId ? String(event.teamId) : null;
+    if (!eventTeamId || eventTeamId === userTeamIdStr) {
+      continue;
+    }
+
+    const dedupKey = event.playerId
+      ? `${state.matchId}|${event.minute}|${event.playerId}`
+      : `${state.matchId}|${event.minute}|${eventTeamId}`;
+    if (input.shownEventIds.has(dedupKey)) {
+      continue;
+    }
+
+    return {
+      dedupKey,
+      matchId: String(state.matchId),
+      state,
+      playerName: event.playerName || 'Jugador rival',
+      minute: event.minute
+    };
   }
 
   return null;
