@@ -40,10 +40,7 @@ export class MatchEngineService {
   private authService = inject(AuthService);
   private apiUrl = `${environment.apiUrl}/match-engine`;
 
-  /**
-   * Inicia el motor de un partido.
-   * El partido avanzará automáticamente cada segundo.
-   */
+  // Starts the engine for one match.
   startEngine(matchId: string, homeTeamId: string, awayTeamId: string): Observable<MatchState> {
     return this.http.post<MatchState>(`${this.apiUrl}/${matchId}/start`, {
       homeTeamId,
@@ -62,39 +59,22 @@ export class MatchEngineService {
     });
   }
 
-  /**
-   * Pausa el motor. El partido deja de avanzar.
-   */
+  // Pauses one match engine.
   pauseEngine(matchId: string): Observable<MatchState> {
     return this.http.post<MatchState>(`${this.apiUrl}/${matchId}/pause`, {});
   }
 
-  /**
-   * Reanuda el motor desde donde quedó.
-   */
+  // Resumes one paused match engine.
   resumeEngine(matchId: string): Observable<MatchState> {
     return this.http.post<MatchState>(`${this.apiUrl}/${matchId}/resume`, {});
   }
 
-  /**
-   * Detiene completamente el motor (cancelar partido).
-   */
+  // Stops one match engine.
   stopEngine(matchId: string): Observable<MatchState> {
     return this.http.post<MatchState>(`${this.apiUrl}/${matchId}/stop`, {});
   }
 
-  /**
-   * Sends a manual substitution to the backend.
-   *
-   * <p>Returns the substitution result with substitutions remaining. The backend
-   * appends the substitution event and updates the live player state.
-   *
-   * @param matchId the match UUID
-   * @param playerOffId sessionPlayerId of the player being substituted off
-   * @param playerOnId sessionPlayerId of the bench player coming on
-   * @param minute optional override; the backend always uses the live session
-   *              clock as the authoritative minute, so this is mostly cosmetic
-   */
+  // Sends a manual substitution. The backend owns the authoritative live minute.
   substitutePlayer(
     matchId: string,
     playerOffId: string,
@@ -107,16 +87,7 @@ export class MatchEngineService {
     );
   }
 
-  /**
-   * Sends a formation change to the backend.
-   *
-   * <p>Endpoint: {@code POST /api/v1/match-engine/matches/{matchId}/formation}.
-   * The body is a list of {@code FormationSlotDTO} (10-11 player slots);
-   * see {@code FormationChangeRequestDTO} on the backend.
-   *
-   * @param matchId  the match UUID
-   * @param players  full list of formation slots (10-11) for the team
-   */
+  // Sends the current tactical shape to the backend.
   changeFormation(
     matchId: string,
     players: Array<{
@@ -152,25 +123,7 @@ export class MatchEngineService {
     return normalized;
   }
 
-  /**
-   * Sends a tactical style change to the backend.
-   *
-   * <p>Endpoint: {@code POST /api/v1/match-engine/matches/{matchId}/style}.
-   * <p>Body: {@code { newStyle: TeamStyle }}.
-   * <p>Response: {@link StyleChangeResult} with {@code success}, {@code currentStyle},
-   * {@code minuteApplied}, and an optional {@code error}.
-   *
-   * <p>Triggers a deterministic replay from the current minute on the backend.
-   * The style change is destructive for the prefix from {@code currentMinute}
-   * onward, using the same deterministic replay contract as formation change.
-   *
-   * <p>Only the manager's home team can be changed. The rival (away) is out of
-   * scope for this endpoint — the backend rejects away changes. The component is
-   * responsible for filtering the UI to show only the home team's buttons.
-   *
-   * @param matchId  the match UUID
-   * @param style    one of the 5 {@link TeamStyle} values
-   */
+  // Sends a tactical style change. The backend replays the remaining match deterministically.
   changeStyle(matchId: string, style: TeamStyle): Observable<StyleChangeResult> {
     return this.http.post<StyleChangeResult>(
       `${this.apiUrl}/matches/${matchId}/style`,
@@ -178,38 +131,19 @@ export class MatchEngineService {
     );
   }
 
-  /**
-   * Envía un comando al motor mientras el partido corre.
-   * Ej: cambiar táctica, hacer sustitución, etc.
-   */
+  // Sends a generic live command while the match is running.
   sendCommand(matchId: string, command: MatchCommand): Observable<string> {
     return this.http.post(`${this.apiUrl}/${matchId}/commands`, command, {
       responseType: 'text'
     });
   }
 
-  /**
-   * Obtiene el estado actual del partido (polling).
-   * Usar para polling cada 1 segundo.
-   */
+  // Reads the current match state for polling fallback.
   getMatchState(matchId: string): Observable<MatchState> {
     return this.http.get<MatchState>(`${this.apiUrl}/${matchId}/state`);
   }
 
-  /**
-   * Streaming de estados en tiempo real con Server-Sent Events (SSE).
-   * El cliente se suscribe una vez y recibe actualizaciones automáticamente.
-   *
-   * VENTAJAS sobre polling:
-   * - Latencia ~0ms (push inmediato)
-   * - 0 requests (conexión persistente)
-   * - Multiplayer nativo (N clientes, 1 motor)
-   *
-   * @param matchId UUID del partido
-   * @returns Observable que emite MatchState cada vez que el motor avanza.
-   *          Includes a `streamHealth$` accessor (via the returned object) so
-   *          the component can render a real-time connection indicator.
-   */
+  // Streams one match through SSE. Polling remains available as fallback.
   streamMatchState(matchId: string): Observable<MatchState> {
     return this.createSseStream<MatchState>(
       `${this.apiUrl}/${matchId}/stream`,
@@ -218,9 +152,7 @@ export class MatchEngineService {
     );
   }
 
-  /**
-   * Obtiene el estado del sistema (cuántos motores activos hay).
-   */
+  // Reads match engine service status.
   getEngineStatus(): Observable<EngineStatus> {
     return this.http.get<EngineStatus>(`${this.apiUrl}/status`);
   }
@@ -239,33 +171,8 @@ export class MatchEngineService {
     );
   }
 
-  // SSE backoff and stream health plumbing
-
-  /**
-   * FE1: build an SSE stream with exponential-backoff reconnect and a
-   * per-stream health subject. The output observable emits the parsed
-   * payload, the caller is expected to attach a separate subscriber to
-   * {@code streamHealth$} via the returned {@link SseStreamHandle} (returned
-   * through the public helpers {@link streamMatchState} / {@link streamRoundState}
-   * which wrap this factory and expose the health subject via the result type).
-   *
-   * <p>FE1 design choice: to keep the public API backward-compatible with
-   * existing call sites (which subscribe to the bare Observable<MatchState>),
-   * the health subject is exposed via the dedicated {@link streamHealth$}
-   * BehaviorSubject field on the service instance. Per-stream health is
-   * maintained in a private Map keyed by URL — when a stream opens, the
-   * matching entry is set to {@code HEALTHY}; when it disconnects, the entry
-   * is set to {@code RECONNECTING} (and the backoff timer is armed); after
-   * {@link RECONNECT_MAX_ATTEMPTS} failed attempts the entry becomes
-   * {@code CLOSED}.
-   *
-   * Uses fetch instead of EventSource so authenticated streams can send headers.
-   * {@code EventSource} browser API does NOT support custom request
-   * headers, which broke the SSE link end-to-end once the backend hardened
-   * the stream endpoint behind JWT. Behavior is otherwise unchanged: same
-   * exponential backoff with jitter, same {@code DEGRADED} timer, same
-   * health map, same completion predicate.
-   */
+  // SSE backoff and stream health plumbing.
+  // Uses fetch instead of EventSource because authenticated streams need headers.
   private createSseStream<T>(
     url: string,
     label: string,
@@ -459,42 +366,19 @@ export class MatchEngineService {
     });
   }
 
-  /**
-   * FE1: shared health subject — the most recent streamHealth across all
-   * SSE connections. Components that have only one live stream (the typical
-   * case) can subscribe here directly. For multi-stream scenarios (rare),
-   * check the per-stream `streamHealthByUrl` map.
-   */
+  // Most recent stream health across active SSE connections.
   readonly streamHealth$ = new BehaviorSubject<StreamHealth>('CLOSED');
 
-  /**
-   * FE1: per-URL health map. Key = the SSE URL, value = last known health.
-   * Useful for tests and for the round-live component which might want to
-   * show the health of multiple round streams.
-   */
+  // Last known health per SSE URL.
   readonly streamHealthByUrl = new Map<string, StreamHealth>();
 
   // Pause/resume round helpers scoped by match id
 
-  /**
-   * In-memory cache for the last known round id per match.
-   * This avoids hitting the helper endpoint on every modal open. TTL of 5 minutes — the round is much shorter
-   * than that, but a stale cache would also surface as a 404 on the next
-   * pause/resume call which is self-healing.
-   */
+  // Short-lived cache for resolving a match to its round.
   private static readonly ROUND_ID_CACHE_TTL_MS = 5 * 60 * 1_000;
   private readonly roundIdCache = new Map<string, { roundId: string; cachedAt: number }>();
 
-  /**
-   * Resolves the roundId for a given matchId via
-   * {@code GET /api/v1/match-engine/matches/{matchId}/roundId}. The result
-   * is cached in-memory for {@link ROUND_ID_CACHE_TTL_MS} to avoid hammering
-   * the helper endpoint when the manager opens a sub/formation modal repeatedly.
-   *
-   * <p>If the cached entry is stale, the cache is refreshed on the next call.
-   * On error (e.g. the round was unregistered, 404), the cache entry is
-   * evicted so the next attempt goes back to the server.
-   */
+  // Resolves the round that owns a match, with a small in-memory cache.
   getRoundIdForMatch(matchId: string): Observable<string> {
     const cached = this.roundIdCache.get(matchId);
     if (cached && Date.now() - cached.cachedAt < MatchEngineService.ROUND_ID_CACHE_TTL_MS) {
@@ -514,21 +398,7 @@ export class MatchEngineService {
     );
   }
 
-  /**
-   * Pauses the full round that contains the given match. Resolves roundId via
-   * {@link getRoundIdForMatch} (cached) and then POSTs to the round-level
-   * pause endpoint.
-   *
-   * <p>The round-level pause propagates to every {@code MatchEngine} in
-   * the round via {@code RoundEngine.pauseAll()} — including the manager's
-   * own match and the other 5 matches running concurrently. That prevents
-   * the {@code MINUTE_IN_PAST} error Iván hit when the server kept ticking
-   * the {@code currentMinute} while he prepared the substitution.
-   *
-   * <p>The endpoint is idempotent on the backend ({@code RoundEngine.pauseAll}
-   * early-returns if already paused), so calling this twice in a row is
-   * safe (e.g. user double-clicks "Sustituir").
-   */
+  // Pauses the whole round before the manager opens a live decision modal.
   pauseRoundForMatch(careerId: string, matchId: string): Observable<unknown> {
     return this.getRoundIdForMatch(matchId).pipe(
       switchMap(roundId =>
@@ -537,11 +407,7 @@ export class MatchEngineService {
     );
   }
 
-  /**
-   * Resumes the round that contains the given match. Called from the modal's
-   * {@code afterClosed()} so the round re-runs whether the manager confirmed
-   * or cancelled. Idempotent on the backend.
-   */
+  // Resumes the round after the live decision modal closes.
   resumeRoundForMatch(careerId: string, matchId: string): Observable<unknown> {
     return this.getRoundIdForMatch(matchId).pipe(
       switchMap(roundId =>
@@ -550,3 +416,4 @@ export class MatchEngineService {
     );
   }
 }
+
