@@ -369,15 +369,10 @@ describe('SquadEditorModalComponent backend formation loading', () => {
 });
 
 /**
- * V25D45 (Sprint C10): chemistry preview — verify the debounced pipeline
- * fires on player assignment/removal, displays the projected score + Δ vs
- * current, and handles errors gracefully.
- *
- * <p>Strategy: mock the HTTP layer to inject a deterministic preview
- * response. Wait for the debounce window (300ms + buffer) before
- * asserting. Same pattern as the existing modal specs (setTimeout-based).
+ * Chemistry preview: verifies the debounced pipeline, projected score,
+ * delta against the current score, and graceful error handling.
  */
-describe('SquadEditorModalComponent — V25D45 chemistry preview', () => {
+describe('SquadEditorModalComponent chemistry preview', () => {
   let component: SquadEditorModalComponent;
   let fixture: ComponentFixture<SquadEditorModalComponent>;
   let httpClientSpy: jasmine.SpyObj<HttpClient>;
@@ -484,8 +479,8 @@ describe('SquadEditorModalComponent — V25D45 chemistry preview', () => {
   });
 
   it('should capture currentChemistryScore from /career/lineup/current response', (done) => {
-    // V25D45: after /career/lineup/current loads, currentChemistryScore holds
-    // the persisted chemistry (used as baseline for the Δ display).
+    // After /career/lineup/current loads, currentChemistryScore holds
+    // the persisted chemistry used as the delta baseline.
     setTimeout(() => {
       expect(component.currentChemistryScore).toBe(85);
       done();
@@ -493,8 +488,7 @@ describe('SquadEditorModalComponent — V25D45 chemistry preview', () => {
   });
 
   it('should trigger chemistry preview POST when a player is assigned (debounced)', (done) => {
-    // V25D45: assignPlayerToSlot triggers triggerChemistryPreview() →
-    // previewTrigger$.next → debounceTime(300) → switchMap → POST.
+    // assignPlayerToSlot triggers the debounced preview pipeline and POST.
     setTimeout(() => {
       // Mutate homePlayers$ to simulate the user assigning a player.
       // (We don't drive the click handlers directly because they require
@@ -522,8 +516,7 @@ describe('SquadEditorModalComponent — V25D45 chemistry preview', () => {
   });
 
   it('should debounce rapid preview triggers into a single backend call', (done) => {
-    // V25D45: 5 rapid triggerChemistryPreview() calls within the debounce
-    // window should collapse into 1 backend POST (debounceTime 300ms).
+    // Rapid preview triggers within the debounce window collapse into one POST.
     setTimeout(() => {
       const ids = ['p0', 'p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8', 'p9', 'p10'];
       const playerObjs = ids.map(id => ({ playerId: id, name: id, position: 'MID', overall: 80,
@@ -548,7 +541,7 @@ describe('SquadEditorModalComponent — V25D45 chemistry preview', () => {
   });
 
   it('should NOT call preview when lineup has fewer than 11 players', (done) => {
-    // V25D45: switchMap guards `ids.length !== 11` → emits null, no POST.
+    // The preview pipeline requires exactly 11 player ids before POSTing.
     setTimeout(() => {
       // Empty homePlayers$ (0 players) — preview should not fire.
       (component as any).homePlayers$.next([]);
@@ -565,7 +558,7 @@ describe('SquadEditorModalComponent — V25D45 chemistry preview', () => {
   });
 
   it('should set previewedChemistry$ when preview succeeds', (done) => {
-    // V25D45: preview success path → previewedChemistry$ emits the response.
+    // On preview success, previewedChemistry$ emits the response.
     setTimeout(() => {
       const ids = ['p0', 'p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8', 'p9', 'p10'];
       const playerObjs = ids.map(id => ({ playerId: id, name: id, position: 'MID', overall: 80,
@@ -585,10 +578,9 @@ describe('SquadEditorModalComponent — V25D45 chemistry preview', () => {
     }, 30);
   });
 
-  it('should compute Δ from currentChemistryScore in template', (done) => {
-    // V25D45: template renders (pc.score - currentChemistryScore).
-    // currentChemistryScore=85 from the mocked /current, preview score=91
-    // from PREVIEW_RESPONSE → Δ = +6.
+  it('should compute delta from currentChemistryScore in template', (done) => {
+    // Template renders pc.score - currentChemistryScore.
+    // currentChemistryScore=85 and preview score=91, so delta is +6.
     setTimeout(() => {
       const ids = ['p0', 'p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8', 'p9', 'p10'];
       const playerObjs = ids.map(id => ({ playerId: id, name: id, position: 'MID', overall: 80,
@@ -612,8 +604,8 @@ describe('SquadEditorModalComponent — V25D45 chemistry preview', () => {
 });
 
 /**
- * V25D47 (Sprint C11b): drag-drop tactical field editor + formationEffectiveness
- * UI integration + chemistry preview weighting.
+ * Drag-drop tactical field editor, formation effectiveness UI, and
+ * chemistry preview weighting.
  *
  * <p>Strategy: drive the drop handlers directly via `(component as any).methodName(...)`
  * with mock CdkDragDrop events rather than simulating real mouse drag events
@@ -625,7 +617,7 @@ describe('SquadEditorModalComponent — V25D45 chemistry preview', () => {
  * {@code fixture.nativeElement.querySelector(...)} to verify the formation-
  * effectiveness row + per-player color classes render correctly.
  */
-describe('SquadEditorModalComponent — V25D47 (C11b) drag-drop + effectiveness', () => {
+describe('SquadEditorModalComponent drag-drop and effectiveness', () => {
   let component: SquadEditorModalComponent;
   let fixture: ComponentFixture<SquadEditorModalComponent>;
   let httpClientSpy: jasmine.SpyObj<HttpClient>;
@@ -655,7 +647,7 @@ describe('SquadEditorModalComponent — V25D47 (C11b) drag-drop + effectiveness'
   /**
    * Builds a /current response with 4 players + a configurable
    * formationEffectiveness payload. Pass null to simulate a legacy
-   * pre-V25D47 response (formationEffectiveness absent).
+   * response (formationEffectiveness absent).
    */
   function buildCurrentLineup(
     formationEffectiveness: any | null,
@@ -728,22 +720,20 @@ describe('SquadEditorModalComponent — V25D47 (C11b) drag-drop + effectiveness'
   // ---- formationEffectiveness UI ----
 
   it('should render the formation-effectiveness row when /current includes formationEffectiveness', (done) => {
-    // V25D47: with formationEffectiveness present in /current, the header
-    // shows "Formación inferida: 4-4-2 · Eff. team: 89%".
+    // With formationEffectiveness present in /current, the header shows
+    // the inferred formation and team effectiveness.
     setTimeout(() => {
       fixture.detectChanges();
       const row = fixture.nativeElement.querySelector('.formation-effectiveness-row');
       expect(row).toBeTruthy('formation-effectiveness row must render when formationEffectiveness is present');
       expect(row?.textContent).toContain('4-4-2');
-      // 0.8875 * 100 = 88.75 → rounded to 89.
       expect(row?.textContent).toContain('89%');
       done();
     }, 30);
   });
 
   it('should NOT render the formation-effectiveness row when formationEffectiveness is null', (done) => {
-    // V25D47 backward compat: legacy pre-V25D47 responses don't carry
-    // formationEffectiveness — the row must be hidden.
+    // Legacy responses without formationEffectiveness must hide the row.
     httpClientSpy.get.and.callFake(((url: string) => {
       if (url.includes('/editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
       if (url.includes('/editor/formations'))  return of(FORMATIONS_RESPONSE);
@@ -764,15 +754,11 @@ describe('SquadEditorModalComponent — V25D47 (C11b) drag-drop + effectiveness'
     }, 30);
   });
 
-  it('should color-code markers by per-player effectiveness (V25D95.7)', (done) => {
-    // V25D95.7: V25D47 originally color-coded `.slot` elements via eff-green/
-    // yellow/red classes. V25D95.2 hid the ghost slot tiles, then V25D95.7
-    // removed the chip-level border (it was bleeding out of the marker card).
-    // The chemistry visual feedback now lives on the .player-marker itself
-    // via drop-shadow filter (see .player-marker.eff-green/-yellow/-red
-    // below line 1626 in component.ts).
+  it('should color-code markers by per-player effectiveness', (done) => {
+    // Chemistry visual feedback lives on the player marker itself
+    // through eff-green, eff-yellow, and eff-red classes.
     //
-    // Thresholds match getChipEffectivenessClass (V25D51 chip-tier):
+    // Thresholds match getChipEffectivenessClass:
     //   eff >= 0.9 → green
     //   0.7 <= eff < 0.9 → yellow
     //   eff < 0.7 → red
@@ -800,8 +786,8 @@ describe('SquadEditorModalComponent — V25D47 (C11b) drag-drop + effectiveness'
   });
 
   it('should explain real off-role tactical penalties with summary and advice', (done) => {
-    // V25D99.127: a deliberate off-role move must be visible as tactical
-    // feedback, not just a raw percent hidden in the left panel.
+    // A deliberate off-role move must be visible as tactical feedback,
+    // not just a raw percent hidden in the left panel.
     setTimeout(() => {
       (component as any).homePlayers$.next([
         {
@@ -841,9 +827,8 @@ describe('SquadEditorModalComponent — V25D47 (C11b) drag-drop + effectiveness'
   // ---- drag-drop handlers (direct method calls) ----
 
   it('handleSlotDrop — moves a slot player to another empty slot', (done) => {
-    // V25D47: drag p-def from S22-1 to S05-2 (currently occupied by p-att
-    // in the role-matched default; we first evict p-att to bench so the
-    // target is empty).
+    // Drag p-def from S22-1 to S05-2; evict p-att to the bench first
+    // so the target slot is empty.
     setTimeout(() => {
       // Move p-att to bench first so S05-2 is empty.
       (component as any).handleBenchDrop({
@@ -868,8 +853,7 @@ describe('SquadEditorModalComponent — V25D47 (C11b) drag-drop + effectiveness'
   });
 
   it('handleSlotDrop — swaps two slot players when target is occupied', (done) => {
-    // V25D47: drag p-def from S22-1 onto S13-2 (occupied by p-mid).
-    // Expected: p-def ends in S13-2, p-mid ends in S22-1 (SWAP).
+    // Drag p-def from S22-1 onto occupied S13-2 and expect a swap.
     setTimeout(() => {
       const pDef = (component as any).slotPlayerMap['S22-1'];
       const pMid = (component as any).slotPlayerMap['S13-2'];
@@ -890,7 +874,7 @@ describe('SquadEditorModalComponent — V25D47 (C11b) drag-drop + effectiveness'
   });
 
   it('handleBenchDrop — moves a slot player to the bench', (done) => {
-    // V25D47: drag p-att from S05-2 to the bench drop list.
+    // Drag p-att from S05-2 to the bench drop list.
     setTimeout(() => {
       const pAtt = (component as any).slotPlayerMap['S05-2'];
       expect(pAtt).toBeTruthy();
@@ -913,7 +897,7 @@ describe('SquadEditorModalComponent — V25D47 (C11b) drag-drop + effectiveness'
   // ---- chemistry preview weighting ----
 
   it('getDisplayedChemistryScore weights raw score by teamAverage', (done) => {
-    // V25D47: raw preview score = 91, teamAverage = 0.8875 → displayed = round(91 * 0.8875) = 81.
+    // Raw preview score = 91, teamAverage = 0.8875, displayed = round(91 * 0.8875) = 81.
     // The chemistry preview pipeline requires exactly 11 players to fire
     // (back validates ids.length === 11), so we push 11 here.
     setTimeout(() => {
@@ -927,21 +911,21 @@ describe('SquadEditorModalComponent — V25D47 (C11b) drag-drop + effectiveness'
 
       setTimeout(() => {
         const displayed = (component as any).getDisplayedChemistryScore();
-        // 91 * 0.8875 = 80.7625 → rounds to 81.
+        // 91 * 0.8875 = 80.7625, rounded to 81.
         expect(displayed).toBe(81,
           `displayed should be round(91 * 0.8875) = 81, got ${displayed}`);
-        // The ×88% weight chip should be rendered when teamAverage < 1.0.
+        // The 89% weight chip should be rendered when teamAverage < 1.0.
         fixture.detectChanges();
         const weightEl = fixture.nativeElement.querySelector('.preview-eff-weight');
-        expect(weightEl?.textContent).toContain('89%');  // (0.8875 * 100).toFixed(0) = '89'
+        expect(weightEl?.textContent).toContain('89%');
         done();
       }, 400);
     }, 30);
   });
 
   it('getDisplayedChemistryScore returns raw score when formationEffectiveness is null', (done) => {
-    // V25D47 backward compat: when formationEffectiveness is missing, the
-    // chemistry preview shows the raw score unchanged.
+    // When formationEffectiveness is missing, the chemistry preview
+    // shows the raw score unchanged.
     httpClientSpy.get.and.callFake(((url: string) => {
       if (url.includes('/editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
       if (url.includes('/editor/formations'))  return of(FORMATIONS_RESPONSE);
@@ -966,7 +950,7 @@ describe('SquadEditorModalComponent — V25D47 (C11b) drag-drop + effectiveness'
       setTimeout(() => {
         const displayed = (component as any).getDisplayedChemistryScore();
         expect(displayed).toBe(91, 'raw score should be returned unchanged when formationEffectiveness is null');
-        // No ×% weight chip should be rendered.
+        // The 89% weight chip should be rendered when teamAverage < 1.0.
         fixture.detectChanges();
         const weightEl = fixture.nativeElement.querySelector('.preview-eff-weight');
         expect(weightEl).toBeFalsy('weight chip must NOT render when formationEffectiveness is null');
@@ -977,13 +961,13 @@ describe('SquadEditorModalComponent — V25D47 (C11b) drag-drop + effectiveness'
 });
 
 /**
- * V25D51 (Sprint C13): chip-level effectiveness feedback. The chip receives a
+ * Marker-level effectiveness feedback. The marker receives a
  * CSS class bound from getChipEffectivenessClass() and renders a corner
  * badge showing the percentage. Thresholds differ from the slot-level
  * eff-green/yellow/red (which uses 0.85 / 0.5); the chip uses 0.9 / 0.7
  * to give the user tighter feedback on their per-player alignment.
  */
-describe('SquadEditorModalComponent — V25D51 chip-level effectiveness feedback', () => {
+describe('SquadEditorModalComponent effectiveness feedback', () => {
   let component: SquadEditorModalComponent;
   let fixture: ComponentFixture<SquadEditorModalComponent>;
   let httpClientSpy: jasmine.SpyObj<HttpClient>;
@@ -1018,7 +1002,7 @@ describe('SquadEditorModalComponent — V25D51 chip-level effectiveness feedback
   /**
    * /career/lineup/current response builder — accepts perPlayerEffectiveness
    * keyed by subdivisionId. Pass null for formationEffectiveness to simulate
-   * a legacy pre-V25D47 response (no chip feedback expected).
+   * a legacy response (no chip feedback expected).
    */
   function buildCurrentLineup(
     perPlayerEffectiveness: Record<string, number> | null,
@@ -1056,7 +1040,7 @@ describe('SquadEditorModalComponent — V25D51 chip-level effectiveness feedback
       if (url.includes('/editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
       if (url.includes('/editor/formations'))  return of(FORMATIONS_RESPONSE);
       if (url.includes('/career/lineup/current')) {
-        // Default: full V25D51 effectiveness coverage. Distribution per slot:
+        // Default: full effectiveness coverage. Distribution per slot:
         //   GK-1=1.0  → eff-good  (perfect GK)
         //   S22-1=0.95 → eff-good  (well above the 0.9 threshold)
         //   S13-2=0.7  → eff-warning (right at the 0.7 threshold)
@@ -1135,8 +1119,7 @@ describe('SquadEditorModalComponent — V25D51 chip-level effectiveness feedback
   // ---- template bindings ----
 
   it('renders eff-good on the marker for eff >= 0.9', (done) => {
-    // V25D99.4-FRONT: chip was removed; chemistry feedback now lives on
-    // the .player-marker via drop-shadow filter (eff-green/yellow/red).
+    // Chemistry feedback lives on the .player-marker via eff-green/yellow/red.
     setTimeout(() => {
       fixture.detectChanges();
       const markers = fixture.nativeElement.querySelectorAll('.player-marker');
@@ -1181,15 +1164,13 @@ describe('SquadEditorModalComponent — V25D51 chip-level effectiveness feedback
     }, 30);
   });
 
-  it('does NOT render any chip element (removed in V25D99.4)', (done) => {
-    // V25D99.4-FRONT: chip was REMOVED entirely. The .player-marker IS
-    // the player — there's no chip+marker duplication. This test asserts
-    // the chip element no longer exists in the DOM.
+  it('does not render any legacy chip element', (done) => {
+    // The .player-marker is the player card; there is no separate chip element.
     setTimeout(() => {
       fixture.detectChanges();
       const chips = fixture.nativeElement.querySelectorAll('.player-chip');
       expect(chips.length).toBe(0,
-        `expected 0 .player-chip elements after V25D99.4 removed them, got ${chips.length}`);
+        `expected 0 .player-chip elements in the final marker-card model, got ${chips.length}`);
       done();
     }, 30);
   });
@@ -1197,8 +1178,8 @@ describe('SquadEditorModalComponent — V25D51 chip-level effectiveness feedback
   // ---- backward compat ----
 
   it('does NOT render any marker-level eff feedback when formationEffectiveness is null', (done) => {
-    // V25D51 backward compat: legacy pre-V25D51 lineups must not show
-    // chemistry feedback. V25D99.4 moved it from chip to marker.
+    // Legacy lineups without formationEffectiveness must not show
+    // marker-level chemistry feedback.
     httpClientSpy.get.and.callFake(((url: string) => {
       if (url.includes('/editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
       if (url.includes('/editor/formations'))  return of(FORMATIONS_RESPONSE);
