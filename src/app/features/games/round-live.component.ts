@@ -22,11 +22,13 @@ import {
   getLastRoundEvents,
   getRoundEventIcon,
   getRoundStatusText,
+  getRoundTeamName,
   isTerminalRoundState,
   isLocalDebugHost,
   mapRoundFixtureStatus,
   normalizeTacticalSlotSnapshotForDebug,
   normalizeTerminalLiveState,
+  patchRoundMatchFormation,
   parsePersistedInjuryAutoModalRefs,
   readStorageFlag,
   ROUND_LIVE_DEBUG_STORAGE_KEYS,
@@ -1153,15 +1155,11 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
    */
   private patchVisibleFormation(matchId: string, state: MatchState, formation: string): void {
     const currentVm = this.vmSubject.value;
-    const patchedMatches = currentVm.matches.map(rm => {
-      if (String(rm.match.id) !== matchId || !rm.state) {
-        return rm;
-      }
-      const managerTeamId = rm.userTeamId ?? state.homeTeamId;
-      const patchedState: MatchState = managerTeamId === rm.state.homeTeamId
-        ? { ...rm.state, homeFormation: formation }
-        : { ...rm.state, awayFormation: formation };
-      return { ...rm, state: patchedState };
+    const patchedMatches = patchRoundMatchFormation({
+      matches: currentVm.matches,
+      matchId,
+      state,
+      formation
     });
     this.vmSubject.next({ ...currentVm, matches: patchedMatches });
   }
@@ -1192,8 +1190,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
   }
 
   getTeamName(teamId: any, teamNameMap: { [id: string]: string } | null): string {
-    const id = String(teamId);
-    return teamNameMap?.[id] || id.substring(0, 8);
+    return getRoundTeamName(teamId, teamNameMap);
   }
 
   getStatusText(status: string): string {

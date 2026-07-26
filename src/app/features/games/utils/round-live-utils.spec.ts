@@ -9,12 +9,14 @@ import {
   getLastRoundEvents,
   getRoundEventIcon,
   getRoundStatusText,
+  getRoundTeamName,
   hasCompleteTacticalSlotSnapshot,
   isLocalDebugHost,
   isTerminalRoundState,
   mapRoundFixtureStatus,
   normalizeTacticalSlotSnapshotForDebug,
   normalizeTerminalLiveState,
+  patchRoundMatchFormation,
   parsePersistedInjuryAutoModalRefs,
   readStorageFlag,
   ROUND_LIVE_DEBUG_STORAGE_KEYS,
@@ -57,6 +59,11 @@ describe('round-live-utils', () => {
 
     expect(getLastRoundEvents(events, 2)).toEqual(['4', '3']);
     expect(events).toEqual(['1', '2', '3', '4']);
+  });
+
+  it('resolves team names with a readable fallback', () => {
+    expect(getRoundTeamName('team-1', { 'team-1': 'Osasuna' })).toBe('Osasuna');
+    expect(getRoundTeamName('1234567890abcdef', null)).toBe('12345678');
   });
 
   it('maps backend fixture and live statuses to card statuses', () => {
@@ -208,6 +215,41 @@ describe('round-live-utils', () => {
     }))).toEqual([
       { matchId: 'running', preSelectedPlayerId: 'p1', status: 'RUNNING' }
     ]);
+  });
+
+  it('patches the visible formation for the manager side only', () => {
+    const userHome = roundMatchWithState('home-match', true, matchState({
+      matchId: 'home-match',
+      homeTeamId: 'home',
+      awayTeamId: 'away',
+      homeFormation: '4-4-2',
+      awayFormation: '4-3-3'
+    }), 'home');
+    const userAway = roundMatchWithState('away-match', true, matchState({
+      matchId: 'away-match',
+      homeTeamId: 'home',
+      awayTeamId: 'away',
+      homeFormation: '4-4-2',
+      awayFormation: '4-3-3'
+    }), 'away');
+
+    const patchedHome = patchRoundMatchFormation({
+      matches: [userHome, userAway],
+      matchId: 'home-match',
+      state: userHome.state!,
+      formation: '3-5-2'
+    });
+    const patchedAway = patchRoundMatchFormation({
+      matches: patchedHome,
+      matchId: 'away-match',
+      state: userAway.state!,
+      formation: '4-2-3-1'
+    });
+
+    expect(patchedAway[0].state?.homeFormation).toBe('3-5-2');
+    expect(patchedAway[0].state?.awayFormation).toBe('4-3-3');
+    expect(patchedAway[1].state?.homeFormation).toBe('4-4-2');
+    expect(patchedAway[1].state?.awayFormation).toBe('4-2-3-1');
   });
 
   it('falls back to any active match as round-control anchor', () => {

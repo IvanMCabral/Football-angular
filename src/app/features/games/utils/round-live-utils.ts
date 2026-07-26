@@ -69,6 +69,11 @@ export function getLastRoundEvents<T>(events: T[], count: number): T[] {
   return events.slice(-count).reverse();
 }
 
+export function getRoundTeamName(teamId: unknown, teamNameMap: Record<string, string> | null): string {
+  const id = String(teamId);
+  return teamNameMap?.[id] || id.substring(0, 8);
+}
+
 export function mapRoundFixtureStatus(fixtureStatus: string): FixtureStatus {
   switch (fixtureStatus) {
     case 'PENDING':
@@ -215,6 +220,26 @@ export function findRestorableInjuryAutoModals(input: {
   }
 
   return restorable;
+}
+
+export function patchRoundMatchFormation(input: {
+  matches: RoundMatchVM[];
+  matchId: string;
+  state: MatchState;
+  formation: string;
+}): RoundMatchVM[] {
+  return input.matches.map(roundMatch => {
+    if (String(roundMatch.match.id) !== input.matchId || !roundMatch.state) {
+      return roundMatch;
+    }
+
+    const managerTeamId = roundMatch.userTeamId ?? input.state.homeTeamId;
+    const patchedState: MatchState = managerTeamId === roundMatch.state.homeTeamId
+      ? { ...roundMatch.state, homeFormation: input.formation }
+      : { ...roundMatch.state, awayFormation: input.formation };
+
+    return { ...roundMatch, state: patchedState };
+  });
 }
 
 export function findInjuryAutoModalCandidates(input: {
