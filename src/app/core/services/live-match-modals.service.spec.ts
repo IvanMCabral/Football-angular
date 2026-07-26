@@ -1,28 +1,5 @@
-/**
- * Unit tests for {@link LiveMatchModalsService}.
- *
- * <p>Validates the pause/resume wiring around live tactical modals:
- * <ul>
- *   <li>{@code openSubstitutionModal} calls
- *       {@code engineService.pauseRoundForMatch(careerId, matchId)} BEFORE
- *       {@code dialog.open(...)} so the round freezes while the manager
- *       prepares the sub.</li>
- *   <li>{@code dialog.afterClosed()} triggers
- *       {@code engineService.resumeRoundForMatch(careerId, matchId)} so the
- *       round resumes whether the manager confirms OR cancels.</li>
- *   <li>{@code openFormationModal} has the same pause/resume wiring
- *       (F5.3.3 scope decision: "modal de sustitución O de formación").</li>
- *   <li>{@code openPartidoModal} has the same pause/resume
- *       wiring — the new dual-tab Partido modal (Mi Formación editable +
- *       Formación Rival read-only) freezes the round while open.</li>
- *   <li>If the URL doesn't match {@code /games/{careerId}/...} the service
- *       skips the pause call and logs a warning instead of crashing.</li>
- * </ul>
- *
- * <p>The rest of the service behavior (lineup/squad fetch
- * + dialog data shape) is exercised via {@link SubstitutionModalComponent}
- * and {@link FormationModalComponent} specs and is out of scope here.
- */
+// Unit tests for live tactical modal orchestration.
+// These specs protect pause/resume timing, modal data, and live substitution memory.
 
 import { TestBed } from '@angular/core/testing';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
@@ -146,7 +123,7 @@ describe('LiveMatchModalsService pause/resume around tactical modals', () => {
 
   // ========== openSubstitutionModal ==========
 
-  it('openSubstitutionModal — calls engineService.pauseRoundForMatch BEFORE dialog.open', (done) => {
+  it('openSubstitutionModal - calls engineService.pauseRoundForMatch before dialog.open', (done) => {
     const callOrder: string[] = [];
     engineServiceSpy.pauseRoundForMatch.and.callFake(() => {
       callOrder.push('pause');
@@ -158,7 +135,7 @@ describe('LiveMatchModalsService pause/resume around tactical modals', () => {
     });
 
     service.openSubstitutionModal('match-1', RUNNING_STATE).subscribe(() => {
-      // The pause call must happen BEFORE the dialog opens (so the
+      // The pause call must happen before the dialog opens (so the
       // `currentMinute` the manager saw is still current when they confirm).
       expect(callOrder[0]).toBe('pause');
       expect(engineServiceSpy.pauseRoundForMatch).toHaveBeenCalledWith('career-abc', 'match-1');
@@ -166,9 +143,9 @@ describe('LiveMatchModalsService pause/resume around tactical modals', () => {
     });
   });
 
-  it('openSubstitutionModal — dialog.afterClosed() triggers engineService.resumeRoundForMatch', (done) => {
+  it('openSubstitutionModal - dialog.afterClosed() triggers engineService.resumeRoundForMatch', (done) => {
     service.openSubstitutionModal('match-1', RUNNING_STATE).subscribe(() => {
-      // Resume hasn't fired yet — the manager is still in the modal.
+      // Resume has not fired yet: the manager is still in the modal.
       expect(engineServiceSpy.resumeRoundForMatch).not.toHaveBeenCalled();
 
       // Now the manager closes the dialog (e.g. confirmed).
@@ -179,7 +156,7 @@ describe('LiveMatchModalsService pause/resume around tactical modals', () => {
     });
   });
 
-  it('openSubstitutionModal — resume fires on cancel too (afterClosed emits regardless of result)', (done) => {
+  it('openSubstitutionModal - resume fires on cancel too (afterClosed emits regardless of result)', (done) => {
     service.openSubstitutionModal('match-1', RUNNING_STATE).subscribe(() => {
       afterClosedSubject.next(undefined); // simulate cancel
       expect(engineServiceSpy.resumeRoundForMatch).toHaveBeenCalledTimes(1);
@@ -187,7 +164,7 @@ describe('LiveMatchModalsService pause/resume around tactical modals', () => {
     });
   });
 
-  it('openSubstitutionModal — opens without re-pausing when match is already PAUSED', (done) => {
+  it('openSubstitutionModal - opens without re-pausing when match is already PAUSED', (done) => {
     const paused = { ...RUNNING_STATE, status: 'PAUSED' as const };
     engineServiceSpy.getMatchState.and.returnValue(of(paused));
 
@@ -198,7 +175,7 @@ describe('LiveMatchModalsService pause/resume around tactical modals', () => {
     });
   });
 
-  it('openSubstitutionModal — if URL has no careerId, skip pause (warn) and skip resume', (done) => {
+  it('openSubstitutionModal - if URL has no careerId, skip pause (warn) and skip resume', (done) => {
     routerStub.url = '/squad';
     const warn = spyOn(console, 'warn');
 
@@ -208,13 +185,13 @@ describe('LiveMatchModalsService pause/resume around tactical modals', () => {
         jasmine.stringMatching(/could not resolve careerId/)
       );
       afterClosedSubject.next(undefined);
-      // No resume either — we never paused.
+      // No resume either: we never paused.
       expect(engineServiceSpy.resumeRoundForMatch).not.toHaveBeenCalled();
       done();
     });
   });
 
-  it('openSubstitutionModal — short-circuits (no pause) if match is FINISHED', (done) => {
+  it('openSubstitutionModal - short-circuits (no pause) if match is FINISHED', (done) => {
     const finished = { ...RUNNING_STATE, status: 'FINISHED' as const };
 
     service.openSubstitutionModal('match-1', finished).subscribe({
@@ -268,7 +245,7 @@ describe('LiveMatchModalsService pause/resume around tactical modals', () => {
 
   // ========== openFormationModal ==========
 
-  it('openFormationModal — calls engineService.pauseRoundForMatch BEFORE dialog.open', (done) => {
+  it('openFormationModal - calls engineService.pauseRoundForMatch before dialog.open', (done) => {
     const callOrder: string[] = [];
     engineServiceSpy.pauseRoundForMatch.and.callFake(() => {
       callOrder.push('pause');
@@ -286,7 +263,7 @@ describe('LiveMatchModalsService pause/resume around tactical modals', () => {
     });
   });
 
-  it('openFormationModal — dialog.afterClosed() triggers engineService.resumeRoundForMatch', (done) => {
+  it('openFormationModal - dialog.afterClosed() triggers engineService.resumeRoundForMatch', (done) => {
     service.openFormationModal('match-1', RUNNING_STATE).subscribe({
       next: () => {
           expect(engineServiceSpy.resumeRoundForMatch).not.toHaveBeenCalled();
@@ -302,7 +279,7 @@ describe('LiveMatchModalsService pause/resume around tactical modals', () => {
     });
   });
 
-  it('openFormationModal — opens without re-pausing when match is already PAUSED', (done) => {
+  it('openFormationModal - opens without re-pausing when match is already PAUSED', (done) => {
     const paused = { ...RUNNING_STATE, status: 'PAUSED' as const };
     engineServiceSpy.getMatchState.and.returnValue(of(paused));
 
@@ -419,7 +396,7 @@ describe('LiveMatchModalsService pause/resume around tactical modals', () => {
 
   // ========== openPartidoModal ==========
 
-  it('openPartidoModal — calls engineService.pauseRoundForMatch BEFORE dialog.open', (done) => {
+  it('openPartidoModal - calls engineService.pauseRoundForMatch before dialog.open', (done) => {
     const callOrder: string[] = [];
     engineServiceSpy.pauseRoundForMatch.and.callFake(() => {
       callOrder.push('pause');
@@ -437,7 +414,7 @@ describe('LiveMatchModalsService pause/resume around tactical modals', () => {
     });
   });
 
-  it('openPartidoModal — dialog.afterClosed() triggers engineService.resumeRoundForMatch', (done) => {
+  it('openPartidoModal - dialog.afterClosed() triggers engineService.resumeRoundForMatch', (done) => {
     service.openPartidoModal('match-1', RUNNING_STATE).subscribe(() => {
       expect(engineServiceSpy.resumeRoundForMatch).not.toHaveBeenCalled();
       afterClosedSubject.next(undefined);
@@ -446,7 +423,7 @@ describe('LiveMatchModalsService pause/resume around tactical modals', () => {
     });
   });
 
-  it('openPartidoModal — does not resume after close while debug freeze is enabled', (done) => {
+  it('openPartidoModal - does not resume after close while debug freeze is enabled', (done) => {
     localStorage.setItem('manager.debugFreezeLiveRound', '1');
     service.openPartidoModal('match-1', RUNNING_STATE).subscribe(() => {
       afterClosedSubject.next(undefined);
@@ -456,7 +433,7 @@ describe('LiveMatchModalsService pause/resume around tactical modals', () => {
     });
   });
 
-  it('openPartidoModal — opens without re-pausing when match is already PAUSED', (done) => {
+  it('openPartidoModal - opens without re-pausing when match is already PAUSED', (done) => {
     const paused = { ...RUNNING_STATE, status: 'PAUSED' as const };
     engineServiceSpy.getMatchState.and.returnValue(of(paused));
 
@@ -467,7 +444,7 @@ describe('LiveMatchModalsService pause/resume around tactical modals', () => {
     });
   });
 
-  it('openPartidoModal — short-circuits (no pause) if match is FINISHED', (done) => {
+  it('openPartidoModal - short-circuits (no pause) if match is FINISHED', (done) => {
     const finished = { ...RUNNING_STATE, status: 'FINISHED' as const };
 
     service.openPartidoModal('match-1', finished).subscribe({
@@ -479,7 +456,7 @@ describe('LiveMatchModalsService pause/resume around tactical modals', () => {
     });
   });
 
-  it('openPartidoModal — passes the rivalFormation from state.awayFormation to the dialog data', (done) => {
+  it('openPartidoModal - passes the rivalFormation from state.awayFormation to the dialog data', (done) => {
     const away433 = { ...RUNNING_STATE, awayFormation: '4-3-3' };
     engineServiceSpy.getMatchState.and.returnValue(of(away433));
     service.openPartidoModal('match-1', away433).subscribe(() => {
@@ -491,7 +468,7 @@ describe('LiveMatchModalsService pause/resume around tactical modals', () => {
     });
   });
 
-  it('openPartidoModal — falls back to 4-4-2 when state.awayFormation is missing', (done) => {
+  it('openPartidoModal - falls back to 4-4-2 when state.awayFormation is missing', (done) => {
     const noAway = { ...RUNNING_STATE, awayFormation: undefined as any };
     engineServiceSpy.getMatchState.and.returnValue(of(noAway));
     service.openPartidoModal('match-1', noAway).subscribe(() => {
@@ -951,3 +928,4 @@ describe('LiveMatchModalsService pause/resume around tactical modals', () => {
     expect(ids).toContain('s7');
   });
 });
+
