@@ -19,6 +19,12 @@ export interface RivalCardModalCandidate {
   minute: number;
 }
 
+export interface DebugTacticalSlot {
+  sessionPlayerId?: string | null;
+  playerId?: string | null;
+  slotIndex?: number | null;
+}
+
 export const ROUND_LIVE_DEBUG_STORAGE_KEYS = {
   freeze: 'manager.deFreezeLiveRound',
   suppressAutoInjury: 'manager.debugSuppressAutoInjuryModals',
@@ -229,4 +235,76 @@ export function writeStorageFlag(storage: Storage | undefined, key: string, enab
   } catch {
     // Non-fatal: callers keep their in-memory state.
   }
+}
+
+export function hasCompleteTacticalSlotSnapshot(slots: DebugTacticalSlot[]): boolean {
+  const playerIds = new Set<string>();
+  const slotIndexes = new Set<number>();
+
+  for (const [fallbackIndex, slot] of (slots ?? []).entries()) {
+    const playerId = String(slot.sessionPlayerId ?? slot.playerId ?? '');
+    if (!playerId) {
+      return false;
+    }
+    playerIds.add(playerId);
+
+    const slotIndex = typeof slot.slotIndex === 'number' ? slot.slotIndex : fallbackIndex;
+    if (slotIndex < 0 || slotIndex > 10) {
+      return false;
+    }
+    slotIndexes.add(slotIndex);
+  }
+
+  return playerIds.size === 11 &&
+    slotIndexes.size === 11 &&
+    Array.from({ length: 11 }, (_, index) => index).every(index => slotIndexes.has(index));
+}
+
+export function normalizeTacticalSlotSnapshotForDebug<T extends DebugTacticalSlot>(
+  slots: T[]
+): T[] | null {
+  const uniqueByPlayer = new Map<string, T>();
+  for (const slot of slots ?? []) {
+    const playerId = String(slot.sessionPlayerId ?? slot.playerId ?? '');
+    if (!playerId || uniqueByPlayer.has(playerId)) {
+      return null;
+    }
+    uniqueByPlayer.set(playerId, slot);
+  }
+  if (uniqueByPlayer.size !== 11) {
+    return null;
+  }
+
+  if (hasCompleteTacticalSlotSnapshot(slots)) {
+    return [...slots].sort((a, b) => (a.slotIndex ?? 0) - (b.slotIndex ?? 0));
+  }
+
+  const usedIndexes = new Set<number>();
+  const normalized: T[] = [];
+  const deferred: T[] = [];
+
+  for (const slot of uniqueByPlayer.values()) {
+    const slotIndex = typeof slot.slotIndex === 'number' ? slot.slotIndex : null;
+    if (slotIndex !== null && slotIndex >= 0 && slotIndex <= 10 && !usedIndexes.has(slotIndex)) {
+      usedIndexes.add(slotIndex);
+      normalized.push(slot);
+    } else {
+      deferred.push(slot);
+    }
+  }
+
+  const missingIndexes = Array.from({ length: 11 }, (_, index) => index)
+    .filter(index => !usedIndexes.has(index));
+  if (missingIndexes.length !== deferred.length) {
+    return null;
+  }
+
+  deferred.forEach((slot, index) => {
+    normalized.push({
+      ...slot,
+      slotIndex: missingIndexes[index]
+    });
+  });
+
+  return normalized.sort((a, b) => (a.slotIndex ?? 0) - (b.slotIndex ?? 0));
 }

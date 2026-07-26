@@ -6,9 +6,11 @@ import {
   getLastRoundEvents,
   getRoundEventIcon,
   getRoundStatusText,
+  hasCompleteTacticalSlotSnapshot,
   isLocalDebugHost,
   isTerminalRoundState,
   mapRoundFixtureStatus,
+  normalizeTacticalSlotSnapshotForDebug,
   normalizeTerminalLiveState,
   readStorageFlag,
   ROUND_LIVE_DEBUG_STORAGE_KEYS,
@@ -287,6 +289,85 @@ describe('round-live-utils', () => {
 
     expect(() => writeStorageFlag(throwingStorage(), 'feature', true)).not.toThrow();
     expect(readStorageFlag(throwingStorage(), 'feature')).toBeFalse();
+  });
+
+  it('normalizes complete tactical slot snapshots by slot index', () => {
+    const slots = Array.from({ length: 11 }, (_, index) => ({
+      playerId: `p${index}`,
+      slotIndex: 10 - index
+    }));
+
+    const normalized = normalizeTacticalSlotSnapshotForDebug(slots);
+
+    expect(normalized?.map(slot => slot.slotIndex)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    expect(hasCompleteTacticalSlotSnapshot(slots)).toBeTrue();
+  });
+
+  it('uses fallback order when tactical slot indexes are missing', () => {
+    const slots = Array.from({ length: 11 }, (_, index) => ({
+      playerId: `p${index}`,
+      slotIndex: index < 9 ? index : null
+    }));
+
+    const normalized = normalizeTacticalSlotSnapshotForDebug(slots);
+
+    expect(normalized?.map(slot => slot.playerId)).toEqual([
+      'p0', 'p9', 'p10', 'p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8'
+    ]);
+  });
+
+  it('rejects incomplete or duplicated tactical slot snapshots', () => {
+    const complete = Array.from({ length: 11 }, (_, index) => ({
+      playerId: `p${index}`,
+      slotIndex: index
+    }));
+
+    expect(normalizeTacticalSlotSnapshotForDebug(complete.slice(0, 10))).toBeNull();
+    expect(normalizeTacticalSlotSnapshotForDebug([
+      ...complete.slice(0, 10),
+      { playerId: 'p0', slotIndex: 10 }
+    ])).toBeNull();
+  });
+
+  it('can repair invalid tactical indexes when the XI still has eleven unique players', () => {
+    const complete = Array.from({ length: 11 }, (_, index) => ({
+      playerId: `p${index}`,
+      slotIndex: index
+    }));
+
+    const normalized = normalizeTacticalSlotSnapshotForDebug([
+      ...complete.slice(0, 10),
+      { playerId: 'p10', slotIndex: 99 }
+    ]);
+
+    expect(normalized?.map(slot => slot.slotIndex)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+  });
+
+  it('repairs multiple invalid tactical indexes when the XI still has eleven unique players', () => {
+    const complete = Array.from({ length: 11 }, (_, index) => ({
+      playerId: `p${index}`,
+      slotIndex: index
+    }));
+
+    const normalized = normalizeTacticalSlotSnapshotForDebug([
+      ...complete.slice(0, 9),
+      { playerId: 'p9', slotIndex: 99 },
+      { playerId: 'p10', slotIndex: 100 }
+    ]);
+
+    expect(normalized?.map(slot => slot.slotIndex)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+  });
+
+  it('rejects tactical snapshots with players that cannot be identified', () => {
+    const complete = Array.from({ length: 11 }, (_, index) => ({
+      playerId: `p${index}`,
+      slotIndex: index
+    }));
+
+    expect(normalizeTacticalSlotSnapshotForDebug([
+      ...complete.slice(0, 10),
+      { playerId: '', slotIndex: 10 }
+    ])).toBeNull();
   });
 });
 
