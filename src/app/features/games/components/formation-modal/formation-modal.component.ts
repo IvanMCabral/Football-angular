@@ -29,35 +29,13 @@ export interface FormationDialogData {
     position: string;
     slotIndex: number;
   }>;
-  /**
-   * #4: full manager-team squad (starters + bench). Source: the
-   * LiveMatchModalsService fetches it via /teams/me/squad at open time.
-   * Used to render player names in the visual pitch dots (previously
-   * only role labels like "CB" / "CM" were shown — manager couldn't
-   * tell who was who) and to populate the bench list so the manager
-   * can drag-drop bench players into starting slots.
-   */
+  // Full manager squad, used for pitch names and bench drag/drop.
   squad: SessionPlayer[];
-  /**
-   * #4: set of sessionPlayerIds currently in the starting XI.
-   * Computed from {@code currentSlots} (starters are slots with
-   * slotIndex in the formation's line count, bench is the rest). The
-   * modal uses this to split the squad into "on pitch" and "bench"
-   * columns when the drag-drop is engaged.
-   */
+  // Session player ids currently assigned to the starting XI.
   startingIds: Set<string>;
 }
 
-/**
- * All formations exposed by the modal. : added 5 formations
- * nuevas (P1: 3-5-2-CDM, 5-4-1, 3-4-1-2, 4-2-2-2; P2: 4-1-2-3) para que
- * el dropdown muestre las 12 formations disponibles en el back.
- *
- * P0.1: source of truth moved to
- * {@code shared/constants/formations.ts}. The 4 dropdowns in this app
- * (formation-modal, squad-management, squad-editor-modal, test-harness)
- * now share the same array + the same derived {@link FormationCode} type.
- */
+// Shared source of truth for all formation dropdowns.
 const FORMATIONS = ALL_FORMATIONS;
 
 /**
@@ -82,7 +60,6 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
     ['LW', 'ST', 'RW']
   ],
   '3-5-2': [
-    // P0 fixed: pos #4 LM→LWB, pos #8 RM→RWB (wide mids son wing-backs).
     ['GK'],
     ['CB', 'CB', 'CB'],
     ['LWB', 'CM', 'CM', 'CM', 'RWB'],
@@ -109,13 +86,11 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
     ['ST']
   ],
   '3-4-3': [
-    // P0 fixed: pos #4 LM→LWB, pos #7 RM→RWB.
     ['GK'],
     ['CB', 'CB', 'CB'],
     ['LWB', 'CM', 'CM', 'RWB'],
     ['LW', 'ST', 'RW']
   ],
-  // ========== P1: 4 formations nuevas ==========
   '3-5-2-CDM': [
     ['GK'],
     ['CB', 'CB', 'CB'],
@@ -144,7 +119,6 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
     ['LM', 'RM'],
     ['ST', 'ST']
   ],
-  // ========== P2: variante 4-1-2-3 ==========
   '4-1-2-3': [
     ['GK'],
     ['LB', 'CB', 'CB', 'RB'],
@@ -154,37 +128,8 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
   ]
 };
 
-/**
- * FE5: formation-change modal.
- *
- * <p>D-formation-ui: dropdown with formation options (4-4-2, 4-3-3, 3-5-2,
- * 4-2-3-1, 5-3-2, 4-1-4-1, 3-4-3 + 5 nuevas ) + a visual pitch
- * that re-renders the layout based on the selection.
- *
- * <p>#4: the F5 comment "drag-and-drop deferred to a follow-up"
- * is now obsolete — the modal renders the manager's actual player names
- * in the visual pitch dots (not just role labels) and supports
- * drag-and-drop re-arrangement between slots + a bench column. See
- * {@link onSlotDrop} / {@link onSlotDragStart} / {@link onSlotDragOver}
- * for the HTML5 drag-drop wire.
- *
- * <p>State: {@code slotAssignments} is a mutable {@code Map<slotIndex,
- * sessionPlayerId>} initialized from {@code data.currentSlots}. On drop,
- * we swap the source and target assignments. On formation change, we
- * re-flow the existing assignments into the new line count (extra slots
- * get `null`; missing slots get trimmed — the formation dropdown
- * inherently changes the line count, so this re-flow is necessary).
- * On confirm, we POST the final slot list to the backend.
- *
- * <p>Trade-off: drag-and-drop is a UX improvement on top of the existing
- * F5 wire. The backend's `changeFormation` endpoint still takes a
- * slot list, so no contract change is required.
- *
- * <p>P3.2: cada dot muestra el role label específico
- * (LWB, RWB, CDM, CAM, ST, etc.) debajo del player name. Player name
- * is the primary identifier (Previously only the role label was shown,
- * which made it impossible to tell who was in which position).
- */
+// Formation-change modal used during live matches.
+// It lets the manager change shape, swap players, and keep the final slot list explicit.
 @Component({
   selector: 'app-formation-modal',
   standalone: true,
@@ -199,9 +144,7 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
     MatProgressSpinnerModule
   ],
   templateUrl: './formation-modal.component.html',
-  // : inlined styles so ɵcmp.styles exposes the source
-  // to unit tests (external CSS would not be reachable). Keep the file in
-  // sync — the .css companion has been left in place for IDE hints only.
+  // Inline styles are kept here because component specs inspect the compiled styles.
   styles: [`
     .formation-modal-root {
       min-width: 460px;
@@ -319,11 +262,7 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       min-height: 36px;
     }
 
-    /* #4: 2-column visual layout (pitch + bench) on tablet+
-       viewports. Mobile collapses to a single column with the bench
-       BELOW the pitch. The drag-drop UX requires the two columns
-       to be visible side-by-side on desktop so the manager can
-       drag from one to the other without scrolling. */
+    /* Two-column pitch and bench layout on tablet and desktop. */
     .formation-grid {
       display: grid;
       grid-template-columns: 1fr;
@@ -356,34 +295,24 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       font-weight: 700;
       color: #1e3c72;
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-      /* #4: cursor + transition for drag-drop UX. The dot
-         is now interactive (draggable + drop target), not just a
-         static label. */
+      /* Interactive drag/drop affordance. */
       cursor: grab;
       user-select: none;
       transition: transform 0.1s ease, box-shadow 0.1s ease;
     }
     .player-dot:active { cursor: grabbing; }
-    /* #4: empty slot has a dashed border + a tinted
-       background so the manager can see "this slot is unassigned"
-       vs. "this slot is filled". The role label still shows in
-       the dot, so the formation is always readable. */
+    /* Empty slots stay readable while looking available. */
     .player-dot.is-empty {
       background: #f5f7fa;
       border-style: dashed;
       color: #5a6473;
     }
-    /* #4: source dot of an in-progress drag gets a
-       subtle scale + red glow so the manager sees what they're
-       moving. */
+    /* Highlight the source dot while dragging. */
     .player-dot.is-drag-source {
       transform: scale(0.92);
       box-shadow: 0 0 0 3px #d32f2f, 0 1px 3px rgba(0, 0, 0, 0.3);
     }
-    /* #4: when a dot is filled, render the player name
-       in addition to (or instead of) the role label. The name is
-       truncated with ellipsis so a long name doesn't blow out the
-       dot. */
+    /* Keep long player names compact inside the dot. */
     .dot-player-name {
       font-size: 0.55rem;
       font-weight: 600;
@@ -395,9 +324,7 @@ const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
       color: #1e3c72;
     }
 
-    /* #4: bench column. Vertical list of draggable
-       player cards. Each card is sized to the column width; the
-       player name + position are stacked. Hover raises the card. */
+    /* Scrollable bench column with draggable player cards. */
     .bench-list {
       display: flex;
       flex-direction: column;
@@ -642,61 +569,24 @@ export class FormationModalComponent {
     this.normalizeFormation(this.data.currentFormation)
   );
 
-  /**
-   * #4: mutable slot→playerId map. Initialized from
-   * {@code data.currentSlots}. Updated by drag-and-drop handlers and
-   * the formation-change re-flow. The visual pitch template binds to
-   * this map to render the player name in each dot.
-   *
-   * <p>Stored as a Map (not a plain object) so we can do
-   * {@code .get(idx) ?? null} and `null`-check for empty slots after
-   * a formation change widens the pitch.
-   */
+  // Mutable slot-to-player map used by the visual pitch and drag/drop flow.
   slotAssignments: Map<number, string | null> = new Map();
 
   selectedSlotIdx: number | null = null;
 
   private slotCoords: Map<number, { x: number; y: number }> = new Map();
 
-  /**
-   * #4: id of the slot currently being dragged (or null
-   * when no drag is active). Used by the {@code onSlotDragOver}
-   * handler to highlight the drop target. {@code -1} when dragging
-   * from the bench (a non-slot source).
-   */
+  // Current drag source. Null means no active drag; bench drags are tracked separately.
   dragSourceSlotIdx: number | null = null;
   dragSourceIsBench: boolean = false;
 
-  /**
-   * : tracks slots that were auto-filled by
-   * {@link autoFillEmptySlots} so the template can render a lock icon
-   * with tooltip "Auto-asignado". When the manager manually drags a
-   * different player into the slot, we drop the entry here so the
-   * lock badge disappears (manual override takes priority).
-   */
+  // Tracks auto-filled slots so manual changes can clear the badge.
   readonly autoFilledSlots = new Map<number, string>();
 
-  /**
-   * warning message surfaced when at least one slot
-   * could not be auto-filled (no compatible bench player). Empty when
-   * every empty slot was resolved. Mirrors the same pattern as
-   * {@code errorMsg} so the same banner styling renders both states.
-   */
+  // Warning shown when an empty slot cannot be filled automatically.
   warningMsg = '';
 
-  /**
-   * position group mapping for the bench fill.
-   * Slot role labels and bench player positions can be either
-   * family CATEGORY (DEF, MID, ATT) or specific role (CB, CM, ST,
-   * etc.). The map lists both forms so either side resolves to the
-   * same group.
-   *
-   * <p>GK only matches GK. DEF matches the DEF category plus every
-   * specific defender role. Same shape for MID and ATT. A slot whose
-   * role label is missing from any group falls back to "all
-   * positions" (defensive — accepts any bench player rather than
-   * failing the slot).
-   */
+  // Position compatibility groups used when auto-filling empty slots.
   private static readonly POSITION_GROUPS: Record<string, string[]> = {
     GK: ['GK'],
     DEF: ['DEF', 'CB', 'LB', 'RB', 'LWB', 'RWB'],
@@ -717,11 +607,7 @@ export class FormationModalComponent {
   }
 
   constructor() {
-    // #4: initialize slotAssignments from the dialog data's
-    // currentSlots. Slots with the same index share the assignment
-    // (a slotIndex of 0 is always the GK, etc.). The slotAssignments
-    // map is mutable; drag-and-drop mutates it in place and the
-    // template re-renders on each CD cycle.
+    // Initialize current pitch assignments from the dialog data.
     for (const s of this.data.currentSlots ?? []) {
       this.slotAssignments.set(s.slotIndex, s.sessionPlayerId || null);
     }
@@ -731,11 +617,7 @@ export class FormationModalComponent {
   onFormationChange(value: string): void {
     const newFormation = this.normalizeFormation(value);
     this.selectedFormation.set(newFormation);
-    // #4: re-flow the slotAssignments to match the new
-    // formation's line count. New slots (when the new formation has
-    // more dots than the current one) start as `null` so the dot
-    // shows the role label with no player name. Existing slots
-    // preserve their assignment when the index is still in range.
+    // Keep the current XI order when changing formation shape.
     const currentXi = Array.from(this.slotAssignments.values()).filter((playerId): playerId is string => !!playerId);
     const newLineCount = (FORMATION_LINES_BY_FORMATION[newFormation] ?? []).reduce(
       (sum, line) => sum + line.length, 0
@@ -747,70 +629,11 @@ export class FormationModalComponent {
     this.selectedSlotIdx = null;
     this.resetAllSlotCoords();
     this.errorMsg = '';
-    // : live formation change preserves the current XI.
-    // Do NOT call /career/lineup/auto-select here: auto-select may choose
-    // better bench players for the new shape, which is useful pre-match but
-    // wrong during play. Substitutes enter only by explicit manager action.
-    return;
-    /*
-
-    // re-flow the local slotAssignments above is
-    // a UI-only change. Without a backend call, the squad page would
-    // still read the stale /career/lineup/current response (with
-    // 14 slots if the previous formation had more dots) and the
-    // chem header on the modal would render against an empty
-    // slot map. POST /career/lineup/auto-select so the backend
-    // re-runs the HELPER-BASED slot assignment with the new
-    // formation, then refresh this modal's slotAssignments from
-    // the response so the local chem readout stays consistent.
-    this.http.post<{
-      formation: string;
-      slots: Array<{ playerId: string; subdivisionId: string }>;
-    }>(`${environment.apiUrl}/career/lineup/auto-select`, {
-      formation: newFormation
-    })
-    .pipe(takeUntil(this.destroy$))
-    .subscribe({
-      next: (resp) => {
-        // : only override the local slotAssignments if
-        // the backend actually returned a non-empty slot list. If the
-        // response has 0 slots (e.g. the test harness's default mock
-        // returns `{slots: []}` or the backend's auto-select produced
-        // a partial map), KEEP the local re-flow above so the visual
-        // pitch doesn't go blank. The chem readout will be refreshed
-        // separately on the next /career/lineup/current call from
-        // the squad page anyway.
-        if (resp && Array.isArray(resp.slots) && resp.slots.length >= newLineCount) {
-          const refreshed = new Map<number, string | null>();
-          for (const s of resp.slots) {
-            if (s && s.subdivisionId && s.playerId) {
-              refreshed.set(refreshed.size, s.playerId);
-            }
-          }
-          if (refreshed.size >= newLineCount) {
-            this.slotAssignments = refreshed;
-          }
-        }
-        this.errorMsg = '';
-      },
-      error: () => {
-        // Keep the manager informed if the visual change could not be saved.
-        this.errorMsg = 'No se pudo actualizar la formación en el backend. Chem puede estar desactualizado.';
-      }
-    });
-    */
   }
 
-  // ========== #4: HTML5 drag-and-drop handlers ==========
+  // ========== HTML5 drag-and-drop handlers ==========
 
-  /**
-   * dragstart on a slot dot. Stores the source slot index in a local
-   * field so {@link onSlotDrop} knows which slot the drag came from.
-   * The browser sets {@code dataTransfer.setData()} so the drop
-   * event has access to the same data — we set a structured payload
-   * with both the slot index and a marker identifying whether the
-   * source is the bench (slotIdx = -1) or a pitch slot.
-   */
+  // Start dragging a player already on the pitch.
   onSlotDragStart(event: DragEvent, slotIdx: number): void {
     if (!event.dataTransfer) {
       return;
@@ -822,10 +645,7 @@ export class FormationModalComponent {
     event.dataTransfer.effectAllowed = 'move';
   }
 
-  /**
-   * dragstart on a bench player. Source is the bench (slotIdx = -1)
-   * and the playerId is carried in the dataTransfer payload.
-   */
+  // Start dragging a bench player into the pitch.
   onBenchDragStart(event: DragEvent, playerId: string): void {
     if (!event.dataTransfer) {
       return;
@@ -836,12 +656,7 @@ export class FormationModalComponent {
     event.dataTransfer.effectAllowed = 'move';
   }
 
-  /**
-   * dragover on a slot dot. Must call {@code preventDefault()} to
-   * signal the browser this is a valid drop target (default is
-   * "no drop allowed"). We also set the dropEffect to 'move' so
-   * the cursor matches the action.
-   */
+  // Allow dropping onto a pitch slot.
   onSlotDragOver(event: DragEvent): void {
     if (!event.dataTransfer) {
       return;
@@ -928,30 +743,7 @@ export class FormationModalComponent {
 
   // ========== auto-fill empty slots on confirm ==========
 
-  /**
-   * : iterates every empty slot in the
-   * current formation and fills it with the first compatible bench
-   * player (same position group). Tracks the assignment in
-   * {@link autoFilledSlots} so the template can render a lock icon
-   * with tooltip "Auto-asignado".
-   *
-   * <p>Selection rules:
-   * <ul>
-   *   <li>Bench player must be currently on the bench (computed from
-   *       {@code data.squad} minus slotAssignments).</li>
-   *   <li>Position must be compatible per
-   *       {@link POSITION_GROUPS} (GK→GK, DEF→CB family, MID→CM
-   *       family, ATT→ST family). Falling back to first available
-   *       bench if no compatible player exists for a slot.</li>
-   *   <li>First compatible player wins (stable order from bench list,
-   *       which is the squad order from the backend).</li>
-   * </ul>
-   *
-   * <p>If at least one slot could not be filled (all bench players
-   * already assigned, or the squad has nobody), the warning is
-   * surfaced to {@link warningMsg} so the manager can see the gap
-   * before confirming.
-   */
+  // Fill empty formation slots with the first compatible bench player.
   autoFillEmptySlots(): void {
     this.autoFilledSlots.clear();
     this.warningMsg = '';
@@ -1045,12 +837,7 @@ export class FormationModalComponent {
     }
   }
 
-  /**
-   * #4: returns the SessionPlayer assigned to the given
-   * slot, or `null` when the slot is empty. Used by the template
-   * to render the player name in the dot (or fall back to the
-   * role label when empty).
-   */
+  // Player assigned to a pitch slot, or null when the slot is empty.
   playerAtSlot(slotIdx: number): SessionPlayer | null {
     const pid = this.slotAssignments.get(slotIdx);
     if (!pid) {
@@ -1059,12 +846,7 @@ export class FormationModalComponent {
     return (this.data.squad ?? []).find(p => p.sessionPlayerId === pid) ?? null;
   }
 
-  /**
-   * #4: helper for the template — converts a (lineIdx,
-   * dotIdx) pair into a flat slotIndex. The pitch renders lines
-   * top-to-bottom and dots left-to-right within a line, so the
-   * flat index is the cumulative offset.
-   */
+  // Convert a line/dot pair into the flat slot index.
   getSlotIndex(lineIdx: number, dotIdx: number): number {
     const lines = FORMATION_LINES_BY_FORMATION[this.selectedFormation()] ?? [];
     let idx = 0;
@@ -1074,11 +856,7 @@ export class FormationModalComponent {
     return idx + dotIdx;
   }
 
-  /**
-   * #4: public re-export of the private
-   * {@link slotsDifferFromInitial} so the template can disable
-   * the Confirm button when nothing changed.
-   */
+  // Template-facing no-op guard for the Confirm button.
   slotsDifferFromInitialPublic(): boolean {
     return this.slotsDifferFromInitial();
   }
@@ -1138,13 +916,7 @@ export class FormationModalComponent {
     return `${coord.x.toFixed(0)} / ${coord.y.toFixed(0)}`;
   }
 
-  /**
-   * #4: returns the bench list — squad players not
-   * currently in the starting XI. The bench list is reactive to
-   * the slotAssignments map (recomputed on every CD cycle), so a
-   * drag that puts a player in the starting XI immediately
-   * removes them from the bench and vice versa.
-   */
+  // Bench players are the squad members not currently assigned to pitch slots.
   get benchPlayers(): SessionPlayer[] {
     const assigned = new Set<string>();
     for (const pid of this.slotAssignments.values()) {
@@ -1153,15 +925,7 @@ export class FormationModalComponent {
     return (this.data.squad ?? []).filter(p => !assigned.has(p.sessionPlayerId));
   }
 
-  /**
-   * Returns the count of players per line for the visual pitch.
-   * E.g. 4-4-2 → [1, 4, 4, 2] (GK, DEF, MID, ATT).
-   *
-   * <p>P3.2: derived from {@link FORMATION_LINES_BY_FORMATION}
-   * para que el conteo siempre matchee los role labels. Si la formation
-   * no está en el map (no debería pasar, pero defensivo), cae al default
-   * 4-4-2.
-   */
+  // Count of players per tactical line for the visual pitch.
   get formationLines(): number[] {
     const lines = FORMATION_LINES_BY_FORMATION[this.selectedFormation()];
     if (!lines || lines.length === 0) {
@@ -1185,11 +949,7 @@ export class FormationModalComponent {
 
   confirm(): void {
     if (this.isSubmitting) { return; }
-    // #4: the no-change check is now broader than the
-    // F5 "formation string didn't change" check. We also treat the
-    // case where the formation changed but the slot assignments are
-    // identical to the original as a no-op (the backend's auto-fill
-    // would re-derive the same lineup).
+    // Close as no-op when formation, players and pixel coordinates are unchanged.
     const formationChanged = this.selectedFormation() !== this.data.currentFormation;
     const slotsChanged = this.slotsDifferFromInitial();
     const coordsChanged = this.coordsDifferFromDefault();
@@ -1197,19 +957,10 @@ export class FormationModalComponent {
       this.dialogRef.close({ success: false, reason: 'no-change' });
       return;
     }
-    // : auto-fill every empty slot from the
-    // bench before we POST. The manager dragged some players around
-    // and the formation changed — empty slots would otherwise be sent
-    // as empty sessionPlayerId and the backend's auto-fill would pick
-    // the same player the manager has on the bench right next to the
-    // modal. Doing it client-side gives the manager immediate visual
-    // feedback (lock icon + tooltip) and lets them undo by dragging a
-    // different player into the slot before re-confirming.
+    // Auto-fill empty slots before sending the final shape.
     this.isSubmitting = true;
     this.errorMsg = '';
-    // #4: build the slot list from the current
-    // slotAssignments (post-drag state), with the position derived from
-    // FORMATION_LINES_BY_FORMATION for the selected formation.
+    // Build the backend payload from the current visual slot state.
     const slots = this.buildSlotListForBackend();
     const openedWithFullXi = (this.data.currentSlots?.length ?? 0) >= 10;
     if (openedWithFullXi && slots.some(slot => !slot.sessionPlayerId)) {
@@ -1240,13 +991,7 @@ export class FormationModalComponent {
       });
   }
 
-  /**
-   * #4: returns the current slot assignments as the
-   * backend-shaped list of `{ sessionPlayerId, position, slotIndex }`.
-   * Position is derived from the formation's role label at the
-   * matching line/dot. In live play, empty slots are invalid because
-   * substitutes must enter only by an explicit manager action.
-   */
+  // Current slot assignments in the shape expected by the backend.
   private buildSlotListForBackend(): Array<{
     sessionPlayerId: string;
     position: string;
@@ -1334,12 +1079,7 @@ export class FormationModalComponent {
     return Math.max(min, Math.min(max, value));
   }
 
-  /**
-   * #4: returns true when the current slotAssignments
-   * differ from the initial currentSlots (in any slot). Used by
-   * {@link confirm} to short-circuit the no-op path when the manager
-   * only opened the modal and dragged nothing.
-   */
+  // True when current assignments differ from the original dialog state.
   private slotsDifferFromInitial(): boolean {
     const initial = new Map<number, string>();
     for (const s of this.data.currentSlots ?? []) {
@@ -1361,21 +1101,7 @@ export class FormationModalComponent {
     this.dialogRef.close({ success: false, reason: 'cancelled' });
   }
 
-  /**
-   * Returns the role label shown on each player dot.
-   *
-   * <p>P3.2: lee de {@link FORMATION_LINES_BY_FORMATION} para
-   * devolver labels específicos por formation (LWB, RWB, CDM, CAM, etc.)
-   * en lugar de los genéricos anteriores (DF, MD, AT).
-   *
-   * <p>Los parámetros {@code count} e {@code isLast} se mantienen por
-   * compat con el template HTML pero ya no se usan para calcular el
-   * label (la info está en el map).
-   *
-   * @param lineIdx índice de la línea en la formación (0 = GK al top,
-   *                última línea = ATT al bottom).
-   * @param n índice del dot dentro de la línea (left-to-right).
-   */
+  // Role label shown on each player dot.
   getDotLabel(lineIdx: number, n: number, _count: number, _isLast: boolean): string {
     const lines = FORMATION_LINES_BY_FORMATION[this.selectedFormation()];
     if (!lines || !lines[lineIdx]) {
