@@ -77,8 +77,7 @@ export class TournamentChampionComponent implements OnInit {
         }
         this.cdr.markForCheck();
       },
-      error: (err) => {
-        console.error('[TournamentChampion] ❌ Error detectando career mode:', err);
+      error: () => {
         this.isCareerMode = false;
         this.careerPhase = '';
         this.loadChampion();
@@ -94,9 +93,8 @@ export class TournamentChampionComponent implements OnInit {
         this.champion = champion;
         this.cdr.markForCheck();
       },
-      error: (err) => {
+      error: () => {
         this.errorMsg = 'Error al cargar el campeón';
-        console.error('[TournamentChampion] Error loading champion from Career:', err);
         this.cdr.markForCheck();
       }
     });
@@ -108,8 +106,7 @@ export class TournamentChampionComponent implements OnInit {
         this.standings = standings;
         this.cdr.markForCheck();
       },
-      error: (err) => {
-        console.error('[TournamentChampion] Error loading standings from Career:', err);
+      error: () => {
         this.cdr.markForCheck();
       }
     });
@@ -121,9 +118,8 @@ export class TournamentChampionComponent implements OnInit {
         this.champion = champion;
         this.cdr.markForCheck();
       },
-      error: (err) => {
+      error: () => {
         this.errorMsg = 'Error al cargar el campeón';
-        console.error('[TournamentChampion] Error loading champion:', err);
         this.cdr.markForCheck();
       }
     });
@@ -135,8 +131,7 @@ export class TournamentChampionComponent implements OnInit {
         this.standings = standings;
         this.cdr.markForCheck();
       },
-      error: (err) => {
-        console.error('[TournamentChampion] Error loading final standings:', err);
+      error: () => {
         this.cdr.markForCheck();
       }
     });
@@ -162,7 +157,6 @@ export class TournamentChampionComponent implements OnInit {
         }
       },
       error: (err) => {
-        console.error('[TournamentChampion] Error iniciando nueva temporada:', err);
         this.errorMsg = err.error?.message || 'Error al iniciar nueva temporada';
         this.cdr.markForCheck();
       }

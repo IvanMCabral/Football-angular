@@ -121,8 +121,7 @@ export class RoundSummaryComponent implements OnInit, OnDestroy {
             this.loadStandings();
             setTimeout(() => this.reloadCareerStatus(), 100);
           },
-          error: (err) => {
-            console.error('[SUMMARY] Error loading fixtures:', err);
+          error: () => {
             this.updateVm({
               ...this.vmSubject.value,
               errorMsg: 'Error al cargar los partidos'
@@ -130,8 +129,7 @@ export class RoundSummaryComponent implements OnInit, OnDestroy {
           }
         });
       }),
-      catchError(err => {
-        console.error('[SUMMARY] Error:', err);
+      catchError(() => {
         return of(null);
       })
     ).subscribe();
@@ -168,8 +166,7 @@ export class RoundSummaryComponent implements OnInit, OnDestroy {
           userPosition
         });
       },
-      error: (err) => {
-        console.error('[SUMMARY] Error loading standings:', err);
+      error: () => {
         this.calculateStandingsFromMatches();
       }
     });
@@ -300,7 +297,6 @@ export class RoundSummaryComponent implements OnInit, OnDestroy {
   goToMatchDetail(matchId: string) {
     const vm = this.vmSubject.value;
     if (!vm.careerId || !matchId) {
-      console.warn('[SUMMARY] Missing careerId or matchId for detail navigation', vm.careerId, matchId);
       return;
     }
     this.router.navigate(['/careers', vm.careerId, 'matches', matchId, 'detail']);
@@ -349,7 +345,6 @@ export class RoundSummaryComponent implements OnInit, OnDestroy {
         }
       },
       error: (err) => {
-        console.error('[SUMMARY] Error iniciando nueva temporada:', err);
         this.vmSubject.next({
           ...this.vmSubject.value,
           errorMsg: err.error?.message || 'Error al iniciar nueva temporada'

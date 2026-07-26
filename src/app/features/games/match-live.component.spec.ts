@@ -17,7 +17,6 @@ import { MatchEngineService } from '../../core/services/match-engine.service';
 import { CareerService } from '../../core/services/career.service';
 import { LiveMatchModalsService } from '../../core/services/live-match-modals.service';
 import { MatchState, RoundState, StreamHealth } from '../../core/services/match-engine.model';
-import { environment } from '../../environments/environment';
 
 const SAMPLE_MATCH_ID = 'm-live-1';
 const SAMPLE_GAME_ID = 'g-career-1';
@@ -217,23 +216,4 @@ describe('MatchLiveComponent', () => {
     expect(engineServiceSpy.getMatchState).not.toHaveBeenCalled();
   });
 
-  it('should warn on console if environment.useSse is false (decision B5: force SSE round anyway)', () => {
-    const originalUseSse = environment.useSse;
-    (environment as any).useSse = false;
-    spyOn(console, 'warn');
-    try {
-      fixture.detectChanges();
-      expect(console.warn).toHaveBeenCalledWith(
-        jasmine.stringMatching(/environment\.useSse is false/)
-      );
-    } finally {
-      (environment as any).useSse = originalUseSse;
-    }
-  });
-
-  it('should not warn on console when environment.useSse is true (default)', () => {
-    spyOn(console, 'warn');
-    fixture.detectChanges();
-    expect(console.warn).not.toHaveBeenCalled();
-  });
 });

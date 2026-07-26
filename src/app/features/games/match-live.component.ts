@@ -97,16 +97,12 @@ export class MatchLiveComponent implements OnInit, OnDestroy {
               });
               this.teamNameMapSubject.next(map);
             },
-            error: (err) => console.error('[MATCH-LIVE] teams error', err)
+            error: () => this.teamNameMapSubject.next({})
           });
 
         // Resolve the round this match belongs to and subscribe to the
         // round-level stream. Each emission carries all match states; this
         // view filters the one requested by the route.
-        if (!environment.useSse) {
-          console.warn('[MATCH-LIVE] environment.useSse is false; forcing round-level SSE.');
-        }
-
         this.engineService.getRoundIdForMatch(this.matchId)
           .pipe(
             switchMap(roundId => this.engineService.streamRoundState(roundId)),
@@ -122,14 +118,10 @@ export class MatchLiveComponent implements OnInit, OnDestroy {
               // yet, `*ngIf` stays in its "Cargando..." state until the next
               // tick carries our matchId — this is the desired UX.
             },
-            error: (err) => {
-              // Decision B4: clear, non-breaking error message. We do NOT
-              // redirect or tear down the layout — the template renders the
-              // banner next to the scoreboard area instead of replacing it.
+            error: () => {
               this.errorMsgSubject.next(
                 'No se puede cargar el partido. Es posible que ya haya finalizado o que aún no haya comenzado.'
               );
-              console.error('[MATCH-LIVE] Error loading match state:', err);
             }
           });
 
@@ -230,8 +222,7 @@ export class MatchLiveComponent implements OnInit, OnDestroy {
             this.snackBar.open(result.error || 'No se pudo cambiar la táctica', 'OK', { duration: 3000 });
           }
         },
-        error: (err) => {
-          console.error('[MATCH-LIVE] [F5.4] changeStyle error', err);
+        error: () => {
           this.snackBar.open('Error al cambiar la táctica', 'OK', { duration: 3000 });
         }
       });
@@ -246,8 +237,7 @@ export class MatchLiveComponent implements OnInit, OnDestroy {
     this.modals.openSubstitutionModal(this.matchId, state)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        error: (err) => {
-          console.error('[MATCH-LIVE] openSubstitutionModal error', err);
+        error: () => {
           this.snackBar.open('No se pudo abrir la sustitución', 'OK', { duration: 3000 });
         }
       });
@@ -261,8 +251,7 @@ export class MatchLiveComponent implements OnInit, OnDestroy {
     this.modals.openFormationModal(this.matchId, state)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        error: (err) => {
-          console.error('[MATCH-LIVE] openFormationModal error', err);
+        error: () => {
           this.snackBar.open('No se pudo abrir el cambio de formación', 'OK', { duration: 3000 });
         }
       });

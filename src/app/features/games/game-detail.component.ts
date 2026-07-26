@@ -120,8 +120,7 @@ export class GameDetailComponent implements OnInit {
             this.cdr.detectChanges();
           });
         },
-        error: (err) => {
-          console.error('[GAME DETAIL] Error loading game:', err);
+        error: () => {
           this.errorMsg = 'No se pudo cargar el juego. Puede que no exista o hubo un error.';
           this.cdr.detectChanges();
         }

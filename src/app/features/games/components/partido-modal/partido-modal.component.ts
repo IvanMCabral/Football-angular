@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, ChangeDetectorRef, Component, computed, inject, isDevMode, signal } from '@angular/core';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
@@ -2842,9 +2842,6 @@ export class PartidoModalComponent {
         error: (err) => {
           this.errorMsg = this.describeSaveError(err);
           this.cdr.markForCheck();
-          if (isDevMode()) {
-            console.error('[PARTIDO-MODAL] error', err);
-          }
         }
       });
   }

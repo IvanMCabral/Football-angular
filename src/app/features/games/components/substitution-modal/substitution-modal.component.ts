@@ -867,7 +867,6 @@ export class SubstitutionModalComponent {
           this.errorMsg = formationSaveAttempted
             ? 'La sustitución se aplicó, pero falló el guardado del ajuste de posición. Podés cerrar y reabrir Partido/Formación para revisar la táctica.'
             : this.formatSubstitutionError(err);
-          console.error('[SUB-MODAL] error', err);
           this.cdr.markForCheck();
         }
       });
