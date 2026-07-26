@@ -11,6 +11,12 @@ import { Subject } from 'rxjs';
 import { MatchCardComponent } from '../../shared/components/match-card/match-card.component';
 import { RoundLiveViewModel, RoundMatchVM } from './models/round-live.model';
 import { MatchState, RoundState } from '../../core/services/match-engine.model';
+import {
+  getLastRoundEvents,
+  getRoundEventIcon,
+  getRoundStatusText,
+  mapRoundFixtureStatus
+} from './utils/round-live-utils';
 
 declare global {
   interface Window {
@@ -1659,25 +1665,15 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
   }
 
   getStatusText(status: string): string {
-    const statusMap: { [key: string]: string } = {
-      'NOT_STARTED': 'Por Iniciar',
-      'RUNNING': 'En Juego',
-      'PAUSED': 'Pausado',
-      'FINISHED': 'Finalizado',
-      'CANCELLED': 'Cancelado'
-    };
-    return statusMap[status] || status;
+    return getRoundStatusText(status);
   }
 
   getEventIcon(eventType: string): string {
-    const iconMap: { [key: string]: string } = {
-      'GOAL': '⚽', 'CARD': '🟨', 'INJURY': '🚑', 'SUBSTITUTION': '🔄'
-    };
-    return iconMap[eventType] || '📋';
+    return getRoundEventIcon(eventType);
   }
 
   getLastEvents(events: any[], count: number): any[] {
-    return events.slice(-count).reverse();
+    return getLastRoundEvents(events, count);
   }
 
   // UX-5: separar el partido del user del resto en la grilla
@@ -1690,19 +1686,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
   }
 
   private mapFixtureStatus(fixtureStatus: string): 'SCHEDULED' | 'SIMULATED' | 'CANCELLED' {
-    // Also accept live state statuses (NOT_STARTED / RUNNING / PAUSED /
-    // FINISHED), so SSE updates of rm.match.status correctly flip SCHEDULED
-    // to SIMULATED when the match ends.
-    switch (fixtureStatus) {
-      case 'PENDING': case 'SIMULATING':
-      case 'NOT_STARTED': case 'RUNNING': case 'PAUSED':
-        return 'SCHEDULED';
-      case 'COMPLETED': case 'FINISHED':
-        return 'SIMULATED';
-      case 'CANCELLED':
-        return 'CANCELLED';
-      default: return 'SCHEDULED';
-    }
+    return mapRoundFixtureStatus(fixtureStatus);
   }
 
   goToRoundSummary() {
