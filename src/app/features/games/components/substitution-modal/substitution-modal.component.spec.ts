@@ -1,9 +1,4 @@
-/**
- * Unit tests for {@link SubstitutionModalComponent}.
- *
- * <p>Validates the validation contract and the substitution flow without
- * involving a real backend (HttpClient is mocked via a Spy).
- */
+// Unit tests for the live substitution modal.
 
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
@@ -502,17 +497,7 @@ describe('Substitution modal effectiveness feedback', () => {
   let dialogRefSpy: jasmine.SpyObj<MatDialogRef<SubstitutionModalComponent>>;
   let snackBarSpy: jasmine.SpyObj<MatSnackBar>;
 
-  /**
-   * Build a SubstitutionDialogData with effectivenessMap populated.
-   *
-   * <p>Players:
-   * <ul>
-   *   <li>p1 (GK, rating 85)            → eff=1.0  (eff-good)</li>
-   *   <li>p2 (CB, rating 80)            → eff=0.95 (eff-good, just above 0.9)</li>
-   *   <li>p3 (CDM, rating 78)           → eff=0.75 (eff-warning, 0.7-0.9 band)</li>
-   *   <li>b1 (CB-bench, rating 75)      → NO en el map (no jugó en XI pre-match) → null</li>
-   * </ul>
-   */
+  // Build dialog data with known effectiveness values for starter and bench cases.
   function buildDataWithEffectiveness(): SubstitutionDialogData {
     return {
       matchId: 'm1',
@@ -527,10 +512,9 @@ describe('Substitution modal effectiveness feedback', () => {
         { sessionPlayerId: 'b1', displayName: 'CB-bench', position: 'CB', rating: 75, isStarter: false }
       ],
       effectivenessMap: {
-        p1: 1.0,    // eff-good
-        p2: 0.95,   // eff-good
-        p3: 0.75    // eff-warning
-        // b1 NO en el map (no jugó en XI pre-match) → null
+        p1: 1.0,
+        p2: 0.95,
+        p3: 0.75
       }
     };
   }
@@ -540,8 +524,7 @@ describe('Substitution modal effectiveness feedback', () => {
     dialogRefSpy = jasmine.createSpyObj('MatDialogRef', ['close']);
     snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
 
-    // Reset the testing module before reconfiguring it so the
-    // MAT_DIALOG_DATA del describe anterior (SAMPLE_DATA) no contamine este.
+    // Reset dialog data between scenarios.
     TestBed.resetTestingModule();
     await TestBed.configureTestingModule({
       imports: [SubstitutionModalComponent, NoopAnimationsModule],
@@ -580,10 +563,7 @@ describe('Substitution modal effectiveness feedback', () => {
   });
 
   it('renders eff-good class on starting XI dot for p1', () => {
-    // The starting XI is rendered as a click-only visual pitch (not a
-    // list). The eff-good / eff-warning / eff-bad classes move from the
-    // <li> to the corresponding pitch dot so the
-    // effectiveness-feedback flow keeps working visually.
+    // Effectiveness classes are rendered on the visual pitch dots.
     const dots = fixture.nativeElement.querySelectorAll('.v25d79-pitch-dot') as NodeListOf<HTMLElement>;
     const p1Dot = Array.from(dots).find((dot: HTMLElement) =>
       dot.querySelector('.v25d79-dot-name')?.textContent?.includes('GK') ?? false);
@@ -614,21 +594,13 @@ describe('Substitution modal effectiveness feedback', () => {
     expect(b1Li.querySelector('.eff-badge')).toBeNull();
   });
 
-  // Green border symmetry for good effectiveness feedback.
-  // visual symmetry with eff-warning (amber) and eff-bad (red). The actual color is
-  // covered by visual smoke tests; here we verify that eff-good remains bound
-  // en el DOM para los SALE dots con eff >= 0.9 (consistency check).
-  //
-  // Query uses pitch dots instead of the old starter list selector
-  // because the starting XI is now a pitch, not a list.
+  // Good effectiveness should have the same DOM hook as warning/bad states.
   it('eff-good class is applied to SALE dot with eff >= 0.9 (green border symmetry check)', () => {
     const dots = fixture.nativeElement.querySelectorAll('.v25d79-pitch-dot') as NodeListOf<HTMLElement>;
-    // p1 (eff=1.0) y p2 (eff=0.95) deben tener eff-good. p3 (eff=0.75) eff-warning.
     const goodDots = Array.from(dots).filter((dot: HTMLElement) =>
       dot.classList.contains('eff-good'));
     expect(goodDots.length).toBe(2,
       `expected 2 SALE dots with eff-good (p1 eff=1.0, p2 eff=0.95), got ${goodDots.length}`);
-    // Sanity: los dots eff-good no deben colisionar con eff-warning ni eff-bad.
     goodDots.forEach((dot: HTMLElement) => {
       expect(dot.classList.contains('eff-warning')).withContext('eff-good dot must not also be eff-warning').toBeFalse();
       expect(dot.classList.contains('eff-bad')).withContext('eff-good dot must not also be eff-bad').toBeFalse();
@@ -636,25 +608,7 @@ describe('Substitution modal effectiveness feedback', () => {
   });
 });
 
-/**
- * Visual pitch, per-player stats chips, and remaining substitutions
- * derived from the SSE-fed MatchState (D3 + D5).
- *
- * <p>3 tests per task spec:
- * <ol>
- *   <li>{@code rendersStatsChips_whenPlayerRatingsContainsPlayerId} —
- *       stats chips (goals G, keyPasses KP, yellows Y, fouls F, injuries I)
- *       render on each dot when {@code data.playerRatings} carries a
- *       matching entry for that playerId.</li>
- *   <li>{@code rendersVisualFormationPitch_withLinesGroupedByCategory} —
- *       the starting XI renders as a click-only visual pitch (not a flat
- *       list) when {@code data.formation} is present.</li>
- *   <li>{@code substitutionsRemaining_isSourcedFromData} — the modal
- *       derives the canConfirm + isOutOfSubs gates from
- *       {@code data.substitutionsRemaining}, which the service
- *       propagates from the live match state.</li>
- * </ol>
- */
+// Live data rendering: visual pitch, player stat chips, and substitutions left.
 describe('Substitution modal visual pitch, stats chips, and remaining substitutions', () => {
   let component: SubstitutionModalComponent;
   let fixture: ComponentFixture<SubstitutionModalComponent>;
@@ -662,18 +616,7 @@ describe('Substitution modal visual pitch, stats chips, and remaining substituti
   let dialogRefSpy: jasmine.SpyObj<MatDialogRef<SubstitutionModalComponent>>;
   let snackBarSpy: jasmine.SpyObj<MatSnackBar>;
 
-  /**
-   * Build a controlled SubstitutionDialogData with playerRatings (per spec
-   * task: "Render stats chips cuando hay eventos con playerId"). Player
-   * states mimic what the backend player-rating calculation
-   * produces after the engine has run for some minutes:
-   *  - p1 (GK): one goal (rare for a GK but illustrative), one foul.
-   *  - p2 (CB): one yellow card, 3 key passes.
-   *  - p3 (CDM): one injury, no other stats.
-   *  - p4 (ST): 2 goals, 1 key pass, 1 yellow.
-   *  - b1 (CB-bench): 1 goal, but on the bench (no chips since the bench
-   *    is a list not a pitch).
-   */
+  // Build controlled live data with ratings and event counters.
   function buildDataWithStats(): SubstitutionDialogData {
     return {
       matchId: 'm1',
@@ -687,26 +630,26 @@ describe('Substitution modal visual pitch, stats chips, and remaining substituti
       bench: [
         { sessionPlayerId: 'b1', displayName: 'Bench CB', position: 'CB', rating: 70, isStarter: false }
       ],
-      // Three substitutions remaining (two already used).
+      // Three substitutions remaining.
       substitutionsRemaining: 3,
       formation: '4-3-3',
       playerRatings: [
-        // GK — defensive stats only (rare for a GK to score, but spec illustrates chip rendering).
+        // GK with defensive events.
         { playerId: 'p1', playerName: 'Home GK', teamId: 'home', position: 'GK',
           rating: 7.2, goals: 0, assists: 0, keyPasses: 0, shots: 0,
           yellowCards: 1, redCards: 0, injuries: 0, fouls: 2,
           substitutedIn: false, substitutedOut: false },
-        // CB — yellow card + key passes (typical defensive mid).
+        // CB with yellow card and key passes.
         { playerId: 'p2', playerName: 'Home CB', teamId: 'home', position: 'CB',
           rating: 7.0, goals: 0, assists: 1, keyPasses: 3, shots: 0,
           yellowCards: 1, redCards: 0, injuries: 0, fouls: 1,
           substitutedIn: false, substitutedOut: false },
-        // CDM — injury (no other stats).
+        // CDM with injury event.
         { playerId: 'p3', playerName: 'Home CDM', teamId: 'home', position: 'CDM',
           rating: 6.5, goals: 0, assists: 0, keyPasses: 0, shots: 0,
           yellowCards: 0, redCards: 0, injuries: 1, fouls: 0,
           substitutedIn: false, substitutedOut: false },
-        // ST — prolific: 2 goals + 1 KP + 1 yellow.
+        // ST with attacking output.
         { playerId: 'p4', playerName: 'Home ST', teamId: 'home', position: 'ST',
           rating: 8.4, goals: 2, assists: 0, keyPasses: 1, shots: 4,
           yellowCards: 1, redCards: 0, injuries: 0, fouls: 0,
@@ -721,8 +664,7 @@ describe('Substitution modal visual pitch, stats chips, and remaining substituti
     dialogRefSpy = jasmine.createSpyObj('MatDialogRef', ['close']);
     snackBarSpy = jasmine.createSpyObj('MatSnackBar', ['open']);
 
-    // Reset the testing module so MAT_DIALOG_DATA from the previous describe
-    // does not leak into this scenario.
+    // Reset dialog data between scenarios.
     TestBed.resetTestingModule();
     await TestBed.configureTestingModule({
       imports: [SubstitutionModalComponent, NoopAnimationsModule],
@@ -994,3 +936,5 @@ describe('Substitution modal visual pitch, stats chips, and remaining substituti
     expect(injuredDot.textContent).toContain('Starter 2');
   });
 });
+
+
