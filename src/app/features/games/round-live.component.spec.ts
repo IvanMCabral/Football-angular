@@ -1,32 +1,4 @@
-﻿/**
- * Unit tests for {@link RoundLiveComponent}'s SSE
- * snapshot propagation.
- *
- * <p>Validates the fix for the snapshot-stale bug: after a match transitions
- * to {@code FINISHED} via the round SSE, the embedded {@code Match.status}
- * on each {@code RoundMatchVM} must also flip to {@code 'SIMULATED'} (the
- * post-match terminal status). Before the fix, the SSE handler only updated
- * {@code rm.state} and left {@code rm.match.status} stuck on the initial
- * {@code 'SCHEDULED'} value, so the UI displayed "En Juego" indefinitely
- * until a manual page refresh.
- *
- * <p>Coverage:
- * <ol>
- *   <li>SSE update with {@code state.status='FINISHED'} → {@code match.status}
- *       flips to {@code 'SIMULATED'} (the canonical post-match MatchStatus).</li>
- *   <li>SSE update with {@code state.status='RUNNING'} → {@code match.status}
- *       stays on {@code 'SCHEDULED'} (in-play is not yet terminal).</li>
- *   <li>SSE update with {@code state.status='CANCELLED'} → {@code match.status}
- *       flips to {@code 'CANCELLED'}.</li>
- *   <li>SSE update without a matching matchState → {@code match.status} is
- *       unchanged.</li>
- * </ol>
- *
- * <p>We avoid the constructor's async setup by injecting the initial VM
- * directly via the private {@code vmSubject} (test-only access) and then
- * trigger the SSE update path by calling {@code startRoundEngine} after
- * stubbing {@code engineService.streamRoundState} to emit a Subject we control.
- */
+﻿// RoundLive SSE tests. Most cases drive the stream path with a controlled Subject.
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, provideRouter, Router } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
@@ -240,7 +212,7 @@ describe('RoundLiveComponent live round behavior', () => {
 
     const vm = (component as any).vmSubject.value as RoundLiveViewModel;
     expect(vm.matches[0].match.status).toBe('SIMULATED',
-        'Bug #2: match.status must flip to SIMULATED when SSE state.status=FINISHED');
+        'match.status must flip to SIMULATED when SSE state.status=FINISHED');
     expect(vm.matches[0].state!.status).toBe('FINISHED');
   });
 
@@ -252,7 +224,7 @@ describe('RoundLiveComponent live round behavior', () => {
 
     const vm = (component as any).vmSubject.value as RoundLiveViewModel;
     expect(vm.matches[0].match.status).toBe('SCHEDULED',
-        'Bug #2: match.status must stay SCHEDULED when SSE state.status=RUNNING');
+        'match.status must stay SCHEDULED when SSE state.status=RUNNING');
   });
 
   it('SSE update with status=CANCELLED flips match.status to CANCELLED', () => {
@@ -1120,27 +1092,7 @@ describe('RoundLiveComponent live round behavior', () => {
 
   // ========== Start-all button and anyStarted flag ==========
 
-  /**
-   * Explicit "Iniciar Todos" trigger for the round-live
-   * header. This is the manager's fallback when the auto-start in
-   * {@code startRoundEngine} did not visibly transition the matches to
-   * RUNNING. The button calls
-   * {@code engineService.startRound(roundId, matches)} with the list of
-   * NOT_STARTED (or no-state) matches from the current VM.
-   *
-   * <p>Tests cover:
-   * <ol>
-   *   <li>{@code iniciarTodos} calls {@code startRound} with the filtered
-   *       NOT_STARTED matches, using the {@code gameId} as the roundId.</li>
-   *   <li>{@code iniciarTodos} is a no-op when all matches already started
-   *       (no spurious backend call).</li>
-   *   <li>{@code iniciarTodos} handles the empty-matches case gracefully
-   *       (no crash, no backend call).</li>
-   *   <li>The {@code anyStarted} flag is computed correctly in the SSE
-   *       handler: true when any match is IN_PROGRESS/PAUSED/FINISHED/
-   *       CANCELLED, false when all are NOT_STARTED.</li>
-   * </ol>
-   */
+  // Manual start fallback and the flag that hides it once the round is live.
   describe('Start-all button and anyStarted flag', () => {
     it('iniciarTodos calls engineService.startRound with NOT_STARTED matches', () => {
       // Build a VM with TWO matches: one NOT_STARTED, one without state yet
@@ -1289,30 +1241,7 @@ describe('RoundLiveComponent live round behavior', () => {
 
   // ========== Initial-load spinner ==========
 
-  /**
-   * The constructor's combineLatest (routeParams + teams +
-   * careerStatus + fixtures) used to render an empty round-live-container
-   * immediately because the vmSubject initial value was empty. The user
-   * saw a blank page until all four HTTP fetches resolved. We added a
-   * {@code loading$} BehaviorSubject that flips to false on the first
-   * combineLatest emission (success or error) so the template can render
-   * a centered spinner while loading.
-   *
-   * <p>Tests cover:
-   * <ol>
-   *   <li>{@code loading$} starts at {@code true} on subscription (initial
-   *       BehaviorSubject value), then flips to {@code false} when the
-   *       constructor's combineLatest chain emits.</li>
-   *   <li>{@code loading$} flips to {@code false} on the error path too
-   *       (the catchError in the constructor chain clears it so the
-   *       empty/error state becomes visible).</li>
-   * </ol>
-   *
-   * <p>Implementation note: we use {@code Subject} (not {@code BehaviorSubject})
-   * for the service spies so the combineLatest chain does NOT emit during
-   * the constructor — we control the emissions from the test body and
-   * can observe the {@code loading$} transitions in order.
-   */
+  // Initial loading state before route, teams, career status and fixtures arrive.
   describe('Initial-load spinner', () => {
     it('loading$ starts true and flips to false after combineLatest emits', (done: DoneFn) => {
       // Cold subjects so combineLatest blocks until we push.
@@ -1384,38 +1313,7 @@ describe('RoundLiveComponent live round behavior', () => {
 
   // ========== Auto-start round on first vm$ emission ==========
 
-  /**
-   * Round-live should auto-start the round as soon as
-   * the first vm$ emission shows NOT_STARTED matches, so the manager
-   * doesn't have to click the "Iniciar Todos" button every time. The
-   * button remains as a manual fallback for refresh / failed-auto-start
-   * cases.
-   *
-   * <p>The auto-start is implemented as a
-   * {@code vm$.pipe(take(1)).subscribe(...)} in the constructor, with
-   * an {@code autoStartTriggered} flag to prevent a duplicate POST when
-   * {@link startRoundEngine} also runs (it must, to wire the SSE
-   * stream).
-   *
-   * <p>Tests cover:
-   * <ol>
-   *   <li>Auto-start fires on first vm$ emission with NOT_STARTED
-   *       matches (calls {@code engineService.startRound} with the
-   *       pending list).</li>
-   *   <li>Auto-start is a no-op when the VM is empty ({@code matches.length === 0}).</li>
-   *   <li>Auto-start is a no-op when the VM has {@code errorMsg} set
-   *       (round can't be played).</li>
-   *   <li>Auto-start is a no-op when all matches already started
-   *       (refresh case — backend round is RUNNING).</li>
-   *   <li>{@code startRoundEngine} skips its own POST when
-   *       {@code autoStartTriggered} is true (no duplicate POST).</li>
-   *   <li>The take(1) subscription fires only once even when multiple
-   *       vm$ emissions arrive (SSE updates don't re-trigger
-   *       auto-start).</li>
-   *   <li>The "Iniciar Todos" button fallback still works after the
-   *       auto-start fired — the manager can re-trigger if needed.</li>
-   * </ol>
-   */
+  // Auto-start should run once, with the header button kept as fallback.
   describe('Round auto-start on first vm$ emission', () => {
     it('auto-start fires when first vm$ has NOT_STARTED matches', () => {
       // Spy on engineService.startRound calls. Note: the constructor's
@@ -1586,42 +1484,7 @@ describe('RoundLiveComponent live round behavior', () => {
 
   // ========== SSE roundId resolution ==========
 
-  /**
-   * The frontend must use the backend roundId rather than {@code gameId} as
-   * the SSE {@code roundId}. The backend registers the RoundEngine
-   * under the value the POST response's {@code state.roundId} returns,
-   * which can differ from the request body (e.g. careerId may not be a
-   * UUID string parseable by {@code UUID.fromString} on the server). When
-   * the frontend subscribed to {@code streamRoundState(gameId)}, the
-   * SSE controller's {@code roundEngineRegistry.get(gameId)} returned
-   * {@code null} and the endpoint returned {@code Flux.empty()} — the
-   * SSE went silently idle (state never updated in the UI).
-   *
-   * <p>Fix: capture {@code state.roundId} from the
-   * {@code engineService.startRound} POST response into a
-   * {@code BehaviorSubject<String> resolvedRoundId$} and subscribe the
-   * SSE chain to that subject (filtered to non-null, take(1)). The
-   * POST body itself still carries {@code gameId} so backend idempotency
-   * on re-init is preserved, but the SSE URL uses the registry key.
-   *
-   * <p>Tests cover:
-   * <ol>
-   *   <li>{@code startRoundEngine} subscribes to
-   *       {@code streamRoundState} with the roundId from the POST
-   *       response, NOT the gameId passed to the constructor.</li>
-   *   <li>The auto-start ({@code tryAutoStartRound}) pipeline captures
-   *       the roundId into the same subject so the SSE chain — which
-   *       has short-circuited its own POST — picks up the resolved
-   *       roundId without re-POSTing.</li>
-   *   <li>{@code iniciarTodos} (manual fallback) also pushes the
-   *       roundId so any SSE subscription that follows uses the
-   *       registry key.</li>
-   *   <li>Defensive: when the POST response lacks a {@code roundId}
-   *       (e.g. the body shape is unknown), the SSE does NOT crash —
-   *       the existing {@code Flux.empty()} behavior is preserved
-   *       (no streamRoundState call with an empty id).</li>
-   * </ol>
-   */
+  // Stream must use the round id returned by the server, not the route game id.
   describe('streamRoundState uses POST roundId, not gameId', () => {
     /**
      * Helper: trigger the auto-start + startRoundEngine the same way the
