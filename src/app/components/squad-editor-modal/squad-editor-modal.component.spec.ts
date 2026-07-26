@@ -258,7 +258,7 @@ describe('SquadEditorModalComponent backend formation loading', () => {
     }, 30);
   });
 
-  it('F3 — loadSquadFromBackend con formation null usa default 4-4-2', (done) => {
+  it('F3 - loadSquadFromBackend con formation null usa default 4-4-2', (done) => {
     // El back NO retorna formation (legacy save)
     httpClientSpy.get.and.callFake(((url: string) => {
       if (url.includes('/editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
@@ -283,9 +283,9 @@ describe('SquadEditorModalComponent backend formation loading', () => {
     }, 30);
   });
 
-  // ===== F4 — executeFormationChange llama saveLineup después del auto-select =====
+  // ===== F4 - executeFormationChange llama saveLineup después del auto-select =====
 
-  it('F4 — executeFormationChange llama a saveLineup después del auto-select', (done) => {
+  it('F4 - executeFormationChange llama a saveLineup después del auto-select', (done) => {
     // Auto-select retorna 11 players con posiciones matching 4-3-3 formation
     // (GK + LB + 2 CB + RB + 3 CM + LW + ST + RW) para que role-match asigne
     // todos a slots y saveLineup NO se bloquee por el guard de playerCount < 7.
@@ -542,7 +542,7 @@ describe('SquadEditorModalComponent chemistry preview', () => {
   it('should NOT call preview when lineup has fewer than 11 players', (done) => {
     // The preview pipeline requires exactly 11 player ids before POSTing.
     setTimeout(() => {
-      // Empty homePlayers$ (0 players) — preview should not fire.
+      // Empty homePlayers$ (0 players) - preview should not fire.
       (component as any).homePlayers$.next([]);
       (component as any).triggerChemistryPreview();
 
@@ -758,15 +758,15 @@ describe('SquadEditorModalComponent drag-drop and effectiveness', () => {
     // through eff-green, eff-yellow, and eff-red classes.
     //
     // Thresholds match getChipEffectivenessClass:
-    //   eff >= 0.9 → green
-    //   0.7 <= eff < 0.9 → yellow
-    //   eff < 0.7 → red
+    //   eff >= 0.9 -> green
+    //   0.7 <= eff < 0.9 -> yellow
+    //   eff < 0.7 -> red
     //
     // Per the mocked perPlayerEffectiveness:
-    //   GK-1  = 1.0  → green  (eff-good)
-    //   S22-1 = 0.85 → yellow (eff-warning, 0.7-0.9)
-    //   S13-2 = 0.7  → yellow (eff-warning, boundary inclusive)
-    //   S05-2 = 1.0  → green  (eff-good)
+    //   GK-1  = 1.0  -> green  (eff-good)
+    //   S22-1 = 0.85 -> yellow (eff-warning, 0.7-0.9)
+    //   S13-2 = 0.7  -> yellow (eff-warning, boundary inclusive)
+    //   S05-2 = 1.0  -> green  (eff-good)
     setTimeout(() => {
       fixture.detectChanges();
       const markers = fixture.nativeElement.querySelectorAll('.player-marker');
@@ -825,7 +825,7 @@ describe('SquadEditorModalComponent drag-drop and effectiveness', () => {
 
   // ---- drag-drop handlers (direct method calls) ----
 
-  it('handleSlotDrop — moves a slot player to another empty slot', (done) => {
+  it('handleSlotDrop - moves a slot player to another empty slot', (done) => {
     // Drag p-def from S22-1 to S05-2; evict p-att to the bench first
     // so the target slot is empty.
     setTimeout(() => {
@@ -851,7 +851,7 @@ describe('SquadEditorModalComponent drag-drop and effectiveness', () => {
     }, 30);
   });
 
-  it('handleSlotDrop — swaps two slot players when target is occupied', (done) => {
+  it('handleSlotDrop - swaps two slot players when target is occupied', (done) => {
     // Drag p-def from S22-1 onto occupied S13-2 and expect a swap.
     setTimeout(() => {
       const pDef = (component as any).slotPlayerMap['S22-1'];
@@ -872,7 +872,7 @@ describe('SquadEditorModalComponent drag-drop and effectiveness', () => {
     }, 30);
   });
 
-  it('handleBenchDrop — moves a slot player to the bench', (done) => {
+  it('handleBenchDrop - moves a slot player to the bench', (done) => {
     // Drag p-att from S05-2 to the bench drop list.
     setTimeout(() => {
       const pAtt = (component as any).slotPlayerMap['S05-2'];
@@ -973,8 +973,8 @@ describe('SquadEditorModalComponent effectiveness feedback', () => {
   let dialogRefSpy: jasmine.SpyObj<MatDialogRef<SquadEditorModalComponent>>;
 
   // Minimal field: 4 slots, one of each perPlayerEffectiveness band the test
-  // cares about (1.0 → good, 0.85 → good (just at threshold), 0.7 → warning
-  // (just at threshold), 0.5 → bad). Plus GK-1 at 1.0 to keep the row
+  // cares about (1.0 -> good, 0.85 -> good (just at threshold), 0.7 -> warning
+  // (just at threshold), 0.5 -> bad). Plus GK-1 at 1.0 to keep the row
   // balanced.
   const SUBDIVISIONS_RESPONSE = [
     { subdivisionId: 'GK-1',  isGoalkeeper: true,  sector: 26, subIndex: 1, left: 35, top: 88, width: 30, height: 10, zone: 'GK' },
@@ -999,7 +999,7 @@ describe('SquadEditorModalComponent effectiveness feedback', () => {
   ];
 
   /**
-   * /career/lineup/current response builder — accepts perPlayerEffectiveness
+   * /career/lineup/current response builder - accepts perPlayerEffectiveness
    * keyed by subdivisionId. Pass null for formationEffectiveness to simulate
    * a legacy response (no chip feedback expected).
    */
@@ -1040,11 +1040,11 @@ describe('SquadEditorModalComponent effectiveness feedback', () => {
       if (url.includes('/editor/formations'))  return of(FORMATIONS_RESPONSE);
       if (url.includes('/career/lineup/current')) {
         // Default: full effectiveness coverage. Distribution per slot:
-        //   GK-1=1.0  → eff-good  (perfect GK)
-        //   S22-1=0.95 → eff-good  (well above the 0.9 threshold)
-        //   S13-2=0.7  → eff-warning (right at the 0.7 threshold)
-        //   S05-2=0.5  → eff-bad    (well below 0.7)
-        //   S05-3=1.0  → eff-good  (perfect ATT)
+        //   GK-1=1.0  -> eff-good  (perfect GK)
+        //   S22-1=0.95 -> eff-good  (well above the 0.9 threshold)
+        //   S13-2=0.7  -> eff-warning (right at the 0.7 threshold)
+        //   S05-2=0.5  -> eff-bad    (well below 0.7)
+        //   S05-3=1.0  -> eff-good  (perfect ATT)
         return of(buildCurrentLineup(
           { 'GK-1': 1.0, 'S22-1': 0.95, 'S13-2': 0.7, 'S05-2': 0.5, 'S05-3': 1.0 },
           { inferredFormation: '4-4-2', perPlayerEffectiveness: { 'GK-1': 1.0, 'S22-1': 0.95, 'S13-2': 0.7, 'S05-2': 0.5, 'S05-3': 1.0 }, teamAverage: 0.83 },
@@ -1086,7 +1086,7 @@ describe('SquadEditorModalComponent effectiveness feedback', () => {
   it('getChipEffectivenessClass returns eff-good for eff >= 0.9', (done) => {
     setTimeout(() => {
       expect((component as any).getChipEffectivenessClass('GK-1')).toBe('eff-good');
-      // 0.95 is above the 0.9 threshold — must be eff-good.
+      // 0.95 is above the 0.9 threshold - must be eff-good.
       expect((component as any).getChipEffectivenessClass('S22-1')).toBe('eff-good');
       done();
     }, 30);
@@ -1095,7 +1095,7 @@ describe('SquadEditorModalComponent effectiveness feedback', () => {
   it('getChipEffectivenessClass returns eff-warning for 0.7 <= eff < 0.9', (done) => {
     setTimeout(() => {
       expect((component as any).getChipEffectivenessClass('S13-2')).toBe('eff-warning');
-      // 0.7 is the inclusive lower bound — must also be eff-warning.
+      // 0.7 is the inclusive lower bound - must also be eff-warning.
       done();
     }, 30);
   });
@@ -1205,7 +1205,7 @@ describe('SquadEditorModalComponent effectiveness feedback', () => {
 });
 
 /**
- * V25D56 (Sprint C17) — responsive modal layout.
+ * V25D56 (Sprint C17) - responsive modal layout.
  *
  * <p>Three progressive breakpoints (mobile <=600px, tablet 601-1024px,
  * desktop default >=1025px). The pre-C17 single breakpoint at 768px
@@ -1213,13 +1213,13 @@ describe('SquadEditorModalComponent effectiveness feedback', () => {
  * flagged as a visual regression.
  *
  * <p>Strategy: Karma/Jasmine runs in jsdom, which doesn't simulate
- * viewport width or evaluate @media queries — so we cannot assert
+ * viewport width or evaluate @media queries - so we cannot assert
  * computed styles. Instead we assert the component's styles source:
  * the 3 breakpoint blocks exist with the expected rules, AND no
  * breakpoint hides .player-chip via `display: none`. This guards the
  * fix from accidental reverts.
  */
-describe('SquadEditorModalComponent — V25D56 (C17) responsive breakpoints', () => {
+describe('SquadEditorModalComponent - V25D56 (C17) responsive breakpoints', () => {
   /**
    * Reads the @Component.styles source. For inline-styled components
    * (like this one) Angular stores the CSS strings on the component
@@ -1312,7 +1312,7 @@ describe('SquadEditorModalComponent — V25D56 (C17) responsive breakpoints', ()
     const block = extractMediaBlock('max-width: 600px');
     expect(block).toBeTruthy();
     // Either overflow-y:auto on the container, or a scroll affordance
-    // somewhere — guarantees the user can reach all content on tall modals.
+    // somewhere - guarantees the user can reach all content on tall modals.
     expect(block).toMatch(/overflow/);
   });
 
@@ -1328,7 +1328,7 @@ describe('SquadEditorModalComponent — V25D56 (C17) responsive breakpoints', ()
   // max-height:50vh lo sobreescribia. Verificamos que los 3 bloques
   // tienen la regla correcta y que NO hay height/max-height que anule
   // el ratio.
-  describe('SquadEditorModalComponent — V25D94 field aspect-ratio 1.15 / 1 (was V25D93.5 landscape 1.4 / 1)', () => {
+  describe('SquadEditorModalComponent - V25D94 field aspect-ratio 1.15 / 1 (was V25D93.5 landscape 1.4 / 1)', () => {
     it('default viewport (>=1025px): .field has aspect-ratio 1.15 / 1 outside any @media block', () => {
       const src = stripEncapsulation(stylesSource());
       // Strip @media blocks so we only inspect the default rules.
@@ -1369,14 +1369,14 @@ describe('SquadEditorModalComponent — V25D56 (C17) responsive breakpoints', ()
 });
 
 /**
- * V25D58 (Sprint C18) — field responsive sizing.
+ * V25D58 (Sprint C18) - field responsive sizing.
  *
  * <p>The field must scale proportionally to the modal. Iván pidió: "la
  * cancha también sea responsive, conforme achiquemos el modal".
  *
  * <p>Strategy: Karma/Jasmine runs in jsdom which doesn't evaluate @media
  * queries, so we cannot assert computed style per viewport. Instead we
- * assert the CSS source — each @media block contains the expected
+ * assert the CSS source - each @media block contains the expected
  * {@code max-width: min(cap, 100%)} rule AND aspect-ratio 1 / 1.4 is
  * preserved. This guards against accidental reverts (e.g., someone
  * changing the cap to a fixed px value).
@@ -1388,7 +1388,7 @@ describe('SquadEditorModalComponent — V25D56 (C17) responsive breakpoints', ()
  * regardless because we never override max-height with a px cap (only
  * {@code max-height: 100%} which is bounded by the container).
  */
-describe('SquadEditorModalComponent — V25D58 (C18) field responsive sizing', () => {
+describe('SquadEditorModalComponent - V25D58 (C18) field responsive sizing', () => {
   /**
    * Reads the @Component.styles source. For inline-styled components
    * (like this one) Angular stores the CSS strings on the component
@@ -1398,7 +1398,7 @@ describe('SquadEditorModalComponent — V25D58 (C18) field responsive sizing', (
    * removes those markers so regex assertions match the original
    * class names.
    *
-   * <p>Mirrors the helper in the V25D56 (C17) describe block — duplicated
+   * <p>Mirrors the helper in the V25D56 (C17) describe block - duplicated
    * because describe-block function declarations aren't hoisted to sibling
    * describe blocks (each describe has its own lexical scope).
    */
@@ -1497,7 +1497,7 @@ describe('SquadEditorModalComponent — V25D58 (C18) field responsive sizing', (
   });
 
   it('tablet viewport (601-1024px): .field has max-width: 100% (no V25D58 cap)', () => {
-    // V25D93.5-FRONT: same landscape flip applies to tablet — aspect-ratio
+    // V25D93.5-FRONT: same landscape flip applies to tablet - aspect-ratio
     // 1.4 / 1, max-width 100%, height 100%. The V25D58 450px cap is gone.
     const block = extractMediaBlock('min-width: 601px) and (max-width: 1024px');
     expect(block).withContext('tablet @media block must exist').toBeTruthy();
@@ -1508,7 +1508,7 @@ describe('SquadEditorModalComponent — V25D58 (C18) field responsive sizing', (
   });
 
   it('mobile viewport (<=600px): .field has max-width: 100% (no V25D58 cap)', () => {
-    // V25D93.5-FRONT: same landscape flip applies to mobile — aspect-ratio
+    // V25D93.5-FRONT: same landscape flip applies to mobile - aspect-ratio
     // 1.4 / 1, max-width 100%, height 100%. The V25D58 380px cap is gone.
     const block = extractMediaBlock('max-width: 600px');
     expect(block).withContext('mobile @media block must exist').toBeTruthy();
@@ -1543,7 +1543,7 @@ describe('SquadEditorModalComponent — V25D58 (C18) field responsive sizing', (
 
     // large-desktop .field may NOT re-declare aspect-ratio (it inherits
     // from default). We assert that NO @media block STRIPS aspect-ratio
-    // from the field — i.e., no @media block sets `aspect-ratio: <other>`
+    // from the field - i.e., no @media block sets `aspect-ratio: <other>`
     // or removes it. Since CSS only adds/overrides, the safe check is:
     // no @media block declares a different aspect-ratio value than 1.15/1.
     const mediaBlocks: Array<{label: string; block: string}> = [
@@ -1559,7 +1559,7 @@ describe('SquadEditorModalComponent — V25D58 (C18) field responsive sizing', (
           .withContext(`${label} .field aspect-ratio must be 1.15 / 1 if declared`)
           .toMatch(/^1\.15\s*\/\s*1$/);
       }
-      // If aspect-ratio is NOT declared in this block, that's fine —
+      // If aspect-ratio is NOT declared in this block, that's fine -
       // it inherits from the default rule. We only assert that whatever
       // is declared matches 1.15/1.
     });
@@ -2937,45 +2937,12 @@ describe('SquadEditorModalComponent formation change updates header and markers'
 });
 
 /**
- * V25D95.1 (post-V25D95): ghost slot rendering + drag-drop player overlap.
- *
- * <p>Two visual bugs reported by Ivan after V25D95-FRONT merged:
- * <ul>
- *   <li><b>Issue A — Ghost slots:</b> dashed "Empty slot" rectangles appeared
- *       at positions NOT in the active formation. Root cause: persisted
- *       slots from a previous formation (e.g., CAM in 4-2-3-1) were applied
- *       verbatim even after switching to 4-4-2, and the .slot loop rendered
- *       ALL 82 subdivisions (so dashed rects at CAM stayed visible). Fix:
- *       validate persisted slots in {@code loadSquadFromBackend} +
- *       {@code shouldRenderSlot} + filter .player-marker by
- *       {@code isSlotInActiveFormation}.</li>
- *   <li><b>Issue B — Player overlap:</b> when Ivan moved Mbappé to a slot
- *       with another player, both players rendered at the same coords
- *       (Mbappé in front, Rodrygo stacked behind). Root cause: actually a
- *       load-time dedup bug where 2 GKs in the persisted lineup shared
- *       the same subdivisionId (a 3-5-2 → 4-4-2 migration edge case).
- *       Fix: final dedup pass in {@code loadSquadFromBackend} that clears
- *       duplicate slotIds (the second occurrence is sent to bench). Also
- *       a defensive re-emit of homePlayers$ after every drag-drop so the
- *       .player-marker *ngFor re-evaluates the per-marker bindings.</li>
- * </ul>
- *
- * <p>5 specs in this block:
- * <ol>
- *   <li>{@code isSlotInActiveFormation} returns true for subdivisionIds
- *       in formationPositions[selectedFormation], false otherwise.</li>
- *   <li>{@code shouldRenderSlot} returns true for slots in the active
- *       formation OR slots with a player, false for ghost slots.</li>
- *   <li>loadSquadFromBackend drops persisted slots that are not in the
- *       active formation (the primary fix for Issue A).</li>
- *   <li>loadSquadFromBackend deduplicates slotIds (the primary fix for
- *       Issue B / "stacked markers").</li>
- *   <li>{@code handleSlotDrop} re-emits homePlayers$ with a new array
- *       reference so the .player-marker *ngFor rebuilds (defensive fix
- *       for the CD edge case Ivan observed).</li>
- * </ol>
+ * Visual consistency around formation changes and drag/drop:
+ * stale slots from previous formations must not appear as ghost tiles,
+ * duplicate persisted slot assignments must not stack players, and drag
+ * moves must re-emit player arrays so marker positions refresh.
  */
-describe('SquadEditorModalComponent — V25D95.1 ghost slots + drag-drop overlap', () => {
+describe('SquadEditorModalComponent ghost slots and drag-drop overlap', () => {
   let component: SquadEditorModalComponent;
   let fixture: ComponentFixture<SquadEditorModalComponent>;
   let httpClientSpy: jasmine.SpyObj<HttpClient>;
@@ -3074,18 +3041,17 @@ describe('SquadEditorModalComponent — V25D95.1 ghost slots + drag-drop overlap
     fixture.detectChanges();
   });
 
-  // ---- F2 / Issue A: ghost slot filter helpers ----
+  // ---- ghost slot filter helpers ----
 
   it('isSlotInActiveFormation returns true for slots in the active formation, false for others', (done) => {
-    // V25D95.1-FRONT F2: the helper must identify "ghost" subdivisionIds
-    // (e.g., 'S99-OUTSIDE' that represents a CAM position from 4-2-3-1
-    // persisting after the user switched to 4-4-2) and exclude them from
-    // any rendering decision.
+    // Identify stale subdivisionIds from a previous formation and keep
+    // them out of active formation rendering decisions.
     setTimeout(() => {
       expect((component as any).isSlotInActiveFormation('GK-1')).toBe(true, 'GK-1 is in 4-4-2');
       expect((component as any).isSlotInActiveFormation('S22-1')).toBe(true, 'S22-1 is in 4-4-2');
       expect((component as any).isSlotInActiveFormation('S13-2')).toBe(true, 'S13-2 is in 4-4-2');
-      expect((component as any).isSlotInActiveFormation('S99-OUTSIDE')).toBe(false, 'S99-OUTSIDE is NOT in 4-4-2 — it is the ghost position');
+      // S99-OUTSIDE is not in 4-4-2 and has no player: hide it.
+      expect((component as any).isSlotInActiveFormation('S99-OUTSIDE')).toBe(false, 'S99-OUTSIDE is outside 4-4-2');
       expect((component as any).isSlotInActiveFormation('')).toBe(false, 'empty subdivisionId is never in the formation');
       expect((component as any).isSlotInActiveFormation(undefined)).toBe(false, 'undefined subdivisionId is never in the formation');
       done();
@@ -3093,11 +3059,8 @@ describe('SquadEditorModalComponent — V25D95.1 ghost slots + drag-drop overlap
   });
 
   it('shouldRenderSlot returns true for active-formation slots or occupied slots, false otherwise', (done) => {
-    // V25D95.1-FRONT F2: template guard for the .slot div. Slots that
-    // are neither in the active formation nor occupied by a player
-    // (e.g., an empty CAM subdivision from a 4-2-3-1 persisted lineup
-    // that doesn't fit 4-4-2) MUST be filtered out so the dashed
-    // "Empty slot" rectangle doesn't render at a ghost position.
+    // The slot tile should render only when it belongs to the active
+    // formation or currently holds a player.
     setTimeout(() => {
       const subs = (component as any).subdivisions;
       const gk = subs.find((s: any) => s.subdivisionId === 'GK-1');
@@ -3105,38 +3068,28 @@ describe('SquadEditorModalComponent — V25D95.1 ghost slots + drag-drop overlap
       const mid = subs.find((s: any) => s.subdivisionId === 'S13-2');
       const ghost = subs.find((s: any) => s.subdivisionId === 'S99-OUTSIDE');
 
-      // In 4-4-2: GK-1, S22-1, S13-2 are all in the formation →
-      // shouldRenderSlot returns true.
-      expect((component as any).shouldRenderSlot(gk)).toBe(true, 'GK-1 in 4-4-2 → render');
-      expect((component as any).shouldRenderSlot(def)).toBe(true, 'S22-1 in 4-4-2 → render');
-      expect((component as any).shouldRenderSlot(mid)).toBe(true, 'S13-2 in 4-4-2 → render');
+      // These slots are part of the active 4-4-2 mock formation.
+      expect((component as any).shouldRenderSlot(gk)).toBe(true, 'GK-1 in 4-4-2 -> render');
+      expect((component as any).shouldRenderSlot(def)).toBe(true, 'S22-1 in 4-4-2 -> render');
+      expect((component as any).shouldRenderSlot(mid)).toBe(true, 'S13-2 in 4-4-2 -> render');
 
-      // S99-OUTSIDE is NOT in 4-4-2 and has no player → ghost, must hide.
-      expect((component as any).shouldRenderSlot(ghost)).toBe(false, 'S99-OUTSIDE ghost (no player, not in 4-4-2) → HIDE');
+      // S99-OUTSIDE is not in 4-4-2 and has no player: hide it.
+      expect((component as any).shouldRenderSlot(ghost)).toBe(false, 'S99-OUTSIDE ghost (no player, not in 4-4-2) -> hide');
 
-      // Even if S99-OUTSIDE had a player (stale persisted slot), the
-      // shouldRenderSlot logic keeps it visible (occupied branch) so
-      // the user can drag the player back. We simulate by adding to
-      // slotPlayerMap directly.
+      // If a stale outside slot still holds a player, keep it visible
+      // so the user can drag the player back into the active shape.
       (component as any).slotPlayerMap['S99-OUTSIDE'] = { playerId: 'p-ghost', name: 'Ghost', position: 'CAM', slotId: 'S99-OUTSIDE' };
-      expect((component as any).shouldRenderSlot(ghost)).toBe(true, 'occupied S99-OUTSIDE → render (so user can drag back)');
+      expect((component as any).shouldRenderSlot(ghost)).toBe(true, 'occupied S99-OUTSIDE -> render (so user can drag back)');
       done();
     }, 30);
   });
 
-  // ---- F2 / Issue A: loadSquadFromBackend drops stale persisted slots ----
+  // ---- stale persisted slots ----
 
   it('loadSquadFromBackend drops persisted slots that are not in the active formation', (done) => {
-    // V25D95.1-FRONT F2 (primary fix for Issue A): when the backend
-    // returns persisted slots for a previous formation (e.g., 4-2-3-1's
-    // CAM at 'S99-OUTSIDE'), the loadSquadFromBackend must clear those
-    // stale slotIds so the .player-marker doesn't render a ghost at
-    // the CAM position after the user has switched to 4-4-2.
-    //
-    // We use role 'WINGER' (ATT family) for the ghost player so it
-    // does NOT match any of the 3 formation positions (GK/DEF/MID) —
-    // otherwise the role-match re-run would re-assign them to a valid
-    // slot and the test wouldn't verify the ghost-slot clearing.
+    // Persisted slots from a previous formation must be cleared when
+    // they do not belong to the active formation. Use WINGER here so
+    // role-match cannot reassign the player into the three-slot mock.
     httpClientSpy.get.and.callFake(((url: string) => {
       if (url.includes('/editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
       if (url.includes('/editor/formations'))  return of(FORMATIONS_RESPONSE);
@@ -3165,15 +3118,12 @@ describe('SquadEditorModalComponent — V25D95.1 ghost slots + drag-drop overlap
     }, 30);
   });
 
-  // ---- F2 / Issue B: loadSquadFromBackend dedupes slotIds ----
+  // ---- duplicate persisted slotIds ----
 
   it('loadSquadFromBackend deduplicates slotIds when two players share a subdivisionId', (done) => {
-    // V25D95.1-FRONT F2 (primary fix for Issue B / "stacked markers"):
-    // if the backend's persisted slots have 2 different subdivisionIds
-    // that map to the same visual position (e.g., 2 GKs from a 3-5-2
-    // migration), only the first player keeps the slot. The second
-    // one is sent to bench. The .player-marker loop then renders 1
-    // marker per slot, never stacked duplicates.
+    // If two persisted entries target the same subdivisionId, only the
+    // first keeps the slot. The second goes to the bench so markers do
+    // not stack visually.
     httpClientSpy.get.and.callFake(((url: string) => {
       if (url.includes('/editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
       if (url.includes('/editor/formations'))  return of(FORMATIONS_RESPONSE);
@@ -3207,20 +3157,13 @@ describe('SquadEditorModalComponent — V25D95.1 ghost slots + drag-drop overlap
     }, 30);
   });
 
-  // ---- F2b / Issue B: drag-drop re-emits homePlayers$ ----
+  // ---- drag-drop re-emits homePlayers$ ----
 
   it('handleSlotDrop re-emits homePlayers$ with a fresh array reference after a move', (done) => {
-    // V25D95.1-FRONT F2b: the drag-drop handler must emit a new
-    // homePlayers$ array (not just mutate the existing one) so the
-    // .player-marker *ngFor rebuilds and the marker re-renders at
-    // the new slotId. Pre-V25D95.1 on rare CD edge cases the *ngFor
-    // kept the old iteration vars and the marker visually "stayed"
-    // in the source slot while a duplicate was rendered at the target.
-    //
-    // The default loadSquadFromBackend maps 4 players to 4 slots
-    // (p-gk→GK-1, p-def→S22-1, p-mid→S13-2 — but with only 3 positions
-    // in the V25D95.1 mock, p-att has no slot and goes to bench).
-    // We swap p-mid and p-def to exercise the SWAP branch of
+    // Drag-drop must emit a fresh homePlayers array after moving a
+    // player, so Angular rebuilds marker bindings at the new slot.
+    // The default load maps p-gk, p-def and p-mid into the three-slot
+    // mock; p-att stays on the bench.
     // handleSlotDrop and verify the re-emit happens.
     setTimeout(() => {
       // Spy on homePlayers$ next to assert it's called with a NEW array
@@ -3228,7 +3171,7 @@ describe('SquadEditorModalComponent — V25D95.1 ghost slots + drag-drop overlap
       const nextSpy = spyOn((component as any).homePlayers$, 'next').and.callThrough();
       const beforeArray = (component as any).homePlayers$.value;
 
-      // Move p-mid from S13-2 to S22-1 (occupied by p-def) → SWAP.
+      // Move p-mid from S13-2 to S22-1 (occupied by p-def): swap.
       const pMid = (component as any).slotPlayerMap['S13-2'];
       expect(pMid).toBeTruthy('p-mid must be at S13-2 in the default loadSquadFromBackend');
       (component as any).handleSlotDrop({
@@ -3259,15 +3202,15 @@ describe('SquadEditorModalComponent — V25D95.1 ghost slots + drag-drop overlap
  *
  * <p>Test goals:
  * <ul>
- *   <li>F1 — handleSlotDrop debe aceptar drop cross-role (CB en MID slot).</li>
- *   <li>F2 — detectFormation devuelve el nombre canónico cuando el lineup
+ *   <li>F1 - handleSlotDrop debe aceptar drop cross-role (CB en MID slot).</li>
+ *   <li> - detectFormation devuelve el nombre canónico cuando el lineup
  *       matchea exactamente; devuelve 'Formación del User' cuando no matchea.</li>
- *   <li>F3 — dropdown muestra 'Formación del User' como selected después de
+ *   <li>F3 - dropdown muestra 'Formación del User' como selected después de
  *       un cross-role drop.</li>
- *   <li>F4 — el marker de un player off-role recibe la clase `off-role`.</li>
+ *   <li>F4 - el marker de un player off-role recibe la clase `off-role`.</li>
  * </ul>
  */
-describe('SquadEditorModalComponent — V25D96 free-formation + drag-drop cross-role', () => {
+describe('SquadEditorModalComponent - V25D96 free-formation + drag-drop cross-role', () => {
   let component: SquadEditorModalComponent;
   let fixture: ComponentFixture<SquadEditorModalComponent>;
   let httpClientSpy: jasmine.SpyObj<HttpClient>;
@@ -3377,9 +3320,9 @@ describe('SquadEditorModalComponent — V25D96 free-formation + drag-drop cross-
     fixture.detectChanges();
   });
 
-  // ---- F1 — handleSlotDrop allows cross-role drops ----
+  // ---- F1 - handleSlotDrop allows cross-role drops ----
 
-  it('V25D96 F1: handleSlotDrop allows cross-role drop (CB p-def → MID slot S13-2)', (done) => {
+  it('V25D96 F1: handleSlotDrop allows cross-role drop (CB p-def -> MID slot S13-2)', (done) => {
     // Ivan spec: "puedo poner a por ejemplo Rudiger en el mediocampo".
     // p-def is Rudiger (CB). S13-2 is the MID slot. handleSlotDrop must
     // NOT block this; after the drop Rudiger ends in the MID slot.
@@ -3403,12 +3346,12 @@ describe('SquadEditorModalComponent — V25D96 free-formation + drag-drop cross-
     }, 30);
   });
 
-  // ---- F2 — detectFormation ----
+  // ---- F2 - detectFormation ----
 
   it('V25D96 F2: detectFormation returns "Formación del User" for an incomplete lineup', (done) => {
     // Default loadSquadFromBackend populates only 4 players (1 GK + 1 DEF +
     // 1 MID + 1 ATT) into a 4-slot mock. This is incomplete (< 11) so the
-    // formation has no canonical match → returns USER_FORMATION_LABEL.
+    // formation has no canonical match -> returns USER_FORMATION_LABEL.
     setTimeout(() => {
       const detected = (component as any).detectFormation();
       expect(detected).toBe('Formación del User',
@@ -3432,7 +3375,7 @@ describe('SquadEditorModalComponent — V25D96 free-formation + drag-drop cross-
     // directly on the component after the formations load, then push an
     // 11-player lineup whose family counts match it exactly.
     setTimeout(() => {
-      // 11 positions for a real 4-4-2 — GK + 4 DEF + 4 MID + 2 ATT.
+      // 11 positions for a real 4-4-2 - GK + 4 DEF + 4 MID + 2 ATT.
       (component as any).formationPositions['4-4-2'] = [
         { subdivisionId: 'GK', role: 'GK', xPercent: 50, yPercent: 93, actionRangePercent: 5, index: 0 },
         { subdivisionId: 'D1', role: 'LB', xPercent: 15, yPercent: 78, actionRangePercent: 7, index: 1 },
@@ -3532,19 +3475,19 @@ describe('SquadEditorModalComponent — V25D96 free-formation + drag-drop cross-
     const counts = (component as any).countRoleFamily(
       ['GK', 'CB', 'LB', 'RB', 'CM', 'CDM', 'CAM', 'ST', 'LW', 'CF', 'WINGER']
     );
-    //   GK    → 1
-    //   CB LB RB → 3 DEF
-    //   CM CDM CAM → 3 MID
-    //   ST LW CF WINGER → 4 ATT
+    //   GK    -> 1
+    //   CB LB RB -> 3 DEF
+    //   CM CDM CAM -> 3 MID
+    //   ST LW CF WINGER -> 4 ATT
     expect(counts).toEqual({ gk: 1, def: 3, mid: 3, att: 4 });
   });
 
-  // ---- F3 — dropdown displays user-formation after cross-role drop ----
+  // ---- F3 - dropdown displays user-formation after cross-role drop ----
 
   it('V25D96 F3: dropdown shows "Formación del User" after a cross-role drop', (done) => {
     // After Rudiger (CB) is dragged into the MID slot, the lineup becomes
     // off-canonical (3 DEF + 5 MID + 1 GK for the 4-4-2 mock which only
-    // has 4 players total → still incomplete, so detectFormation returns
+    // has 4 players total -> still incomplete, so detectFormation returns
     // 'Formación del User' either way). The dropdown's `dropdownFormationValue`
     // getter should reflect the user-formation state, and the rendered
     // select's selected option should match.
@@ -3575,7 +3518,7 @@ describe('SquadEditorModalComponent — V25D96 free-formation + drag-drop cross-
     }, 30);
   });
 
-  // ---- F4 — marker off-role class ----
+  // ---- F4 - marker off-role class ----
 
   it('V25D96 F4: marker receives off-role class when player role != slot recommended role', (done) => {
     // After Rudiger (CB) is dragged to S13-2 (MID slot with recommended 'CM'),
@@ -3616,15 +3559,15 @@ describe('SquadEditorModalComponent — V25D96 free-formation + drag-drop cross-
 });
 
 /**
- * V25D98-FRONT — free positioning via field-level drop list.
+ * V25D98-FRONT - free positioning via field-level drop list.
  *
  * <p>Adds the ability to drop a player on the field OUTSIDE any canonical
- * slot — the marker then renders at the exact drop position (as a
+ * slot - the marker then renders at the exact drop position (as a
  * percentage of the field bounding rect). The player's {@code slotId} is
  * preserved so chemistry / off-role calculations stay valid, but the
  * visual position is decoupled from the subdivision grid.
  */
-describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', () => {
+describe('SquadEditorModalComponent - V25D98 free positioning (field drop)', () => {
   let component: SquadEditorModalComponent;
   let fixture: ComponentFixture<SquadEditorModalComponent>;
   let httpClientSpy: jasmine.SpyObj<HttpClient>;
@@ -3711,7 +3654,7 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
     // marker is at the slot center.
     setTimeout(() => {
       const pDef = (component as any).slotPlayerMap['S22-1'];
-      // baseline: no override → returns slot center
+      // baseline: no override -> returns slot center
       const baseX = (component as any).getMarkerX(pDef);
       const baseY = (component as any).getMarkerY(pDef);
       expect(baseX).toBe(20);
@@ -3725,9 +3668,9 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
     }, 30);
   });
 
-  it('V25D99.7 handleMarkerDragEnd: drop in field but not on slot → FREE POSITIONING (xPct/yPct set)', (done) => {
+  it('V25D99.7 handleMarkerDragEnd: drop in field but not on slot -> FREE POSITIONING (xPct/yPct set)', (done) => {
     // V25D99.7: free positioning restored (Ivan liked it). Drop at coords
-    // that don't land on a subdivision → marker stays at the free
+    // that don't land on a subdivision -> marker stays at the free
     // position (xPct, yPct). The original slot becomes empty + invisible.
     setTimeout(() => {
       const pDef = (component as any).slotPlayerMap['S22-1'];
@@ -3737,9 +3680,9 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
         x: 0, y: 0, toJSON: () => ({})
       });
       (component as any).fieldContainer = { nativeElement: fieldEl };
-      // Drop at (600, 600) → xPct=60, yPct=75 → no subdivision at these coords.
+      // Drop at (600, 600) -> xPct=60, yPct=75 -> no subdivision at these coords.
       (component as any).handleMarkerDragEnd({ dropPoint: { x: 600, y: 600 } } as any, pDef);
-      // V25D99.7: free positioning — marker stays at the drop position.
+      // V25D99.7: free positioning - marker stays at the drop position.
       expect(pDef.xPercent).toBe(60);
       expect(pDef.yPercent).toBe(75);
       expect((component as any).getMarkerX(pDef)).toBe(60);
@@ -3768,7 +3711,7 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
 
   it('hasCustomPositions: returns false when no player has overrides', (done) => {
     setTimeout(() => {
-      // baseline: no overrides → false
+      // baseline: no overrides -> false
       expect((component as any).hasCustomPositions()).toBeFalse();
       const home = (component as any).homePlayers$.value.slice();
       home[0].xPercent = 50;
@@ -3779,7 +3722,7 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
   });
 
   /**
-   * V25D98.2-FRONT: regression — after free positioning, the legacy
+   * V25D98.2-FRONT: regression - after free positioning, the legacy
    * `.player-chip` rendered INSIDE the slot must be hidden so it doesn't
    * duplicate the player name at the original slot position while the
    * marker is at the override. Verify:
@@ -3787,14 +3730,14 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
    *  2. isSlotOverridden(sub) returns true for the player's original slot.
    *  3. The DOM has no .player-chip with the player's name in that slot.
    *  4. The DOM has no .missing-indicator at all (V25D98.2 removed the
-   *     amber override indicator — slot must look fully empty per Iván's
+   *     amber override indicator - slot must look fully empty per Iván's
    *     "el espacio sigue claiming" feedback).
    *  5. handleSlotDrop must clear xPercent/yPercent on the dropped player
    *     (so a second drag to a slot doesn't leave the marker pinned at
-   *     the previous override position — Iván's "solo 1 vez" symptom).
+   *     the previous override position - Iván's "solo 1 vez" symptom).
    *  6. handleBenchDrop must clear xPercent/yPercent too.
    */
-  it('V25D99.6: slot-only model — marker IS the player, no chip, no missing-indicator, no abandoned', (done) => {
+  it('V25D99.6: slot-only model - marker IS the player, no chip, no missing-indicator, no abandoned', (done) => {
     // V25D99.6 PROFESSIONAL FINAL: chip + missing-indicator + abandoned
     // class were ALL removed. The .player-marker IS the player. Players
     // live at slot centers (no free positioning, no xPercent/yPercent
@@ -3829,7 +3772,7 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
       });
       expect(defPlayerIds.length).withContext('V25D99.6: marker must render once per player (no duplication)').toBe(1);
 
-      // handleSlotDrop swap: S22-1 → S05-2. S05-2 is occupied in fixture so
+      // handleSlotDrop swap: S22-1 -> S05-2. S05-2 is occupied in fixture so
       // the occupant gets swapped to S22-1 (no empty slot remains).
       (component as any).handleSlotDrop({
         item: { data: pDef },
@@ -3842,7 +3785,7 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
       expect((component as any).slotPlayerMap['S22-1']).toBeTruthy();
       expect((component as any).slotPlayerMap['S22-1']).not.toBe(pDef);
 
-      // handleBenchDrop: S05-2 → bench.
+      // handleBenchDrop: S05-2 -> bench.
       (component as any).handleBenchDrop({
         item: { data: pDef },
         previousContainer: { id: 'slot-S05-2' },
@@ -3855,7 +3798,7 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
   });
 
   /**
-   * V25D98.3-FRONT: regression — Ivan reported "me deja mover 1 vez y nada
+   * V25D98.3-FRONT: regression - Ivan reported "me deja mover 1 vez y nada
    * mas" + "el jugador queda ahi infinitamente". Two things must work
    * after the first free drop:
    *  1. The marker's DOM element is STILL cdk-drag enabled.
@@ -3867,17 +3810,17 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
    * re-applies xPercent/yPercent on each call (subsequent drags update).
    */
   it('V25D99.8 (refined by V25D99.20-BUG-4a): drops OUTSIDE any slot go to FREE POSITIONING (snap-back for inside-slot drops is tested separately)', (done) => {
-    // V25D99.8: snap-to-slot REMOVED for the free-field case — Ivan's
+    // V25D99.8: snap-to-slot REMOVED for the free-field case - Ivan's
     // complaint was that drops near a slot teleported to its center.
     // V25D99.20-BUG-4a: snap-back RESTORED for drops that land INSIDE
     // the player's owning subdivision bbox (so chem restaura a baseline
     // when the user drags a free-positioned player back onto their slot).
-    // This test covers the free-field branch only — the snap-back
+    // This test covers the free-field branch only - the snap-back
     // branch has dedicated V25D99.20 BUG-4a tests above.
     //
     // Verify:
-    //  1. Drop outside any slot bbox → xPercent/yPercent set, slot vacated.
-    //  2. Drop in free space → free positioning as before.
+    //  1. Drop outside any slot bbox -> xPercent/yPercent set, slot vacated.
+    //  2. Drop in free space -> free positioning as before.
     //  3. Marker visually at the drop coords.
     setTimeout(() => {
       const pDef = (component as any).slotPlayerMap['S22-1'];
@@ -3890,7 +3833,7 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
       (component as any).fieldContainer = { nativeElement: fieldEl };
       const mkEvt = (x: number, y: number) => ({ dropPoint: { x, y } } as any);
 
-      // 1. Drop at (700, 350) → xPct=70, yPct=43.75 — outside S22-1 bbox
+      // 1. Drop at (700, 350) -> xPct=70, yPct=43.75 - outside S22-1 bbox
       //    (xPct 70 > 35 right edge, yPct 43.75 < 70 top edge) AND
       //    outside S13-2 bbox. Free positioning: xPercent/yPercent set,
       //    slot vacated. V25D99.20-BUG-4a snap-back does NOT fire here.
@@ -3906,7 +3849,7 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
       pDef.yPercent = undefined;
       (component as any).slotPlayerMap['S22-1'] = pDef;
 
-      // Drop at (300, 400) → xPct=30, yPct=50.
+      // Drop at (300, 400) -> xPct=30, yPct=50.
       (component as any).handleMarkerDragEnd(mkEvt(300, 400), pDef);
       expect(pDef.xPercent).toBe(30);
       expect(pDef.yPercent).toBe(50);
@@ -3919,7 +3862,7 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
   });
 
   /**
-   * V25D98.4-FRONT: regression — Ivan reported 'el problema va por otro
+   * V25D98.4-FRONT: regression - Ivan reported 'el problema va por otro
    * lado, los movi 1 vez y no me deja, es como si quedaran arraigado al
    * del 4-4-2'. The root cause was that handleFieldDrop was RE-ADDING
    * the player to slotPlayerMap[slotId] AFTER setting the override, so
@@ -3928,7 +3871,7 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
    * name ('Slot: S17-1 / Malaga B 2 CAM #6784') and he read it as 'the
    * slot still claims the player'. Fix: handleFieldDrop does NOT touch
    * slotPlayerMap anymore (player leaves the slot for real). The slot
-   * becomes truly empty (click → 'Sin asignar' + bench dropdown).
+   * becomes truly empty (click -> 'Sin asignar' + bench dropdown).
    *
    * Additionally:
    *  - isSlotAbandonedByOverride(sub) must return true for the
@@ -3940,7 +3883,7 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
   it('V25D99.7: drop in field but not on a slot triggers FREE POSITIONING', (done) => {
     // V25D99.7: Ivan: 'me gustaba lo de free posicion, pero que sea solo
     // dentro del campo'. Drops that don't land on a slot now result in
-    // free positioning — the marker stays at (xPct, yPct) where the user
+    // free positioning - the marker stays at (xPct, yPct) where the user
     // dropped it (clamped to [0, 100]).
     //  1. slotPlayerMap[slotId] cleared (player left the slot).
     //  2. player.xPercent/yPercent SET to the drop coords.
@@ -3958,11 +3901,11 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
       // Baseline: player at S22-1.
       expect((component as any).slotPlayerMap['S22-1']).toBe(pDef);
 
-      // Drop at (700, 350) → xPct=70, yPct=43.75 → no slot at these coords.
+      // Drop at (700, 350) -> xPct=70, yPct=43.75 -> no slot at these coords.
       (component as any).fieldContainer = { nativeElement: fieldEl };
       (component as any).handleMarkerDragEnd({ dropPoint: { x: 700, y: 350 } } as any, pDef);
 
-      // V25D99.7: free positioning — slot cleared, xPct/yPct set.
+      // V25D99.7: free positioning - slot cleared, xPct/yPct set.
       expect((component as any).slotPlayerMap['S22-1']).toBeUndefined('free drop: slot cleared from slotPlayerMap');
       expect((component as any).isSlotOccupied(slotS22)).withContext('free drop: slot is now empty').toBeFalse();
       expect(pDef.xPercent).toBe(70, 'free drop: xPercent set');
@@ -3976,10 +3919,10 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
   });
 
   /**
-   * V25D98.5-FRONT: regression — Ivan reported 'no deberia decir eso
+   * V25D98.5-FRONT: regression - Ivan reported 'no deberia decir eso
    * [Sin asignar], directamente no deberia decir nada apretar ese slot'.
    * After V25D98.4 the empty original slot shows 'Sin asignar' on
-   * click. Iván wants the slot to be FULLY INERT on click — not even
+   * click. Iván wants the slot to be FULLY INERT on click - not even
    * 'Sin asignar'. The player has fully relocated to the override
    * position; the slot is just a visual rectangle with no functional
    * click handler until the user drag-drops the marker back onto it
@@ -4016,8 +3959,8 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
       (component as any).fieldContainer = { nativeElement: fieldEl };
 
       // Step 1: free-positioning drop (mimics Ivan's drag 30px down).
-      // S22-1 bbox is left=10, top=70, width=25, height=12 → bbox x in
-      // [10, 35], y in [70, 82]. Drop at (600, 600) → xPct=60, yPct=75 →
+      // S22-1 bbox is left=10, top=70, width=25, height=12 -> bbox x in
+      // [10, 35], y in [70, 82]. Drop at (600, 600) -> xPct=60, yPct=75 ->
       // outside any slot bbox.
       (component as any).handleMarkerDragEnd({ dropPoint: { x: 600, y: 600 } } as any, pDef);
       expect(pDef.xPercent).toBe(60, 'first drop: free-position xPercent set');
@@ -4071,9 +4014,9 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
     // moves out of a slot, the slot must be visually empty (no chip, no
     // missing-indicator, no .abandoned class, no amber outline). With the
     // slot-only model, the only way to empty a slot is via slot-swap
-    // (where the displaced occupant fills the source slot — no empty
+    // (where the displaced occupant fills the source slot - no empty
     // slot remains) or via bench-move (which removes the player from
-    // homePlayers entirely — the slot no longer exists in the user's
+    // homePlayers entirely - the slot no longer exists in the user's
     // view because shouldRenderSlot filters empty non-recommended slots).
     //
     // This test verifies: after a slot-swap, the source slot has a new
@@ -4085,7 +4028,7 @@ describe('SquadEditorModalComponent — V25D98 free positioning (field drop)', (
       const pMid = (component as any).slotPlayerMap['S13-2'];
 
       // Move pDef to bench. Source slot S22-1 should not have any visual
-      // indicator (chip, missing-indicator, abandoned) — only the
+      // indicator (chip, missing-indicator, abandoned) - only the
       // shouldRenderSlot filter keeps it from rendering at all.
       (component as any).movePlayerToBench(pDef);
       fixture.detectChanges();
