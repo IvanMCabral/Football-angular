@@ -225,8 +225,8 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
 
   constructor() {
     this.vm$ = this.vmSubject.asObservable();
-    this.registerDeRoundLiveHook();
-    setTimeout(() => this.registerDeRoundLiveHook(), 0);
+    this.registerDebugRoundLiveHook();
+    setTimeout(() => this.registerDebugRoundLiveHook(), 0);
 
     // Auto-start the round as soon as the first vm$
     // emission shows NOT_STARTED matches. This replaces the previous
@@ -404,7 +404,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
     this.vmSubject.next(vm);
   }
 
-  private registerDeRoundLiveHook(): void {
+  private registerDebugRoundLiveHook(): void {
     if (typeof window === 'undefined') {
       return;
     }
@@ -430,7 +430,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
     const userTeamId = this.resolveManagerTeamId(userMatch, state);
     const managerIsAway = userTeamId === String(state.awayTeamId);
     const sourceSlots = managerIsAway ? (state.awaySlots ?? []) : (state.homeSlots ?? []);
-    const normalizedSourceSlots = this.normalizeTacticalSlotSnapshotForDe(sourceSlots);
+    const normalizedSourceSlots = this.normalizeTacticalSlotSnapshotForDebug(sourceSlots);
     const activeDebugPartidoEvents = (state.events ?? []).filter(event =>
       event.eventType === 'INJURY'
       && typeof event.description === 'string'
@@ -497,7 +497,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
     return { injuredPlayerId };
   }
 
-  private normalizeTacticalSlotSnapshotForDe<T extends { sessionPlayerId?: string | null; playerId?: string | null; slotIndex?: number | null }>(
+  private normalizeTacticalSlotSnapshotForDebug<T extends { sessionPlayerId?: string | null; playerId?: string | null; slotIndex?: number | null }>(
     slots: T[]
   ): T[] | null {
     const uniqueByPlayer = new Map<string, T>();
@@ -603,7 +603,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
     return { queued: ids };
   }
 
-  onDeDoubleInjury(): void {
+  onDebugDoubleInjury(): void {
     const result = this.debugTriggerUserInjuryModals();
     if (result.reason) {
       this.logDevWarn('[ROUND-LIVE] double injury skipped:', result.reason);
@@ -1008,7 +1008,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
     });
   }
 
-  toggleDeFreeze(): void {
+  toggleDebugFreeze(): void {
     this.debugFreezeEnabled = !this.debugFreezeEnabled;
     try {
       localStorage.setItem(this.debugFreezeStorageKey, this.debugFreezeEnabled ? '1' : '0');
@@ -1031,7 +1031,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
     return String(userMatch.match.homeTeamId ?? state.homeTeamId);
   }
 
-  toggleDeSuppressAutoInjuryModals(): void {
+  toggleDebugSuppressAutoInjuryModals(): void {
     this.debugSuppressAutoInjuryModals = !this.debugSuppressAutoInjuryModals;
     try {
       localStorage.setItem(

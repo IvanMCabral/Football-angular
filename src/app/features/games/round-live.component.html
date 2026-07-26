@@ -22,7 +22,7 @@
       <button *ngIf="!vm.allFinished && vm.isRoundPaused" (click)="resumeAll()" class="btn btn-resume">▶️ Reanudar todos</button>
       <button
         *ngIf="showDebugControls && !vm.allFinished"
-        (click)="toggleDeFreeze()"
+        (click)="toggleDebugFreeze()"
         class="btn btn-defreeze"
         [class.active]="debugFreezeEnabled"
         [attr.aria-pressed]="debugFreezeEnabled"
@@ -32,7 +32,7 @@
       </button>
       <button
         *ngIf="showDebugControls && !vm.allFinished"
-        (click)="toggleDeSuppressAutoInjuryModals()"
+        (click)="toggleDebugSuppressAutoInjuryModals()"
         class="btn btn-defreeze"
         [class.active]="debugSuppressAutoInjuryModals"
         [attr.aria-pressed]="debugSuppressAutoInjuryModals"
@@ -43,7 +43,7 @@
       </button>
       <button
         *ngIf="showDebugControls && !vm.allFinished"
-        (click)="onDeDoubleInjury()"
+        (click)="onDebugDoubleInjury()"
         class="btn btn-defreeze"
         data-testid="dedouble-injury-button"
         title="Modo prueba local: dispara dos lesiones propias para validar cola de modales"
