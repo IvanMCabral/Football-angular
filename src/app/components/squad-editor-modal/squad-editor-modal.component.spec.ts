@@ -3192,25 +3192,12 @@ describe('SquadEditorModalComponent ghost slots and drag-drop overlap', () => {
 });
 
 /**
- * V25D96-FRONT: free-formation + drag-drop cross-role validation.
- *
- * <p>Ivan feedback (2026-07-06): "los colores los entiendo, pero me
- * resulta raro que pongo 4-4-2 pero yo después de eso quiero mover mis
- * jugadores a voluntad, talvez que se cambie el 4-4-2 automáticamente y
- * diga formación del user pero que pueda poner a por ejemplo Rudiger en
- * el mediocampo si esa es mi estrategia para ganar".
- *
- * <p>Test goals:
- * <ul>
- *   <li>F1 - handleSlotDrop debe aceptar drop cross-role (CB en MID slot).</li>
- *   <li> - detectFormation devuelve el nombre canónico cuando el lineup
- *       matchea exactamente; devuelve 'Formación del User' cuando no matchea.</li>
- *   <li>F3 - dropdown muestra 'Formación del User' como selected después de
- *       un cross-role drop.</li>
- *   <li>F4 - el marker de un player off-role recibe la clase `off-role`.</li>
- * </ul>
+ * Free-formation behavior:
+ * the manager may move players outside their natural tactical role,
+ * the lineup is then treated as a custom shape, and the UI marks
+ * off-role players clearly without blocking the move.
  */
-describe('SquadEditorModalComponent - V25D96 free-formation + drag-drop cross-role', () => {
+describe('SquadEditorModalComponent free-formation cross-role drag/drop', () => {
   let component: SquadEditorModalComponent;
   let fixture: ComponentFixture<SquadEditorModalComponent>;
   let httpClientSpy: jasmine.SpyObj<HttpClient>;
@@ -3267,7 +3254,7 @@ describe('SquadEditorModalComponent - V25D96 free-formation + drag-drop cross-ro
         { playerId: 'p-gk',  name: 'GK',  position: 'GK',  overall: 80, energy: 100, injured: false },
         { playerId: 'p-def', name: 'Rudiger', position: 'CB', overall: 85, energy: 100, injured: false },
         { playerId: 'p-mid', name: 'Valverde', position: 'CM', overall: 86, energy: 100, injured: false },
-        { playerId: 'p-att', name: 'Mbappé', position: 'ST', overall: 92, energy: 100, injured: false }
+        { playerId: 'p-att', name: 'Mbappe', position: 'ST', overall: 92, energy: 100, injured: false }
       ],
       confirmed: true,
       warnings: [],
@@ -3320,12 +3307,11 @@ describe('SquadEditorModalComponent - V25D96 free-formation + drag-drop cross-ro
     fixture.detectChanges();
   });
 
-  // ---- F1 - handleSlotDrop allows cross-role drops ----
+  // ---- cross-role drag/drop ----
 
-  it('V25D96 F1: handleSlotDrop allows cross-role drop (CB p-def -> MID slot S13-2)', (done) => {
-    // Ivan spec: "puedo poner a por ejemplo Rudiger en el mediocampo".
-    // p-def is Rudiger (CB). S13-2 is the MID slot. handleSlotDrop must
-    // NOT block this; after the drop Rudiger ends in the MID slot.
+  it('handleSlotDrop allows cross-role drop (CB p-def -> MID slot S13-2)', (done) => {
+    // A CB can be moved into a MID slot. The modal should allow that
+    // tactical decision and keep the player's new slot consistent.
     setTimeout(() => {
       const rudiger = (component as any).slotPlayerMap['S22-1'];
       expect(rudiger).toBeTruthy('Rudiger must be at S22-1 (DEF slot) in default loadSquadFromBackend');
@@ -3346,12 +3332,11 @@ describe('SquadEditorModalComponent - V25D96 free-formation + drag-drop cross-ro
     }, 30);
   });
 
-  // ---- F2 - detectFormation ----
+  // ---- formation detection ----
 
-  it('V25D96 F2: detectFormation returns "Formación del User" for an incomplete lineup', (done) => {
-    // Default loadSquadFromBackend populates only 4 players (1 GK + 1 DEF +
-    // 1 MID + 1 ATT) into a 4-slot mock. This is incomplete (< 11) so the
-    // formation has no canonical match -> returns USER_FORMATION_LABEL.
+  it('detectFormation returns the user-formation label for an incomplete lineup', (done) => {
+    // Incomplete lineups are treated as a custom manager shape, not as a
+    // silent canonical formation match.
     setTimeout(() => {
       const detected = (component as any).detectFormation();
       expect(detected).toBe('Formación del User',
@@ -3361,7 +3346,7 @@ describe('SquadEditorModalComponent - V25D96 free-formation + drag-drop cross-ro
     }, 30);
   });
 
-  it('V25D96 F2: detectFormation returns a canonical name when role counts match exactly', (done) => {
+  it('detectFormation returns a canonical name when role counts match exactly', (done) => {
     // Build a complete 11-player lineup with role family counts
     // 1 GK + 4 DEF + 4 MID + 2 ATT (= '4-4-2'). Force it into the
     // component via the BehaviorSubject so we don't depend on the auto-select
@@ -3468,7 +3453,7 @@ describe('SquadEditorModalComponent - V25D96 free-formation + drag-drop cross-ro
     }, 30);
   });
 
-  it('V25D96 F2 (helper): countRoleFamily buckets roles into the 4 families', () => {
+  it('countRoleFamily buckets roles into the 4 families', () => {
     // Direct unit test of the role-family counter with explicit input.
     // Bypasses the canonical-formations + lineup machinery to isolate
     // the counting logic from the matching logic.
@@ -3482,15 +3467,11 @@ describe('SquadEditorModalComponent - V25D96 free-formation + drag-drop cross-ro
     expect(counts).toEqual({ gk: 1, def: 3, mid: 3, att: 4 });
   });
 
-  // ---- F3 - dropdown displays user-formation after cross-role drop ----
+  // ---- custom formation dropdown ----
 
-  it('V25D96 F3: dropdown shows "Formación del User" after a cross-role drop', (done) => {
-    // After Rudiger (CB) is dragged into the MID slot, the lineup becomes
-    // off-canonical (3 DEF + 5 MID + 1 GK for the 4-4-2 mock which only
-    // has 4 players total -> still incomplete, so detectFormation returns
-    // 'Formación del User' either way). The dropdown's `dropdownFormationValue`
-    // getter should reflect the user-formation state, and the rendered
-    // select's selected option should match.
+  it('dropdown shows the user-formation label after a cross-role drop', (done) => {
+    // After a cross-role move, the selector must display the custom
+    // formation label so the manager sees that the shape is now manual.
     setTimeout(() => {
       const rudiger = (component as any).slotPlayerMap['S22-1'];
       (component as any).handleSlotDrop({
@@ -3518,12 +3499,11 @@ describe('SquadEditorModalComponent - V25D96 free-formation + drag-drop cross-ro
     }, 30);
   });
 
-  // ---- F4 - marker off-role class ----
+  // ---- off-role marker feedback ----
 
-  it('V25D96 F4: marker receives off-role class when player role != slot recommended role', (done) => {
-    // After Rudiger (CB) is dragged to S13-2 (MID slot with recommended 'CM'),
-    // the player-marker rendered for Rudiger must carry the `off-role` class
-    // so the dashed orange border + OFF badge visual kicks in.
+  it('marker receives off-role class when player role != slot recommended role', (done) => {
+    // A player standing in a slot outside his recommended family should be
+    // visually marked as off-role, without preventing the tactical choice.
     setTimeout(() => {
       // Manually set up state: place Rudiger at S13-2 (off-role).
       const rudiger = (component as any).slotPlayerMap['S22-1'];
