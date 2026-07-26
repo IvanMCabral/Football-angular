@@ -13,29 +13,7 @@ const BUCKET_SIZE = 5;
 const MAX_BUCKET_END = 90; // 18 buckets of 5 min: 0-5, 6-10, ..., 86-90
 
 /**
- * LIVE-MATCH-F3-UI-LIVE FE3: vertical event timeline with 5-minute buckets
- * and a "AHORA" pulse marker on the bucket that contains the current match
- * minute. Renders a chip per event with color based on event type.
- *
- * <p>Inputs:
- * <ul>
- *   <li>{@code events} — list of {@link MatchEvent} from the live snapshot.</li>
- *   <li>{@code currentMinute} — integer 0-90 driving the "AHORA" marker and
- *       the auto-scroll target.</li>
- *   <li>{@code homeTeamId} / {@code awayTeamId} — used to color the chips
- *       on the appropriate side (home chip on the left rail, away chip on
- *       the right rail; central events like SUBSTITUTION span the rail).</li>
- *   <li>{@code teamNameMap} — id → display name lookup used for the "X' Team"
- *       event label.</li>
- * </ul>
- *
- * <p>A11y: the bucket container has {@code aria-live="polite"} so screen
- * readers announce new events.
- *
- * <p>Performance: with 90 minutes × 5-10 events per minute, the worst case
- * is ~900 DOM nodes. Per the F3 prompt, virtual scrolling is YAGNI — we
- * fall back to {@code cdk-virtual-scroll} only if Playwright shows visible
- * lag (R5).
+ * Vertical event timeline with 5-minute buckets and a current-minute marker.
  */
 @Component({
   selector: 'app-live-timeline',
@@ -54,7 +32,7 @@ export class LiveTimelineComponent {
     this._events.set(value ?? []);
   }
 
-  /** Current match minute (0-90) — drives the "AHORA" marker. */
+  /** Current match minute (0-90); drives the current-minute marker. */
   private _currentMinute = signal<number>(0);
   @Input()
   set currentMinute(value: number) {

@@ -614,7 +614,7 @@ describe('Substitution modal effectiveness feedback', () => {
     expect(b1Li.querySelector('.eff-badge')).toBeNull();
   });
 
-  // V25D64 (Sprint C24) P0: eff-good border verde (#10b981 emerald-500) para
+  // Green border symmetry for good effectiveness feedback.
   // visual symmetry with eff-warning (amber) and eff-bad (red). The actual color is
   // covered by visual smoke tests; here we verify that eff-good remains bound
   // en el DOM para los SALE dots con eff >= 0.9 (consistency check).
@@ -665,7 +665,7 @@ describe('Substitution modal visual pitch, stats chips, and remaining substituti
   /**
    * Build a controlled SubstitutionDialogData with playerRatings (per spec
    * task: "Render stats chips cuando hay eventos con playerId"). Player
-   * states mimic what the back's V24PlayerMatchStatsModel.computeRatings
+   * states mimic what the backend player-rating calculation
    * produces after the engine has run for some minutes:
    *  - p1 (GK): one goal (rare for a GK but illustrative), one foul.
    *  - p2 (CB): one yellow card, 3 key passes.
@@ -778,7 +778,7 @@ describe('Substitution modal visual pitch, stats chips, and remaining substituti
     // (GK category always 1); DEF line should hold any CB/CDM players;
     // ATT line should hold any ST/CF players. The lines are categorized,
     // not formation-line-counts (4-4-2 → 4 lines, etc.) — this is the
-    // V25D79 simplification documented in pitchLines getter.
+    // Category grouping is documented in the pitchLines getter.
     const pitchLines = fixture.nativeElement.querySelectorAll(
       '.v25d79-pitch .v25d79-pitch-line');
     expect(pitchLines.length).withContext('pitch should have at least one line').toBeGreaterThan(0);
@@ -819,11 +819,9 @@ describe('Substitution modal visual pitch, stats chips, and remaining substituti
   });
 
   it('substitutionsRemaining_isSourcedFromData', () => {
-    // V25D79 (D5): substitutionsRemaining comes from the live SSE state
-    // (computed by MatchSession.adaptV24Snapshot as max(0, 5 - SUBSTITUTION
-    // events)). The modal uses it to gate canConfirm + isOutOfSubs. The
-    // service sources it from `state.substitutionsRemaining` and falls back
-    // to 5 when the SSE feed hasn't arrived.
+    // substitutionsRemaining comes from the live state. The modal uses it
+    // to gate canConfirm and isOutOfSubs, with a safe fallback before the
+    // stream has produced the field.
     //
     // This test rebuilds the TestBed with TWO distinct dialog-data shapes:
     // one with subs=3 (positive case), one with subs=0 (zero case). Each

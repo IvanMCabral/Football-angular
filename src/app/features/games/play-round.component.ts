@@ -62,7 +62,7 @@ export class PlayRoundComponent implements OnInit {
             simulated.push(sim);
             count++;
             if (count === pending.length) {
-              // Volver a cargar los partidos de la primera fecha ya simulados
+              // Reload the first-round matches after simulation.
               this.matchService.getMatchesByGameId(this.gameId).subscribe((updated: Match[]) => {
                 const updatedFirstRound = updated.filter((m: Match) => m.round === firstRound);
                 this.animateMatches(updatedFirstRound);
@@ -79,7 +79,7 @@ export class PlayRoundComponent implements OnInit {
 
   animateMatches(matches: Match[]) {
     this.animatedMatches = [];
-    // Si TODOS los partidos no tienen eventos, mostrar todos de una vez y salir del loading
+    // If no match has events, render the final cards immediately.
     const allNoEvents = matches.every(m => (m.result?.events?.length ?? 0) === 0);
     if (allNoEvents) {
       this.animatedMatches = matches.map(match => ({

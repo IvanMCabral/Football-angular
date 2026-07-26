@@ -4,21 +4,7 @@ import { MAT_DIALOG_DATA, MatDialogRef, MatDialogModule } from '@angular/materia
 import { MatButtonModule } from '@angular/material/button';
 
 /**
- * V25D81.1 BUG #3: rival RED_CARD awareness modal.
- *
- * <p>When the rival receives a red card, the manager gets a small
- * informational dialog so they know their opponent is down a man —
- * but the modal does NOT trigger any automatic substitution action.
- * Closing the dialog (the only action) returns the manager to the
- * live-match view unchanged.
- *
- * <p>The dialog intentionally has no "Cerrar y sustituir" button. Quick
- * squad changes after a rival sending-off still go through the
- * existing "Sustituir" button, not this awareness flow.
- *
- * <p>Rendered inline-styled (no {@code styleUrls}) so Karma/jsdom tests
- * can parse the styles via {@code ɵcmp.styles} (see the angular-testing
- * patterns memory note for the rationale).
+ * Informational modal shown when the rival receives a red card.
  */
 export interface RivalCardInfoDialogData {
   /** Display name of the rival player who received the card. */
