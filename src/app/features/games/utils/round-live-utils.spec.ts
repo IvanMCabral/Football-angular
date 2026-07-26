@@ -1,4 +1,5 @@
 import {
+  buildPendingLiveModalNotice,
   findRoundControlAnchorMatch,
   getLastRoundEvents,
   getRoundEventIcon,
@@ -114,6 +115,42 @@ describe('round-live-utils', () => {
 
     expect(wasPlayerSubstitutedOffInState(state, 'p2')).toBeTrue();
     expect(wasPlayerSubstitutedOffInState(state, 'p1')).toBeFalse();
+  });
+
+  it('builds pending injury modal notices with queue count', () => {
+    expect(buildPendingLiveModalNotice({
+      queuedInjuryCount: 1,
+      hasQueuedRivalCard: false,
+      isCriticalLiveModalOpen: false
+    })).toBe('Evento pendiente: lesión propia. Al cerrar el modal actual se abrirá Sustitución.');
+
+    expect(buildPendingLiveModalNotice({
+      queuedInjuryCount: 2,
+      hasQueuedRivalCard: true,
+      isCriticalLiveModalOpen: true
+    })).toBe('Evento pendiente: lesión propia (2). Al cerrar el modal actual se abrirá Sustitución.');
+  });
+
+  it('builds pending rival red-card notices based on the current modal state', () => {
+    expect(buildPendingLiveModalNotice({
+      queuedInjuryCount: 0,
+      hasQueuedRivalCard: true,
+      isCriticalLiveModalOpen: true
+    })).toBe('Evento pendiente: roja rival. Al cerrar el modal actual verás el aviso táctico.');
+
+    expect(buildPendingLiveModalNotice({
+      queuedInjuryCount: 0,
+      hasQueuedRivalCard: true,
+      isCriticalLiveModalOpen: false
+    })).toBe('Evento pendiente: roja rival. Pausá el partido o abrí Partido para revisarlo sin cortar el juego.');
+  });
+
+  it('returns no pending modal notice when there are no queued events', () => {
+    expect(buildPendingLiveModalNotice({
+      queuedInjuryCount: 0,
+      hasQueuedRivalCard: false,
+      isCriticalLiveModalOpen: false
+    })).toBeNull();
   });
 });
 

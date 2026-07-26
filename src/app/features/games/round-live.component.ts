@@ -12,6 +12,7 @@ import { MatchCardComponent } from '../../shared/components/match-card/match-car
 import { RoundLiveViewModel, RoundMatchVM } from './models/round-live.model';
 import { MatchState, RoundState } from '../../core/services/match-engine.model';
 import {
+  buildPendingLiveModalNotice,
   findRoundControlAnchorMatch,
   getLastRoundEvents,
   getRoundEventIcon,
@@ -1548,18 +1549,11 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
   }
 
   private updatePendingLiveModalNotice(): void {
-    if (this.queuedAutoModals.length > 0) {
-      const suffix = this.queuedAutoModals.length > 1 ? ` (${this.queuedAutoModals.length})` : '';
-      this.pendingLiveModalNotice = `Evento pendiente: lesión propia${suffix}. Al cerrar el modal actual se abrirá Sustitución.`;
-      return;
-    }
-    if (this.queuedRivalCardModal) {
-      this.pendingLiveModalNotice = this.isCriticalLiveModalOpen
-        ? 'Evento pendiente: roja rival. Al cerrar el modal actual verás el aviso táctico.'
-        : 'Evento pendiente: roja rival. Pausá el partido o abrí Partido para revisarlo sin cortar el juego.';
-      return;
-    }
-    this.pendingLiveModalNotice = null;
+    this.pendingLiveModalNotice = buildPendingLiveModalNotice({
+      queuedInjuryCount: this.queuedAutoModals.length,
+      hasQueuedRivalCard: !!this.queuedRivalCardModal,
+      isCriticalLiveModalOpen: this.isCriticalLiveModalOpen
+    });
   }
 
   /**

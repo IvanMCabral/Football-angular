@@ -77,3 +77,22 @@ export function wasPlayerSubstitutedOffInState(state: MatchState, playerId: stri
     String(event.playerId ?? '') === playerId
   );
 }
+
+export function buildPendingLiveModalNotice(input: {
+  queuedInjuryCount: number;
+  hasQueuedRivalCard: boolean;
+  isCriticalLiveModalOpen: boolean;
+}): string | null {
+  if (input.queuedInjuryCount > 0) {
+    const suffix = input.queuedInjuryCount > 1 ? ` (${input.queuedInjuryCount})` : '';
+    return `Evento pendiente: lesión propia${suffix}. Al cerrar el modal actual se abrirá Sustitución.`;
+  }
+
+  if (input.hasQueuedRivalCard) {
+    return input.isCriticalLiveModalOpen
+      ? 'Evento pendiente: roja rival. Al cerrar el modal actual verás el aviso táctico.'
+      : 'Evento pendiente: roja rival. Pausá el partido o abrí Partido para revisarlo sin cortar el juego.';
+  }
+
+  return null;
+}
