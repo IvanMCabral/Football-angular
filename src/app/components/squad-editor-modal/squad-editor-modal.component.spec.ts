@@ -3962,7 +3962,11 @@ describe('SquadEditorModalComponent free positioning on field drop', () => {
     expect(bad).toBe(0);
   });
 
-  it('micro-move coach read exposes fine pixel trace and coordinates', (done) => {
+  /**
+   * Tactical coach reads translate tiny visual moves into understandable
+   * manager feedback: pixel trace, channel pressure, coverage, and risk.
+   */
+  it('coach read exposes fine pixel trace and coordinates for micro moves', (done) => {
     setTimeout(() => {
       const midfielder = {
         playerId: 'p-mid',
@@ -3982,7 +3986,7 @@ describe('SquadEditorModalComponent free positioning on field drop', () => {
     }, 30);
   });
 
-  it('resetCustomPositions: clears last movement read so visual smokes start clean', (done) => {
+  it('resetCustomPositions clears movement reads so visual smokes start clean', (done) => {
     setTimeout(() => {
       const home = (component as any).homePlayers$.value.slice();
       home.forEach((p: any) => { p.xPercent = 25; p.yPercent = 75; });
@@ -4047,7 +4051,7 @@ describe('SquadEditorModalComponent free positioning on field drop', () => {
     }, 30);
   });
 
-  it('last coach move read includes visual threat connection and coverage deltas', (done) => {
+  it('coach move read includes visual threat connection and coverage deltas', (done) => {
     setTimeout(() => {
       const home = (component as any).homePlayers$.value.slice();
       const sample = [
@@ -4085,7 +4089,7 @@ describe('SquadEditorModalComponent free positioning on field drop', () => {
     }, 30);
   });
 
-  it('last coach move read warns when visual threat rises but engine attack drops', (done) => {
+  it('coach move read warns when visual threat rises but engine attack drops', (done) => {
     setTimeout(() => {
       const home = (component as any).homePlayers$.value.slice();
       const sample = [
@@ -4122,7 +4126,7 @@ describe('SquadEditorModalComponent free positioning on field drop', () => {
     }, 30);
   });
 
-  it('last coach move read treats defender steps as risk tradeoffs', (done) => {
+  it('coach move read treats defender steps as risk tradeoffs', (done) => {
     setTimeout(() => {
       const home = (component as any).homePlayers$.value.slice();
       const defender = {
@@ -4146,7 +4150,7 @@ describe('SquadEditorModalComponent free positioning on field drop', () => {
     }, 30);
   });
 
-  it('last coach move read treats wide and inside drags as tactical tradeoffs', (done) => {
+  it('coach move read treats wide and inside drags as tactical tradeoffs', (done) => {
     setTimeout(() => {
       const home = (component as any).homePlayers$.value.slice();
       const midfielder = {
@@ -4177,7 +4181,7 @@ describe('SquadEditorModalComponent free positioning on field drop', () => {
     }, 30);
   });
 
-  it('last coach move read names diagonal combined moves explicitly', (done) => {
+  it('coach move read names diagonal combined moves explicitly', (done) => {
     setTimeout(() => {
       const home = (component as any).homePlayers$.value.slice();
       const midfielder = {
