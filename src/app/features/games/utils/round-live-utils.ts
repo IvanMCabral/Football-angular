@@ -31,6 +31,11 @@ export interface PendingRoundStartMatch {
   awayTeamId: string;
 }
 
+export interface PersistedInjuryAutoModalRef {
+  matchId: string;
+  preSelectedPlayerId: string;
+}
+
 export const ROUND_LIVE_DEBUG_STORAGE_KEYS = {
   freeze: 'manager.deFreezeLiveRound',
   suppressAutoInjury: 'manager.debugSuppressAutoInjuryModals',
@@ -154,6 +159,62 @@ export function shouldQueueInjuryAutoModal(input: {
   isCriticalLiveModalOpen: boolean;
 }): boolean {
   return input.isAutoModalOpen || input.isCriticalLiveModalOpen;
+}
+
+export function buildPersistedInjuryAutoModalPayload(input: {
+  active: PersistedInjuryAutoModalRef | null;
+  queued: PersistedInjuryAutoModalRef[];
+}): { active: PersistedInjuryAutoModalRef[]; queued: PersistedInjuryAutoModalRef[] } | null {
+  const active = input.active ? [input.active] : [];
+  const queued = input.queued.map(item => ({
+    matchId: item.matchId,
+    preSelectedPlayerId: item.preSelectedPlayerId
+  }));
+
+  if (active.length === 0 && queued.length === 0) {
+    return null;
+  }
+
+  return { active, queued };
+}
+
+export function parsePersistedInjuryAutoModalRefs(raw: string): PersistedInjuryAutoModalRef[] | null {
+  let parsed: {
+    active?: PersistedInjuryAutoModalRef[];
+    queued?: PersistedInjuryAutoModalRef[];
+  };
+
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+
+  return [
+    ...(parsed.active ?? []),
+    ...(parsed.queued ?? [])
+  ].filter(item => !!item?.matchId && !!item?.preSelectedPlayerId);
+}
+
+export function findRestorableInjuryAutoModals(input: {
+  refs: PersistedInjuryAutoModalRef[];
+  matches: RoundMatchVM[];
+}): Array<PersistedInjuryAutoModalRef & { state: MatchState }> {
+  const restorable: Array<PersistedInjuryAutoModalRef & { state: MatchState }> = [];
+
+  for (const ref of input.refs) {
+    const match = input.matches.find(candidate => String(candidate.state?.matchId ?? candidate.match.id) === ref.matchId);
+    const state = match?.state;
+    if (!state || isTerminalRoundState(state.status)) {
+      continue;
+    }
+    if (wasPlayerSubstitutedOffInState(state, ref.preSelectedPlayerId)) {
+      continue;
+    }
+    restorable.push({ ...ref, state });
+  }
+
+  return restorable;
 }
 
 export function findInjuryAutoModalCandidates(input: {

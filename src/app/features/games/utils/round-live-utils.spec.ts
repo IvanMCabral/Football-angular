@@ -1,7 +1,9 @@
 import {
+  buildPersistedInjuryAutoModalPayload,
   buildPendingRoundStartMatches,
   buildPendingLiveModalNotice,
   findInjuryAutoModalCandidates,
+  findRestorableInjuryAutoModals,
   findRivalRedCardModalCandidate,
   findRoundControlAnchorMatch,
   getLastRoundEvents,
@@ -13,6 +15,7 @@ import {
   mapRoundFixtureStatus,
   normalizeTacticalSlotSnapshotForDebug,
   normalizeTerminalLiveState,
+  parsePersistedInjuryAutoModalRefs,
   readStorageFlag,
   ROUND_LIVE_DEBUG_STORAGE_KEYS,
   shouldQueueInjuryAutoModal,
@@ -143,6 +146,68 @@ describe('round-live-utils', () => {
       isAutoModalOpen: false,
       isCriticalLiveModalOpen: false
     })).toBeFalse();
+  });
+
+  it('builds persisted injury modal payloads only when there is something to restore', () => {
+    expect(buildPersistedInjuryAutoModalPayload({
+      active: null,
+      queued: []
+    })).toBeNull();
+
+    expect(buildPersistedInjuryAutoModalPayload({
+      active: { matchId: 'm1', preSelectedPlayerId: 'p1' },
+      queued: [{ matchId: 'm2', preSelectedPlayerId: 'p2' }]
+    })).toEqual({
+      active: [{ matchId: 'm1', preSelectedPlayerId: 'p1' }],
+      queued: [{ matchId: 'm2', preSelectedPlayerId: 'p2' }]
+    });
+  });
+
+  it('parses persisted injury modal refs and drops incomplete entries', () => {
+    expect(parsePersistedInjuryAutoModalRefs('{bad json')).toBeNull();
+    expect(parsePersistedInjuryAutoModalRefs(JSON.stringify({
+      active: [{ matchId: 'm1', preSelectedPlayerId: 'p1' }],
+      queued: [
+        { matchId: 'm2', preSelectedPlayerId: 'p2' },
+        { matchId: '', preSelectedPlayerId: 'p3' },
+        { matchId: 'm4', preSelectedPlayerId: '' }
+      ]
+    }))).toEqual([
+      { matchId: 'm1', preSelectedPlayerId: 'p1' },
+      { matchId: 'm2', preSelectedPlayerId: 'p2' }
+    ]);
+  });
+
+  it('restores only actionable persisted injury modal refs', () => {
+    const running = roundMatchWithState('running', true, matchState({
+      matchId: 'running',
+      status: 'RUNNING'
+    }));
+    const finished = roundMatchWithState('finished', true, matchState({
+      matchId: 'finished',
+      status: 'FINISHED'
+    }));
+    const alreadySubbed = roundMatchWithState('already-subbed', true, matchState({
+      matchId: 'already-subbed',
+      status: 'PAUSED',
+      events: [{ eventType: 'SUBSTITUTION', playerId: 'p3' } as any]
+    }));
+
+    expect(findRestorableInjuryAutoModals({
+      refs: [
+        { matchId: 'running', preSelectedPlayerId: 'p1' },
+        { matchId: 'finished', preSelectedPlayerId: 'p2' },
+        { matchId: 'already-subbed', preSelectedPlayerId: 'p3' },
+        { matchId: 'missing', preSelectedPlayerId: 'p4' }
+      ],
+      matches: [running, finished, alreadySubbed]
+    }).map(item => ({
+      matchId: item.matchId,
+      preSelectedPlayerId: item.preSelectedPlayerId,
+      status: item.state.status
+    }))).toEqual([
+      { matchId: 'running', preSelectedPlayerId: 'p1', status: 'RUNNING' }
+    ]);
   });
 
   it('falls back to any active match as round-control anchor', () => {

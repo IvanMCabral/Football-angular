@@ -12,9 +12,11 @@ import { MatchCardComponent } from '../../shared/components/match-card/match-car
 import { RoundLiveViewModel, RoundMatchVM } from './models/round-live.model';
 import { MatchState, RoundState } from '../../core/services/match-engine.model';
 import {
+  buildPersistedInjuryAutoModalPayload,
   buildPendingRoundStartMatches,
   buildPendingLiveModalNotice,
   findInjuryAutoModalCandidates,
+  findRestorableInjuryAutoModals,
   findRivalRedCardModalCandidate,
   findRoundControlAnchorMatch,
   getLastRoundEvents,
@@ -25,11 +27,11 @@ import {
   mapRoundFixtureStatus,
   normalizeTacticalSlotSnapshotForDebug,
   normalizeTerminalLiveState,
+  parsePersistedInjuryAutoModalRefs,
   readStorageFlag,
   ROUND_LIVE_DEBUG_STORAGE_KEYS,
   shouldQueueInjuryAutoModal,
   shouldQueueRivalCardModal,
-  wasPlayerSubstitutedOffInState,
   writeStorageFlag
 } from './utils/round-live-utils';
 
@@ -1043,17 +1045,15 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
     if (typeof sessionStorage === 'undefined') {
       return;
     }
-    const active = this.activeInjuryAutoModal ? [this.activeInjuryAutoModal] : [];
-    const queued = this.queuedAutoModals.map(payload => ({
-      matchId: payload.matchId,
-      preSelectedPlayerId: payload.preSelectedPlayerId
-    }));
-    const payload = {
-      active,
-      queued
-    };
+    const payload = buildPersistedInjuryAutoModalPayload({
+      active: this.activeInjuryAutoModal,
+      queued: this.queuedAutoModals.map(item => ({
+        matchId: item.matchId,
+        preSelectedPlayerId: item.preSelectedPlayerId
+      }))
+    });
     const key = this.injuryAutoModalStorageKey();
-    if (active.length === 0 && queued.length === 0) {
+    if (!payload) {
       sessionStorage.removeItem(key);
       return;
     }
@@ -1071,39 +1071,21 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
       return;
     }
 
-    let parsed: {
-      active?: PersistedInjuryAutoModal[];
-      queued?: PersistedInjuryAutoModal[];
-    };
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
+    const refs = parsePersistedInjuryAutoModalRefs(raw);
+    if (!refs) {
       sessionStorage.removeItem(key);
       return;
     }
 
-    const items = [
-      ...(parsed.active ?? []),
-      ...(parsed.queued ?? [])
-    ].filter(item => !!item?.matchId && !!item?.preSelectedPlayerId);
-
     sessionStorage.removeItem(key);
-    if (items.length === 0) {
+    if (refs.length === 0) {
       return;
     }
 
-    for (const item of items) {
-      const match = matches.find(candidate => String(candidate.state?.matchId ?? candidate.match.id) === item.matchId);
-      const state = match?.state;
-      if (!state || state.status === 'FINISHED' || state.status === 'CANCELLED') {
-        continue;
-      }
-      if (wasPlayerSubstitutedOffInState(state, item.preSelectedPlayerId)) {
-        continue;
-      }
+    for (const item of findRestorableInjuryAutoModals({ refs, matches })) {
       this.queueOrOpenAutoModal({
         matchId: item.matchId,
-        state,
+        state: item.state,
         preSelectedPlayerId: item.preSelectedPlayerId
       });
     }
