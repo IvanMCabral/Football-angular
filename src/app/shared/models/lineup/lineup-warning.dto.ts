@@ -1,10 +1,8 @@
 /**
- * V24D6U3: Warning DTO surfaced by the backend on auto-select / manual-select.
+ * Non-fatal lineup warning returned by the backend.
  *
- * <p>Warnings are non-fatal: the match is still playable but degraded. The
- * UI renders them as inline banners (yellow). Fatal errors (too few
- * players, etc.) come back as 4xx and are handled separately via
- * {@code lineupError$}.
+ * Warnings mean the match is still playable but degraded. Fatal lineup errors
+ * are returned separately as failed requests.
  */
 export type LineupWarningSeverity = 'WARNING' | 'ERROR';
 
@@ -18,6 +16,6 @@ export interface LineupWarningDTO {
   code: LineupWarningCode | string;
   /** Severity. WARNING for soft warnings, ERROR for 4xx payloads. */
   severity: LineupWarningSeverity;
-  /** Human-readable message. Spanish (es-neutro). */
+  /** Human-readable message. Spanish neutral. */
   message: string;
 }

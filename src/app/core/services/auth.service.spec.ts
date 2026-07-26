@@ -1,10 +1,4 @@
-// V25D78-C55.12: regression tests for AuthService.
-// Covers BUG_C55.10_UI_FRESH_USER_LOGIN_FAIL — fresh register succeeded but immediate
-// login failed with 400 "Failed to read HTTP message" for hyphen-dot emails. The fix adds
-// payload hygiene (trim + explicit Content-Type) on both login() and register() so the
-// browser's HttpClient cannot leak whitespace into the request body. These specs pin the
-// trimmed-body contract and the explicit Content-Type header so future refactors of
-// AuthService cannot regress to the old behavior.
+// Regression coverage for AuthService request payload hygiene.
 
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
@@ -13,7 +7,7 @@ import { of } from 'rxjs';
 import { AuthService } from './auth.service';
 import { AuthResponse } from '../../shared/models/auth.model';
 
-describe('AuthService — C55.12 payload hygiene', () => {
+describe('AuthService payload hygiene', () => {
   let service: AuthService;
   let httpSpy: jasmine.SpyObj<HttpClient>;
   const fakeResponse: AuthResponse = {
@@ -41,7 +35,7 @@ describe('AuthService — C55.12 payload hygiene', () => {
   });
 
   describe('login()', () => {
-    it('POSTs to /auth/login with the trimmed email and password (regression: BUG_C55.10_UI_FRESH_USER_LOGIN_FAIL)', (done) => {
+    it('POSTs to /auth/login with the trimmed email and password', (done) => {
       // The failing smoke scenario: email arrived in the form with leading + trailing
       // whitespace (clipboard paste, autofill). AuthService must trim before sending.
       service.login('  smoke-c55.10-d-160100@test.com  ', '  SmokePwd123!  ').subscribe((resp) => {

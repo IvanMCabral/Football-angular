@@ -145,10 +145,7 @@ export class MatchLiveComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
   }
 
-  /**
-   * Compares the new event list with the previous one and triggers a
-   * {@code MatSnackBar} for every goal that wasn't present before.
-   */
+  // Shows a snack-bar only for goals that were not present in the previous event list.
   private detectNewGoals(prev: MatchEvent[], next: MatchEvent[]) {
     const nextGoals = next.filter(e => (e.eventType || '').toUpperCase() === 'GOAL');
     if (nextGoals.length === 0) {

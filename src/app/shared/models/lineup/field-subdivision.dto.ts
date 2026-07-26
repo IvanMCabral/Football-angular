@@ -1,11 +1,8 @@
 /**
- * DTO de subdivisión del campo de fútbol (response de GET /editor/subdivisions).
+ * Football field subdivision returned by the lineup editor API.
  *
- * <p>Replicado de {@code com.footballmanager.adapters.in.web.career.lineup.dto.FieldSubdivisionDTO}.
- * 81 subdivisiones normales (27 sectores × 3 sub-espacios) + 1 GK = 82 totales.
- *
- * <p>Coordenadas en % relativos al field (0-100). El campo está orientado
- * vertical: top% bajo = zona de ATAQUE; top% alto = zona DEFENSA.
+ * The field uses relative coordinates from 0 to 100. Lower top values are the
+ * attacking zone; higher top values are the defensive zone.
  */
 export interface FieldSubdivisionDTO {
   sector: number;

@@ -1,10 +1,8 @@
 /**
- * Posición de formación (response de GET /editor/formations).
+ * Formation position returned by the lineup editor API.
  *
- * <p>Replicado de {@code com.footballmanager.adapters.in.web.career.lineup.dto.FormationPositionDTO}.
- *
- * <p>Coordenadas en % relativos al field. La {@code subdivisionId} apunta
- * a la subdivisión donde el jugador debe renderizarse.
+ * Coordinates are relative to the pitch. The subdivisionId points to the zone
+ * where the player should be rendered.
  */
 export interface FormationPositionDTO {
   index: number;
@@ -16,11 +14,7 @@ export interface FormationPositionDTO {
 }
 
 /**
- * Formación táctica completa con sus posiciones.
- *
- * <p>Replicado de {@code com.footballmanager.adapters.in.web.career.lineup.dto.FormationDTO}.
- * Las posiciones marcan los slots "recommended" del campo para esta formación
- * (lo que el modal resalta visualmente).
+ * Tactical formation with its recommended pitch slots.
  */
 export interface FormationDTO {
   name: string;
