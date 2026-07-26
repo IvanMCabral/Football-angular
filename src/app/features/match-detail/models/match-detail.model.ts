@@ -1,14 +1,11 @@
 /**
- * V24D5E2: Match Detail Types
- * TypeScript interfaces for V24DetailedMatchData consumed from:
- * GET /api/careers/{careerId}/matches/{matchId}/detail
+ * Match detail types consumed from the career match-detail endpoint.
  *
- * These types reflect the V24DetailedMatchData DTO from the backend.
- * playerRatings may be empty; shotCoordinate may be null.
- * UI must handle both gracefully.
+ * Some enriched fields are optional because older or lightweight match
+ * simulations may not persist every detail.
  */
 
-/** All possible event types in a V24 match timeline */
+/** All possible event types in a match timeline. */
 export type MatchEventType =
   | 'GOAL'
   | 'SHOT'
@@ -36,7 +33,7 @@ export type ShotLocation =
 
 /**
  * Shot coordinate for a shot event.
- * Nullable — only present when V24D3C event attachment is implemented.
+ * Nullable because not every historical event has stored coordinates.
  */
 export interface ShotCoordinate {
   x: number;
@@ -48,10 +45,10 @@ export interface ShotCoordinate {
 }
 
 /**
- * A single event in the V24 match timeline.
+ * A single event in the match timeline.
  * relatedPlayerId/relatedPlayerName are nullable (e.g., assists on goals).
  * xg is nullable (only for SHOT and GOAL events).
- * shotCoordinate is nullable (only for SHOT/GOAL events after V24D3C).
+ * shotCoordinate is nullable and only meaningful for shot-like events.
  */
 export interface MatchEvent {
   minute: number;
@@ -98,15 +95,14 @@ export interface MatchLineupPlayer {
 }
 
 /**
- * V24 Detailed Match Data DTO.
- * Consumed from: GET /api/careers/{careerId}/matches/{matchId}/detail
+ * Detailed match data returned by the API.
  *
- * This is ADDITIVE enrichment — never required for career progress.
+ * This is additive enrichment and is never required for career progress.
  * When detail is unavailable (404), UI must fall back to aggregate MatchFixture.MatchResultData.
  *
  * Current known limitations:
  * - playerRatings is currently an empty list (persistence deferred)
- * - shotCoordinate is nullable on all events (requires V24D3C)
+ * - shotCoordinate can be null on any event
  */
 export interface MatchDetail {
   matchId: string;
@@ -137,15 +133,12 @@ export interface MatchDetail {
 }
 
 /**
- * V24D24: Snapshot of V24 detailed match data filtered up to and including
- * a specific minute. Returned by
- * GET /api/v1/careers/{careerId}/matches/{matchId}/timeline?minute=N
- * for the test-harness UI timeline scrubber (Panel D, F3).
+ * Match detail snapshot filtered up to and including a specific minute.
  *
  * Aggregation rules (see backend V24TimelineSnapshot):
  * - homeGoals / awayGoals: count of GOAL events per team
  * - homeShots / awayShots: count of SHOT events per team (SHOT_ON_TARGET
- *   is NOT a separate shot — it's the same attempt, just with on-target flag)
+ *   is NOT a separate shot; it is the same attempt with an on-target flag)
  * - homeXg / awayXg: sum of xG for SHOT/SHOT_ON_TARGET/GOAL events per team
  * - events: filtered to event.minute <= minute
  */

@@ -16,14 +16,7 @@ import {
 } from '../components/substitution-dialog/substitution-dialog.component';
 
 /**
- * V24D5E4: Add Player Ratings UI
- *
- * Shows per-player ratings when playerRatings is non-empty.
- * Empty state for old matches or missing data.
- * Sorted by rating descending, top-rated player highlighted.
- * Grouped by team (home first, then away).
- *
- * No mutations. No career-state changes.
+ * Match detail page with score, timeline, player ratings and post-match data.
  */
 @Component({
   selector: 'app-v24-match-detail-page',
@@ -33,14 +26,12 @@ import {
     <div class="v24-match-detail-page">
 
       <!-- Loading state -->
-      <!-- P1a: role="status" + aria-live="polite" so screen readers announce "Loading..." -->
       <div *ngIf="loading" class="state-container" role="status" aria-live="polite">
         <div class="state-spinner" aria-hidden="true"></div>
         <p class="loading-text">Cargando detalle del partido...</p>
       </div>
 
       <!-- Error state -->
-      <!-- P1a: role="alert" so screen readers announce errors immediately -->
       <div *ngIf="!loading && error" class="state-container" role="alert">
         <div class="state-icon error-icon" aria-hidden="true">!</div>
         <p class="error-text">No se pudo cargar el detalle del partido.</p>
@@ -73,14 +64,6 @@ import {
         <div class="match-header">
           <a routerLink="/matches" class="link link-back"
              aria-label="Volver a la lista de partidos">&#8592; Volver a partidos</a>
-          <!-- V24D15-CLEANUP BUG_BREADCRUMB_PLACEHOLDER: the previous template
-               rendered the Round span with a literal placeholder in the title
-               attribute ('Round summary route requires gameId (not in MatchDetail
-               DTO)'). The Phase 2 invariant Game.id == Career.careerId means
-               we can use careerId as gameId here and link to the real
-               /games/:gameId/round/:round/summary route (defined in app.routes.ts).
-               Removed the placeholder text — the link now navigates to the
-               round summary page where the manager can see the full round recap. -->
           <nav class="breadcrumb" aria-label="Breadcrumb">
             <a routerLink="/dashboard" class="breadcrumb-link" title="Ir al dashboard">Dashboard</a>
             <span class="breadcrumb-sep">›</span>
@@ -114,19 +97,16 @@ import {
             <span class="meta-dot">·</span>
             <span class="badge badge-v24">V24 Engine</span>
           </div>
-          <!-- P1a: Prev/Next match navigation (placeholders, disabled until P1a.1 wires to backend) -->
           <div class="match-nav">
             <button type="button" class="btn-nav btn-nav-prev" disabled
                     aria-label="Partido anterior no disponible todavía"
                     title="Próximamente">← Partido anterior</button>
-            <!-- LIVE-MATCH: manual substitution entry point with real data only -->
             <button type="button" class="btn-nav btn-nav-substitute"
                     (click)="openSubstitutionDialog()"
                     aria-label="Sustituir jugador"
                     title="Sustituir jugador con datos reales del partido">
               Sustituir
             </button>
-            <!-- F6 Sprint 2 (LIVE-MATCH-F6-MATCH-COMPARE): link to baseline-vs-live comparison -->
             <a [routerLink]="['/careers', careerId, 'matches', matchId, 'compare']"
                class="btn-nav btn-nav-compare"
                aria-label="Ver comparación baseline vs live"
@@ -140,7 +120,6 @@ import {
         </div>
 
         <!-- Summary Cards -->
-        <!-- P1a: each stat card has role="group" with a descriptive aria-label -->
         <div class="summary-cards">
           <div class="stat-card" role="group"
                [attr.aria-label]="'Goles esperados: ' + detail.homeXg.toFixed(2) + ' local, ' + detail.awayXg.toFixed(2) + ' visitante'">
@@ -180,7 +159,7 @@ import {
           </div>
         </div>
 
-        <!-- Post-Match Condition Summary (V24D6G6A) -->
+        <!-- Post-match condition summary -->
         <div class="section post-match-summary" *ngIf="!loading && !error && detail !== null">
           <h3 class="section-title">Estado post-partido</h3>
           <div class="condition-summary">
@@ -304,7 +283,7 @@ import {
                   </tbody>
                 </table>
               </div>
-              <!-- P1a: mobile cards layout (visible only on screens <= 600px) -->
+              <!-- Mobile cards layout -->
               <div class="players-cards-mobile">
                 <div *ngFor="let p of team.players; let i = index"
                      class="player-card-mobile"
@@ -496,7 +475,7 @@ import {
     }
     .badge-v24 { background: #e3f2fd; color: #1976d2; }
 
-    /* === P1a: Breadcrumb === */
+    /* Breadcrumb */
     .breadcrumb {
       display: flex;
       align-items: center;
@@ -515,7 +494,7 @@ import {
     .breadcrumb-sep { color: #ccc; margin: 0 2px; }
     .breadcrumb-current { color: #555; font-weight: 500; }
 
-    /* === P1a: Prev/Next match navigation === */
+    /* Match navigation */
     .match-nav {
       display: flex;
       justify-content: space-between;
@@ -590,7 +569,7 @@ import {
       border-bottom: 2px solid #f0f0f0;
     }
 
-    /* === V24D6G6A Post-Match Condition Summary === */
+    /* Post-match condition summary */
     .post-match-summary {
       background: #fff;
       border-left: 4px solid #1976d2;
@@ -754,7 +733,7 @@ import {
     .stat-label { font-size: 13px; color: #666; text-transform: uppercase; font-size: 11px; letter-spacing: 0.3px; }
     .stats-row .stat-home { text-align: right; font-weight: 700; font-size: 15px; color: #1a1a2e; }
     .stats-row .stat-away { text-align: left; font-weight: 700; font-size: 15px; color: #1a1a2e; }
-    /* P1a: stats delta visual indicator (home - away, color-coded) */
+    /* Stats delta visual indicator (home - away, color-coded). */
     .stat-delta {
       font-size: 11px;
       font-weight: 600;
@@ -835,7 +814,7 @@ import {
     /* === Shot Map moved to standalone MatchShotMapComponent === */
 
     /* === Responsive === */
-    /* P1a: mobile players cards layout (default hidden, visible <= 600px) */
+    /* Mobile player cards layout (default hidden, visible <= 600px). */
     .players-cards-mobile { display: none; }
     .player-card-mobile {
       background: #fafafa;
@@ -871,7 +850,7 @@ import {
       .score { font-size: 28px; }
       .team-name { font-size: 14px; }
       .scoreboard { gap: 10px; }
-      /* P1a: on mobile, swap table for cards */
+      /* On mobile, swap table for cards. */
       .table-responsive { display: none; }
       .players-cards-mobile { display: block; }
     }
@@ -881,7 +860,6 @@ export class V24MatchDetailPageComponent implements OnInit, OnChanges {
   private api = inject(MatchDetailApiService);
   private route = inject(ActivatedRoute);
   private cdr = inject(ChangeDetectorRef);
-  // LIVE-MATCH-F1-POC: dialog + snackbar + engine service for manual substitutions
   private dialog = inject(MatDialog);
   private snackBar = inject(MatSnackBar);
   private engine = inject(MatchEngineService);
@@ -889,16 +867,10 @@ export class V24MatchDetailPageComponent implements OnInit, OnChanges {
   loading = false;
   error = '';
   detail: MatchDetail | null = null;
-  // F6 Sprint 2 (LIVE-MATCH-F6-MATCH-COMPARE): exposed for the compare
-  // link in the match-header.
   careerId: string | null = null;
   matchId: string | null = null;
 
-  // V24D24: optional @Input bindings. When provided, the page reads
-  // careerId/matchId from inputs (used by the test-harness debug UI at
-  // /debug/test-harness). When NOT provided, the page falls back to the
-  // ActivatedRoute params (existing route-based behavior at
-  // /careers/:careerId/matches/:matchId/detail).
+  // Optional input bindings let debug surfaces mount this page directly.
   private _inputCareerId: string | null | undefined = undefined;
   private _inputMatchId: string | null | undefined = undefined;
   private _inputRefreshToken = 0;
@@ -909,9 +881,6 @@ export class V24MatchDetailPageComponent implements OnInit, OnChanges {
     const isNew = value !== this._inputCareerId;
     this._inputCareerId = value;
     this.careerId = value ?? null;
-    // V24D24: trigger refetch if the component is already initialized and
-    // both inputs are present. Covers programmatic changes (tests) and
-    // template-bound changes (the test-harness page binds the inputs).
     if (this._initialised && isNew && this._inputCareerId && this._inputMatchId) {
       this.fetchDetail(this._inputCareerId, this._inputMatchId);
     }
@@ -941,10 +910,10 @@ export class V24MatchDetailPageComponent implements OnInit, OnChanges {
   get inputRefreshToken(): number { return this._inputRefreshToken; }
 
   ngOnInit(): void {
-    // P1a: scroll to top on entry to this view (avoid stale scroll position when navigating between matches)
+    // Avoid stale scroll position when navigating between matches.
     window.scrollTo(0, 0);
 
-    // V24D24: prefer @Input bindings when provided; otherwise read from route.
+    // Prefer direct inputs when provided; otherwise read from the route.
     const careerId = this._inputCareerId || this.route.snapshot.paramMap.get('careerId');
     const matchId = this._inputMatchId || this.route.snapshot.paramMap.get('matchId');
     if (!careerId || !matchId) {
@@ -964,8 +933,7 @@ export class V24MatchDetailPageComponent implements OnInit, OnChanges {
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    // V24D24: when the input bindings change after init (parent component
-    // picks a new match in Panel C of the test-harness page), refetch.
+    // Refetch when a parent component selects another match after init.
     if (!this._initialised) {
       return;
     }
@@ -1047,7 +1015,7 @@ export class V24MatchDetailPageComponent implements OnInit, OnChanges {
       .replace(/^Substitution: (.+)$/i, 'Cambio: $1');
   }
 
-  // P1a: stats comparison now includes a delta field for visual indication
+  // Stats comparison includes a delta field for visual indication.
   // of home - away (color-coded green/red/grey in the template).
   statsComparison(): { label: string; home: string; away: string; delta: { value: number; formatted: string; winner: 'home' | 'away' | 'even' } }[] {
     if (!this.detail) return [];
@@ -1087,7 +1055,7 @@ export class V24MatchDetailPageComponent implements OnInit, OnChanges {
     ].filter(t => t.players.length > 0);
   }
 
-  // === Post-Match Condition Summary (V24D6G6A) ===
+  // Post-match condition summary.
   injuryEvents(): import('../models/match-detail.model').MatchEvent[] {
     return (this.detail?.timeline ?? []).filter(e => e.type === 'INJURY');
   }
@@ -1121,7 +1089,7 @@ export class V24MatchDetailPageComponent implements OnInit, OnChanges {
     return 'No se registraron lesiones en este partido.';
   }
 
-  // === Shot Map (V24D6O) ===
+  // Shot map.
   hasShotMap(): boolean { return !!(this.detail?.timeline?.some(e => e.shotCoordinate != null)); }
   /**
    * Build a strongly-typed ShotInput[] for the standalone MatchShotMapComponent.
@@ -1142,8 +1110,6 @@ export class V24MatchDetailPageComponent implements OnInit, OnChanges {
       }));
   }
 
-  // ========== LIVE-MATCH: manual substitution dialog ==========
-
   /**
    * Opens the substitution dialog only when the page can use real players.
    * A professional DT flow must never show placeholder names or fake ids:
@@ -1158,7 +1124,7 @@ export class V24MatchDetailPageComponent implements OnInit, OnChanges {
     const data = this.buildRealSubstitutionDialogData();
     if (!data) {
       this.snackBar.open(
-        'Sustituciones reales bloqueadas: el detalle del partido todav?a no expone titulares + suplentes reales. Hay que extender el DTO antes de habilitar este modal.',
+        'Sustituciones reales bloqueadas: el detalle del partido todavía no expone titulares y suplentes reales. Hay que extender el DTO antes de habilitar este modal.',
         'Cerrar',
         {
           duration: 7000,
@@ -1186,8 +1152,8 @@ export class V24MatchDetailPageComponent implements OnInit, OnChanges {
       ).subscribe({
         next: (subResult: { success: boolean; minuteApplied: number; substitutionsRemaining: number; error?: string }) => {
           const msg = subResult.success
-            ? `Sustituci?n registrada (minuto ${subResult.minuteApplied || result.minute}). Te quedan ${subResult.substitutionsRemaining ?? '?'}.`
-            : `Error: ${subResult.error || 'sustituci?n no aplicada'}`;
+            ? `Sustitución registrada (minuto ${subResult.minuteApplied || result.minute}). Te quedan ${subResult.substitutionsRemaining ?? '?'}.`
+            : `Error: ${subResult.error || 'sustitución no aplicada'}`;
           this.snackBar.open(msg, 'Cerrar', {
             duration: 5000,
             panelClass: subResult.success ? 'snack-success' : 'snack-error',

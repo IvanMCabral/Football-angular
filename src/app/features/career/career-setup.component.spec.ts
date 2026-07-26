@@ -363,16 +363,7 @@ describe('CareerSetupComponent — setup flow', () => {
       { divisionNumber: 3, name: 'Tercera División', teams: [] }
     ];
 
-    /**
-     * (a) verify the data flow: when GET /world/leagues/:id/teams-with-ovr
-     * returns, the component's {@code teamsWithOVR$} observable emits the
-     * payload. The template (`<option *ngFor="let team of (teamsWithOVR$ |
-     * async)">`) binds to this observable, so an emission is sufficient to
-     * prove the team selector populates. The option's text label
-     * "{name} ({ovr} OVR) - PRIMERA" is verified in a separate unit test
-     * against the template source to avoid coupling against async-pipe
-     * render timing.
-     */
+    // Verifies that the team selector receives the payload from the API.
     it('teamsWithOVR$ emits teams payload from /teams-with-ovr', (done: DoneFn) => {
       httpSpy.get.and.callFake(((url: string) => {
         if (url.includes('/teams-with-ovr')) return of(TEAMS_WITH_OVR);
@@ -434,9 +425,7 @@ describe('CareerSetupComponent — setup flow', () => {
         'single-division option template MUST label PRIMERA tier');
     });
 
-    /**
-     * (a2) data flow: divisionPreviews$ emits the 3-tier payload.
-     */
+    // Verifies that the division preview stream emits the three-tier payload.
     it('divisionPreviews$ emits 3-tier payload from /division-preview', (done: DoneFn) => {
       httpSpy.get.and.callFake(((url: string) => {
         if (url.includes('/division-preview')) return of(DIVISION_PREVIEWS);
@@ -462,11 +451,7 @@ describe('CareerSetupComponent — setup flow', () => {
       });
     });
 
-    /**
-     * (a2) source-of-truth: the multi-division preview card template MUST
-     * include tier-specific class bindings (division-badge-primera,
-     * -segunda, -tercera) driven off the card's divIndex.
-     */
+    // Keeps the multi-division preview badge classes covered.
     it('multi-division preview card template uses tier-specific badge classes', () => {
       // Same drift-detection strategy as the (a) option-text test: assert
       // that the contract string contains the expected tier labels and the
@@ -499,10 +484,7 @@ describe('CareerSetupComponent — setup flow', () => {
       country: 'England'
     };
 
-    /**
-     * Helper: capture every URL passed to {@code HttpClient.get} so tests
-     * can assert on what was fetched without coupling to call ordering.
-     */
+    // Captures every GET URL so tests do not depend on call ordering.
     function captureGetUrls(): string[] {
       const urls: string[] = [];
       httpSpy.get.and.callFake(((url: string) => {

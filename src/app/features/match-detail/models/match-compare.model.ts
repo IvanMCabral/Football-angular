@@ -1,9 +1,4 @@
-// F6 Sprint 2 (LIVE-MATCH-F6-MATCH-COMPARE): Models for the
-// "Match Compare: baseline vs live" feature. Mirrors the back-end
-// MatchComparison DTOs (see V24MatchContextFactory in the back).
-//
-// Endpoint: GET /api/v1/careers/{careerId}/matches/{matchId}/compare
-// Response: 200 OK with MatchComparison, or 404 if no comparison available.
+// Models for the match comparison endpoint.
 
 import { MatchDetail } from './match-detail.model';
 
@@ -36,7 +31,7 @@ export interface MatchComparisonDiff {
   shotsDeltaHome: number;
   shotsDeltaAway: number;
   possessionDeltaHome: number;
-  timelineDiff: EventBucketDiff[];   // 90 entries: 5 types × 18 buckets
+  timelineDiff: EventBucketDiff[];   // 90 entries: 5 types x 18 buckets
 }
 
 /**

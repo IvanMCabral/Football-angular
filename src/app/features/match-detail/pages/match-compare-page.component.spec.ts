@@ -1,12 +1,4 @@
-// F6 Sprint 2 (LIVE-MATCH-F6-MATCH-COMPARE): Tests for
-// MatchComparePageComponent.
-//
-// V24D15-CLEANUP (BUG_COMPARE_UX Zone.js fix): switched from
-// `waitForAsync(() => ...)` to `async/await + fixture.whenStable()`
-// because Angular 21's Zone.js setup rejects `waitForAsync` outside an
-// active ProxyZone. The `async` form does not depend on the test runner's
-// zone-detection helpers, so it works under the default ChromeHeadlessCI
-// environment.
+// Tests for the match comparison page.
 
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, provideRouter } from '@angular/router';
@@ -37,7 +29,7 @@ describe('MatchComparePageComponent', () => {
         provideRouter([]),
         provideHttpClient(),
         provideHttpClientTesting(),
-        MatchCompareApiService,   // provide the real service (will be spied)
+        MatchCompareApiService,
         { provide: MatSnackBar, useValue: snackBarSpy },
         { provide: ActivatedRoute, useValue: routeStub },
       ],

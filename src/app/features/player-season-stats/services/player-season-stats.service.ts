@@ -9,17 +9,14 @@ import {
 } from '../models/player-season-stats.model';
 
 /**
- * Player Season Stats API Service
- *
- * Service for fetching player season stats from the V24D6M7 API.
- * Follows the same patterns as CareerService and other existing services.
+ * Service for fetching player season stats.
  *
  * Backend endpoints:
  * - GET /api/careers/{careerId}/seasons/{season}/player-stats
  * - GET /api/careers/{careerId}/seasons/{season}/teams/{teamId}/player-stats
  * - GET /api/careers/{careerId}/seasons/{season}/players/{playerId}/stats
  *
- * Note: The backend uses /api/careers (plural) which differs from
+ * Note: the backend uses /api/careers (plural) which differs from
  * the /api/v1/career pattern used by CareerService. This service
  * uses the correct /api/careers base path.
  */

@@ -1,8 +1,5 @@
 /**
- * Player Season Stats - TypeScript Type Definitions
- *
- * Type definitions for the V24D6M7 Player Season Stats API.
- * These types mirror the backend response shapes exactly.
+ * Player season stats type definitions.
  *
  * Deferred fields (NOT included - not available in backend):
  * - minutesPlayed
@@ -12,10 +9,6 @@
  * - averageEnergy
  * - lowestEnergy
  */
-
-// =============================================================================
-// Enums and Unions
-// =============================================================================
 
 /** Sortable fields for the player stats API */
 export type SortField =

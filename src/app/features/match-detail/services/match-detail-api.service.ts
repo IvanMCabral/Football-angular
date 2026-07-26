@@ -5,13 +5,7 @@ import { environment } from '../../../environments/environment';
 import { MatchDetail, TimelineSnapshot } from '../models/match-detail.model';
 
 /**
- * V24D5E2: Match Detail API Service
- *
- * Consumes V24 detailed match data from:
- * GET /api/careers/{careerId}/matches/{matchId}/detail
- *
- * V24D24: Extended with /timeline?minute=N for the test-harness UI
- * timeline scrubber (Panel D, F3).
+ * HTTP access to detailed match data and minute-by-minute snapshots.
  *
  * Behavior for /detail:
  * - 200: returns MatchDetail
@@ -20,11 +14,11 @@ import { MatchDetail, TimelineSnapshot } from '../models/match-detail.model';
  *
  * The /detail endpoint returns 404 when:
  * - app.simulation.v24.expose-detail-api=false (flag disabled)
- * - match was simulated before V24 detail persistence was enabled
+ * - match was simulated before detail persistence was enabled
  * - detail was not persisted for this match
  *
  * IMPORTANT: This service intentionally returns null for 404 on /detail.
- * Future UI components should handle null gracefully — not as an error.
+ * UI components should handle null gracefully, not as an error.
  */
 @Injectable({ providedIn: 'root' })
 export class MatchDetailApiService {
@@ -32,7 +26,7 @@ export class MatchDetailApiService {
   private apiUrl = `${environment.apiUrl}/careers`;
 
   /**
-   * Fetch V24 detailed match data for a given career and match.
+   * Fetch detailed match data for a given career and match.
    *
    * @param careerId The career ID
    * @param matchId  The match ID (matchId from MatchFixture)
@@ -57,7 +51,7 @@ export class MatchDetailApiService {
         if (response.status === 200) {
           return response.body;
         }
-        // 404 is expected when detail is unavailable — return null
+        // 404 is expected when detail is unavailable.
         return null;
       }),
       catchError((error: unknown) => {
@@ -70,17 +64,14 @@ export class MatchDetailApiService {
   }
 
   /**
-   * V24D24: Fetch a partial snapshot of the V24 match timeline filtered up
-   * to and including the requested minute. Pure derivation from the stored
-   * detail — no re-simulation, no cache. Sub-ms on the backend for typical
-   * matches.
+   * Fetch a partial timeline snapshot up to and including the requested minute.
    *
    * @param careerId The career ID
    * @param matchId  The match ID
    * @param minute   The inclusive upper bound for event filtering (0-130)
    * @returns Observable<TimelineSnapshot | null>
    *   - 200 → TimelineSnapshot
-   *   - 400 → error (bad request — minute out of range, blank ids)
+   *   - 400 → error (bad request: minute out of range, blank ids)
    *   - 404 → null (feature flag off, or no detail stored)
    *   - 500+ → error (caller should handle)
    *

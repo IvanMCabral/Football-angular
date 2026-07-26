@@ -88,7 +88,7 @@
   padding: 0 1rem;
 }
 
-/* V24D6O: button to open V24 match detail for a completed match */
+/* Button to open match detail for a completed match. */
 .btn-detail {
   background: #1e3c72;
   color: white;

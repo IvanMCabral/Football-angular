@@ -6,15 +6,10 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatRadioModule } from '@angular/material/radio';
 
 /**
- * LIVE-MATCH-F1-POC: minimal substitution dialog.
+ * Data contract for the simple substitution dialog.
  *
- * <p>Two columns: "Sale" (radios over starting XI) and "Entra" (radios over bench).
+ * Two columns are shown: the player leaving the pitch and the player entering.
  * Submit is disabled until both selections are made.
- *
- * <p>Phase 1 POC limitation (per F3 in the prompt): this dialog receives a
- * static-ish list of starting/bench players hardcoded in the parent component,
- * NOT a real {@code V24DetailedMatchData.startingPlayers} array. The real
- * lineup data requires a backend DTO extension (deferred to Phase 2).
  */
 export interface SubstitutionDialogData {
   matchId: string;

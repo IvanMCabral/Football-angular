@@ -93,18 +93,11 @@ export class TeamService {
   }
 
   /**
-   * LIVE-MATCH-F3-UI-LIVE F5.1 BUG-001: the legacy URL
-   * `/api/v1/career/session-teams/{id}/squad` returns 404 because the
-   * controller exposes the squad under `/api/v1/career/teams/{id}/squad`
-   * and `/api/v1/career/teams/me/squad`. The modal only needs the manager's
-   * own squad, so we use the `me/squad` shortcut and drop the unused
-   * sessionTeamId parameter (server resolves it from the JWT).
+   * Loads the manager's current career squad.
    *
-   * V25D99.23: live match modals must never lose the bench because one
-   * squad read path returns an empty list. `/career/players/squad` is the
-   * canonical "my current career squad" endpoint already used by /squad and
-   * the harness, so it is a safe fallback when `teams/me/squad` is empty or
-   * unavailable.
+   * The primary endpoint returns the team-owned squad. If it is empty or
+   * unavailable, the career player-squad endpoint is used as a safe fallback
+   * so live-match modals do not lose the bench.
    */
   getMyTeamSquad(): Observable<SessionPlayer[]> {
     const fallback$ = () => this.http.get<SessionPlayer[]>(`${this.careerApiUrl}/players/squad`);

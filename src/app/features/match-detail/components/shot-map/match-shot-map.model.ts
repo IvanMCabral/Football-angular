@@ -1,5 +1,5 @@
 /**
- * V24D6O: Shot map geometry and projection helpers.
+ * Shot map geometry and projection helpers.
  *
  * Coordinate system: the backend stores shotCoordinate.{x,y} as
  * normalized 0..100 values where:
@@ -8,13 +8,13 @@
  *   - y=0   is the TOP touchline
  *   - y=100 is the BOTTOM touchline
  *
- * The V24 generator normalizes every shot as "attacking goal at x=100",
+ * The match engine normalizes every shot as "attacking goal at x=100",
  * so the away team must be mirrored horizontally when rendered on the
  * same pitch.
  *
  * The pitch is drawn in a 100x100 logical space; CSS positions the
  * elements as percentages. Geometry constants below define the official
- * V24 spec (see V24D3 plan): penalty box depth 18, vertical span 21..79,
+ * pitch model: penalty box depth 18, vertical span 21..79,
  * six-yard depth 6, vertical span 36..64, goal vertical span 44..56.
  */
 

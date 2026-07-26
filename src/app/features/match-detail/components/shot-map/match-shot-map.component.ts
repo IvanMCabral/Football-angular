@@ -25,12 +25,10 @@ interface ShotMarkerClass {
 }
 
 /**
- * V24D6O: Clean deterministic Shot Map renderer.
+ * Deterministic shot-map renderer.
  *
- * - Backend provides shot data + normalized coordinates (0..100 x/y).
- * - Frontend owns drawing the pitch and projecting coords.
- * - Geometry defined as percentages, not magic pixels.
- * - Mirrors away team horizontally so both attack opposite ends.
+ * Backend provides normalized coordinates, while the frontend owns the pitch
+ * drawing and projection to keep the visual layer predictable.
  */
 @Component({
   selector: 'app-match-shot-map',

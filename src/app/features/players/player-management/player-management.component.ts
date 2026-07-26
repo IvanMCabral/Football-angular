@@ -47,7 +47,7 @@ export class PlayerManagementComponent {
     catchError(() => of([]))
   );
 
-  // WorldTeams = TODOS los equipos disponibles (catálogo completo: reales + custom)
+  // Full team catalog: real and custom teams.
   teams$: Observable<Team[]> = merge(
     this.reloadTeams$
   ).pipe(
@@ -57,7 +57,7 @@ export class PlayerManagementComponent {
         switchMap(userInfo => 
           this.http.get<any[]>(`http://localhost:8080/api/v1/world/teams?userId=${userInfo.id}`).pipe(
             map(worldTeams => worldTeams.map(wt => ({
-              sessionTeamId: wt.worldTeamId, // Usamos worldTeamId como sessionTeamId
+              sessionTeamId: wt.worldTeamId,
               name: wt.name,
               country: wt.country
             }))),

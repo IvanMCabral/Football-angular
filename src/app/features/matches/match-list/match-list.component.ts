@@ -8,21 +8,6 @@ import { CareerStatus, Fixture } from '../../../core/services/career.model';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
 import { ErrorMessageComponent } from '../../../shared/components/error-message/error-message.component';
 
-/**
- * V25D77-C42 F1: list of matches for the current user.
- *
- * <p>V25D77-C42 change: switched to OnPush + a single view-state
- * {@link BehaviorSubject} consumed via the {@code async} pipe. The previous
- * default-CD + direct-subscribe pattern would, in some route-reuse /
- * zone-event-ordering edge cases, leave the {@code @if/@else if} branches
- * stuck on the initial {@code loading=true} spinner even after the http
- * response had populated {@code matches} and {@code loading=false}. With
- * OnPush the async pipe drives change detection directly (it calls
- * {@code markForCheck} on every emission), so the DOM always reflects the
- * latest state on every navigation. This brings the component in line with
- * the rest of the codebase (see {@code MatchLiveComponent}, which has been
- * OnPush + async pipe since LIVE-MATCH-F3-UI-LIVE FE2).
- */
 interface MatchListViewState {
   loading: boolean;
   errorMessage: string;
@@ -59,15 +44,13 @@ const EMPTY_STATE: MatchListViewState = {
   imports: [CommonModule, AsyncPipe, RouterLink, LoadingSpinnerComponent, ErrorMessageComponent],
   templateUrl: './match-list.component.html',
   styleUrls: ['./match-list.component.css'],
-  // V25D77-C42 F1: OnPush forces the async pipe to be the single source of CD
-  // triggers. See class doc.
+  // The async pipe is the single source of change-detection triggers.
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class MatchListComponent implements OnInit {
   private careerService = inject(CareerService);
 
-  // V25D77-C42 F1: single BehaviorSubject holds the entire view state. A
-  // single async pipe in the template drives the whole @if/@else tree.
+  // A single view-state stream drives the whole template.
   private readonly viewStateSubject = new BehaviorSubject<MatchListViewState>(EMPTY_STATE);
   readonly viewState$ = this.viewStateSubject.asObservable();
 
@@ -97,10 +80,6 @@ export class MatchListComponent implements OnInit {
     });
   }
 
-  /**
-   * V25D77-C42 F1: pure helper kept on the component for the template.
-   * Reads the latest careerStatus out of the view state.
-   */
   hasCareer(state: MatchListViewState): boolean {
     return !!(state.careerStatus && state.careerStatus.careerId);
   }

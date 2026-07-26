@@ -108,10 +108,8 @@ describe('SeasonStatsTabComponent — scope contract', () => {
     expect(teamSpy.calls.mostRecent().args[1]).toBe(1);
     expect(teamSpy.calls.mostRecent().args[2]).toBe('team-A');
     expect(allSpy).not.toHaveBeenCalled();
-    // V24D15-CLEANUP (BUG 8 — SeasonStatsTabComponent scope contract):
-    // the FAKE_RESPONSE has playerStats:[] so handleResponse correctly
-    // maps to loadingState='empty' (not 'loaded'). The point of the
-    // test is the ENDPOINT routing, not the loading-vs-empty distinction.
+    // This assertion only verifies endpoint routing. The fake response is
+    // empty, so the component correctly remains in the empty state.
     expect(component.loadingState).toBe('empty');
   });
 

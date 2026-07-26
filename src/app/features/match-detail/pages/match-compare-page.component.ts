@@ -1,6 +1,4 @@
-// F6 Sprint 2 (LIVE-MATCH-F6-MATCH-COMPARE): Side-by-side comparison of
-// baseline vs live match. This page is intentionally coach-readable: it keeps
-// the raw baseline/live deltas, but also explains the match in tactical blocks.
+// Coach-readable side-by-side comparison between baseline and live match data.
 
 import { CommonModule } from '@angular/common';
 import {

@@ -1,6 +1,4 @@
-// F6 Sprint 2 (LIVE-MATCH-F6-MATCH-COMPARE): Tests for
-// MatchCompareApiService. Pattern mirrors match-engine.service.spec.ts:
-// spy on HttpClient and verify request shape.
+// Tests for the match comparison API service.
 
 import { HttpClient, HttpResponse } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
