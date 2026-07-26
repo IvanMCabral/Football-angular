@@ -1205,21 +1205,12 @@ describe('SquadEditorModalComponent effectiveness feedback', () => {
 });
 
 /**
- * V25D56 (Sprint C17) - responsive modal layout.
- *
- * <p>Three progressive breakpoints (mobile <=600px, tablet 601-1024px,
- * desktop default >=1025px). The pre-C17 single breakpoint at 768px
- * hid the .player-chip via `display: none` on mobile, which Iván
- * flagged as a visual regression.
- *
- * <p>Strategy: Karma/Jasmine runs in jsdom, which doesn't simulate
- * viewport width or evaluate @media queries - so we cannot assert
- * computed styles. Instead we assert the component's styles source:
- * the 3 breakpoint blocks exist with the expected rules, AND no
- * breakpoint hides .player-chip via `display: none`. This guards the
- * fix from accidental reverts.
+ * Responsive modal layout: mobile, tablet, and desktop breakpoints must
+ * keep player chips visible and the modal scrollable on small screens.
+ * These tests inspect component CSS because Karma does not evaluate media
+ * queries like a real viewport.
  */
-describe('SquadEditorModalComponent - V25D56 (C17) responsive breakpoints', () => {
+describe('SquadEditorModalComponent responsive modal breakpoints', () => {
   /**
    * Reads the @Component.styles source. For inline-styled components
    * (like this one) Angular stores the CSS strings on the component
@@ -1279,10 +1270,8 @@ describe('SquadEditorModalComponent - V25D56 (C17) responsive breakpoints', () =
   });
 
   it('desktop defaults are preserved (no top-level @media hiding the chip)', () => {
-    // Pre-C17 the @media (max-width: 768px) block hid .player-chip.
-    // The fix replaces it with progressive breakpoints AND keeps the
-    // chip visible everywhere. We assert the legacy breakpoint AND the
-    // legacy display:none rule are gone.
+    // The legacy mobile breakpoint hid player chips. Keep the
+    // old breakpoint and display:none rule out of the stylesheet.
     const src = stripEncapsulation(stylesSource());
     expect(src).not.toMatch(/@media\s*\(\s*max-width:\s*768px\s*\)/);
     // Strip CSS comments before scanning for the legacy chip-hide rule
@@ -1322,13 +1311,9 @@ describe('SquadEditorModalComponent - V25D56 (C17) responsive breakpoints', () =
     expect(block).toMatch(/\.bench-container\s+\.bench-list\s*\{[^}]*overflow-x:\s*auto/);
   });
 
-  // V25D57 (Sprint C17b): aspect-ratio del campo en los 3 breakpoints.
-  // Bug pre-C17b: desktop/tablet sin aspect-ratio (height:100% aplastaba
-  // el field a horizontal slab). Mobile tenia aspect-ratio pero
-  // max-height:50vh lo sobreescribia. Verificamos que los 3 bloques
-  // tienen la regla correcta y que NO hay height/max-height que anule
-  // el ratio.
-  describe('SquadEditorModalComponent - V25D94 field aspect-ratio 1.15 / 1 (was V25D93.5 landscape 1.4 / 1)', () => {
+  // Field proportions must hold across default, tablet, and mobile
+  // layouts so the pitch never collapses into a horizontal slab.
+  describe('field aspect ratio across responsive breakpoints', () => {
     it('default viewport (>=1025px): .field has aspect-ratio 1.15 / 1 outside any @media block', () => {
       const src = stripEncapsulation(stylesSource());
       // Strip @media blocks so we only inspect the default rules.
@@ -1337,12 +1322,9 @@ describe('SquadEditorModalComponent - V25D56 (C17) responsive breakpoints', () =
       // (we strip comments + the rule body).
       const fieldRule = nonMedia.match(/\.field\s*\{[^}]*\}/);
       expect(fieldRule).withContext('top-level .field rule must exist').toBeTruthy();
-      // V25D94-FRONT: aspect 1.15/1 (more square, less landscape).
-      // Ivan: "la cancha se vea como cancha no tan ancha".
+      // The field is intentionally more square than the older landscape shape.
       expect(fieldRule![0]).toMatch(/aspect-ratio:\s*1\.15\s*\/\s*1/);
-      // Sanity: height:100% is now the driver (not aspect-ratio's height
-      // auto). V25D93.5 inverted the strategy: height:100% + aspect-ratio
-      // so the field fills available height and width adjusts via aspect.
+      // Height drives the layout and width follows from aspect-ratio.
       expect(fieldRule![0]).toMatch(/height:\s*100%/);
     });
 
@@ -1369,26 +1351,10 @@ describe('SquadEditorModalComponent - V25D56 (C17) responsive breakpoints', () =
 });
 
 /**
- * V25D58 (Sprint C18) - field responsive sizing.
- *
- * <p>The field must scale proportionally to the modal. Iván pidió: "la
- * cancha también sea responsive, conforme achiquemos el modal".
- *
- * <p>Strategy: Karma/Jasmine runs in jsdom which doesn't evaluate @media
- * queries, so we cannot assert computed style per viewport. Instead we
- * assert the CSS source - each @media block contains the expected
- * {@code max-width: min(cap, 100%)} rule AND aspect-ratio 1 / 1.4 is
- * preserved. This guards against accidental reverts (e.g., someone
- * changing the cap to a fixed px value).
- *
- * <p>Why this works: at runtime, the browser resolves {@code min(cap, 100%)}
- * to the smaller of the cap and the available container width. If the
- * container is wider than the cap, field.width = cap. If narrower,
- * field.width = container.width. The 1.4 ratio on height is honored
- * regardless because we never override max-height with a px cap (only
- * {@code max-height: 100%} which is bounded by the container).
+ * Responsive field sizing: the pitch should scale with the modal, keep
+ * its football-field proportions, and avoid old fixed-width caps.
  */
-describe('SquadEditorModalComponent - V25D58 (C18) field responsive sizing', () => {
+describe('SquadEditorModalComponent responsive field sizing', () => {
   /**
    * Reads the @Component.styles source. For inline-styled components
    * (like this one) Angular stores the CSS strings on the component
@@ -1398,9 +1364,8 @@ describe('SquadEditorModalComponent - V25D58 (C18) field responsive sizing', () 
    * removes those markers so regex assertions match the original
    * class names.
    *
-   * <p>Mirrors the helper in the V25D56 (C17) describe block - duplicated
-   * because describe-block function declarations aren't hoisted to sibling
-   * describe blocks (each describe has its own lexical scope).
+   * Mirrors the helper in the responsive breakpoint suite because sibling
+   * describe blocks don't share local function declarations.
    */
   function stylesSource(): string {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1452,26 +1417,20 @@ describe('SquadEditorModalComponent - V25D58 (C18) field responsive sizing', () 
     return fieldRule ? fieldRule[0] : '';
   }
 
-  it('desktop default viewport (>=1025px): .field has max-width: 100% (no V25D58 cap)', () => {
-    // V25D93.5-FRONT: removed the V25D58 max-width cap min(500px, 100%).
-    // The field is now height-driven landscape (aspect-ratio: 1.4 / 1)
-    // with max-width: 100% (no horizontal cap). Width is computed from
-    // height via aspect-ratio.
+  it('desktop default viewport (>=1025px): .field has max-width: 100% (no fixed width cap)', () => {
+    // The field is height-driven with max-width: 100%; old fixed caps stay removed.
     const src = stripEncapsulation(stylesSource());
     const nonMedia = src.replace(/@media[\s\S]*?\}\s*\}/g, '');
     const fieldRule = extractFieldRule(nonMedia);
     expect(fieldRule).withContext('top-level .field rule must exist').toBeTruthy();
     expect(fieldRule).toMatch(/max-width:\s*100%/,
-      'desktop default .field must use max-width: 100% (no V25D58 cap)');
+      'desktop default .field must use max-width: 100% (no fixed width cap)');
     // Sanity: no min(cap, ...) pattern.
     expect(fieldRule).not.toMatch(/max-width:\s*min\(/);
   });
 
   it('desktop default viewport (>=1025px): .field has height: 100% (height-driven)', () => {
-    // V25D93.5-FRONT: field is height-driven (height: 100% of
-    // field-container), width adjusts via aspect-ratio. No max-height
-    // cap is needed because the parent field-container already bounds
-    // available height (min-height:0 allows flex child to honor aspect).
+    // The field uses the container height; aspect-ratio determines width.
     const src = stripEncapsulation(stylesSource());
     const nonMedia = src.replace(/@media[\s\S]*?\}\s*\}/g, '');
     const fieldRule = extractFieldRule(nonMedia);
@@ -1480,10 +1439,7 @@ describe('SquadEditorModalComponent - V25D58 (C18) field responsive sizing', () 
   });
 
   it('large desktop viewport (>=1600px): .field inherits from base (no override)', () => {
-    // V25D93.5-FRONT: removed the V25D58 max-width: min(600px, 100%)
-    // override. Large desktop now uses the same .field rule as default
-    // (no @media block resets field dimensions). This guards against
-    // accidental re-addition of the V25D58 cap.
+    // The field is height-driven with max-width: 100%; old fixed caps stay removed.
     const block = extractMediaBlock('min-width: 1600px');
     expect(block).toBeTruthy();
     // The large-desktop @media block may have rules for other selectors
@@ -1492,37 +1448,33 @@ describe('SquadEditorModalComponent - V25D58 (C18) field responsive sizing', () 
     const fieldRule = block.match(/\.field\s*\{[^}]*\}/);
     if (fieldRule) {
       expect(fieldRule[0]).not.toMatch(/max-width:\s*min\(/,
-        'large-desktop .field must NOT redefine V25D58 max-width cap');
+        'large-desktop .field must NOT redefine fixed max-width cap');
     }
   });
 
-  it('tablet viewport (601-1024px): .field has max-width: 100% (no V25D58 cap)', () => {
-    // V25D93.5-FRONT: same landscape flip applies to tablet - aspect-ratio
-    // 1.4 / 1, max-width 100%, height 100%. The V25D58 450px cap is gone.
+  it('tablet viewport (601-1024px): .field has max-width: 100% (no fixed width cap)', () => {
+    // Tablet/mobile use the same max-width: 100% field strategy.
     const block = extractMediaBlock('min-width: 601px) and (max-width: 1024px');
     expect(block).withContext('tablet @media block must exist').toBeTruthy();
     const fieldRule = extractFieldRule(block);
     expect(fieldRule).withContext('tablet .field rule must exist').toBeTruthy();
     expect(fieldRule).toMatch(/max-width:\s*100%/,
-      'tablet .field must use max-width: 100% (no V25D58 cap)');
+      'tablet .field must use max-width: 100% (no fixed width cap)');
   });
 
-  it('mobile viewport (<=600px): .field has max-width: 100% (no V25D58 cap)', () => {
-    // V25D93.5-FRONT: same landscape flip applies to mobile - aspect-ratio
-    // 1.4 / 1, max-width 100%, height 100%. The V25D58 380px cap is gone.
+  it('mobile viewport (<=600px): .field has max-width: 100% (no fixed width cap)', () => {
+    // Tablet/mobile use the same max-width: 100% field strategy.
     const block = extractMediaBlock('max-width: 600px');
     expect(block).withContext('mobile @media block must exist').toBeTruthy();
     const fieldRule = extractFieldRule(block);
     expect(fieldRule).withContext('mobile .field rule must exist').toBeTruthy();
     expect(fieldRule).toMatch(/max-width:\s*100%/,
-      'mobile .field must use max-width: 100% (no V25D58 cap)');
+      'mobile .field must use max-width: 100% (no fixed width cap)');
   });
 
   it('aspect-ratio 1.15 / 1 is preserved in all 4 viewports (default + 3 breakpoints)', () => {
-    // V25D94-FRONT: aspect ratio 1.15/1 (more square, less landscape).
-    // V25D58 inherited V25D57 (C17b): aspect-ratio must hold in every
-    // viewport so the field never becomes a horizontal slab. We sweep
-    // each breakpoint and assert the .field rule carries the ratio.
+    // The field is intentionally more square than the older landscape shape.
+    // Sweep each breakpoint and assert the .field rule carries the ratio.
     const src = stripEncapsulation(stylesSource());
     const nonMedia = extractFieldRule(src.replace(/@media[\s\S]*?\}\s*\}/g, ''));
     const mobile = extractFieldRule(extractMediaBlock('max-width: 600px'));
@@ -1566,9 +1518,7 @@ describe('SquadEditorModalComponent - V25D58 (C18) field responsive sizing', () 
   });
 
   it('field-container has min-height: 0 to allow flex child to honor aspect-ratio', () => {
-    // V25D58 F2: add min-height:0 to .field-container. Without it, the
-    // flex child's intrinsic min-content size can silently override the
-    // aspect-ratio in tight viewports (a known flexbox gotcha).
+    // min-height:0 lets the flex child honor aspect-ratio in tight viewports.
     const src = stripEncapsulation(stylesSource());
     // Match the default .field-container block (outside any @media).
     const nonMedia = src.replace(/@media[\s\S]*?\}\s*\}/g, '');
