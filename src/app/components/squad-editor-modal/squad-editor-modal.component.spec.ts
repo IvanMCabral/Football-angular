@@ -3929,42 +3929,24 @@ describe('SquadEditorModalComponent free positioning on field drop', () => {
   });
 
   /**
-   * V25D99.20-BUG-5: mojibake regression guard.
-   *
-   * <p>After the mechanical mojibake fix in this sprint (304 substitutions
-   * from fix_both_files.py + 3 supplemental Δ substitutions), the
-   * squad-editor-modal.component.ts source must not contain the
-   * characteristic double-encoded sentinel byte patterns that produce
-   * "FormaciÃ³n", "MÃ­nimo", "QuÃ­mica", etc. in the rendered DOM.
-   *
-   * <p>Test reads the source .ts file at runtime and asserts each
-   * sentinel pattern is absent. Each pattern is the UTF-8 byte sequence
-   * that, when mis-decoded as cp1252 and re-encoded as UTF-8, produces
-   * the visible Mojibake. The post-BUG-5 source has the correct UTF-8
-   * characters (Formación, Mínimo, etc.) so the sentinels are gone.
-   *
-   * <p>This is a source-level guard. It complements the runtime tests
-   * for individual strings (e.g. BUG_L4 happy path, Formación del User
-   * F3) by failing fast if the mojibake ever sneaks back into the file.
+   * Guard against broken Spanish text in the modal source. If encoded
+   * sentinels reappear here, the UI can render labels such as
+   * formation, chemistry, or minimum-player messages incorrectly.
    */
-  it('V25D99.20-BUG-5: source .ts has no double-encoded Spanish-char Mojibake sentinels', () => {
-    // Lazy-load Node fs so the spec works in browsers that polyfill
-    // window.fs (Karma may not). Karma runs in ChromeHeadless which
-    // doesn't expose fs, so we go through SystemJS-style require.
+  it('source .ts has no double-encoded Spanish text sentinels', () => {
+    // Karma usually runs in the browser, so Node fs may be unavailable.
+    // When it is available, inspect the source directly.
     const fs: any = (window as any).require ? (window as any).require('fs') : null;
     if (!fs) {
-      // Karma TestBed doesn't expose Node fs. Skip via pending + rely on
-      // the broader suite for runtime coverage. This test is a power-user
-      // belt-and-suspenders; pre-fix failures were caught by the runtime
-      // tests in BUG_L4 + Formación del User F3.
+      // Browser-only test runs skip the direct source inspection; runtime
+      // string checks elsewhere still cover the visible UI labels.
       pending('Node fs not available in this test runner; rely on runtime equivalents');
       return;
     }
     const src = fs.readFileSync(
       'src/app/components/squad-editor-modal/squad-editor-modal.component.ts',
       'utf-8');
-    // Each entry: [mojibake-sentinel regex] describes the bytes a
-    // double-encoded Spanish char would render as. Post-fix must be 0 hits.
+    // Double-encoded Spanish characters should never reach the source.
     const sentinels = [
       { name: 'ó', pattern: /Formaci[^o]n[^c]?[^i]?[^o]/ }, // 'Formaci\u00f3n' rendered correctly
       { name: 'Mínimo 7', pattern: /M[^n]?nimo 7/ },
@@ -3973,8 +3955,8 @@ describe('SquadEditorModalComponent free positioning on field drop', () => {
     let bad = 0;
     for (const s of sentinels) {
       const hits = (src.match(/[\u00c0-\u00df]\u0083\u00c2[\u0080-\u00bf]/g) || []).length;
-      // Above regex catches 'c3 83 c2 b3' style sequences (Mojibake of Spanish chars via the c38x / c3 8x + c2 xx double-encoding chain).
-      expect(hits).withContext('Mojibake sentinel ' + s.name + ' must not appear in source').toBe(0);
+      // Catches c3 83 / c2 xx double-encoding chains.
+      expect(hits).withContext('Encoded text sentinel ' + s.name + ' must not appear in source').toBe(0);
       bad += hits;
     }
     expect(bad).toBe(0);
