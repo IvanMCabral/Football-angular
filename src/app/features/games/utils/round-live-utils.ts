@@ -25,6 +25,12 @@ export interface DebugTacticalSlot {
   slotIndex?: number | null;
 }
 
+export interface PendingRoundStartMatch {
+  matchId: string;
+  homeTeamId: string;
+  awayTeamId: string;
+}
+
 export const ROUND_LIVE_DEBUG_STORAGE_KEYS = {
   freeze: 'manager.deFreezeLiveRound',
   suppressAutoInjury: 'manager.debugSuppressAutoInjuryModals',
@@ -84,6 +90,16 @@ export function findRoundControlAnchorMatch(vm: { matches: RoundMatchVM[] }): Ro
   return vm.matches.find(match => match.isUserMatch && !isTerminalRoundState(match.state?.status))
     ?? vm.matches.find(match => !isTerminalRoundState(match.state?.status))
     ?? null;
+}
+
+export function buildPendingRoundStartMatches(matches: RoundMatchVM[]): PendingRoundStartMatch[] {
+  return matches
+    .filter(roundMatch => !roundMatch.state || roundMatch.state.status === 'NOT_STARTED')
+    .map(roundMatch => ({
+      matchId: String(roundMatch.match.id),
+      homeTeamId: String(roundMatch.match.homeTeamId),
+      awayTeamId: String(roundMatch.match.awayTeamId)
+    }));
 }
 
 export function normalizeTerminalLiveState(state: MatchState): MatchState {

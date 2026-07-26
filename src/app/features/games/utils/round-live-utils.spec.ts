@@ -1,4 +1,5 @@
 import {
+  buildPendingRoundStartMatches,
   buildPendingLiveModalNotice,
   findInjuryAutoModalCandidates,
   findRivalRedCardModalCandidate,
@@ -79,6 +80,29 @@ describe('round-live-utils', () => {
     ];
 
     expect(findRoundControlAnchorMatch({ matches })?.match.id).toBe('user');
+  });
+
+  it('builds start payloads only for matches that have not started', () => {
+    const matches = [
+      roundMatch('no-state', false, 'RUNNING'),
+      roundMatch('pending', false, 'NOT_STARTED'),
+      roundMatch('running', false, 'RUNNING'),
+      roundMatch('finished', false, 'FINISHED')
+    ];
+    matches[0].state = undefined;
+
+    expect(buildPendingRoundStartMatches(matches)).toEqual([
+      {
+        matchId: 'no-state',
+        homeTeamId: 'no-state-home',
+        awayTeamId: 'no-state-away'
+      },
+      {
+        matchId: 'pending',
+        homeTeamId: 'pending-home',
+        awayTeamId: 'pending-away'
+      }
+    ]);
   });
 
   it('falls back to any active match as round-control anchor', () => {

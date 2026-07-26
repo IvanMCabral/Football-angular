@@ -12,6 +12,7 @@ import { MatchCardComponent } from '../../shared/components/match-card/match-car
 import { RoundLiveViewModel, RoundMatchVM } from './models/round-live.model';
 import { MatchState, RoundState } from '../../core/services/match-engine.model';
 import {
+  buildPendingRoundStartMatches,
   buildPendingLiveModalNotice,
   findInjuryAutoModalCandidates,
   findRivalRedCardModalCandidate,
@@ -143,48 +144,10 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
 
   pendingLiveModalNotice: string | null = null;
 
-  /**
-   * Guard for the auto-start subscription so the
-   * backend POST to {@code POST /api/v1/match-engine/rounds/start}
-   * fires exactly once per component instance. Set to {@code true}
-   * the moment the take(1) subscription observes the first vm$
-   * emission that has NOT_STARTED matches  -  subsequent calls to
-   * {@link tryAutoStartRound} short-circuit.
-   *
-   * <p>Why a flag (instead of just {@code take(1)}): the existing
-   * {@link startRoundEngine} still calls {@code engineService.startRound}
-   * (it has to, to wire the SSE stream post-POST). The flag prevents
-   * the auto-start subscription AND {@code startRoundEngine} from
-   * racing on a duplicate POST. {@code startRoundEngine} reads the
-   * flag and skips its own POST when the auto-start already covered
-   * the same round.
-   */
+  // Avoid duplicated start requests while the round stream is being wired.
   private autoStartTriggered = false;
 
-  /**
-   * Resolved round id from the latest successful
-   * {@code engineService.startRound(...)} POST response. The
-   * backend registers the {@code RoundEngine} under THIS roundId  - 
-   * not necessarily whatever string the request body sent (the
-   * server may canonicalize to a real UUID, or the player's
-   * careerId may not be a parseable UUID at the SSE endpoint).
-   * Frontend code MUST subscribe to {@code streamRoundState(...)}
-   * with the value carried here, NEVER with {@code gameId}.
-   *
-   * <ul>
-   *   <li>Initialized to {@code null}; any of the three POST call
-   *       sites ({@link tryAutoStartRound}, {@link startRoundEngine},
-   *       {@link iniciarTodos}) push the response's
-   *       {@code state.roundId} here as soon as the backend answers.</li>
-   *   <li>The SSE subscription in {@link startRoundEngine} waits on
-   *       this subject ({@code filter(id !== null), take(1)}) before
-   *       opening the stream, so we never send a wrong roundId to
-   *       {@code GET /api/v1/match-engine/rounds/{roundId}/stream}.</li>
-   *   <li>Without this, {@code MatchEngineController:48} returns
-   *       {@code Flux.empty()} because the registry has no entry for
-   *       the frontend's {@code gameId}  -  silently idle SSE.</li>
-   * </ul>
-   */
+  // Backend may resolve a canonical round id; the stream must use that id.
   private resolvedRoundId$ = new BehaviorSubject<string | null>(null);
 
   private vmSubject = new BehaviorSubject<RoundLiveViewModel>({
@@ -201,27 +164,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
 
   vm$: Observable<RoundLiveViewModel>;
 
-  /**
-   * Initial round load indicator. True while the
-   * {@code combineLatest([routeParams$, teams$, careerStatus$, fixtures$])}
-   * chain in the constructor is still resolving (i.e. the manager hit
-   * /games/:gameId/round/:round and the round has not yet rendered).
-   *
-   * <p>Before this fix the round-live page rendered an empty
-   * {@code .round-live-container} immediately because the
-   * {@code vmSubject} initialized with an empty matches array  -  the user
-   * saw a blank screen with no feedback while the four HTTP fetches
-   * raced in. We now expose this flag (drel usuario by a BehaviorSubject that
-   * the constructor flips to {@code false} on the first combineLatest
-   * emission, success or error) and the template renders a centered
-   * spinner until it clears.
-   *
-   * <p>Distinct from {@code vm.errorMsg}: errorMsg is set when the chain
-   * emitted with a non-recoverable state (e.g. "No hay partidos para la
-   * fecha N"). {@code loading$} tracks the network fetch itself, not the
-   * result. After loading$ clears, the existing
-   * {@code <div *ngIf="vm.errorMsg">} guard takes over.
-   */
+  // Keeps the page from rendering an empty shell while the round loads.
   private loadingSubject = new BehaviorSubject<boolean>(true);
   loading$: Observable<boolean> = this.loadingSubject.asObservable();
 
@@ -1078,13 +1021,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
    */
   iniciarTodos(): void {
     const vm = this.vmSubject.value;
-    const pending = vm.matches
-      .filter(rm => !rm.state || rm.state?.status === 'NOT_STARTED')
-      .map(rm => ({
-        matchId: String(rm.match.id),
-        homeTeamId: String(rm.match.homeTeamId),
-        awayTeamId: String(rm.match.awayTeamId)
-      }));
+    const pending = buildPendingRoundStartMatches(vm.matches);
 
     if (pending.length === 0) {
       // No NOT_STARTED matches left  -  button should already be hidden via
@@ -1112,35 +1049,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
     });
   }
 
-  /**
-   * Auto-starts the round once the first vm$ emission
-   * has NOT_STARTED matches. Triggered by the take(1) subscription
-   * in the constructor  -  the explicit "Iniciar Todos" button in the
-   * header remains as a manual fallback for refresh / recovery cases
-   * where the auto-start POST was rejected by the backend.
-   *
-   * <p>Behavior:
-   * <ul>
-   *   <li>Sets {@code autoStartTriggered} to {@code true} immediately
-   *       so duplicate calls (e.g. from {@link startRoundEngine}) can
-   *       short-circuit and skip their own POST.</li>
-   *   <li>No-ops on error/empty VMs (the round can't be started
-   *       without matches).</li>
-   *   <li>No-ops when no match has status {@code NOT_STARTED}  -  the
-   *       round already started ticking (covers the refresh case
-   *       where the backend round is RUNNING but the frontend VM was
-   *       rebuilt from scratch).</li>
-   *   <li>Otherwise POSTs to {@code /match-engine/rounds/start} with
-   *       the pending matches. The SSE stream (opened by
-   *       {@link startRoundEngine} after this method runs) will pick
-   *       up the resulting state transitions and flip
-   *       {@code vm.anyStarted} to {@code true}, hiding the fallback
-   *       button automatically.</li>
-   * </ul>
-   *
-   * <p>This is the primary auto-start path in The
-   * {@link iniciarTodos} method is its manual twin.
-   */
+  // Primary auto-start path; "Iniciar Todos" remains as a manual fallback.
   private tryAutoStartRound(vm: RoundLiveViewModel): void {
     if (this.autoStartTriggered) {
       // Defensive: take(1) should already guarantee single-fire, but
@@ -1155,13 +1064,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const pending = vm.matches
-      .filter(rm => !rm.state || rm.state?.status === 'NOT_STARTED')
-      .map(rm => ({
-        matchId: String(rm.match.id),
-        homeTeamId: String(rm.match.homeTeamId),
-        awayTeamId: String(rm.match.awayTeamId)
-      }));
+    const pending = buildPendingRoundStartMatches(vm.matches);
 
     if (pending.length === 0) {
       // All matches already started (e.g. user refreshed an in-flight
