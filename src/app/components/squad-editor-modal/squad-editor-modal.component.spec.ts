@@ -1988,7 +1988,7 @@ describe('SquadEditorModalComponent bench display', () => {
 
       const captured = (threePlayerComponent as any).errorMessage$.value;
       expect(captured).toContain('Mínimo 7',
-        'error must still mention the 7-player floor (no copy regression)');
+        'error must still mention the 7-player floor');
       expect(captured).toContain('(puedes tener más)',
         'the clarification "(puedes tener más)" must be present so users '
           + 'understand 7 is a floor, not a ceiling');
@@ -2495,7 +2495,7 @@ describe('SquadEditorModalComponent formation change updates header and markers'
     fixture.detectChanges();
   });
 
-  // ---- formation-change regression suite ----
+  // ---- formation change behavior ----
 
   it('onFormationChange(3-5-2) saves the same XI with formation=3-5-2', (done) => {
     // Passing the new formation explicitly matches the production
@@ -2607,7 +2607,7 @@ describe('SquadEditorModalComponent formation change updates header and markers'
         const callsAfter = httpClientSpy.post.calls.allArgs()
           .filter(args => String(args[0]).includes('/career/lineup/manual-select')).length;
         expect(callsAfter - callsBefore).withContext(
-          'selecting the current formation must NOT trigger /auto-select').toBe(0);
+          'selecting the current formation must NOT trigger /manual-select').toBe(0);
         expect(component.isFormationChanging).withContext(
           'flag must remain false for no-op selection').toBeFalse();
         done();
