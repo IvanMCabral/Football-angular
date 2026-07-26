@@ -1329,59 +1329,17 @@ export class PartidoModalComponent {
   /** Available formations (12 codes from the shared constants). */
   readonly formations: readonly string[] = ALL_FORMATIONS;
 
-  // ========== : tab state ==========
+  // ========== Tab state ==========
 
   /** Currently visible tab. Default = 'mine' (manager formation first). */
   readonly activeTab = signal<'mine' | 'rival'>('mine');
 
-  // ========== : stats live data (derived from MatchEvent list) ==========
+  // ========== Live match stats ==========
 
-  /**
-   * : full MatchEvent list from the snapshot, defensively defaulted
-   * to {@code []} when the SSE feed hasn't reached tick 1 (modal opens while
-   * the round is still NOT_STARTED). All derived stats + the timeline read
-   * from this signal.
-   */
+  // Snapshot events used by stats and timeline sections.
   private readonly eventList = (): MatchEvent[] => this.data.events ?? [];
 
-  /**
-   * : derived match stats from {@link eventList}. Returns a flat
-   * row-per-stat shape so the template can {@code *ngFor} over a single
-   * collection. Each row carries:
-   * <ul>
-   *   <li>{@code label}  -  display string in Spanish</li>
-   *   <li>{@code home} / {@code away}  -  formatted value</li>
-   * </ul>
-   * Computed eagerly (not as a {@code computed} signal) because Angular's
-   * signals don't deeply track {@code data.events} reference changes  - 
-   * the SSE feed pushes a NEW MatchState object every tick, so the dialog
-   * data is replaced wholesale on each round-live vm$ emission. Calling
-   * this getter per change-detection cycle is cheap (8 filter passes over
-   * a list that maxes at ~120 events per match) and keeps the data fresh.
-   *
-   * <p>Stats derived:
-   * <ul>
-   *   <li>Posesión  -  snapshot possession, not derived from events.</li>
-   *   <li>Goles  -  {@code state.score.home/away} (canonical, not GOAL events).</li>
-   *   <li>Tiros totales  -  count(SHOT + SHOT_ON_TARGET) for each team.</li>
-   *   <li>Tiros a puerta  -  count(SHOT_ON_TARGET) for each team.</li>
-   *   <li>Corners  -  count(CORNER) for each team.</li>
-   *   <li>Faltas  -  count(FOUL) for each team.</li>
-   *   <li>Offsides  -  count(OFFSIDE) for each team.</li>
-   *   <li>Tarjetas  -  count(YELLOW_CARD + RED_CARD) shown as "A:R" for each
-   *       team (yellows:reds) so the manager can spot ejections at a glance.</li>
-   * </ul>
-   *
-   * <p>Event attribution: each {@link MatchEvent} carries an optional
-   * {@code teamId}. We match it against {@code data.homeTeamId} /
-   * {@code data.awayTeamId} (both strings) and increment the corresponding
-   * bucket. Events without a {@code teamId} are skipped.
-   *
-   * <p>Why string-comparison: {@code state.homeTeamId} and the event's
-   * {@code teamId} may have different types (UUID vs string) depending on
-   * the SSE serialization layer. {@link String(...)} normalizes both sides
-   * and handles the undefined case safely.
-   */
+  // Derived match stats shown in both manager and rival tabs.
   statsRows(): PartidoStatRow[] {
     const events = this.eventList();
     const homeId = String(this.data.homeTeamId ?? '');
@@ -1480,11 +1438,7 @@ export class PartidoModalComponent {
     return this.data.currentMinute ?? 0;
   }
 
-  /**
-   * : home score accessor for the score chip in the modal
-   * title bar AND the stats-header-row "score-cell" (replaces the * dash placeholder). Sourced from {@code data.score.home}, falling back
-   * to 0 when the SSE feed hasn't reached tick 1.
-   */
+  // Home score accessor used by the title chip and stats header.
   homeScore(): number {
     return this.data.score?.home ?? 0;
   }
@@ -1605,12 +1559,7 @@ export class PartidoModalComponent {
     this.normalizeFormation(this.data.currentFormation)
   );
 
-  /**
-   * Mutable slot -> playerId map. Initialized from {@code data.currentSlots}
-   * and updated by drag-and-drop handlers + formation-change re-flow. The
-   * visual pitch template binds to this map to render the player name
-   * in each dot.
-   */
+  // Mutable slot-to-player map used by the visual pitch and drag/drop flow.
   slotAssignments: Map<number, string | null> = new Map();
 
   /**
@@ -1666,12 +1615,7 @@ export class PartidoModalComponent {
 
   // ========== Rival-tab formation ==========
 
-  /**
-   * Rival formation (read-only). Sourced from
-   * {@code data.rivalFormation} (which is {@code state.awayFormation}).
-   * Normalized via {@link normalizeFormation} so the rival tab falls
-   * back to 4-4-2 if the SSE feed carries a stale or unknown string.
-   */
+  // Read-only rival formation, normalized for safe rendering.
   readonly rivalFormation = signal<FormationCode>(
     this.normalizeFormation(this.data.rivalFormation)
   );
