@@ -12,13 +12,10 @@ import { PlayerCardData } from './player-card.model';
 export class PlayerCardComponent {
   @Input() player!: PlayerCardData;
   @Input() isSquad: boolean = false;
+
   /**
-   * V25D78-C55.7.7 BUG-L3: optional current round number. When provided,
-   * the injury detail surfaces a "Vuelve en fecha N" hint (e.g. "Fuera 1 partido
-   * · Vuelve en fecha 6") so the user knows exactly when the player is
-   * available again. When null/undefined, the detail falls back to the
-   * pre-fix "Fuera N partidos" wording (back-compat for callers that don't
-   * have career context — e.g. detail pages with no current round loaded).
+   * Optional current round. When provided, injury details show the expected
+   * return round; otherwise the card falls back to a relative absence label.
    */
   @Input() currentRound: number | null = null;
 
@@ -65,19 +62,13 @@ export class PlayerCardComponent {
     if (remaining === null || remaining === undefined || remaining <= 0) {
       return 'No disponible';
     }
-    // V25D78-C55.7.7 BUG-L3: when the parent provides the current round,
-    // append "Vuelve en fecha N" so the user knows when the player is back.
-    // Pre-fix the detail was just "Fuera N partidos" with no specificity.
     const returnRound = this.computeReturnRound(remaining);
     const baseText = remaining === 1 ? 'Fuera 1 partido' : `Fuera ${remaining} partidos`;
     return returnRound !== null ? `${baseText} · Vuelve en fecha ${returnRound}` : baseText;
   }
 
   /**
-   * V25D78-C55.7.7 BUG-L3: compute the absolute round number when the
-   * player is expected to return. Returns null when currentRound is
-   * missing (no career context) so the caller can fall back to the
-   * pre-fix "Fuera N partidos" wording.
+   * Computes the absolute round number when the player is expected to return.
    */
   private computeReturnRound(remaining: number): number | null {
     if (this.currentRound === null || this.currentRound === undefined) return null;

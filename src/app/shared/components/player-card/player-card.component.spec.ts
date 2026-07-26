@@ -1,27 +1,8 @@
-/**
- * V25D78-C55.7.7 BUG-L3: tests for the "Vuelve en fecha N" suffix in
- * {@link PlayerCardComponent#injuryDetail} when {@code currentRound} is
- * provided.
- *
- * <p>Pre-fix the player card showed "Fuera 1 partido" / "Fuera N partidos"
- * with no specificity about WHEN the player would be back. Post-fix
- * the card appends "· Vuelve en fecha X" when {@code currentRound} is
- * set, so the user can plan around the absence.
- *
- * <p>Coverage:
- * <ul>
- *   <li>currentRound=5, remaining=1 → "Fuera 1 partido · Vuelve en fecha 6".</li>
- *   <li>currentRound=5, remaining=3 → "Fuera 3 partidos · Vuelve en fecha 8".</li>
- *   <li>currentRound=null → fallback to "Fuera N partidos" (back-compat).</li>
- *   <li>remaining<=0 → "No disponible" (sin aviso de vuelta, no false info).</li>
- *   <li>injured=false → empty string (sin aviso falso de vuelta).</li>
- * </ul>
- */
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { PlayerCardComponent } from './player-card.component';
 import { PlayerCardData } from './player-card.model';
 
-describe('PlayerCardComponent — V25D78-C55.7.7 BUG-L3 (injury Vuelve en fecha hint)', () => {
+describe('PlayerCardComponent injury availability details', () => {
   let component: PlayerCardComponent;
   let fixture: ComponentFixture<PlayerCardComponent>;
 
@@ -45,27 +26,25 @@ describe('PlayerCardComponent — V25D78-C55.7.7 BUG-L3 (injury Vuelve en fecha 
     component.player = { ...basePlayer };
   });
 
-  it('L3 happy path: currentRound=5, remaining=1 → "Fuera 1 partido · Vuelve en fecha 6"', () => {
+  it('shows the return round for a one-match injury when the current round is known', () => {
     component.currentRound = 5;
     component.player.injuryRemainingMatches = 1;
     expect(component.injuryDetail()).toBe('Fuera 1 partido · Vuelve en fecha 6');
   });
 
-  it('L3 multi-match: currentRound=5, remaining=3 → "Fuera 3 partidos · Vuelve en fecha 8"', () => {
+  it('shows the return round for a multi-match injury when the current round is known', () => {
     component.currentRound = 5;
     component.player.injuryRemainingMatches = 3;
     expect(component.injuryDetail()).toBe('Fuera 3 partidos · Vuelve en fecha 8');
   });
 
-  it('L3 back-compat: currentRound=null → fallback to "Fuera N partidos" (sin aviso de vuelta)', () => {
+  it('falls back to a relative absence label when the current round is unknown', () => {
     component.currentRound = null;
     component.player.injuryRemainingMatches = 2;
-    // Pre-fix behavior preserved for callers that don't pass currentRound
-    // (e.g. detail pages with no career context).
     expect(component.injuryDetail()).toBe('Fuera 2 partidos');
   });
 
-  it('L3 zero/negative remaining → "No disponible" (sin aviso falso de vuelta)', () => {
+  it('does not show a return round when remaining matches are missing or zero', () => {
     component.currentRound = 5;
     component.player.injuryRemainingMatches = 0;
     expect(component.injuryDetail()).toBe('No disponible');
@@ -74,7 +53,7 @@ describe('PlayerCardComponent — V25D78-C55.7.7 BUG-L3 (injury Vuelve en fecha 
     expect(component.injuryDetail()).toBe('No disponible');
   });
 
-  it('L3 not injured → empty string (sin info falsa de lesi?n)', () => {
+  it('returns an empty detail when the player is not injured', () => {
     component.currentRound = 5;
     component.player.injured = false;
     component.player.injuryRemainingMatches = 2;
