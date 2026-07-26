@@ -332,27 +332,7 @@ import {
   positionPixelWideChannelReason as getPositionPixelWideChannelReason,
 } from './position-pixel-analysis';
 /**
- * V24D24: Test-Harness UI page (4-panel layout).
- *
- * <p>Route: {@code /debug/test-harness}.
- *
- * <p>Layout (desktop, ?768px):
- * <pre>
- * +-----------------+-----------------+
- * |  Panel A        |  Panel B        |
- * |  V24 match      |  Formation      |
- * |  detail (reused)|  select + btns  |
- * +-----------------+-----------------+
- * |  Panel C (match list, full width)  |
- * +-----------------------------------+
- * |  Panel D (timeline scrubber, full) |
- * +-----------------------------------+
- * </pre>
- *
- * <p>Backend gating: this UI is a debug surface - the backend is
- * profile-gated ({@code dev | local | test}). The /detail and /timeline
- * endpoints return 404 in prod. REVISOR runs the smoke against the
- * dev profile.
+ * Debug page for replaying and comparing match-engine scenarios.
  */
 @Component({
   selector: 'app-test-harness-page',
@@ -522,9 +502,7 @@ import {
               </button>
             </div>
           </div>
-          <!-- V24D24.2: replay-with-seed + simulate-round block.
-               Kept in its own control-group separated by a subtle divider so
-               the layout stays predictable when more controls land later. -->
+          <!-- Replay-with-seed and simulate-round block. -->
           <div class="control-group control-group-replay">
             <div class="control-group-divider" aria-hidden="true"></div>
             <mat-form-field appearance="outline" class="seed-field">
@@ -4991,9 +4969,9 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   scenarioBatteryGroupModel: 'ALL' | 'OFFENSE' | 'DEFENSE' | 'OPPONENT' = 'OFFENSE';
   scenarioBatteryScopeModel: 'quick' | 'balanced' = 'quick';
   scenarioBatteryCoachObjectiveModel: ScenarioBatteryCoachObjectiveModel = 'AUTO';
-  /** V24D24.2: seed for the "Repetir con seed" button (null = non-reproducible). */
+  /** Seed for the replay button; null means non-reproducible. */
   seedInputModel: number | null = DEFAULT_REPLAY_SEED;
-  /** V24D24.2: round selected in the "Simulate round N" dropdown. */
+  /** Round selected in the simulate-round dropdown. */
   selectedRoundModel: number | null = null;
   // ============== State signals ==============
   /** The active careerId (resolved from CareerStatus; null if no career). */
@@ -5900,7 +5878,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   private timelineFetchSeq = 0;
   // ============== Constructor / effects ==============
   constructor() {
-    // V24D24 F3: re-fetch the timeline snapshot whenever the selected
+    // Re-fetch the timeline snapshot whenever the selected
     // match or the selected minute changes. Debounced 150ms so a fast
     // slider drag doesn't fire 18 requests.
     effect(() => {
@@ -6210,7 +6188,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     });
   }
   onReplaceFixtures(): void {
-    // V24D24 F2: For now the UI only triggers a no-op POST (the backend
+    // For now the UI only triggers a no-op POST (the backend
     // expects a real CustomFixture[]). The full "Barcelona rival" preset
     // builder is out of F2 scope. Until then, we send an empty array.
     const preset = this.buildSingleMatchPreset();
@@ -8974,7 +8952,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       },
     });
   }
-  // ============== V24D24.2: Replay-with-seed + Simulate-round handlers ==============
+  // Replay-with-seed and simulate-round handlers.
   /**
    * Two-way binding shim for the seed number input. Empty / NaN input
    * ? null (non-reproducible replay). Otherwise coerce to a number.
@@ -9007,13 +8985,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     this.playerSwapSeedCountModel = this.playerSwapBatteryPrecisionSeedCount(this.playerSwapBatteryPrecisionModel);
   }
   /**
-   * V24D24.2: replay the currently-selected match (Panel C click ? selected
-   * match) with the seed typed in Panel B. Refresca Panel A + D via
-   * {@link refreshDetailAfterMutation}.
-   *
-   * <p>Respects the existing {@code mutationInFlight} contract: the button
-   * is disabled while any other mutation is in flight, and we set the flag
-   * here so all sibling buttons disable while we wait.
+   * Replays the selected match with the current seed and refreshes the detail panels.
    */
   onReplayWithSeed(): void {
     const matchId = this.selectedMatchId();
@@ -9060,7 +9032,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         this.loadMatches();
         this.refreshDetailAfterMutation();
         this.refreshDetailAfterMutation(1200);
-        // V25D99.278: the replay endpoint persists fixture + V24 detail, and
+        // The replay endpoint persists fixture and match detail, and
         // Match Compare can already read the new live detail. In the harness,
         // however, Panel A is an embedded detail page and can briefly repaint
         // from the previous request if the immediate refresh wins the race.
@@ -10974,13 +10946,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return `R${match.round} vs ${opponent} · ${presetLabel}`;
   }
   /**
-   * V24D24.2: simulate the selected round (Panel B dropdown). Extracts the
-   * matches of that round from {@code rounds()}, builds the request body,
-   * and POSTs to {@code /api/v1/match-engine/rounds/start}.
-   *
-   * <p>The backend runs the simulation async ? we get back the initial
-   * RoundStateResponse and let Iván watch the scores land by reloading
-   * Panel C (the round will eventually mark matches COMPLETED).
+   * Simulates the selected round and refreshes Panel C while the backend finishes.
    */
   onSimulateRound(): void {
     const roundNumber = this.selectedRoundModel;
@@ -13201,8 +13167,8 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
    * Replay-lab shortcut: run the selected match once per formation with the
    * same seed, then render the score/possession/shot/xG/zone table in Panel E.
    *
-   * V25D99.59: uses the backend in-memory formation-matrix endpoint instead
-   * of 12 full replay+detail-persist cycles. The backend still applies the
+   * Uses the backend in-memory formation-matrix endpoint instead of 12 full
+   * replay-and-persist cycles. The backend still applies the
    * real formation label plus canonical visual slots, so the engine sees the
    * same geometry contract as the squad modal without paying the Redis detail
    * cost for every row.
@@ -15345,23 +15311,10 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     this.roundRefreshTimers = [];
   }
   /**
-   * Build a TestHarnessMatchRow from a CareerService Fixture.
+   * Builds a harness match row from a career fixture.
    *
-   * <p>Team display names: the backend {@code GET /career/fixtures/
-   * round-with-bye} endpoint (the one this UI calls via
-   * {@code getAllFixturesWithBye}) hydrates {@code homeTeamName} and
-   * {@code awayTeamName} on each fixture via the
-   * {@code FixtureQueryDtos.MatchInfo} record. V24D24.2-F2.5 surfaces
-   * those names in Panel C instead of falling back to the teamId.
-   *
-   * <p>Defensive fallback: if the backend ever returns a fixture
-   * without the names hydrated (legacy endpoint, race condition on a
-   * freshly created career), we still render the teamId so the row is
-   * not blank.
-   *
-   * <p>V24D24.2: also carries through {@code roundId} so the dropdown /
-   * Simulate button can POST it directly to
-   * {@code /api/v1/match-engine/rounds/start}.
+   * Team names are preferred when hydrated by the backend; IDs remain as a
+   * defensive fallback so the row is never blank.
    */
   private fixtureToMatchRow(f: Fixture): TestHarnessMatchRow {
     return {

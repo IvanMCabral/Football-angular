@@ -685,7 +685,7 @@ describe('Substitution modal visual pitch, stats chips, and remaining substituti
   it('rendersStatsChips_whenPlayerRatingsContainsPlayerId', () => {
     // The visual pitch renders each starting-XI dot. p4 (ST) has the richest
     // chips: 2G + 1KP + 1Y. Verifying via data-testid leaves a stable hook
-    // for REVISOR smoke checks too.
+    // for visual smoke checks too.
     const stChip = fixture.nativeElement.querySelector(
       '[data-testid="chip-goals-p4"]') as HTMLElement;
     expect(stChip).withContext('ST goals chip should render for player p4').not.toBeNull();

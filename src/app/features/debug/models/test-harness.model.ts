@@ -1,35 +1,18 @@
 /**
- * V24D24: Test-Harness UI models.
+ * Wire types for the debug test harness.
  *
- * The test-harness UI is a debug page at /debug/test-harness that lets
- * Iván play with formation / seed / injuries / fixtures and see the impact
- * on match results. All endpoints are profile-gated to dev/local/test on
- * the backend (see TestHarnessController).
- *
- * No mutation here — these are wire types only.
+ * The harness lets us replay matches with different formations, seeds,
+ * injuries, fixtures and tactical changes to inspect engine behavior.
  */
 
 import { MatchDetail } from '../../match-detail/models/match-detail.model';
 import { ALL_FORMATIONS, FormationCode } from '../../../shared/constants/formations';
 import { LineupDTO } from '../../../shared/models/lineup/lineup.dto';
 
-/**
- * V25D55-C16 P0.1: re-export the shared {@link FormationCode} type from
- * `shared/constants/formations.ts`. Source of truth moved out — every
- * front-end dropdown that exposes formations now shares the same array
- * AND the same derived union type, so adding a formation in the back-end
- * is a one-line change in the shared file.
- *
- * Deprecated: hand-written unions like `'4-3-3' | '4-4-2' | ...` will
- * silently miss any formation added after they were last updated.
- */
+// Re-export the shared formation type so every dropdown uses the same source of truth.
 export type { FormationCode };
 
-/**
- * Allowed formation codes for the test-harness UI select.
- * V25D55-C16 P0.1: now an alias of {@link ALL_FORMATIONS} (12 formations,
- * up from the 7 stale entries the file used to hardcode).
- */
+/** Allowed formation codes for the test-harness UI select. */
 export const FORMATION_CODES: readonly FormationCode[] = ALL_FORMATIONS;
 
 /** Body for POST /api/v1/test-harness/career/set-formation. */
@@ -106,12 +89,7 @@ export interface TestHarnessMatchRow {
   awayStrength?: TeamStrengthInfo | null;
   homeFormation: string | null;
   awayFormation: string | null;
-  /**
-   * V24D24.2 — deterministic UUID for this (careerId, round) pair, hydrated
-   * by the backend. All matches in the same round share the same roundId.
-   * The "Simulate round N" button POSTs this roundId to
-   * `/api/v1/match-engine/rounds/start`.
-  */
+  /** Deterministic backend round id shared by every match in the same round. */
   roundId?: string | null;
 }
 
@@ -589,14 +567,10 @@ export interface TeamStyleOption {
 }
 
 /**
- * V24D24.2 — wire type for the body of
- * {@code POST /api/v1/test-harness/career/match/{matchId}/replay}.
+ * Request body for replaying one match.
  *
- * <p>{@code seed} is the random seed for the V24 engine replay. Pass an
- * explicit number for a reproducible replay (same match + same seed = same
- * result byte-exact). Pass {@code null} (or omit the body) for a non-
- * reproducible replay that uses {@code System.currentTimeMillis()} as the
- * seed.
+ * A numeric seed makes the replay reproducible. Null asks the backend to use
+ * a fresh seed.
  */
 export interface ReplayMatchRequest {
   seed: number | null;
@@ -789,13 +763,10 @@ export interface MatchPreviewSummary {
 }
 
 /**
- * V24D24.2 — wire type for the body of
- * {@code POST /api/v1/match-engine/rounds/start} (the simulate-round endpoint).
+ * Request body for starting all matches in a round.
  *
- * <p>The backend derives {@code userId} from the JWT (auth) — it is NOT sent
- * here. The caller picks a {@code roundId} from the roundId-hydrated fixtures
- * and includes all matches of that round (the backend starts one MatchEngine
- * per match).
+ * The backend derives the user from auth; the UI sends the round id and match
+ * pairs to simulate.
  */
 export interface SimulateRoundRequest {
   roundId: string;
@@ -806,13 +777,7 @@ export interface SimulateRoundRequest {
   }>;
 }
 
-/**
- * V24D24.2 — match fixture as returned by
- * {@code POST /api/v1/test-harness/career/match/{matchId}/replay}.
- *
- * <p>Mirrors the backend {@code com.footballmanager.domain.model.valueobject.MatchFixture}
- * shape (only the fields the UI cares about).
- */
+/** Match fixture fields consumed by the harness after replay. */
 export interface MatchFixture {
   matchId: string;
   homeTeamId: string;
@@ -822,7 +787,7 @@ export interface MatchFixture {
   result?: MatchResultData | null;
 }
 
-/** Subset of {@code MatchFixture.MatchResultData} that the UI reads. */
+/** Match result fields consumed by the harness. */
 export interface MatchResultData {
   homeGoals: number;
   awayGoals: number;
@@ -1578,13 +1543,7 @@ export interface ScenarioMatrixSummaryRow {
   sameFormationAsBaseline?: boolean;
 }
 
-/**
- * V24D24.2 — response shape for {@code POST /match-engine/rounds/start}.
- *
- * <p>The backend returns a snapshot of all matches that were just started.
- * The UI doesn't currently consume the full shape — it only needs to know
- * the round started — so we model just enough fields to type the observable.
- */
+/** Minimal response shape for a started round. */
 export interface RoundStateResponse {
   roundId: string;
   status: 'IN_PROGRESS' | 'COMPLETED' | 'PAUSED' | 'CANCELLED' | string;
