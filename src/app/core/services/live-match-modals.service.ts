@@ -189,7 +189,7 @@ export class LiveMatchModalsService {
                 }
                 if (careerId && this.shouldResumeRoundAfterModalClose()) {
                   this.engineService.resumeRoundForMatch(careerId, matchId).subscribe({
-                    error: (err) => console.warn('[LIVE-MATCH] resume round on sub modal close failed:', err)
+                    error: (err) => console.warn('Could not resume the round after closing the substitution modal:', err)
                   });
                 }
               }),
@@ -225,7 +225,7 @@ export class LiveMatchModalsService {
   /** Opens the formation-change modal for the given match/state. */
   openFormationModal(matchId: string, state: MatchState): Observable<unknown> {
     if (state.status === 'FINISHED' || state.status === 'CANCELLED') {
-      this.snackBar.open('El partido ya terminó, no se puede cambiar la formación', 'OK', { duration: 3000 });
+      this.snackBar.open('El partido ya termino, no se puede cambiar la formacion', 'OK', { duration: 3000 });
       return new Observable(sub => sub.complete());
     }
     const careerId = this.getCurrentCareerId();
@@ -295,7 +295,7 @@ export class LiveMatchModalsService {
           tap(() => {
             if (careerId && this.shouldResumeRoundAfterModalClose()) {
               this.engineService.resumeRoundForMatch(careerId, matchId).subscribe({
-                error: (err) => console.warn('[LIVE-MATCH] resume round on formation modal close failed:', err)
+                error: (err) => console.warn('Could not resume the round after closing the formation modal:', err)
               });
             }
           }),
@@ -317,7 +317,7 @@ export class LiveMatchModalsService {
     }
   ): Observable<unknown> {
     if (state.status === 'FINISHED' || state.status === 'CANCELLED') {
-      this.snackBar.open('El partido ya terminó, no se puede editar la formación', 'OK', { duration: 3000 });
+      this.snackBar.open('El partido ya termino, no se puede editar la formacion', 'OK', { duration: 3000 });
       return new Observable(sub => sub.complete());
     }
     const careerId = this.getCurrentCareerId();
@@ -405,7 +405,7 @@ export class LiveMatchModalsService {
             this.rememberPartidoSavedSlots(matchId, closeResult);
             if (careerId && this.shouldResumeRoundAfterModalClose()) {
               this.engineService.resumeRoundForMatch(careerId, matchId).subscribe({
-                error: (err) => console.warn('[LIVE-MATCH] resume round on partido modal close failed:', err)
+                error: (err) => console.warn('Could not resume the round after closing the match modal:', err)
               });
             }
         })).subscribe();
@@ -432,12 +432,12 @@ export class LiveMatchModalsService {
       return of(null);
     }
     if (!careerId) {
-      console.warn('[LIVE-MATCH] could not resolve careerId from URL; round will NOT be paused on modal open');
+      console.warn('could not resolve careerId from the current URL; the round will not be paused before opening the modal');
       return of(null);
     }
     return this.engineService.pauseRoundForMatch(careerId, matchId).pipe(
       catchError(err => {
-        console.warn(`[LIVE-MATCH] pause round on ${modalName} modal prepare failed:`, err);
+        console.warn(`Could not pause the round before opening the ${modalName} modal:`, err);
         return of(null);
       })
     );
@@ -981,3 +981,6 @@ export class LiveMatchModalsService {
     };
   }
 }
+
+
+
