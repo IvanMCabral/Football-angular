@@ -1,9 +1,17 @@
 import {
+  findRoundControlAnchorMatch,
   getLastRoundEvents,
   getRoundEventIcon,
   getRoundStatusText,
-  mapRoundFixtureStatus
+  isTerminalRoundState,
+  mapRoundFixtureStatus,
+  normalizeTerminalLiveState,
+  wasPlayerSubstitutedOffInState
 } from './round-live-utils';
+import { RoundMatchVM } from '../models/round-live.model';
+import { MatchState } from '../../../core/services/match-engine.model';
+
+type LiveStatus = MatchState['status'];
 
 describe('round-live-utils', () => {
   it('returns user-facing labels for known live statuses', () => {
@@ -47,4 +55,100 @@ describe('round-live-utils', () => {
     expect(mapRoundFixtureStatus('CANCELLED')).toBe('CANCELLED');
     expect(mapRoundFixtureStatus('UNKNOWN')).toBe('SCHEDULED');
   });
+
+  it('identifies terminal live states', () => {
+    expect(isTerminalRoundState('FINISHED')).toBeTrue();
+    expect(isTerminalRoundState('CANCELLED')).toBeTrue();
+    expect(isTerminalRoundState('RUNNING')).toBeFalse();
+    expect(isTerminalRoundState(undefined)).toBeFalse();
+  });
+
+  it('prefers the manager match as round-control anchor when available', () => {
+    const matches = [
+      roundMatch('other', false, 'RUNNING'),
+      roundMatch('user', true, 'RUNNING')
+    ];
+
+    expect(findRoundControlAnchorMatch({ matches })?.match.id).toBe('user');
+  });
+
+  it('falls back to any active match as round-control anchor', () => {
+    const matches = [
+      roundMatch('user', true, 'FINISHED'),
+      roundMatch('other', false, 'RUNNING')
+    ];
+
+    expect(findRoundControlAnchorMatch({ matches })?.match.id).toBe('other');
+  });
+
+  it('returns no round-control anchor when every match is terminal', () => {
+    const matches = [
+      roundMatch('user', true, 'FINISHED'),
+      roundMatch('other', false, 'CANCELLED')
+    ];
+
+    expect(findRoundControlAnchorMatch({ matches })).toBeNull();
+  });
+
+  it('normalizes live states stuck past full time', () => {
+    const state = matchState({ currentMinute: 90, status: 'RUNNING' });
+
+    expect(normalizeTerminalLiveState(state).status).toBe('FINISHED');
+  });
+
+  it('does not normalize paused or already terminal live states', () => {
+    const paused = matchState({ currentMinute: 92, status: 'PAUSED' });
+    const finished = matchState({ currentMinute: 92, status: 'FINISHED' });
+
+    expect(normalizeTerminalLiveState(paused)).toBe(paused);
+    expect(normalizeTerminalLiveState(finished)).toBe(finished);
+  });
+
+  it('detects whether a player was substituted off', () => {
+    const state = matchState({
+      events: [
+        { eventType: 'GOAL', playerId: 'p1' },
+        { eventType: 'SUBSTITUTION', playerId: 'p2' }
+      ] as any[]
+    });
+
+    expect(wasPlayerSubstitutedOffInState(state, 'p2')).toBeTrue();
+    expect(wasPlayerSubstitutedOffInState(state, 'p1')).toBeFalse();
+  });
 });
+
+function roundMatch(id: string, isUserMatch: boolean, status: LiveStatus): RoundMatchVM {
+  return {
+    match: {
+      id,
+      homeTeamId: `${id}-home`,
+      awayTeamId: `${id}-away`,
+      round: 1,
+      scheduledAt: '',
+      status: 'SCHEDULED',
+      result: null,
+      createdAt: '',
+      simulatedAt: null
+    },
+    isUserMatch,
+    userTeamId: isUserMatch ? `${id}-home` : undefined,
+    state: matchState({ status })
+  };
+}
+
+function matchState(overrides: Partial<MatchState>): MatchState {
+  return {
+    matchId: 'match-1',
+    roundId: 'round-1',
+    homeTeamId: 'home',
+    awayTeamId: 'away',
+    homeScore: 0,
+    awayScore: 0,
+    currentMinute: 1,
+    status: 'RUNNING',
+    homePossession: 50,
+    awayPossession: 50,
+    events: [],
+    ...overrides
+  } as MatchState;
+}

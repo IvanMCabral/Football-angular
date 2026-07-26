@@ -1,3 +1,6 @@
+import { MatchState } from '../../../core/services/match-engine.model';
+import { RoundMatchVM } from '../models/round-live.model';
+
 export type FixtureStatus = 'SCHEDULED' | 'SIMULATED' | 'CANCELLED';
 
 const STATUS_LABELS: Record<string, string> = {
@@ -43,4 +46,34 @@ export function mapRoundFixtureStatus(fixtureStatus: string): FixtureStatus {
     default:
       return 'SCHEDULED';
   }
+}
+
+export function isTerminalRoundState(status: string | undefined): boolean {
+  return status === 'FINISHED' || status === 'CANCELLED';
+}
+
+export function findRoundControlAnchorMatch(vm: { matches: RoundMatchVM[] }): RoundMatchVM | null {
+  return vm.matches.find(match => match.isUserMatch && !isTerminalRoundState(match.state?.status))
+    ?? vm.matches.find(match => !isTerminalRoundState(match.state?.status))
+    ?? null;
+}
+
+export function normalizeTerminalLiveState(state: MatchState): MatchState {
+  if (
+    state.currentMinute >= 90 &&
+    state.status !== 'FINISHED' &&
+    state.status !== 'CANCELLED' &&
+    state.status !== 'PAUSED'
+  ) {
+    return { ...state, status: 'FINISHED' };
+  }
+
+  return state;
+}
+
+export function wasPlayerSubstitutedOffInState(state: MatchState, playerId: string): boolean {
+  return (state.events ?? []).some(event =>
+    event.eventType === 'SUBSTITUTION' &&
+    String(event.playerId ?? '') === playerId
+  );
 }

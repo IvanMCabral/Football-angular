@@ -12,10 +12,14 @@ import { MatchCardComponent } from '../../shared/components/match-card/match-car
 import { RoundLiveViewModel, RoundMatchVM } from './models/round-live.model';
 import { MatchState, RoundState } from '../../core/services/match-engine.model';
 import {
+  findRoundControlAnchorMatch,
   getLastRoundEvents,
   getRoundEventIcon,
   getRoundStatusText,
-  mapRoundFixtureStatus
+  isTerminalRoundState,
+  mapRoundFixtureStatus,
+  normalizeTerminalLiveState,
+  wasPlayerSubstitutedOffInState
 } from './utils/round-live-utils';
 
 declare global {
@@ -1154,7 +1158,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
     }
 
     const anchorMatch = this.findRoundControlAnchorMatch(vm);
-    if (!anchorMatch || !anchorMatch.state || this.isTerminalState(anchorMatch.state.status)) {
+    if (!anchorMatch || !anchorMatch.state || isTerminalRoundState(anchorMatch.state.status)) {
       return;
     }
 
@@ -1200,13 +1204,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
    * and fall back to any non-terminal match.
    */
   private findRoundControlAnchorMatch(vm: RoundLiveViewModel): RoundMatchVM | null {
-    return vm.matches.find(rm => rm.isUserMatch && !this.isTerminalState(rm.state?.status))
-      ?? vm.matches.find(rm => !this.isTerminalState(rm.state?.status))
-      ?? null;
-  }
-
-  private isTerminalState(status: string | undefined): boolean {
-    return status === 'FINISHED' || status === 'CANCELLED';
+    return findRoundControlAnchorMatch(vm);
   }
 
   /**
@@ -1215,16 +1213,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
    * this keeps the manager flow from getting visually stuck on "En Juego".
    */
   private normalizeTerminalLiveState(state: MatchState): MatchState {
-    if (
-      state.currentMinute >= 90 &&
-      state.status !== 'FINISHED' &&
-      state.status !== 'CANCELLED' &&
-      state.status !== 'PAUSED'
-    ) {
-      return { ...state, status: 'FINISHED' };
-    }
-
-    return state;
+    return normalizeTerminalLiveState(state);
   }
 
   /**
@@ -1534,10 +1523,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
   }
 
   private wasPlayerSubstitutedOffInState(state: MatchState, playerId: string): boolean {
-    return (state.events ?? []).some(event =>
-      event.eventType === 'SUBSTITUTION'
-      && String(event.playerId ?? '') === playerId
-    );
+    return wasPlayerSubstitutedOffInState(state, playerId);
   }
 
   /**
