@@ -20,6 +20,13 @@ import { FormationEffectivenessDTO, effectivenessColor } from '../../shared/mode
 import { ALL_FORMATIONS, USER_FORMATION_LABEL } from '../../shared/constants/formations';
 import { ChemistryPreviewService } from '../../core/services/chemistry-preview.service';
 import { SessionPlayer } from '../../shared/models/player.model';
+import {
+  PlayerRoleFamily,
+  countRoleFamily as countRolesByFamily,
+  getMarkerRoleClasses as getRoleMarkerClasses,
+  getRoleFamily as resolveRoleFamily,
+  rolesMatch as roleFamiliesMatch
+} from '../../shared/utils/player-role-utils';
 
 @Component({
   selector: 'app-squad-editor-modal',
@@ -2027,35 +2034,18 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   }
 
   getMarkerRoleClasses(role: string | undefined): { [klass: string]: boolean } {
-    if (!role) { return {}; }
-    return {
-      'color-gk':  role === 'GK',
-      'color-def': ['CB', 'LB', 'RB', 'DEF'].includes(role),
-      'color-mid': ['CM', 'CDM', 'CAM', 'LM', 'RM', 'MID'].includes(role),
-      'color-att': ['ST', 'LW', 'RW', 'CF', 'ATT'].includes(role)
-    };
+    return getRoleMarkerClasses(role);
   }
 
   rolesMatch(playerRole: string | undefined, formationRole: string | undefined): boolean {
-    if (!playerRole || !formationRole) { return false; }
-    if (playerRole === formationRole) { return true; }
-    const playerFamily = this.getRoleFamily(playerRole);
-    const formationFamily = this.getRoleFamily(formationRole);
-    if (playerFamily !== null && playerFamily === formationFamily) {
-      return true;
-    }
-    return false;
+    return roleFamiliesMatch(playerRole, formationRole);
   }
 
-  private getRoleFamily(role: string): 'GK' | 'DEF' | 'MID' | 'ATT' | null {
-    if (role === 'GK') return 'GK';
-    if (['CB', 'LB', 'RB', 'LWB', 'RWB', 'DEF'].includes(role)) return 'DEF';
-    if (['CM', 'CDM', 'CAM', 'LM', 'RM', 'MID'].includes(role)) return 'MID';
-    if (['ST', 'LW', 'RW', 'CF', 'ATT', 'WINGER'].includes(role)) return 'ATT';
-    return null;
+  private getRoleFamily(role: string): PlayerRoleFamily | null {
+    return resolveRoleFamily(role);
   }
 
-  private getPositionRoleFamily(player: PlayerOnFieldDto): 'GK' | 'DEF' | 'MID' | 'ATT' | null {
+  private getPositionRoleFamily(player: PlayerOnFieldDto): PlayerRoleFamily | null {
     if (typeof player.xPercent === 'number' && isFinite(player.xPercent) &&
         typeof player.yPercent === 'number' && isFinite(player.yPercent) &&
         this.subdivisions && this.subdivisions.length > 0) {
@@ -2073,15 +2063,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   }
 
   private countRoleFamily(roles: string[]): { gk: number; def: number; mid: number; att: number } {
-    let gk = 0, def = 0, mid = 0, att = 0;
-    for (const role of roles) {
-      const family = this.getRoleFamily(role);
-      if (family === 'GK') gk++;
-      else if (family === 'DEF') def++;
-      else if (family === 'MID') mid++;
-      else if (family === 'ATT') att++;
-    }
-    return { gk, def, mid, att };
+    return countRolesByFamily(roles);
   }
 
   detectFormation(): string {
