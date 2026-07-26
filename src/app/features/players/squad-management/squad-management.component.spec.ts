@@ -1,22 +1,4 @@
-/**
- * MVP1-lineup-cancha-1: basic spec para {@link SquadManagementComponent}.
- *
- * <p>Smoke test: el botón "🎯 Editar Formación Visual" abre el
- * {@link SquadEditorModalComponent} con los datos correctos.
- *
- * <p>El componente squad-management tiene muchas dependencias (HttpClient,
- * Router, FixtureService, MatDialog, varios componentes hijos). Este spec
- * se mantiene intencionalmente mínimo — se enfoca sólo en el wire del modal.
- *
- * <p>V25D42 (Sprint C7): tests del chemistry badge agregado en la barra
- * de información del lineup. Verifica color coding por threshold y
- * backward compat (chemistryScore opcional).
- *
- * <p>V25D43 (Sprint C8): tests del chemistry breakdown agregado debajo del
- * chemistry badge. Verifica render por position group (GK/DEF/MID/ATT),
- * color coding por maxLevel, cobertura percentage, y backward compat
- * (chemistryBreakdown opcional).
- */
+// Squad management component tests.
 
 import { Component, NO_ERRORS_SCHEMA } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
@@ -40,7 +22,7 @@ class LineupPlayerCardStub {}
 @Component({ selector: 'app-season-stats-tab', standalone: true, template: '' })
 class SeasonStatsTabStub {}
 
-describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
+describe('SquadManagementComponent', () => {
   let component: SquadManagementComponent;
   let fixture: ComponentFixture<SquadManagementComponent>;
   let dialogSpy: jasmine.SpyObj<MatDialog>;
@@ -53,9 +35,6 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
     season: 1,
     currentRound: 1
   };
-
-  // V25D42: helper para construir un LineupDTO con chemistryScore opcional.
-  // V25D43: extendido para aceptar chemistryBreakdown opcional (Sprint C8).
   // Toma players como base (evita duplicar el array literal en cada test).
   function buildLineup(players: PlayerLineupDTO[], chemistryScore?: number, chemistryBreakdown?: ChemistryBreakdownDTO): LineupDTO {
     const base: LineupDTO = {
@@ -72,8 +51,6 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
     }
     return base;
   }
-
-  // V25D43: helper para construir un ChemistryBreakdownDTO con un set
   // representativo de skills. Coverage percentage = 30% (3 of 10 covered).
   function buildBreakdown(): ChemistryBreakdownDTO {
     const positionGroups: Record<string, SkillCoverageDTO[]> = {
@@ -183,18 +160,13 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
   });
 
   it('openVisualEditor method is defined and does not throw', () => {
-    // MVP1-lineup-cancha-1: smoke test del método openVisualEditor.
     // El método existe en el componente y se invoca sin lanzar excepciones.
     // El wiring end-to-end (HTTP + Dialog → modal → persistencia) lo valida
-    // el smoke de REVISOR; este spec verifica solo que el método está expuesto.
     expect(typeof component.openVisualEditor).toBe('function');
     expect(() => component.openVisualEditor()).not.toThrow();
   });
 
-  // ========== V25D66-C26 (Sprint C26): openVisualEditor passes squad via dialog data ==========
-
-  it('V25D66-C26: squad$ observable emits the squad (HTTP mock returns [])', (done) => {
-    // V25D66-C26: verifica que squad$ (que se pasa al dialog data.squad)
+  it('squad$ observable emits the squad (HTTP mock returns [])', (done) => {
     // emite el squad del HTTP GET /career/players/squad. El mock default
     // retorna [], por lo que squad$ debe emitir []. Esto valida que el
     // data flow (HTTP → squad$ observable) está funcionando, sobre el cual
@@ -214,21 +186,17 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
     });
   });
 
-  it('V25D66-C26: openVisualEditor does not throw with empty squad (backward compat)', () => {
-    // V25D66-C26: openVisualEditor no debe romperse cuando squad está vacío
+  it('openVisualEditor does not throw with empty squad (backward compat)', () => {
     // (HTTP mock retorna []). El dialog.open se llama con data.squad = [],
     // que es la condición de fallback que el modal maneja correctamente.
     expect(() => component.openVisualEditor()).not.toThrow(
       'openVisualEditor should not throw even with empty squad');
   });
 
-  it('V25D55-C16 P0.1: availableFormations exposes the 12 formations shared constant', () => {
-    // V25D54 backend extendió a 12 formations (7 originales + 5 nuevas).
-    // V25D55-C16 P0.1: source of truth movido a shared/constants/formations.ts;
+  it('availableFormations exposes the 12 formations shared constant', () => {
     // squad-management ahora referencia ALL_FORMATIONS (12 entries) en lugar
     // del array hardcoded de 7 que tenía antes.
     expect(component.availableFormations.length).toBe(12);
-    // Spot-check the 5 nuevas from C15 are now exposed in the squad dropdown.
     expect(component.availableFormations).toContain('3-5-2-CDM');
     expect(component.availableFormations).toContain('5-4-1');
     expect(component.availableFormations).toContain('3-4-1-2');
@@ -240,11 +208,8 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
     }
   });
 
-  // ========== V25D42: chemistry badge (Sprint C7) ==========
-
-  describe('V25D42: chemistry badge in lineup view', () => {
+  describe('chemistry badge in lineup view', () => {
     it('should render chemistry badge when lineup has chemistryScore', () => {
-      // V25D42: el chemistry badge aparece cuando el back popula chemistryScore.
       component.lineupSubject$.next(buildLineup(ELEVEN_PLAYERS, 87));
       fixture.detectChanges();
 
@@ -255,7 +220,6 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
     });
 
     it('should apply chemistry-high class for chemistry >= 80 (green)', () => {
-      // V25D42: >=80 → chemistry-high (verde). Lineup elite da ~80-95.
       component.lineupSubject$.next(buildLineup(ELEVEN_PLAYERS, 85));
       fixture.detectChanges();
 
@@ -267,7 +231,6 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
     });
 
     it('should apply chemistry-mid class for chemistry 60-79 (yellow)', () => {
-      // V25D42: 60-79 → chemistry-mid (amarillo). Threshold boundary.
       component.lineupSubject$.next(buildLineup(ELEVEN_PLAYERS, 70));
       fixture.detectChanges();
 
@@ -278,7 +241,6 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
     });
 
     it('should apply chemistry-low class for chemistry < 60 (red)', () => {
-      // V25D42: <60 → chemistry-low (rojo). Lineup con muchos null stats o muy corto.
       component.lineupSubject$.next(buildLineup(ELEVEN_PLAYERS, 45));
       fixture.detectChanges();
 
@@ -289,7 +251,6 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
     });
 
     it('should NOT render chemistry badge when chemistryScore is undefined (backward compat)', () => {
-      // V25D42: chemistryScore es opcional. Si el back no lo popula (careers pre-V25D41
       // o respuesta de error), el badge NO se renderiza — el componente no rompe.
       component.lineupSubject$.next(buildLineup(ELEVEN_PLAYERS));  // sin chemistryScore
       fixture.detectChanges();
@@ -299,7 +260,6 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
     });
 
     it('should render boundary threshold at 80 (inclusive) and 60 (inclusive)', () => {
-      // V25D42: thresholds son inclusivos. chemistry=80 → high (no mid), chemistry=60 → mid (no low).
       component.lineupSubject$.next(buildLineup(ELEVEN_PLAYERS, 80));
       fixture.detectChanges();
       let badge = fixture.nativeElement.querySelector('.chemistry-badge');
@@ -314,11 +274,8 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
     });
   });
 
-  // ========== V25D43: chemistry breakdown (Sprint C8) ==========
-
-  describe('V25D43: chemistry breakdown (per position group)', () => {
+  describe('chemistry breakdown by position group', () => {
     it('should render breakdown section when chemistryBreakdown is present', () => {
-      // V25D43: la sección de breakdown se renderiza cuando el back popula chemistryBreakdown.
       const breakdown = buildBreakdown();
       component.lineupSubject$.next(buildLineup(ELEVEN_PLAYERS, 87, breakdown));
       fixture.detectChanges();
@@ -333,7 +290,6 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
     });
 
     it('should render one row per non-empty position group with label + chips', () => {
-      // V25D43: 4 grupos (GK/DEF/MID/ATT) con label, cada uno con sus chips.
       const breakdown = buildBreakdown();
       component.lineupSubject$.next(buildLineup(ELEVEN_PLAYERS, 87, breakdown));
       fixture.detectChanges();
@@ -359,7 +315,6 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
     });
 
     it('should apply chip-high / chip-mid / chip-low classes per maxLevel threshold', () => {
-      // V25D43: >=80 verde (chip-high), 50-79 amarillo (chip-mid), <50 rojo (chip-low).
       const positionGroups: Record<string, SkillCoverageDTO[]> = {
         GK: [
           { skill: 'WALL',   maxLevel: 99, contributorId: 'p1' },  // high
@@ -398,8 +353,6 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
     });
 
     it('should NOT render breakdown section when chemistryBreakdown is undefined (backward compat)', () => {
-      // V25D43: chemistryBreakdown es opcional. Lineups pre-V25D43 no lo traen
-      // (legacy V25D41/V25D42 builds). El componente no rompe — no renderiza la sección.
       component.lineupSubject$.next(buildLineup(ELEVEN_PLAYERS, 87));  // sin breakdown
       fixture.detectChanges();
 
@@ -408,7 +361,6 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
     });
 
     it('should render coverage percentage from chemistryBreakdown.coveragePercentage', () => {
-      // V25D43: coverage percentage se lee del back (no se calcula en el front).
       const breakdown: ChemistryBreakdownDTO = {
         positionGroups: { GK: [{ skill: 'WALL', maxLevel: 99, contributorId: 'p1' }], DEF: [], MID: [], ATT: [] },
         maxSkillByType: { WALL: 99 },
@@ -423,9 +375,7 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
     });
   });
 
-  // ========== V25D44: chemistry breakdown interactivity (Sprint C9) ==========
-
-  describe('V25D44: chemistry breakdown chip click → contributor popover', () => {
+  describe('chemistry breakdown contributor popover', () => {
     // 11-player lineup where p0 is Courtois (GK, OVR 86) and p1 is Van Dijk (DEF, OVR 88).
     // Breakdown points WALL → p0 and MARKER → p1 so we can verify chip switches
     // (different contributor when clicking a different chip).
@@ -450,7 +400,6 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
     }
 
     it('should open popover with contributor (name, position, overall) when chip is clicked', () => {
-      // V25D44: click WALL chip → popover shows Courtois, GK, OVR 86.
       const { lineup } = buildCourtoisLineup();
       component.lineupSubject$.next(lineup);
       fixture.detectChanges();
@@ -474,7 +423,6 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
     });
 
     it('should switch popover to a different contributor when a different chip is clicked', () => {
-      // V25D44: click WALL chip (Courtois) → click MARKER chip (Van Dijk) → popover switches.
       const { lineup } = buildCourtoisLineup();
       component.lineupSubject$.next(lineup);
       fixture.detectChanges();
@@ -499,7 +447,6 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
     });
 
     it('should close popover when the same chip is clicked again (toggle off)', () => {
-      // V25D44: click WALL → open. Click WALL again → close.
       const { lineup } = buildCourtoisLineup();
       component.lineupSubject$.next(lineup);
       fixture.detectChanges();
@@ -517,7 +464,6 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
     });
 
     it('should close popover when the X close button is clicked', () => {
-      // V25D44: popover X button calls closeContributorPopover() and hides the popover.
       const { lineup } = buildCourtoisLineup();
       component.lineupSubject$.next(lineup);
       fixture.detectChanges();
@@ -537,7 +483,6 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
     });
 
     it('should NOT open popover when chip references a contributorId not in lineup (backyard compat)', () => {
-      // V25D44: if contributorId is stale (e.g., lineup reloaded and the player
       // is gone), the chip handler should silently no-op — don't open a
       // popover with missing data, don't crash.
       const staleBreakdown: ChemistryBreakdownDTO = {
@@ -561,15 +506,8 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
     });
   });
 
-  // ========== V25D59-C19 P1: hero label "Lineup armado: X/11" reflects actual persisted slots ==========
-
-  describe('V25D59-C19 P1: hero label reflects actual persisted slots', () => {
-    /**
-     * Helper to build a LineupDTO with explicit subdivision {@code slots}
-     * array of size {@code slotsCount}. Mirrors the MVP1-lineup-cancha-1
-     * wire contract (post-V25D59 back returns {@code slots} with one
-     * entry per filled subdivision on the field).
-     */
+  describe('hero label reflects persisted lineup slots', () => {
+    // Builds a lineup with an explicit number of persisted pitch slots.
     function buildLineupWithSlots(slotsCount: number, players: PlayerLineupDTO[]): LineupDTO {
       const slots: LineupSlotDTO[] = Array.from({ length: slotsCount }, (_, i) => ({
         playerId: players[i % players.length]?.playerId ?? `p${i}`,
@@ -584,10 +522,7 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
       };
     }
 
-    it('V25D59-C19 P1: should display "7/11" when lineup has 7 persisted slots', () => {
-      // V25D59-C19 P1 (Test 1): lineup con 7 slots persistidos (caso del bug C18b —
-      // auto-select había devuelto 7 players). El label debe reflejar 7/11, no
-      // 11/11 hardcoded.
+    it('should display "7/11" when lineup has 7 persisted slots', () => {
       const lineup7 = buildLineupWithSlots(7, ELEVEN_PLAYERS.slice(0, 7));
       component.lineupSubject$.next(lineup7);
       fixture.detectChanges();
@@ -597,15 +532,13 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
       expect(cta.textContent).toContain('7');
       expect(cta.textContent).toContain('/ 11');
       expect(cta.textContent).not.toContain('11/11');
-      // V25D59-C19 P1: incomplete class applies for < 11
       expect(cta.classList.contains('lineup-incomplete'))
         .withContext('Should have lineup-incomplete class for 7/11')
         .toBeTrue();
       expect(cta.classList.contains('lineup-complete')).toBeFalse();
     });
 
-    it('V25D59-C19 P1: should display "11/11" when lineup has 11 persisted slots', () => {
-      // V25D59-C19 P1: caso happy path post-fix C19 P0 back — auto-select
+    it('should display "11/11" when lineup has 11 persisted slots', () => {
       // garantiza 11 slots. El label muestra 11/11 con styling "complete".
       const lineup11 = buildLineupWithSlots(11, ELEVEN_PLAYERS);
       component.lineupSubject$.next(lineup11);
@@ -621,8 +554,7 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
       expect(cta.classList.contains('lineup-incomplete')).toBeFalse();
     });
 
-    it('V25D59-C19 P1: should display "0/11" when lineup has no players and no slots', () => {
-      // V25D59-C19 P1 (Test 2): lineup vacío (players=[], slots=[]). Spec exige
+    it('should display "0/11" when lineup has no players and no slots', () => {
       // "0/11" visible, no hidden — para que el usuario sepa que NO hay lineup armado.
       const lineupEmpty: LineupDTO = {
         formation: '',
@@ -641,8 +573,7 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
       expect(cta.classList.contains('lineup-incomplete')).toBeTrue();
     });
 
-    it('V25D59-C19 P1: should NOT render hero CTA when no lineup is loaded', () => {
-      // V25D59-C19 P1: cuando lineupSubject$ es null (initial state antes
+    it('should NOT render hero CTA when no lineup is loaded', () => {
       // de GET /career/lineup/current), el hero NO se renderiza — no hay
       // información para mostrar.
       component.lineupSubject$.next(null as unknown as LineupDTO);
@@ -652,8 +583,7 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
       expect(cta).toBeNull('Hero CTA must not render when no lineup is loaded');
     });
 
-    it('V25D59-C19 P1: should fall back to players.length for legacy lineups without slots', () => {
-      // V25D59-C19 P1: backward compat — lineups pre-MVP1-lineup-cancha-1
+    it('should fall back to players.length for legacy lineups without slots', () => {
       // (sin `slots` field) caen al fallback de players.length para no
       // mostrar "0/11" en carreras activas que aún no re-armaron via auto-select.
       const legacyLineup: LineupDTO = {
@@ -672,8 +602,7 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
       expect(cta.textContent).toContain('/ 11');
     });
 
-    it('V25D59-C19 P1: hero label updates reactively when lineup changes (7 → 11)', () => {
-      // V25D59-C19 P1: regression — el counter debe actualizarse cuando
+    it('hero label updates reactively when lineup changes (7 → 11)', () => {
       // lineupSubject$ emite un nuevo lineup (e.g., después de auto-select).
       // Antes del fix, el counter quedaba stale en 11/11 aunque el back
       // devolvía 7 players.
@@ -691,9 +620,7 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
     });
   });
 
-  // ========== V25D60-C20 P1: 3 displays must use lineupSlotsCount (not lineup.players.length) ==========
-
-  describe('V25D60-C20 P1: lineup displays use lineupSlotsCount (consistency fix)', () => {
+  describe('lineup displays use persisted slot count', () => {
     /**
      * Helper: lineup with persisted slots + 11 players in the players[] array
      * (simulating the bug scenario: back now persists 11 slots but for
@@ -714,8 +641,7 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
       };
     }
 
-    it('V25D60-C20 P1: .lineup-count should display "7 / 11" when lineup has 7 persisted slots (not 11)', () => {
-      // V25D60-C20 P1 (Test 1): el verifier C19 detectó que .lineup-count
+    it('.lineup-count should display "7 / 11" when lineup has 7 persisted slots (not 11)', () => {
       // mostraba "11 / 11" usando lineup.players.length mientras el hero
       // label (correcto) mostraba "7 / 11" usando lineupSlotsCount. Tras el
       // fix ambos displays muestran el mismo número.
@@ -728,15 +654,13 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
       expect(count.textContent).toContain('7');
       expect(count.textContent).toContain('/ 11');
       expect(count.textContent).not.toContain('11 / 11');
-      // V25D60-C20 P1: el count-short class aplica para < 7, count-ok para 7..10
       expect(count.classList.contains('count-ok'))
         .withContext('Should have count-ok class for 7/11 (count-short is < 7)')
         .toBeTrue();
       expect(count.classList.contains('count-full')).toBeFalse();
     });
 
-    it('V25D60-C20 P1: .sticky-confirm-info should display "⚽ 7 / 11 jugadores" when lineup has 7 slots', () => {
-      // V25D60-C20 P1 (Test 2): el verifier C19 detectó que el sticky-confirm
+    it('.sticky-confirm-info should display "⚽ 7 / 11 jugadores" when lineup has 7 slots', () => {
       // bar mostraba "⚽ 11 / 11 jugadores" usando lineup.players.length.
       const lineup = buildLineupWithSlotsAndStalePlayers(7);
       component.lineupSubject$.next(lineup);
@@ -751,15 +675,13 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
       expect(info.textContent).toContain('jugadores');
     });
 
-    it('V25D60-C20 P1: Confirm button should be disabled when lineup has 7 persisted slots', () => {
-      // V25D60-C20 P1 (Test 3): el verifier C19 detectó que el Confirm button
+    it('Confirm button should be disabled when lineup has 7 persisted slots', () => {
       // permitía confirmar un lineup con 7 slots (porque lineup.players.length=11
       // pero lineupSlotsCount=7). Con el fix, el botón está disabled porque
       // el contrato es ahora 11/11 completo (no 7+).
       //
       // Scope: el botón objetivo es el del .sticky-confirm-bar (línea 338 del
       // HTML), no el botón primario dentro de .lineup-actions (línea 306, que
-      // sigue con lógica legacy — fuera de scope del task C20).
       const lineup = buildLineupWithSlotsAndStalePlayers(7);
       component.lineupSubject$.next(lineup);
       fixture.detectChanges();
@@ -775,9 +697,7 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
         .toContain('11');
     });
 
-    it('V25D60-C20 P1: Confirm button should be enabled when lineup has 11 persisted slots', () => {
-      // V25D60-C20 P1 (Test 3b): positive case — el Confirm button se habilita
-      // cuando lineupSlotsCount === 11 (contrato del fix C20 P1).
+    it('Confirm button should be enabled when lineup has 11 persisted slots', () => {
       const lineup = buildLineupWithSlotsAndStalePlayers(11);
       component.lineupSubject$.next(lineup);
       fixture.detectChanges();
@@ -792,17 +712,14 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
         .toContain('Confirmar y jugar');
     });
   });
-
-  // ========== V25D62-C21 P0.1: in-page Confirm button must use lineupSlotsCount ==========
   //
-  // V25D60-C20 P1 fixed the .sticky-confirm-bar Confirm button (línea 338) y los
   // displays de count, pero el verifier detectó que el botón DENTRO de
   // .lineup-actions (líneas 306-316) todavía usaba `lineup.players.length`
   // (legacy < 7 || > 11). Esto causa que un lineup con slots persistidos truth
   // (e.g. 11) y players stale (e.g. 5) permita confirmar — el botón queda
   // disabled por players<7 aunque slots=11 está OK.
 
-  describe('V25D62-C21 P0.1: in-page Confirm button uses lineupSlotsCount (not lineup.players.length)', () => {
+  describe('confirm button uses persisted slot count', () => {
     /**
      * Helper local: lineup con N slots persistidos (truth) y M players
      * stale (legacy `players[]`). El bug C21 surge cuando N y M caen en
@@ -833,7 +750,6 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
     }
 
     it('should be ENABLED when lineup.slots.length=11 even though lineup.players.length=5 < 7', () => {
-      // Caso del bug: lineup con 11 slots persistidos (truth) pero solo 5
       // players stale (players.length < 7). Con el código viejo que usaba
       // `lineup.players.length`, el botón quedaba DISABLED porque 5 < 7.
       // Con el fix (lineupSlotsCount = lineup.slots.length = 11), el botón
@@ -843,7 +759,6 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
       fixture.detectChanges();
 
       // Selector: el botón in-page vive dentro de .lineup-actions (NO dentro
-      // de .sticky-confirm-bar, ese es otro botón cubierto por C20 P1).
       const inPageBtn = fixture.nativeElement.querySelector('.lineup-actions .btn-confirm-lineup');
       const btn = fixture.nativeElement.querySelector('.sticky-confirm-bar .btn-confirm-lineup');
       expect(inPageBtn)
@@ -867,10 +782,7 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
         .not.toContain('Mínimo 7 jugadores');
     });
   });
-
-  // ========== V25D78-C55.13 BUG-1: continueToNewSeason reloads the page on success ==========
   //
-  // BUG-1 (BUG_V25D78_CONTINUE_CAREER_SQUAD_BUTTON_NOOP):
   //   Click "Continuar Carrera" verde en /squad → backend crea T3 OK pero
   //   la UI queda stale (T2 Finalizada sigue visible). El botón del
   //   /dashboard funciona porque hace router.navigate(['/squad']). El fix
@@ -879,9 +791,8 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
   //   (jsdom hace reload non-writable, spyOn(window.location, 'reload')
   //   tira "reload is not declared writable or has no setter").
 
-  describe('V25D78-C55.13 BUG-1: continueToNewSeason reloads the page on success', () => {
+  describe('continueToNewSeason reloads the page on success', () => {
     it('should call reloadPage() after /career/continue returns success', () => {
-      // V25D78-C55.13 BUG-1: el backend crea T3 (careerPhase=PRE_MATCH)
       // correctamente, pero sin reload el component squad-management queda
       // mostrando el estado stale de T2. El dashboard button funciona porque
       // hace router.navigate(['/squad']) que re-instancia. Acá mirroreamos
@@ -925,19 +836,15 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
       expect(component.lineupError$.value).toBe('No se pudo iniciar temporada');
     });
   });
-
-  // ========== V25D78-C55.13 BUG-2: sticky-confirm-bar hidden when careerPhase=FINISHED ==========
   //
-  // BUG-2 (BUG_V25D78_CONFIRMAR_YUGAR_FOOTER_PERSIST_FINISHED):
   //   Footer .sticky-confirm-bar con "0 / 11 jugadores" + "Confirmar y
   //   Jugar" disabled persiste visible en careerPhase=FINISHED. Iván pidió
   //   que en FINISHED el único botón visible sea "Continuar Carrera" (verde),
   //   no el footer de confirmar. Fix: envolver .sticky-confirm-bar con un
   //   *ngIf que lo oculta cuando careerPhase === 'FINISHED'.
 
-  describe('V25D78-C55.13 BUG-2: sticky-confirm-bar hidden when careerPhase=FINISHED', () => {
+  describe('sticky-confirm-bar hidden when career is finished', () => {
     it('should NOT render .sticky-confirm-bar when careerPhase=FINISHED', () => {
-      // V25D78-C55.13 BUG-2: con careerPhase=FINISHED, el footer .sticky-confirm-bar
       // NO debe renderizar (mostraría "Confirmar y Jugar" disabled). Iván pidió
       // que el único botón visible en FINISHED sea el verde "Continuar Carrera"
       // (que vive dentro del bloque tournament-ended arriba en el template).
@@ -970,9 +877,7 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
     });
 
     it('control: SHOULD render .sticky-confirm-bar when careerPhase=PRE_MATCH with valid lineup', () => {
-      // V25D78-C55.13 BUG-2 control test: en careerPhase=PRE_MATCH con un lineup
       // válido (11 players + 11 slots), el .sticky-confirm-bar SÍ debe
-      // renderizar. Esto confirma que el fix BUG-2 (hide en FINISHED) no rompe
       // el render normal en otros careerPhases.
       component.careerStatus$ = of({
         ...CAREER_STATUS_RESPONSE,
@@ -997,36 +902,9 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
     });
   });
 
-  /**
-   * V25D83.1 sprint 2 ajuste (pre-push): squad loading-state UX gap fix.
-   *
-   * <p>Pre-fix (2 bugs):
-   * <ol>
-   *   <li>{@code loading$} was derived from
-   *       {@code combineLatest(...).pipe(map(() => false))} — every emission
-   *       mapped to {@code false}, so the page-level spinner never rendered
-   *       during initial mount. Dead code that silently blocked the UX gap.</li>
-   *   <li>There was no {@code squadLoading$} observable and no spinner
-   *       overlay. After lineup-confirm (or modal close), the squad$ could
-   *       be stale and the grid would flash empty.</li>
-   * </ol>
-   *
-   * <p>Post-fix:
-   * <ul>
-   *   <li>{@code loading$} ahora usa el patrón
-   *       {@code startWith(true) → map(() => false) → distinctUntilChanged}
-   *       (idéntico al de career-setup V25D83.1). El spinner de página
-   *       aparece durante el initial mount.</li>
-   *   <li>Nuevo {@code squadLoading$} derivado de
-   *       {@code combineLatest([refetchSquadTrigger$, squad$])} con el mismo
-   *       startWith pattern. Emite {@code true} en initial mount y después
-   *       de cada {@code refreshSquad()} (post-lineup-confirm, post-modal-close).</li>
-   *   <li>Spinner overlay full-screen en el template bound a
-   *       {@code squadLoading$} con {@code data-testid="squad-loading-overlay"}.</li>
-   * </ul>
-   */
-  describe('V25D83.1 sprint 2 ajuste: squad loading$ + spinner overlay', () => {
-    it('V25D83.1 #1: loading$ starts true and flips to false (broken map(() => false) fixed)', (done: DoneFn) => {
+  // Loading state and spinner overlay behavior.
+  describe('squad loading state and spinner overlay', () => {
+    it('loading$ starts true and flips to false (broken map(() => false) fixed)', (done: DoneFn) => {
       // With the pre-fix broken loading$, emissions would be [false, false, ...].
       // Post-fix: first emission MUST be true (startWith seed), final MUST be
       // false (after combineLatest resolves).
@@ -1042,7 +920,7 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
       });
     });
 
-    it('V25D83.1 #2: squadLoading$ starts true and flips to false on initial mount (data flow)', (done: DoneFn) => {
+    it('squadLoading$ starts true and flips to false on initial mount (data flow)', (done: DoneFn) => {
       // squadLoading$ is the post-refetch indicator. On initial mount it MUST
       // start at true (startWith seed) and flip to false once squad$ emits.
       const emissions: boolean[] = [];
@@ -1057,7 +935,7 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
       });
     });
 
-    it('V25D83.1 #3: refreshSquad() triggers a re-fetch (squadLoading$ flips true then false)', (done: DoneFn) => {
+    it('refreshSquad() triggers a re-fetch (squadLoading$ flips true then false)', (done: DoneFn) => {
       // Install a counter mock AFTER ngOnInit (the initial mount already
       // fired with the beforeEach mock). refreshSquad() should fire a NEW
       // HTTP request that we can count.
@@ -1092,7 +970,7 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
       });
     });
 
-    it('V25D83.1 #4: spinner overlay renders in template (squadLoading$ → *ngIf → DOM)', (done: DoneFn) => {
+    it('spinner overlay renders in template (squadLoading$ → *ngIf → DOM)', (done: DoneFn) => {
       // DOM-level test: the squad-loading-overlay element MUST be present
       // when squadLoading$ is true (initial mount). The default mock returns
       // [] for /career/players/squad which resolves synchronously, so we
@@ -1122,13 +1000,12 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
         // The overlay element query may return null if the HTTP resolved
         // synchronously and squadLoading$ flipped to false before our
         // detectChanges — this is expected with of([]). The source-level
-        // template binding is verified separately by V25D83.1 #5 below.
         sub.unsubscribe();
         done();
       });
     });
 
-    it('V25D83.1 #5: refreshSquad() is idempotent (multiple calls in quick succession)', (done: DoneFn) => {
+    it('refreshSquad() is idempotent (multiple calls in quick succession)', (done: DoneFn) => {
       // Verify the refreshSquad() method exists and doesn't throw when called
       // multiple times rapidly (idempotency for the post-lineup-confirm +
       // post-modal-close double-fire scenario).
@@ -1157,26 +1034,8 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
     });
   });
 
-  /**
-   * V25D99.20-FRONT BUG-4b: onFormationChange persists the formation to
-   * the back and refreshes lineupSubject$, so the squad page header chem
-   * badge stays in sync with the selected formation even without
-   * auto-select.
-   *
-   * <p>Pre-fix (3-line handler at squad-management.component.ts:462-464):
-   * only updated selectedFormation$ locally. The header chem badge and
-   * chemistry score came from lineupSubject$, which only refreshed on
-   * modal close, auto-select success, or career-status refresh. Ivan saw
-   * "header says 4-4-2, editor opens with 3-5-2" and read it as random.
-   *
-   * <p>Post-fix: onFormationChange also POSTs /career/lineup/manual-select
-   * with the current lineup's playerIds reflowed into the new formation slots,
-   * then GETs /career/lineup/current and emits the result into lineupSubject$.
-   * Why /manual-select instead of /auto-select: auto-select rewrites the
-   * 11 player assignments; /manual-select with the current playerIds preserves
-   * the XI while changing tactical positions.
-   */
-  describe('V25D99.20-BUG-4b: onFormationChange persists + refreshes lineup', () => {
+  // Formation changes should persist the same XI in the selected shape.
+  describe('onFormationChange persists and refreshes lineup', () => {
     it('POSTs /manual-select with current XI reflowed into new formation slots, then GETs /current and updates lineupSubject$', () => {
       const httpSpy = TestBed.inject(HttpClient) as jasmine.SpyObj<HttpClient>;
       const initialLineup: LineupDTO = {
@@ -1295,3 +1154,5 @@ describe('SquadManagementComponent — MVP1-lineup-cancha-1', () => {
     });
   });
 });
+
+
