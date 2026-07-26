@@ -602,20 +602,7 @@ describe('SquadEditorModalComponent chemistry preview', () => {
   });
 });
 
-/**
- * Drag-drop tactical field editor, formation effectiveness UI, and
- * chemistry preview weighting.
- *
- * <p>Strategy: drive the drop handlers directly via `(component as any).methodName(...)`
- * with mock CdkDragDrop events rather than simulating real mouse drag events
- * (CDK drag-drop events are notoriously hard to fire from specs). The handlers
- * are the only place where swap/move/bench logic lives, so testing them is
- * equivalent to testing the drag-drop UX.
- *
- * <p>For template-render tests we use {@code fixture.detectChanges()} +
- * {@code fixture.nativeElement.querySelector(...)} to verify the formation-
- * effectiveness row + per-player color classes render correctly.
- */
+// Drag-drop, tactical effectiveness and chemistry preview behavior.
 describe('SquadEditorModalComponent drag-drop and effectiveness', () => {
   let component: SquadEditorModalComponent;
   let fixture: ComponentFixture<SquadEditorModalComponent>;
@@ -1214,7 +1201,7 @@ describe('SquadEditorModalComponent responsive modal breakpoints', () => {
   /**
    * Reads the @Component.styles source. For inline-styled components
    * (like this one) Angular stores the CSS strings on the component
-   * definition at `ɵcmp.styles`, but with Angular's emulated
+   * definition at `\u0275cmp.styles`, but with Angular's emulated
    * encapsulation every selector is rewritten with `[_ngcontent-%COMP%]`
    * (or the hashed version at runtime). {@link #stripEncapsulation}
    * removes those markers so regex assertions match the original
@@ -1222,7 +1209,7 @@ describe('SquadEditorModalComponent responsive modal breakpoints', () => {
    */
   function stylesSource(): string {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const styles = (SquadEditorModalComponent as any).ɵcmp?.styles ?? [];
+    const styles = (SquadEditorModalComponent as any)['\u0275cmp']?.styles ?? [];
     if (Array.isArray(styles)) {
       return styles.join('\n');
     }
@@ -1236,10 +1223,7 @@ describe('SquadEditorModalComponent responsive modal breakpoints', () => {
     return css.replace(/\[[_]?ngcontent-[^\]]*\]/g, '');
   }
 
-  /**
-   * Extracts the body of the @media block whose query matches {@code query}.
-   * Walks the brace stack to handle nested rule blocks.
-   */
+  // Extracts a media-query block while preserving nested CSS rules.
   function extractMediaBlock(query: string): string {
     const src = stripEncapsulation(stylesSource());
     const re = new RegExp(
@@ -1358,7 +1342,7 @@ describe('SquadEditorModalComponent responsive field sizing', () => {
   /**
    * Reads the @Component.styles source. For inline-styled components
    * (like this one) Angular stores the CSS strings on the component
-   * definition at `ɵcmp.styles`, but with Angular's emulated
+   * definition at `\u0275cmp.styles`, but with Angular's emulated
    * encapsulation every selector is rewritten with `[_ngcontent-%COMP%]`
    * (or the hashed version at runtime). {@link #stripEncapsulation}
    * removes those markers so regex assertions match the original
@@ -1369,7 +1353,7 @@ describe('SquadEditorModalComponent responsive field sizing', () => {
    */
   function stylesSource(): string {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const styles = (SquadEditorModalComponent as any).ɵcmp?.styles ?? [];
+    const styles = (SquadEditorModalComponent as any)['\u0275cmp']?.styles ?? [];
     if (Array.isArray(styles)) {
       return styles.join('\n');
     }
@@ -1383,10 +1367,7 @@ describe('SquadEditorModalComponent responsive field sizing', () => {
     return css.replace(/\[[_]?ngcontent-[^\]]*\]/g, '');
   }
 
-  /**
-   * Extracts the body of the @media block whose query matches {@code query}.
-   * Walks the brace stack to handle nested rule blocks.
-   */
+  // Extracts a media-query block while preserving nested CSS rules.
   function extractMediaBlock(query: string): string {
     const src = stripEncapsulation(stylesSource());
     const re = new RegExp(
@@ -2237,7 +2218,7 @@ describe('SquadEditorModalComponent marker cards', () => {
 
   it('CSS source defines the role-color rules for all 4 families', () => {
     // Assert the four role color rules exist with the expected palette.
-    const styles = (SquadEditorModalComponent as any).ɵcmp?.styles ?? [];
+    const styles = (SquadEditorModalComponent as any)['\u0275cmp']?.styles ?? [];
     const src = (Array.isArray(styles) ? styles.join('\n') : String(styles))
       .replace(/\[[_]?ngcontent-[^\]]*\]/g, '');
     expect(src).toMatch(/\.player-marker\.color-gk\s+\.player-role-label\s*\{[^}]*background:\s*#f59e0b/);
@@ -2691,7 +2672,7 @@ describe('SquadEditorModalComponent formation change updates header and markers'
      */
     function stylesSource(): string {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const styles = (SquadEditorModalComponent as any).ɵcmp?.styles ?? [];
+      const styles = (SquadEditorModalComponent as any)['\u0275cmp']?.styles ?? [];
       if (Array.isArray(styles)) {
         return styles.join('\n');
       }
@@ -2705,16 +2686,14 @@ describe('SquadEditorModalComponent formation change updates header and markers'
       return css.replace(/\[[_]?ngcontent-[^\]]*\]/g, '');
     }
 
-    /** Extracts the body of the {@code .selector} rule from CSS chunk. */
+    // Extracts one CSS rule from a style chunk.
     function extractRule(css: string, selector: string): string {
       const re = new RegExp(`\\.${selector.replace(/\./g, '\\.')}\\s*\\{[^}]*\\}`);
       const m = css.match(re);
       return m ? m[0] : '';
     }
 
-    /* ----------------------------------------------------------------------- */
-    /* Grass texture */
-    /* ----------------------------------------------------------------------- */
+    // Grass texture.
 
     it('.field background uses repeating-linear-gradient (TV-broadcast stripes)', () => {
       const src = stripEncapsulation(stylesSource());
@@ -4160,3 +4139,4 @@ describe('SquadEditorModalComponent free positioning on field drop', () => {
     }, 30);
   });
 });
+
