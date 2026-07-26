@@ -39,6 +39,19 @@ interface PersistedInjuryAutoModal {
   preSelectedPlayerId: string;
 }
 
+interface InjuryAutoModalPayload {
+  matchId: string;
+  state: MatchState;
+  preSelectedPlayerId: string;
+}
+
+interface RivalCardModalPayload {
+  matchId: string;
+  state: MatchState;
+  playerName: string;
+  minute: number;
+}
+
 @Component({
   selector: 'app-round-live',
   standalone: true,
@@ -83,11 +96,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
    * multiple dialogs on top of each other.
    */
   private isAutoModalOpen = false;
-  private queuedAutoModals: Array<{
-    matchId: string;
-    state: MatchState;
-    preSelectedPlayerId: string;
-  }> = [];
+  private queuedAutoModals: InjuryAutoModalPayload[] = [];
   private activeInjuryAutoModal: PersistedInjuryAutoModal | null = null;
   private restoredPersistedInjuryAutoModals = false;
   private releaseQueuedAutoModalResumeHold: (() => void) | null = null;
@@ -128,12 +137,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
    * on the same tick (e.g. manager gets injury, rival gets sent off).
    */
   private isRivalCardModalOpen = false;
-  private queuedRivalCardModal: {
-    matchId: string;
-    state: MatchState;
-    playerName: string;
-    minute: number;
-  } | null = null;
+  private queuedRivalCardModal: RivalCardModalPayload | null = null;
 
   pendingLiveModalNotice: string | null = null;
 
@@ -864,12 +868,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
    * it if the previous awareness modal is still on screen. Replaces any
    * older queued entry.
    */
-  private queueOrOpenRivalCardModal(payload: {
-    matchId: string;
-    state: MatchState;
-    playerName: string;
-    minute: number;
-  }): void {
+  private queueOrOpenRivalCardModal(payload: RivalCardModalPayload): void {
     if (payload.state.status === 'RUNNING') {
       this.queuedRivalCardModal = payload;
       this.updatePendingLiveModalNotice();
@@ -889,12 +888,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
    * the dialog closes (whether dismissed or auto-closed) and drains the
    * queue. Does NOT pause/resume the round  -  the modal is informational.
    */
-  private openRivalCardInfoModal(payload: {
-    matchId: string;
-    state: MatchState;
-    playerName: string;
-    minute: number;
-  }): void {
+  private openRivalCardInfoModal(payload: RivalCardModalPayload): void {
     this.isRivalCardModalOpen = true;
     this.updatePendingLiveModalNotice();
     this.modals.openRivalCardInfoModal(
@@ -929,11 +923,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
    * one is still on screen. Replaces any older queued entry (the
    * most recent injury is the most important).
    */
-  private queueOrOpenAutoModal(payload: {
-    matchId: string;
-    state: MatchState;
-    preSelectedPlayerId: string;
-  }): void {
+  private queueOrOpenAutoModal(payload: InjuryAutoModalPayload): void {
     if (this.isAutoModalOpen || this.isCriticalLiveModalOpen) {
       this.enqueueAutoModal(payload);
       this.updatePendingLiveModalNotice();
@@ -942,11 +932,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
     this.openInjuryAutoModal(payload);
   }
 
-  private enqueueAutoModal(payload: {
-    matchId: string;
-    state: MatchState;
-    preSelectedPlayerId: string;
-  }): void {
+  private enqueueAutoModal(payload: InjuryAutoModalPayload): void {
     if ((this.isAutoModalOpen || this.isCriticalLiveModalOpen) && !this.releaseQueuedAutoModalResumeHold) {
       this.releaseQueuedAutoModalResumeHold = this.modals.holdRoundResumeAfterModalClose();
     }
@@ -967,11 +953,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
    * so the manager can replace the player, change formation and tune
    * pixels in one decision.
    */
-  private openInjuryAutoModal(payload: {
-    matchId: string;
-    state: MatchState;
-    preSelectedPlayerId: string;
-  }): void {
+  private openInjuryAutoModal(payload: InjuryAutoModalPayload): void {
     this.isAutoModalOpen = true;
     this.isCriticalLiveModalOpen = true;
     this.activeInjuryAutoModal = {
@@ -1443,7 +1425,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
       if (!state || state.status === 'FINISHED' || state.status === 'CANCELLED') {
         continue;
       }
-      if (this.wasPlayerSubstitutedOffInState(state, item.preSelectedPlayerId)) {
+      if (wasPlayerSubstitutedOffInState(state, item.preSelectedPlayerId)) {
         continue;
       }
       this.queueOrOpenAutoModal({
@@ -1458,10 +1440,6 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
   private injuryAutoModalStorageKey(): string {
     const vm = this.vmSubject.value;
     return `${this.injuryAutoModalStoragePrefix}:${vm.gameId}:${vm.roundNumber}`;
-  }
-
-  private wasPlayerSubstitutedOffInState(state: MatchState, playerId: string): boolean {
-    return wasPlayerSubstitutedOffInState(state, playerId);
   }
 
   /**
@@ -1500,11 +1478,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
    * first/manual modal. In that case the queued modal would be noise, so we
    * silently drop it. If the player still needs attention, the modal opens.
    */
-  private openQueuedInjuryAutoModalIfStillNeeded(payload: {
-    matchId: string;
-    state: MatchState;
-    preSelectedPlayerId: string;
-  }): void {
+  private openQueuedInjuryAutoModalIfStillNeeded(payload: InjuryAutoModalPayload): void {
     this.releaseQueuedAutoModalResumeHold?.();
     this.releaseQueuedAutoModalResumeHold = null;
     if (this.modals.wasPlayerConfirmedSubstitutedOff(payload.matchId, payload.preSelectedPlayerId)) {
