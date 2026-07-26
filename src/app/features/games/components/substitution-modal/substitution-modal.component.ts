@@ -285,9 +285,7 @@ interface RecommendedSubstitution {
       background: #ffebee;
       color: #b71c1c;
     }
-    /* #3: reason banner for INJURY_FORCED_SUBSTITUTION auto-opens.
-       Sits next to the minute tag in the modal title. Red theme to match
-       the chip-injury timeline color and signal urgency. */
+    /* Reason badge shown when the modal opens from an injury prompt. */
     .reason-badge {
       display: inline-block;
       margin-left: 0.5rem;
@@ -473,17 +471,7 @@ export class SubstitutionModalComponent {
   isSubmitting = false;
   private destroy$ = new Subject<void>();
 
-  /**
-   * #3: pre-select the OFF player when the modal opens via
-   * the INJURY auto-listener. Runs once in {@code ngOnInit}; we don't
-   * subscribe to data changes (the modal is created fresh per open).
-   *
-   * <p>If {@code preSelectedPlayerId} is not in {@code startingXi}
-   * (e.g. the injured player was already substituted off by an
-   * earlier prompt), the lookup is a silent no-op and the manager
-   * picks manually — we don't show an error to avoid a noisy UX
-   * edge case during busy seconds.
-   */
+  // Pre-select the outgoing player when the modal opens from an injury prompt.
   ngOnInit(): void {
     if (this.data.preSelectedPlayerId) {
       const target = this.data.startingXi.find(
@@ -994,13 +982,7 @@ export class SubstitutionModalComponent {
   /** trackBy for *ngFor on player lists. */
   trackByPlayer = (_idx: number, p: SubModalPlayer) => p.sessionPlayerId;
 
-  /**
-   * P0: effectiveness classification para chips SALE/ENTRA.
-   * Mismo threshold que squad-editor-modal (eff >= 0.9 good,
-   * 0.7-0.9 warning, <0.7 bad). Retorna null si el jugador no está en
-   * el effectivenessMap (bench sin data pre-match, o lineup legacy
-   * pre-sin formationEffectiveness).
-   */
+  // Effectiveness class used by SALE/ENTRA chips.
   getEffClass(sessionPlayerId: string): 'eff-good' | 'eff-warning' | 'eff-bad' | null {
     const v = this.data.effectivenessMap?.[sessionPlayerId];
     if (v == null) { return null; }
@@ -1009,27 +991,14 @@ export class SubstitutionModalComponent {
     return 'eff-bad';
   }
 
-  /**
-   * P0: retorna el porcentaje rounded (e.g. '95%') o null
-   * si no hay data para ese sessionPlayerId.
-   */
+  // Effectiveness percentage label for a player, when available.
   getEffBadge(sessionPlayerId: string): string | null {
     const v = this.data.effectivenessMap?.[sessionPlayerId];
     if (v == null) { return null; }
     return `${Math.round(v * 100)}%`;
   }
 
-  /**
-   * : visual pitch layout — group starting Xi by position category.
-   * GK first row (always 1), then DEF, MID, WINGER, ATT. Each line has
-   * the players in slot order. Players with an unknown position fall
-   * into the MID bucket as a defensive default.
-   *
-   * <p>This forms a 4-5 row pitch where each row is one click-only lane.
-   * The categorization handles the full position vocabulary the front
-   * consumes (GK / GK-aliases; DEF including CB/LB/RB; MID including
-   * CM/CDM/CAM/LM/RM; WINGER for LW/RW/LWB/RWB; ATT including ST/CF/FW).
-   */
+  // Visual pitch rows grouped by position category.
   get pitchLines(): PitchLine[] {
     return this.buildPitchLines(this.effectiveStartingXi);
   }
@@ -1266,12 +1235,7 @@ export class SubstitutionModalComponent {
     return `is-${lineCategory.toLowerCase()}`;
   }
 
-  /**
-   * : lookup helper — read the per-player stats entry by playerId.
-   * Returns null when {@code data.playerRatings} is missing (no chips on
-   * the dot) or when the player has no rating entry. The chips rendering
-   * in the template uses this to decide whether to show the chip strip.
-   */
+  // Per-player live rating entry, when available.
   getRating(playerId: string): V24LivePlayerRating | null {
     if (!this.data.playerRatings) { return null; }
     for (const r of this.data.playerRatings) {
