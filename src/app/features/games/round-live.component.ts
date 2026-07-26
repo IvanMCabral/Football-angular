@@ -20,9 +20,13 @@ import {
   getRoundEventIcon,
   getRoundStatusText,
   isTerminalRoundState,
+  isLocalDebugHost,
   mapRoundFixtureStatus,
   normalizeTerminalLiveState,
-  wasPlayerSubstitutedOffInState
+  readStorageFlag,
+  ROUND_LIVE_DEBUG_STORAGE_KEYS,
+  wasPlayerSubstitutedOffInState,
+  writeStorageFlag
 } from './utils/round-live-utils';
 
 declare global {
@@ -109,12 +113,9 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
    */
   private isCriticalLiveModalOpen = false;
 
-  private readonly debugFreezeStorageKey = 'manager.deFreezeLiveRound';
-  private readonly debugSuppressAutoInjuryStorageKey = 'manager.debugSuppressAutoInjuryModals';
-  private readonly debugControlsStorageKey = 'manager.showRoundLiveDeControls';
   private readonly injuryAutoModalStoragePrefix = 'manager.pendingInjuryAutoModals.v1';
   readonly isLocalDebugHost = typeof window !== 'undefined'
-    && ['localhost', '127.0.0.1'].includes(window.location.hostname);
+    && isLocalDebugHost(window.location.hostname);
   readonly showDebugControls = this.readDebugControlsFlag();
   debugFreezeEnabled = this.showDebugControls && this.readDebugFreezeFlag();
   debugSuppressAutoInjuryModals = this.showDebugControls && this.readDebugSuppressAutoInjuryFlag();
@@ -1010,11 +1011,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
 
   toggleDebugFreeze(): void {
     this.debugFreezeEnabled = !this.debugFreezeEnabled;
-    try {
-      localStorage.setItem(this.debugFreezeStorageKey, this.debugFreezeEnabled ? '1' : '0');
-    } catch {
-      // Non-fatal: the in-memory flag still works for this session.
-    }
+    writeStorageFlag(this.localStorageRef(), ROUND_LIVE_DEBUG_STORAGE_KEYS.freeze, this.debugFreezeEnabled);
 
     if (this.debugFreezeEnabled) {
       const vm = this.vmSubject.value;
@@ -1033,14 +1030,11 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
 
   toggleDebugSuppressAutoInjuryModals(): void {
     this.debugSuppressAutoInjuryModals = !this.debugSuppressAutoInjuryModals;
-    try {
-      localStorage.setItem(
-        this.debugSuppressAutoInjuryStorageKey,
-        this.debugSuppressAutoInjuryModals ? '1' : '0'
-      );
-    } catch {
-      // Non-fatal: the in-memory flag still works for this session.
-    }
+    writeStorageFlag(
+      this.localStorageRef(),
+      ROUND_LIVE_DEBUG_STORAGE_KEYS.suppressAutoInjury,
+      this.debugSuppressAutoInjuryModals
+    );
 
     if (this.debugSuppressAutoInjuryModals) {
       this.queuedAutoModals = [];
@@ -1049,27 +1043,20 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
   }
 
   private readDebugFreezeFlag(): boolean {
-    try {
-      return localStorage.getItem(this.debugFreezeStorageKey) === '1';
-    } catch {
-      return false;
-    }
+    return readStorageFlag(this.localStorageRef(), ROUND_LIVE_DEBUG_STORAGE_KEYS.freeze);
   }
 
   private readDebugSuppressAutoInjuryFlag(): boolean {
-    try {
-      return localStorage.getItem(this.debugSuppressAutoInjuryStorageKey) === '1';
-    } catch {
-      return false;
-    }
+    return readStorageFlag(this.localStorageRef(), ROUND_LIVE_DEBUG_STORAGE_KEYS.suppressAutoInjury);
   }
 
   private readDebugControlsFlag(): boolean {
-    try {
-      return this.isLocalDebugHost && localStorage.getItem(this.debugControlsStorageKey) === '1';
-    } catch {
-      return false;
-    }
+    return this.isLocalDebugHost &&
+      readStorageFlag(this.localStorageRef(), ROUND_LIVE_DEBUG_STORAGE_KEYS.controls);
+  }
+
+  private localStorageRef(): Storage | undefined {
+    return typeof localStorage === 'undefined' ? undefined : localStorage;
   }
 
   private applyDeFreezeIfNeeded(vm: RoundLiveViewModel, force = false): void {

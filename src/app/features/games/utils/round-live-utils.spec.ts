@@ -6,10 +6,14 @@ import {
   getLastRoundEvents,
   getRoundEventIcon,
   getRoundStatusText,
+  isLocalDebugHost,
   isTerminalRoundState,
   mapRoundFixtureStatus,
   normalizeTerminalLiveState,
-  wasPlayerSubstitutedOffInState
+  readStorageFlag,
+  ROUND_LIVE_DEBUG_STORAGE_KEYS,
+  wasPlayerSubstitutedOffInState,
+  writeStorageFlag
 } from './round-live-utils';
 import { RoundMatchVM } from '../models/round-live.model';
 import { MatchState } from '../../../core/services/match-engine.model';
@@ -261,6 +265,29 @@ describe('round-live-utils', () => {
 
     expect(candidate).toBeNull();
   });
+
+  it('identifies local debug hosts', () => {
+    expect(isLocalDebugHost('localhost')).toBeTrue();
+    expect(isLocalDebugHost('127.0.0.1')).toBeTrue();
+    expect(isLocalDebugHost('example.com')).toBeFalse();
+    expect(ROUND_LIVE_DEBUG_STORAGE_KEYS.freeze).toBe('manager.deFreezeLiveRound');
+    expect(readStorageFlag(memoryStorage({ test: '1' }), 'test')).toBeTrue();
+    expect(readStorageFlag(memoryStorage({ test: '0' }), 'test')).toBeFalse();
+    expect(readStorageFlag(undefined, 'test')).toBeFalse();
+  });
+
+  it('writes local storage flags without leaking storage exceptions', () => {
+    const storage = memoryStorage({});
+
+    writeStorageFlag(storage, 'feature', true);
+    expect(storage.getItem('feature')).toBe('1');
+
+    writeStorageFlag(storage, 'feature', false);
+    expect(storage.getItem('feature')).toBe('0');
+
+    expect(() => writeStorageFlag(throwingStorage(), 'feature', true)).not.toThrow();
+    expect(readStorageFlag(throwingStorage(), 'feature')).toBeFalse();
+  });
 });
 
 function roundMatch(id: string, isUserMatch: boolean, status: LiveStatus): RoundMatchVM {
@@ -306,4 +333,31 @@ function matchState(overrides: Partial<MatchState>): MatchState {
     events: [],
     ...overrides
   } as MatchState;
+}
+
+function memoryStorage(initial: Record<string, string>): Storage {
+  const values = new Map(Object.entries(initial));
+  return {
+    get length() {
+      return values.size;
+    },
+    clear: () => values.clear(),
+    getItem: (key: string) => values.get(key) ?? null,
+    key: (index: number) => Array.from(values.keys())[index] ?? null,
+    removeItem: (key: string) => values.delete(key),
+    setItem: (key: string, value: string) => values.set(key, value)
+  } as Storage;
+}
+
+function throwingStorage(): Storage {
+  return {
+    get length() {
+      throw new Error('blocked');
+    },
+    clear: () => { throw new Error('blocked'); },
+    getItem: () => { throw new Error('blocked'); },
+    key: () => { throw new Error('blocked'); },
+    removeItem: () => { throw new Error('blocked'); },
+    setItem: () => { throw new Error('blocked'); }
+  } as unknown as Storage;
 }

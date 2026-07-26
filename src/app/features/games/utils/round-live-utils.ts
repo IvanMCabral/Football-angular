@@ -19,6 +19,12 @@ export interface RivalCardModalCandidate {
   minute: number;
 }
 
+export const ROUND_LIVE_DEBUG_STORAGE_KEYS = {
+  freeze: 'manager.deFreezeLiveRound',
+  suppressAutoInjury: 'manager.debugSuppressAutoInjuryModals',
+  controls: 'manager.showRoundLiveDeControls'
+} as const;
+
 const STATUS_LABELS: Record<string, string> = {
   NOT_STARTED: 'Por Iniciar',
   RUNNING: 'En Juego',
@@ -203,4 +209,24 @@ export function findRivalRedCardModalCandidate(input: {
   }
 
   return null;
+}
+
+export function isLocalDebugHost(hostname: string | undefined): boolean {
+  return hostname === 'localhost' || hostname === '127.0.0.1';
+}
+
+export function readStorageFlag(storage: Storage | undefined, key: string): boolean {
+  try {
+    return storage?.getItem(key) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function writeStorageFlag(storage: Storage | undefined, key: string, enabled: boolean): void {
+  try {
+    storage?.setItem(key, enabled ? '1' : '0');
+  } catch {
+    // Non-fatal: callers keep their in-memory state.
+  }
 }
