@@ -1581,25 +1581,19 @@ describe('SquadEditorModalComponent — V25D58 (C18) field responsive sizing', (
 });
 
 /**
- * V25D64 (Sprint C24): eff-good border verde distintivo (#10b981 emerald-500)
- * para simetria visual con eff-warning (amber) y eff-bad (red). Cubre chips
- * de /squad squad-editor-modal. El color real se valida en smoke REVISOR;
- * aca validamos que el class eff-good sigue bindeando en el DOM (consistency
- * check con los tests V25D51 existentes).
+ * Marker effectiveness: players with strong tactical fit get the green visual
+ * state, while weaker fits remain yellow/red.
  */
-describe('SquadEditorModalComponent — V25D64 (C24) eff-good green border', () => {
+describe('SquadEditorModalComponent green marker effectiveness', () => {
   let component: SquadEditorModalComponent;
   let fixture: ComponentFixture<SquadEditorModalComponent>;
   let httpClientSpy: jasmine.SpyObj<HttpClient>;
   let dialogRefSpy: jasmine.SpyObj<MatDialogRef<SquadEditorModalComponent>>;
 
-  // Mismo setup que describe V25D51: 5 slots con perPlayerEffectiveness
-  //   GK-1=1.0  → eff-good  (>= 0.9)
-  //   S22-1=0.95 → eff-good (>= 0.9)
-  //   S13-2=0.7 → eff-warning (0.7-0.9)
-  //   S05-2=0.5 → eff-bad   (< 0.7)
-  //   S05-3=1.0 → eff-good  (>= 0.9)
-  // → 3 chips eff-good, 1 eff-warning, 1 eff-bad.
+  // Five slots with deterministic perPlayerEffectiveness:
+  //   GK-1=1.0, S22-1=0.95 and S05-3=1.0 -> green
+  //   S13-2=0.7 -> yellow
+  //   S05-2=0.5 -> red
   const SUBDIVISIONS_RESPONSE = [
     { subdivisionId: 'GK-1',  isGoalkeeper: true,  sector: 26, subIndex: 1, left: 35, top: 88, width: 30, height: 10, zone: 'GK' },
     { subdivisionId: 'S22-1', isGoalkeeper: false, sector: 22, subIndex: 1, left: 10, top: 70, width: 25, height: 12, zone: 'DEFENSE' },
@@ -1680,10 +1674,8 @@ describe('SquadEditorModalComponent — V25D64 (C24) eff-good green border', () 
     fixture.detectChanges();
   });
 
-  // V25D64 C24 P0 + V25D99.4: el marker con eff >= 0.9 debe tener eff-green
-  // (era eff-good en el chip antes de V25D99.4). El glow verde via drop-shadow
-  // (#10b981) se valida visualmente con REVISOR smoke (no se puede medir
-  // color en Karma/jsdom sin Playwright e2e).
+  // The marker with eff >= 0.9 must get eff-green. This spec checks the
+  // semantic class; browser smoke tests cover the actual glow rendering.
   it('CSS class eff-green applies to markers with eff >= 0.9 (green glow visual symmetry check)', (done) => {
     setTimeout(() => {
       fixture.detectChanges();
