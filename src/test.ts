@@ -1,7 +1,4 @@
-// LIVE-MATCH-F3-UI-LIVE F3.4: Karma test entry point.
-// Angular 21 uses `@angular/platform-browser/testing` (not the
-// legacy `@angular/platform-browser-dynamic/testing`) for the
-// standalone-components testing platform.
+// Karma test entry point for the standalone Angular test platform.
 import 'zone.js';
 import 'zone.js/testing';
 import { getTestBed } from '@angular/core/testing';

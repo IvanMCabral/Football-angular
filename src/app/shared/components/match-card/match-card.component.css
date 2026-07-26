@@ -167,10 +167,7 @@
   color: #667eea;
 }
 
-/* ============================================================
- * LIVE-MATCH-F3-UI-LIVE FE6: possession bar + sub/formation
- * quick actions for the user-match card.
- * ============================================================ */
+/* Possession bar and quick actions for the user-match card. */
 .possession-block {
   margin: 0.5rem 0;
 }

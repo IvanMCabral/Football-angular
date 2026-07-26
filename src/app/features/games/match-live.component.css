@@ -252,9 +252,7 @@ h2 {
   border-radius: 12px;
 }
 
-/* LIVE-MATCH-F5.4: when the .tactics block contains only the manager's
-   home team (no AWAY counterpart), collapse to a single column so the 5
-   buttons share the full width instead of squashing into half. */
+/* Single-team tactics use the full width instead of a cramped two-column grid. */
 .tactics:has(.tactic-control-single) {
   grid-template-columns: 1fr;
 }
@@ -271,8 +269,7 @@ h2 {
   gap: 0.4rem;
 }
 
-/* LIVE-MATCH-F5.4: 5 buttons in a single row — allow wrap on small viewports
-   so they never overflow horizontally. */
+/* Tactic buttons wrap on small viewports instead of overflowing. */
 .tactic-control-single .tactic-buttons {
   flex-direction: row;
   flex-wrap: wrap;
@@ -298,9 +295,7 @@ h2 {
 .btn-tactic:hover { border-color: #667eea; background: #f0f4ff; }
 .btn-tactic.active { border-color: #667eea; background: #667eea; color: white; font-weight: 600; }
 
-/* LIVE-MATCH-F5.4: when a button is disabled (the current style is already
-   active), reduce opacity and switch the cursor to default so the user
-   understands no action will happen on click. */
+/* The active tactic is visible but no longer feels clickable. */
 .btn-tactic:disabled {
   opacity: 0.7;
   cursor: default;

@@ -1,5 +1,5 @@
 {
-  "name": "angular-starter",
+  "name": "football-manager-ui",
   "private": true,
   "scripts": {
     "ng": "ng",
