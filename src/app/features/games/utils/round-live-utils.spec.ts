@@ -3,6 +3,7 @@ import {
   buildPendingRoundStartMatches,
   buildPendingLiveModalNotice,
   canOpenCriticalLiveModal,
+  areRoundMatchesFinished,
   findInjuryAutoModalCandidates,
   findRestorableInjuryAutoModals,
   findRivalRedCardModalCandidate,
@@ -11,6 +12,7 @@ import {
   getRoundEventIcon,
   getRoundStatusText,
   getRoundTeamName,
+  hasRoundMatchStarted,
   hasCompleteTacticalSlotSnapshot,
   isLocalDebugHost,
   isTerminalRoundState,
@@ -85,6 +87,42 @@ describe('round-live-utils', () => {
     expect(isTerminalRoundState('CANCELLED')).toBeTrue();
     expect(isTerminalRoundState('RUNNING')).toBeFalse();
     expect(isTerminalRoundState(undefined)).toBeFalse();
+  });
+
+  it('identifies live statuses that mean the round has started', () => {
+    expect(hasRoundMatchStarted('NOT_STARTED')).toBeFalse();
+    expect(hasRoundMatchStarted(undefined)).toBeFalse();
+    expect(hasRoundMatchStarted('RUNNING')).toBeTrue();
+    expect(hasRoundMatchStarted('HALF_TIME')).toBeTrue();
+    expect(hasRoundMatchStarted('PAUSED')).toBeTrue();
+    expect(hasRoundMatchStarted('FINISHED')).toBeTrue();
+    expect(hasRoundMatchStarted('CANCELLED')).toBeTrue();
+  });
+
+  it('detects when all round matches are finished or the backend marks the round completed', () => {
+    expect(areRoundMatchesFinished({
+      matches: [
+        roundMatch('one', false, 'FINISHED'),
+        roundMatch('two', false, 'CANCELLED')
+      ],
+      roundStatus: 'RUNNING'
+    })).toBeTrue();
+
+    expect(areRoundMatchesFinished({
+      matches: [
+        roundMatch('one', false, 'RUNNING'),
+        roundMatch('two', false, 'FINISHED')
+      ],
+      roundStatus: 'RUNNING'
+    })).toBeFalse();
+
+    expect(areRoundMatchesFinished({
+      matches: [
+        roundMatch('one', false, 'RUNNING'),
+        roundMatch('two', false, 'FINISHED')
+      ],
+      roundStatus: 'COMPLETED'
+    })).toBeTrue();
   });
 
   it('prefers the manager match as round-control anchor when available', () => {

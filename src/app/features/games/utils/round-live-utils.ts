@@ -96,6 +96,25 @@ export function isTerminalRoundState(status: string | undefined): boolean {
   return status === 'FINISHED' || status === 'CANCELLED';
 }
 
+export function hasRoundMatchStarted(status: string | undefined): boolean {
+  return status === 'RUNNING'
+    || status === 'HALF_TIME'
+    || status === 'PAUSED'
+    || status === 'FINISHED'
+    || status === 'CANCELLED';
+}
+
+export function areRoundMatchesFinished(input: {
+  matches: RoundMatchVM[];
+  roundStatus: string | undefined;
+}): boolean {
+  return input.matches.every(match =>
+    match.state?.status === 'FINISHED'
+    || match.state?.status === 'CANCELLED'
+    || input.roundStatus === 'COMPLETED'
+  );
+}
+
 export function findRoundControlAnchorMatch(vm: { matches: RoundMatchVM[] }): RoundMatchVM | null {
   return vm.matches.find(match => match.isUserMatch && !isTerminalRoundState(match.state?.status))
     ?? vm.matches.find(match => !isTerminalRoundState(match.state?.status))

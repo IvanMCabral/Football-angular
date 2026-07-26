@@ -16,6 +16,7 @@ import {
   buildPendingRoundStartMatches,
   buildPendingLiveModalNotice,
   canOpenCriticalLiveModal,
+  areRoundMatchesFinished,
   findInjuryAutoModalCandidates,
   findRestorableInjuryAutoModals,
   findRivalRedCardModalCandidate,
@@ -24,6 +25,7 @@ import {
   getRoundEventIcon,
   getRoundStatusText,
   getRoundTeamName,
+  hasRoundMatchStarted,
   isTerminalRoundState,
   isLocalDebugHost,
   mapRoundFixtureStatus,
@@ -529,24 +531,9 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
         const newVm = {
           ...currentVm,
           matches: updatedMatches,
-          allFinished: updatedMatches.every(m =>
-            m.state?.status === 'FINISHED' ||
-            m.state?.status === 'CANCELLED' ||
-            roundState.status === 'COMPLETED'
-          ),
+          allFinished: areRoundMatchesFinished({ matches: updatedMatches, roundStatus: roundState.status }),
           isRoundPaused: updatedMatches.some(m => m.state?.status === 'PAUSED'),
-          // UX fix: true if at least one match has
-          // transitioned past NOT_STARTED. Drives the "Iniciar Todos"
-          // button visibility (button hides once the round has started
-          // ticking). Note: MatchState.status uses 'RUNNING' (not
-          // 'IN_PROGRESS'  -  that's the RoundState.status value).
-          anyStarted: updatedMatches.some(m =>
-            m.state?.status === 'RUNNING' ||
-            m.state?.status === 'HALF_TIME' ||
-            m.state?.status === 'PAUSED' ||
-            m.state?.status === 'FINISHED' ||
-            m.state?.status === 'CANCELLED'
-          )
+          anyStarted: updatedMatches.some(m => hasRoundMatchStarted(m.state?.status))
         };
 
         this.updateVm(newVm);
