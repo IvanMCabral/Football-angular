@@ -61,19 +61,14 @@ export interface FormationDialogData {
 const FORMATIONS = ALL_FORMATIONS;
 
 /**
- * P3.2: per-formation role labels por dot.
+ * Tactical slot labels used by the in-match formation editor.
  *
- * Cada entrada es un array de líneas (GK al TOP del display, ATT al
- * BOTTOM). Cada línea es un array de role labels (en orden left-to-right)
- * matching las posiciones del slot en la formación correspondiente.
- *
- * Source of truth: `FormationService.buildFormations()` en el back.
- * Los role labels match los golden masters de
- * `FormationServiceTest.goldenRolesForOriginal7Formations` y
- * `goldenRolesForNew5Formations`.
+ * Each entry is rendered from goalkeeper to attack, left to right inside
+ * every tactical line, and must stay aligned with the backend formation
+ * definitions.
  */
 const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
-  // ========== 7 formations originales () ==========
+  // Standard formations
   '4-4-2': [
     ['GK'],
     ['LB', 'CB', 'CB', 'RB'],
@@ -798,13 +793,8 @@ export class FormationModalComponent {
         }
         this.errorMsg = '';
       },
-      error: (err) => {
-        // Surface the failure so the manager doesn't think the change
-        // committed. The local slotAssignments re-flow is still
-        // applied (UI-only), but the chem readout will be wrong
-        // until the next /career/lineup/current refresh from the
-        // squad page.
-        console.error('[FORMATION-MODAL] auto-select failed on formation change:', err);
+      error: () => {
+        // Keep the manager informed if the visual change could not be saved.
         this.errorMsg = 'No se pudo actualizar la formación en el backend. Chem puede estar desactualizado.';
       }
     });
@@ -1243,10 +1233,9 @@ export class FormationModalComponent {
             this.errorMsg = result.error || 'Cambio de formación rechazado por el servidor';
           }
         },
-        error: (err) => {
+        error: () => {
           this.isSubmitting = false;
           this.errorMsg = 'Error de red al intentar cambiar la formación';
-          console.error('[FORMATION-MODAL] error', JSON.stringify(err?.error ?? err));
         }
       });
   }
