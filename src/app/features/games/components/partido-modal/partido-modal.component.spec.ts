@@ -1,26 +1,5 @@
-/**
- * Unit tests for {@link PartidoModalComponent}.
- *
- * <p>Scope:
- * <ul>
- *   <li>Tab state: default = 'mine', click handler flips to 'rival'.</li>
- *   <li>Tab 1 (Mi Formaci?n) renders the formation select + pitch dots.</li>
- *   <li>Tab 2 (Formaci?n Rival) renders the rival banner + pitch dots,
- *       all dots have pointer-events disabled (no drag).</li>
- *   <li>Footer: "Descartar" enabled; "Guardar" disabled when no pending
- *       changes; enabled when formation string OR slots change.</li>
- *   <li>Save flow: POSTs to engineService.changeFormation, closes dialog
- *       with success payload on 200, surfaces error banner on failure.</li>
- *   <li>Discard flow: closes dialog with success=false reason=discarded,
- *       no API call.</li>
- *   <li>Inlined styles expose `.rival-pitch` + `.banner-info-ai` to
- *       ɵcmp.styles for the responsive + visual-pitch assertions.</li>
- * </ul>
- *
- * <p>Per angular-testing-patterns memory: this codebase uses the
- * `(done: DoneFn) => { ... fixture.whenStable().then(() => { ... done(); }); }`
- * pattern instead of fakeAsync (no ProxyZone setup).
- */
+// Unit tests for the live DT partido modal.
+// Covers tab navigation, tactical edits, substitutions, stats and save/discard flows.
 
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { CommonModule } from '@angular/common';
@@ -1123,23 +1102,15 @@ describe('PartidoModalComponent', () => {
 
   // ========== Pitch readability ==========
 
-  // ========== Role label always visible below player name ==========
+  // ========== Role labels ==========
 
-  it('F1: every filled player-dot renders BOTH the player name AND a .dot-role label (not just empty slots)', () => {
-    // the role label was previously only rendered inside
-    // the #emptyDot branch. Now it lives INSIDE the player branch too
-    // (rendered via getDotLabel(...) which returns "GK", "CB", "ST", etc.).
-    // Every filled dot should therefore contain 2 spans:
-    //   <span class="dot-player-name">Player Name</span>
-    //   <span class="dot-role">GK</span>
-    // Every empty dot should contain exactly 1 span:
-    //   <span class="dot-label">CM</span> (previous empty-slot markup)
+  it('every filled player-dot renders both player name and role label', () => {
+    // Filled dots show both player name and role; empty dots keep the role label only.
     const filledDots = Array.from(
       fixture.nativeElement.querySelectorAll('.player-dot:not(.is-empty)')
     );
     expect(filledDots.length).toBe(11);  // 4-4-2 = 11 starters
-    // Role vocabulary covers the FULL 4-4-2 grid (GK + 4 DEF including
-    // LB/RB + 4 MID including LM/RM + 2 ST) — same vocabulary as
+    // Role vocabulary covers the full 4-4-2 grid.
     // FORMATION_LINES_BY_FORMATION['4-4-2'] in partido-modal.component.ts.
     const expectedRoles = new Set(['GK', 'CB', 'LB', 'RB', 'CM', 'LM', 'RM', 'ST']);
     filledDots.forEach((dot: any) => {
@@ -1155,7 +1126,7 @@ describe('PartidoModalComponent', () => {
     });
   });
 
-  it('F1: empty player-dots still show only the .dot-label (no player name)', () => {
+  it('empty player-dots still show only the dot label', () => {
     // To exercise the empty branch, skip slot 0 (GK) in the currentSlots
     // array so no player is assigned to that slot — the constructor
     // initializes slotAssignments from currentSlots, so slot 0 stays null
@@ -1192,7 +1163,7 @@ describe('PartidoModalComponent', () => {
     const slot0HasName = !!slot0.querySelector('.dot-player-name');
     const slot0HasRole = !!slot0.querySelector('.dot-role');
     const slot0HasLabel = !!slot0.querySelector('.dot-label');
-    // F1: empty slots still show ONLY the .dot-label (no name, no .dot-role).
+    // Empty slots show only the role label.
     // .dot-role is reserved for FILLED slots (it pairs with the player name).
     expect(slot0HasName).withContext('empty slot must NOT have .dot-player-name').toBeFalse();
     expect(slot0HasRole).withContext('empty slot must NOT have .dot-role').toBeFalse();
