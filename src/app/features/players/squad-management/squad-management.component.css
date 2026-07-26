@@ -141,19 +141,7 @@
 }
 
 /* Players Grid */
-/* V25D92.6-FRONT F2: bumped minmax(260px → 140px, 1fr). Pre-V25D92.6 the
-   260px minimum caused cards (Andriy Lunin, Vinicius Junior, etc.) to
-   overflow horizontally at 1600vw+ viewports — the 260px min forced each
-   card to expand to its content's min-content size when the .container
-   was wider than 260*N cards, and at narrow viewports the 260px min
-   locked the grid into 4-5 columns even when 6-7 would fit comfortably.
-
-   With minmax(140px, 1fr) the grid fills the container more evenly:
-     - 1280vw container (1190px content): 1190/140 = 8.5 → 8 cards per row
-     - 1600vw container (1310px content): 1310/140 = 9.36 → 9 cards per row
-   auto-fill (no auto-fit) preserva los tracks vacíos cuando hay menos
-   cards que tracks posibles, asi que el grid no se estira para llenar
-   huecos. Cards now respeta viewport width sin overflow horizontal. */
+/* Compact cards that fill wide and narrow viewports without horizontal overflow. */
 .players-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
@@ -212,7 +200,7 @@
   cursor: not-allowed;
 }
 
-/* MVP1-lineup-cancha-1: botón para abrir el modal con cancha visual. */
+/* Button to open the visual formation editor. */
 .btn-visual-editor {
   padding: 0.5rem 1rem;
   background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
@@ -251,7 +239,7 @@
   cursor: pointer;
 }
 
-/* V24D6U3: Lineup warning banner (LINEUP_SHORT_HANDED, LINEUP_NO_GOALKEEPER) */
+/* Lineup warning banner. */
 .lineup-warning-banner {
   display: flex;
   align-items: center;
@@ -316,10 +304,7 @@
   gap: 0.5rem;
 }
 
-/* V25D42 (Sprint C7): team chemistry badge.
-   Color coding thresholds: >=80 verde (elite), 60-79 amarillo (regular), <60 rojo (bajo).
-   Razon thresholds: lineups elite sin skills inyectadas dan ~80 (base = AVG de overalls).
-   Inyectar skills puede subir hasta ~95 (max lineup). <60 indica lineup corto / muchos null stats. */
+/* Team chemistry badge with high, mid and low states. */
 .chemistry-badge {
   display: inline-flex;
   align-items: center;
@@ -352,9 +337,7 @@
   border-color: #c53030;
 }
 
-/* V25D43 (Sprint C8): chemistry breakdown section.
-   Container under the chemistry badge, shows per-position-group skill chips
-   with color coding (parallels the badge: verde / amarillo / rojo). */
+/* Chemistry breakdown by position group. */
 .chemistry-breakdown {
   margin-bottom: 1rem;
   padding: 0.75rem 1rem;
@@ -423,8 +406,7 @@
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-/* V25D44 (Sprint C9): chip currently associated with the open contributor
-   popover. Stronger outline so the user can see which chip is selected. */
+/* Selected chip associated with the open contributor popover. */
 .skill-chip.chip-selected {
   outline: 2px solid #4299e1;
   outline-offset: 1px;
@@ -448,10 +430,7 @@
   border-color: #c53030;
 }
 
-/* V25D99.19-FRONT (BUG-1 fix): inline hint shown when a positionGroup
-   has no SkillCoverage entries (e.g. short-handed lineup without
-   matching skills in that category). Italic + muted color so it reads
-   as placeholder content, not data. */
+/* Inline hint shown when a position group has no skill coverage entries. */
 .group-empty {
   font-style: italic;
   color: #a0aec0;
@@ -459,9 +438,7 @@
   margin-left: 0.25rem;
 }
 
-/* V25D44 (Sprint C9): contributor popover. Inline below the chip rows, shows
-   the contributor of the currently-selected chip. Closes via X button or
-   click-outside (HostListener('document:click')). */
+/* Contributor popover for the currently selected skill chip. */
 .contributor-popover {
   display: flex;
   align-items: center;
@@ -690,8 +667,7 @@
   opacity: 0.8;
 }
 
-/* V24D6T2 (bug #6): dedicated short-handed warning banner on the Plantilla
-   header. Distinct from the .lineup-warning-banner in the lineup section. */
+/* Short-handed warning banner in the squad header. */
 .squad-short-handed-banner {
   display: flex;
   align-items: center;
@@ -750,7 +726,7 @@
   background: #fff;
 }
 
-/* V24D11 UX-3: sticky CTA bar al fondo de la viewport */
+/* Sticky CTA bar at the bottom of the viewport. */
 .sticky-confirm-bar {
   position: sticky;
   bottom: 0;
@@ -771,7 +747,7 @@
   font-weight: 500;
 }
 
-/* V24D11 UX-3: mini-CTA en el header del squad */
+/* Mini CTA in the squad header. */
 .lineup-mini-cta {
   background: #ebf8ff;
   border: 1px solid #bee3f8;
@@ -782,18 +758,14 @@
   color: #2c5282;
 }
 
-/* V25D59-C19 P1: visual cue cuando lineupSlotsCount < 11. El back
-   ahora garantiza 11 en auto-select (C19 P0) — esta clase sólo dispara
-   para lineups manuales/legacy incompletos. Amarillo para diferenciar
-   del verde de "completo" sin alarmar como el rojo del short-handed. */
+/* Visual cue for incomplete manual or legacy lineups. */
 .lineup-mini-cta.lineup-incomplete {
   background: #fffaf0;
   border-color: #fbd38d;
   color: #7b341e;
 }
 
-/* V25D59-C19 P1: visual cue cuando lineupSlotsCount === 11. Verde
-   discreto para confirmar visualmente que el lineup está completo. */
+/* Visual cue for a complete lineup. */
 .lineup-mini-cta.lineup-complete {
   background: #f0fff4;
   border-color: #9ae6b4;
@@ -818,7 +790,7 @@
   color: #1a365d;
 }
 
-/* V24D11 UX-4: link inline en el banner short-handed */
+/* Inline link in the short-handed banner. */
 .banner-link {
   color: #2b6cb0;
   text-decoration: underline;
@@ -830,11 +802,7 @@
   color: #1a365d;
 }
 
-/* V25D83.1 sprint 2 ajuste (pre-push): full-screen spinner overlay
-   durante squad (re-)load. Cubre la grid con un backdrop semi-transparente
-   y un spinner centrado. Visible en initial mount del componente y
-   después de cualquier refetch disparado por refetchSquadTrigger$
-   (lineup-confirm, squad-editor close, continue-to-new-season). */
+/* Full-screen loading overlay while the squad is loading or refreshing. */
 .squad-loading-overlay {
   position: fixed;
   top: 0;

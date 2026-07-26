@@ -1,7 +1,4 @@
-// V24D24: Tests for MatchDetailApiService — both getMatchDetail and the
-// new getMatchTimeline methods. Pattern mirrors
-// match-compare-api.service.spec.ts: spy on HttpClient, verify request
-// shape, return mapping.
+// Tests for MatchDetailApiService detail and timeline endpoints.
 
 import { HttpClient, HttpErrorResponse, HttpParams, HttpResponse } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
@@ -58,7 +55,7 @@ describe('MatchDetailApiService', () => {
     });
   });
 
-  describe('getMatchTimeline (V24D24)', () => {
+  describe('getMatchTimeline', () => {
     it('returns the snapshot body on 200 and forwards the minute param', (done) => {
       const snap: TimelineSnapshot = {
         minute: 45,

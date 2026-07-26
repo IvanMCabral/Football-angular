@@ -1,11 +1,4 @@
-// V24D24: Tests for V24MatchDetailPageComponent — covers the new
-// @Input('inputCareerId') / @Input('inputMatchId') path added in F2.0
-// so the page can be reused inside TestHarnessPageComponent without
-// requiring a route-based context.
-//
-// Existing route-based usage is preserved as the fallback (when inputs
-// are NOT provided) and is exercised by the live integration smoke in
-// /careers/:careerId/matches/:matchId/detail.
+// Tests for the input-driven path used when this page is embedded in the harness.
 
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, provideRouter } from '@angular/router';
@@ -19,7 +12,7 @@ import { V24MatchDetailPageComponent } from './v24-match-detail-page.component';
 import { MatchDetailApiService } from '../services/match-detail-api.service';
 import { MatchDetail } from '../models/match-detail.model';
 
-describe('V24MatchDetailPageComponent — V24D24 @Input path', () => {
+describe('V24MatchDetailPageComponent input path', () => {
   let component: V24MatchDetailPageComponent;
   let fixture: ComponentFixture<V24MatchDetailPageComponent>;
   let api: MatchDetailApiService;

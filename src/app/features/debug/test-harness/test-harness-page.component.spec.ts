@@ -1,8 +1,8 @@
-﻿// V24D24: Tests for TestHarnessPageComponent.
+﻿// Tests for TestHarnessPageComponent.
 //
 // These tests focus on the state-management contract (signals, handlers).
 // The full template rendering (Material modules, V24MatchDetailPageComponent
-// re-mount, etc.) is exercised by REVISOR's manual smoke — Angular Material
+// re-mount, etc.) is exercised by the visual smoke tests because Angular Material
 // component specs would need NoopAnimations + providers for every nested
 // component, which is high-cost relative to value for a debug-only page.
 
@@ -1105,7 +1105,7 @@ describe('TestHarnessPageComponent', () => {
     expect(component.loading()).toBeFalse();
   });
 
-  // ============== V24D24 F3: Panel D timeline scrubber ==============
+  // Timeline scrubber.
 
   it('starts with selectedMinute at 0 and no snapshot loaded', () => {
     expect(component.selectedMinute()).toBe(0);
@@ -1391,7 +1391,7 @@ describe('TestHarnessPageComponent', () => {
     expect(calls.length).toBeLessThanOrEqual(1);
   });
 
-  // ============== V24D24.2: Replay-with-seed + Simulate-round ==============
+  // Replay-with-seed and simulate-round.
 
   it('seeds the replay input with the documented default (12345)', () => {
     expect(component.seedInputModel).toBe(12345);
@@ -1521,12 +1521,12 @@ describe('TestHarnessPageComponent', () => {
     expect(careerService.getAllFixturesWithBye).toHaveBeenCalled();
   });
 
-  // ============== V24D24.2-F2.5: Bug #1 + Bug #2 regression tests ==============
+  // Regression coverage for hydrated team names and replay refresh.
 
-  it('F2.5: Panel C surfaces backend team names when hydrated (BUG_FIXTURES_TEAM_NAMES_UUID)', async () => {
+  it('Panel C surfaces backend team names when hydrated', async () => {
     // Backend hydrates team names on /fixtures/round-with-bye (MatchInfo
     // record). The UI must display those names instead of the teamId
-    // (UUID-style) it was falling back to before F2.5.
+    // (UUID-style) it was falling back to before.
     careerService.getAllFixturesWithBye.and.returnValue(
       of({
         rounds: [
@@ -1563,7 +1563,7 @@ describe('TestHarnessPageComponent', () => {
     expect(row.awayTeamId).toBe('team-uuid-away');
   });
 
-  it('F2.5: Panel C falls back to teamId when backend omits team names (legacy endpoint)', async () => {
+  it('Panel C falls back to teamId when backend omits team names', async () => {
     // Defensive fallback: if a future endpoint forgets to hydrate the
     // names (or a legacy career pre-dates the roll-out), we still
     // render the teamId so the row is not blank.
@@ -1598,7 +1598,7 @@ describe('TestHarnessPageComponent', () => {
     expect(row.awayTeamName).toBe('team-uuid-away');
   });
 
-  it('F2.5: onReplayWithSeed remounts detail without clearing the selected match (BUG_REPLAY_NO_REFRESH_UI)', async () => {
+  it('onReplayWithSeed remounts detail without clearing the selected match', async () => {
     // The replay handler must trigger refreshDetailAfterMutation() in the
     // success callback. Current implementation remounts only Panel A and keeps
     // selectedMatchId stable, avoiding the old null-and-reset flicker.

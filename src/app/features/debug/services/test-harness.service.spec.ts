@@ -1,6 +1,4 @@
-// V24D24: Tests for TestHarnessService.
-// Mirrors match-compare-api.service.spec.ts pattern — spy on HttpClient,
-// verify request shape and return mapping.
+// Tests for TestHarnessService.
 
 import { HttpClient, HttpResponse } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
@@ -135,7 +133,7 @@ describe('TestHarnessService', () => {
     });
   });
 
-  // ========== V24D24.2: replay-with-seed + simulate-round ==========
+  // Replay-with-seed and simulate-round.
 
   describe('replayMatch', () => {
     it('POSTs to /match/{id}/replay with the seed body', (done) => {
