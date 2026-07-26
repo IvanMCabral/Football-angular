@@ -181,6 +181,13 @@ export function shouldQueueInjuryAutoModal(input: {
   return input.isAutoModalOpen || input.isCriticalLiveModalOpen;
 }
 
+export function canOpenCriticalLiveModal(input: {
+  state: MatchState | undefined;
+  isCriticalLiveModalOpen: boolean;
+}): input is { state: MatchState; isCriticalLiveModalOpen: false } {
+  return !!input.state && !input.isCriticalLiveModalOpen;
+}
+
 export function buildPersistedInjuryAutoModalPayload(input: {
   active: PersistedInjuryAutoModalRef | null;
   queued: PersistedInjuryAutoModalRef[];

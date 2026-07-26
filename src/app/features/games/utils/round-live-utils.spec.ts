@@ -2,6 +2,7 @@ import {
   buildPersistedInjuryAutoModalPayload,
   buildPendingRoundStartMatches,
   buildPendingLiveModalNotice,
+  canOpenCriticalLiveModal,
   findInjuryAutoModalCandidates,
   findRestorableInjuryAutoModals,
   findRivalRedCardModalCandidate,
@@ -185,6 +186,21 @@ describe('round-live-utils', () => {
     expect(shouldQueueInjuryAutoModal({
       isAutoModalOpen: false,
       isCriticalLiveModalOpen: false
+    })).toBeFalse();
+  });
+
+  it('allows opening critical live modals only with state and no active critical modal', () => {
+    expect(canOpenCriticalLiveModal({
+      state: matchState({ status: 'PAUSED' }),
+      isCriticalLiveModalOpen: false
+    })).toBeTrue();
+    expect(canOpenCriticalLiveModal({
+      state: undefined,
+      isCriticalLiveModalOpen: false
+    })).toBeFalse();
+    expect(canOpenCriticalLiveModal({
+      state: matchState({ status: 'PAUSED' }),
+      isCriticalLiveModalOpen: true
     })).toBeFalse();
   });
 

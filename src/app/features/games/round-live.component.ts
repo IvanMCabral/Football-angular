@@ -15,6 +15,7 @@ import {
   buildPersistedInjuryAutoModalPayload,
   buildPendingRoundStartMatches,
   buildPendingLiveModalNotice,
+  canOpenCriticalLiveModal,
   findInjuryAutoModalCandidates,
   findRestorableInjuryAutoModals,
   findRivalRedCardModalCandidate,
@@ -983,10 +984,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
    * + dialog opening is delegated to {@link LiveMatchModalsService}.
    */
   onSubstitutionOpen(match: Match, state: MatchState | undefined): void {
-    if (!state) {
-      return;
-    }
-    if (this.isCriticalLiveModalOpen) {
+    if (!state || !canOpenCriticalLiveModal({ state, isCriticalLiveModalOpen: this.isCriticalLiveModalOpen })) {
       return;
     }
     this.isCriticalLiveModalOpen = true;
@@ -1006,10 +1004,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
    * match-card's (formationOpen) output.
    */
   onFormationOpen(match: Match, state: MatchState | undefined): void {
-    if (!state) {
-      return;
-    }
-    if (this.isCriticalLiveModalOpen) {
+    if (!state || !canOpenCriticalLiveModal({ state, isCriticalLiveModalOpen: this.isCriticalLiveModalOpen })) {
       return;
     }
     this.isCriticalLiveModalOpen = true;
@@ -1167,10 +1162,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
 
   // Opens the live match detail modal with readable team names when available.
   onPartidoOpen(match: Match, state: MatchState | undefined): void {
-    if (!state) {
-      return;
-    }
-    if (this.isCriticalLiveModalOpen) {
+    if (!state || !canOpenCriticalLiveModal({ state, isCriticalLiveModalOpen: this.isCriticalLiveModalOpen })) {
       return;
     }
     this.isCriticalLiveModalOpen = true;
