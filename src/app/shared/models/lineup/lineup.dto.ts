@@ -20,57 +20,25 @@ export interface PlayerLineupDTO {
   suspensionRemainingMatches?: number;
 }
 
-/**
- * V25D43 (Sprint C8): one skill's contribution to a position group inside
- * the chemistry breakdown. Mirrors `ChemistryBreakdownDTO.SkillCoverageDTO`
- * on the backend.
- *
- * <p>A skill can appear in multiple position groups if it has non-zero
- * weight in those groups (e.g., AERIAL appears in both GK and DEF). Same
- * skill in different groups has the same {@link maxLevel} and
- * {@link contributorId}.
- */
+// One skill contribution inside a chemistry position group.
 export interface SkillCoverageDTO {
   /** {@link PlayerSkill} enum name, e.g., "WALL", "AERIAL". */
   skill: string;
-  /** Max level of this skill across the lineup, {@code [0, 99]}. */
+  /** Max level of this skill across the lineup, [0, 99]. */
   maxLevel: number;
-  /** {@code sessionPlayerId} of the player carrying the max level. */
+  /** sessionPlayerId of the player carrying the max level. */
   contributorId: string;
 }
 
-/**
- * V25D43 (Sprint C8): per-position-group chemistry breakdown returned
- * alongside {@link LineupDTO.chemistryScore}. Mirrors
- * `ChemistryBreakdownDTO` on the backend.
- *
- * <p>Group keys are the 4 {@code PositionGroup} values on the back:
- * {@code "GK" | "DEF" | "MID" | "ATT"}. The WINGER category from
- * {@code SessionPlayer.position} is folded into ATT — skills of
- * WINGER players (SPEEDSTER, DRIBBLER, SHOOTER) appear in the ATT row.
- *
- * <p>Each group is a list of {@link SkillCoverageDTO} for skills
- * <b>present</b> in the lineup (maxLevel &gt; 0). Empty groups mean
- * the lineup has no players with skills weighted to that group.
- */
+// Per-position-group chemistry breakdown returned with the lineup.
 export interface ChemistryBreakdownDTO {
-  /**
-   * Per-group chip list. Stable key order on the back: GK → DEF → MID → ATT
-   * (matches {@code ChemistryDetail.PositionGroup.values()}).
-   */
+  // Per-group chip list keyed by GK, DEF, MID and ATT.
   positionGroups: Record<string, SkillCoverageDTO[]>;
-  /**
-   * Per-skill max level across the lineup. Always contains all 10
-   * {@code PlayerSkill} keys (absent skills → 0), so the frontend can
-   * index by skill name without null checks.
-   */
+  // Per-skill max level across the lineup.
   maxSkillByType: Record<string, number>;
-  /**
-   * {@code 0..100} — share of skills (out of 10) whose maxLevel is &ge; 80.
-   * Same "elite" threshold as the V25D41 coverage bonus on the back.
-   */
+  // Share of elite skills, expressed from 0 to 100.
   coveragePercentage: number;
-  /** V25D99.20.13: optional spatial/player-link chemistry. */
+  // Optional spatial and player-link chemistry.
   tacticalChemistry?: TacticalChemistryDTO | null;
 }
 
@@ -91,26 +59,7 @@ export interface TacticalChemistryLinkDTO {
   note: string;
 }
 
-/**
- * V25D45 (Sprint C10): chemistry detail returned by
- * {@code POST /career/lineup/preview-chemistry}. Mirrors the back's
- * {@code ChemistryDetail} record (V25D43). Used by the SquadEditorModalComponent
- * to show the projected chemistry of an in-progress lineup (without persisting).
- *
- * <p>Shape:
- * <pre>
- *   {
- *     score: 82,
- *     breakdown: ChemistryBreakdownDTO,
- *     maxSkillByType: { WALL: 99, ... },
- *     coveragePercentage: 75
- *   }
- * </pre>
- *
- * <p>Same field set as the back record, deserialized 1:1 by Jackson.
- * The frontend uses this DTO to populate the live preview UI in the
- * SquadEditorModalComponent's header.
- */
+// Chemistry preview details for the current lineup draft.
 export interface ChemistryDetailDTO {
   score: number;
   breakdown: ChemistryBreakdownDTO;
@@ -118,52 +67,18 @@ export interface ChemistryDetailDTO {
   coveragePercentage: number;
 }
 
-/**
- * V24D6U3 + MVP1-lineup-cancha-1 + V25D41 (C6) + V25D42 (C7) + V25D43 (C8):
- * Response shape of /career/lineup/{current, auto-select, manual-select}.
- *
- * <p>Backend returns:
- * <pre>
- *   { formation, players[], confirmed, warnings[], slots[],
- *     chemistryScore?, chemistryBreakdown? }
- * </pre>
- *
- * <p>{@code slots} (MVP1-lineup-cancha-1) lista las asignaciones
- * {@code playerId → subdivisionId} persistidas. Si está vacío o ausente,
- * el front debe inferir los slots del role del jugador (backward compat
- * con lineups previos al sprint).
- *
- * <p><b>V25D42 (Sprint C7):</b> {@code chemistryScore} (opcional, 0..99) es el
- * team chemistry score agregado del lineup (V25D41 back) — base = AVG de
- * overalls + skill_bonus (team-level MAX per skill) + coverage_bonus.
- * Opcional para backward compat con lineups creados antes de V25D41.
- *
- * <p><b>V25D43 (Sprint C8):</b> {@code chemistryBreakdown} (opcional) es el
- * desglose por position group de qué skills están presentes en el lineup
- * y a qué nivel. Cuando está presente, la UI renderiza una sección de
- * chips debajo del chemistry badge con WALL=99, AERIAL=99, etc. agrupados
- * por GK / DEF / MID / ATT. Nullable para backward compat con lineups
- * pre-V25D43.
- *
- * <p><b>V25D47 (Sprint C11a + C11b):</b> {@code formationEffectiveness}
- * (opcional) es la efectividad táctica del lineup — formación inferida
- * desde los subdivisionIds + per-player effectiveness (penalización por
- * jugar fuera de posición) + teamAverage. C11b lo usa para: (1) renderizar
- * una sección de "Formación inferida" + colores por jugador en el modal,
- * (2) ponderar el chemistry preview live multiplicando por teamAverage.
- * Nullable para backward compat con lineups pre-V25D47 (los renders
- * correspondientes se ocultan cuando es null).
- */
+// Response shape for current, auto-selected and manually selected lineups.
 export interface LineupDTO {
   formation: string;
   players: PlayerLineupDTO[];
   confirmed: boolean;
   warnings?: LineupWarningDTO[];
   slots?: LineupSlotDTO[];
-  /** V25D42: team chemistry score in [0, 99] (optional, nullable for backward compat). */
+  // Team chemistry score in [0, 99].
   chemistryScore?: number;
-  /** V25D43: per-position-group chemistry breakdown (optional, nullable for backward compat). */
+  // Optional per-position-group chemistry breakdown.
   chemistryBreakdown?: ChemistryBreakdownDTO;
-  /** V25D47: tactical position effectiveness (optional, nullable for backward compat). */
+  // Optional tactical position effectiveness.
   formationEffectiveness?: FormationEffectivenessDTO;
 }
+

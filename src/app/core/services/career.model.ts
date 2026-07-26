@@ -12,23 +12,7 @@ export interface SessionTeam {
   id?: any; // Can be sessionTeamId or worldTeamId depending on context
 }
 
-/**
- * CareerStatus - Career session status from backend GetCareerStatusUseCase
- *
- * <p><b>V25D78-C55.2 phase 4 UI</b> added two fields to the back contract:
- * <ul>
- *   <li><b>{@link userDivision}</b> — 'PRIMERA' | 'SEGUNDA' | 'TERCERA' | null.
- *       Tells the dashboard what tier the user's team is currently in so it
- *       can render the badge prominent without a 2nd round-trip to
- *       /career/divisions. null when the career is legacy (pre-C55.2) or
- *       absent.</li>
- *   <li><b>{@link promotionsAvailable}</b> — true when the engine just
- *       finished a season and computed promotion/relegation movements. The
- *       frontend uses this flag (plus localStorage) to auto-open the
- *       {@link PromotionsDialogComponent} instead of waiting for the user
- *       to click the manual button.</li>
- * </ul>
- */
+// Career session status returned by the backend.
 export interface CareerStatus {
   careerId: string | null;
   season: number;
@@ -44,16 +28,9 @@ export interface CareerStatus {
   careerPhase: string | null;
   squadSize: number;
   freePlayersCount: number;
-  /**
-   * V25D78-C55.2 phase 4 UI (c): user's division tier.
-   * PRIMERA / SEGUNDA / TERCERA / null (legacy or no career).
-   */
+  // User division tier, when a career is active.
   userDivision?: string | null;
-  /**
-   * V25D78-C55.2 phase 4 UI (d2): true when a season just ended and
-   * promotions are queued for display. Front uses localStorage to mark
-   * 'viewed' so the dialog doesn't re-pop on every reload.
-   */
+  // True when end-of-season promotion results are ready to show.
   promotionsAvailable?: boolean;
 }
 
@@ -94,24 +71,10 @@ export interface Fixture {
   awayGoals?: number | null;
   homeStrength?: TeamStrengthInfo | null;
   awayStrength?: TeamStrengthInfo | null;
-  /**
-   * V24D24.2-F2.5 — team display names hydrated by the backend on
-   * GET /api/v1/career/fixtures/round-with-bye (the
-   * FixtureQueryDtos.MatchInfo record carries homeTeamName /
-   * awayTeamName). Optional: absent on endpoints that do not hydrate
-   * them (legacy GET /career/fixtures?round=N). Consumers should fall
-   * back to the corresponding teamId when these fields are missing.
-   */
+  // Optional display names hydrated by newer fixture endpoints.
   homeTeamName?: string | null;
   awayTeamName?: string | null;
-  /**
-   * V24D24.2 — deterministic UUID for this (careerId, round) pair,
-   * hydrated by the backend on GET /api/v1/career/fixtures/round-with-bye.
-   * Used by the test-harness UI to POST /match-engine/rounds/start without
-   * having to look up the roundId via the live engine registry first.
-   * Optional: absent for careers created before the F1 hydration roll-out,
-   * or for fixtures served by endpoints that don't hydrate it.
-   */
+  // Optional stable round id used by round-level match engine endpoints.
   roundId?: string | null;
 }
 
@@ -196,3 +159,4 @@ export interface DivisionInfo {
   divisionNumber: number;
   teamCount: number;
 }
+
