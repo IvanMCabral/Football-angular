@@ -31,6 +31,7 @@ import {
   patchRoundMatchFormation,
   parsePersistedInjuryAutoModalRefs,
   readStorageFlag,
+  resolveRoundManagerTeamId,
   ROUND_LIVE_DEBUG_STORAGE_KEYS,
   shouldQueueInjuryAutoModal,
   shouldQueueRivalCardModal,
@@ -776,11 +777,11 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
   }
 
   private resolveManagerTeamId(userMatch: RoundMatchVM, state: MatchState): string {
-    const explicit = userMatch.userTeamId ?? this.currentUserSessionTeamId;
-    if (explicit && [String(state.homeTeamId), String(state.awayTeamId)].includes(String(explicit))) {
-      return String(explicit);
-    }
-    return String(userMatch.match.homeTeamId ?? state.homeTeamId);
+    return resolveRoundManagerTeamId({
+      userMatch,
+      state,
+      currentUserSessionTeamId: this.currentUserSessionTeamId
+    });
   }
 
   toggleDebugSuppressAutoInjuryModals(): void {

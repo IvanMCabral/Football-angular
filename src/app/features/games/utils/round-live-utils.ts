@@ -112,6 +112,21 @@ export function buildPendingRoundStartMatches(matches: RoundMatchVM[]): PendingR
     }));
 }
 
+export function resolveRoundManagerTeamId(input: {
+  userMatch: RoundMatchVM;
+  state: MatchState;
+  currentUserSessionTeamId: string | null;
+}): string {
+  const explicit = input.userMatch.userTeamId ?? input.currentUserSessionTeamId;
+  const teamIds = [String(input.state.homeTeamId), String(input.state.awayTeamId)];
+
+  if (explicit && teamIds.includes(String(explicit))) {
+    return String(explicit);
+  }
+
+  return String(input.userMatch.match.homeTeamId ?? input.state.homeTeamId);
+}
+
 export function normalizeTerminalLiveState(state: MatchState): MatchState {
   if (
     state.currentMinute >= 90 &&

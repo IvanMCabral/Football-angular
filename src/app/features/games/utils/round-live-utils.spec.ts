@@ -19,6 +19,7 @@ import {
   patchRoundMatchFormation,
   parsePersistedInjuryAutoModalRefs,
   readStorageFlag,
+  resolveRoundManagerTeamId,
   ROUND_LIVE_DEBUG_STORAGE_KEYS,
   shouldQueueInjuryAutoModal,
   shouldQueueRivalCardModal,
@@ -115,6 +116,38 @@ describe('round-live-utils', () => {
         awayTeamId: 'pending-away'
       }
     ]);
+  });
+
+  it('resolves the manager team id from explicit match or session data', () => {
+    const state = matchState({
+      homeTeamId: 'home',
+      awayTeamId: 'away'
+    });
+
+    expect(resolveRoundManagerTeamId({
+      userMatch: roundMatchWithState('m1', true, state, 'away'),
+      state,
+      currentUserSessionTeamId: null
+    })).toBe('away');
+
+    expect(resolveRoundManagerTeamId({
+      userMatch: roundMatchWithState('m1', true, state),
+      state,
+      currentUserSessionTeamId: 'home'
+    })).toBe('home');
+  });
+
+  it('falls back to the fixture home team when manager team data is stale', () => {
+    const state = matchState({
+      homeTeamId: 'home',
+      awayTeamId: 'away'
+    });
+
+    expect(resolveRoundManagerTeamId({
+      userMatch: roundMatchWithState('m1', true, state, 'other-team'),
+      state,
+      currentUserSessionTeamId: 'also-other'
+    })).toBe('m1-home');
   });
 
   it('queues rival red-card notices while the round is running or another live modal is open', () => {
