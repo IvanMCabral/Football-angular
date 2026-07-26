@@ -1,0 +1,594 @@
+    <div class="squad-editor-container">
+
+      <div class="squad-header">
+        <div class="squad-header-left">
+          <h2>Editor de Formación</h2>
+          <div class="formation-selector">
+          <label>Formación:</label>
+
+          <select [value]="dropdownFormationValue"
+                  (change)="onFormationSelect($any($event.target).value)"
+                  [disabled]="isFormationChanging"
+                  [title]="(isCustomLineup() ? 'Tu lineup personalizado no coincide con una formación canónica' : '')">
+            <option *ngFor="let f of formations" [value]="f">{{f}}</option>
+            <option [value]="userFormationLabel" [disabled]="true">Formación del User</option>
+          </select>
+          <span *ngIf="isFormationChanging" class="formation-change-blocked">(espera...)</span>
+        </div>
+        </div>
+
+        <div class="squad-header-right">
+          <div class="header-preview-stack">
+            <div class="chemistry-preview-row">
+            <ng-container *ngIf="getDisplayedChemistryScore() as displayedScore; else previewEmpty">
+              <span class="preview-label">Quimica proyectada:</span>
+              <span class="preview-score"
+                    [class.high]="displayedScore >= 80"
+                    [class.mid]="displayedScore >= 60 && displayedScore < 80"
+                    [class.low]="displayedScore < 60">
+                {{ displayedScore }}/99
+              </span>
+              <span *ngIf="teamAverage !== null && teamAverage < 1.0"
+                    class="preview-eff-weight"
+                    [title]="'Ponderado por formación (eff. team ' + (teamAverage * 100).toFixed(0) + '%)'">
+                ×{{ (teamAverage * 100).toFixed(0) }}%
+              </span>
+              <span class="preview-delta"
+                    *ngIf="currentChemistryScore !== null"
+                    [class.positive]="displayedScore > currentChemistryScore"
+                    [class.negative]="displayedScore < currentChemistryScore"
+                    [title]="'Δ vs chemistry guardado en backend (' + currentChemistryScore + '/99)'">
+                ({{ displayedScore > currentChemistryScore ? '+' : '' }}{{ displayedScore - currentChemistryScore }})
+              </span>
+            </ng-container>
+            <ng-template #previewEmpty>
+              <span class="preview-label preview-pending"
+                    *ngIf="!previewError; else previewFailed">
+                Proyectando chemistry...
+              </span>
+              <ng-template #previewFailed>
+                <span class="preview-label preview-error">⚠ Chemistry preview unavailable</span>
+              </ng-template>
+            </ng-template>
+          </div>
+
+          <div class="formation-effectiveness-row" *ngIf="formationEffectiveness$ | async as fe">
+            <span class="fe-label">Formación inferida:</span>
+            <span class="fe-formation">{{ fe.inferredFormation }}</span>
+            <span class="fe-sep">·</span>
+            <span class="fe-label">Eff. team:</span>
+            <span class="fe-team-avg"
+                  [class.high]="fe.teamAverage >= 0.85"
+                  [class.mid]="fe.teamAverage >= 0.5 && fe.teamAverage < 0.85"
+                  [class.low]="fe.teamAverage < 0.5">
+              {{ (fe.teamAverage * 100).toFixed(0) }}%
+            </span>
+          </div>
+          </div>
+
+          <button mat-stroked-button
+                  (click)="resetCustomPositions()"
+                  class="reset-positions-btn"
+                  data-testid="reset-custom-positions-button"
+                  *ngIf="hasCustomPositions()"
+                  title="Volver a las posiciones canónicas de la formación">
+            ↺ Reset posiciones
+          </button>
+          <button mat-icon-button (click)="close()" class="close-btn" title="Cerrar">×</button>
+        </div>
+      </div>
+
+      <div class="main-area">
+        <aside class="team-stats-panel" aria-label="Team stats panel">
+
+          <section class="tsp-section">
+            <h3 class="tsp-title">📊 Match preview</h3>
+            <div class="tsp-formation-row">
+              <span class="tsp-formation-label">Formación:</span>
+              <span class="tsp-formation-value"
+                    [class.is-custom]="isCustomLineup()">
+                {{ dropdownFormationValue }}
+              </span>
+              <span class="tsp-coverage">{{ occupiedSlots }}/11</span>
+            </div>
+            <div class="tsp-style-tags" *ngIf="styleTags.length">
+              <span *ngFor="let tag of styleTags" class="tsp-tag">{{ tag }}</span>
+            </div>
+            <div class="tsp-style-tags" *ngIf="!styleTags.length">
+              <span class="tsp-tag-empty">Lineup incompleto</span>
+            </div>
+          </section>
+
+          <section class="tsp-section">
+            <h3 class="tsp-title">⚗ Chemistry</h3>
+            <div class="tsp-chem-row">
+              <span class="tsp-chem-value"
+                    [class.high]="(chemistryScore ?? 0) >= 80"
+                    [class.mid]="(chemistryScore ?? 0) >= 60 && (chemistryScore ?? 0) < 80"
+                    [class.low]="(chemistryScore ?? 0) < 60">
+                {{ chemistryScore ?? '—' }}<span class="tsp-chem-max">/99</span>
+              </span>
+              <span *ngIf="teamAverage !== null && teamAverage < 1.0"
+                    class="tsp-eff-weight"
+                    [title]="'Eff. team: ' + (teamAverage * 100).toFixed(0) + '%'">
+                ×{{ (teamAverage * 100).toFixed(0) }}%
+              </span>
+            </div>
+            <div class="tsp-bar-bg">
+              <div class="tsp-bar-fg"
+                   [class.high]="(chemistryScore ?? 0) >= 80"
+                   [class.mid]="(chemistryScore ?? 0) >= 60 && (chemistryScore ?? 0) < 80"
+                   [class.low]="(chemistryScore ?? 0) < 60"
+                   [style.width.%]="chemistryScore ?? 0"></div>
+            </div>
+            <div class="tsp-tactical-chem" *ngIf="tacticalChemistry as tc">
+              <div class="tsp-stat">
+                <span class="tsp-stat-label">Tactical links</span>
+                <span class="tsp-stat-val"
+                      [class.high]="tc.score >= 80"
+                      [class.mid]="tc.score >= 60 && tc.score < 80"
+                      [class.low]="tc.score < 60">{{ tc.score }}/99</span>
+              </div>
+              <div class="tsp-mini-grid">
+                <span>DEF {{ tc.lineScores['DEF'] }}</span>
+                <span>MID {{ tc.lineScores['MID'] }}</span>
+                <span>ATT {{ tc.lineScores['ATT'] }}</span>
+                <span>L {{ tc.channelScores['LEFT'] }}</span>
+                <span>C {{ tc.channelScores['CENTER'] }}</span>
+                <span>R {{ tc.channelScores['RIGHT'] }}</span>
+              </div>
+              <div class="tsp-warning-line" *ngIf="tc.warnings.length">
+                {{ tc.warnings[0] }}
+              </div>
+            </div>
+            <div class="tsp-stats-row">
+              <div class="tsp-stat">
+                <span class="tsp-stat-label">Stamina avg</span>
+                <span class="tsp-stat-val"
+                      [class.high]="avgStamina >= 70"
+                      [class.low]="avgStamina < 30">{{ avgStamina }}%</span>
+              </div>
+              <div class="tsp-stat">
+                <span class="tsp-stat-label">Eff. team</span>
+                <span class="tsp-stat-val"
+                      [class.high]="(teamAverage ?? 0) >= 0.85"
+                      [class.mid]="(teamAverage ?? 0) >= 0.5 && (teamAverage ?? 0) < 0.85"
+                      [class.low]="(teamAverage ?? 0) < 0.5">
+                  {{ teamAverage !== null ? (teamAverage * 100).toFixed(0) + '%' : '—' }}
+                </span>
+              </div>
+              <div class="tsp-stat">
+                <span class="tsp-stat-label">Injured</span>
+                <span class="tsp-stat-val"
+                      [class.danger]="injuredCount > 0">{{ injuredCount }}</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="tsp-section">
+            <h3 class="tsp-title">⚔ Attack vs Defense</h3>
+            <div class="tsp-rating-row">
+              <div class="tsp-rating-col">
+                <span class="tsp-rating-label">ATT</span>
+                <span class="tsp-rating-val"
+                      [class.high]="attackRating >= 100"
+                      [class.mid]="attackRating >= 75 && attackRating < 100"
+                      [class.low]="attackRating < 75">
+                  {{ attackRating || '—' }}{{ attackRating ? '%' : '' }}
+                </span>
+                <div class="tsp-bar-bg">
+                  <div class="tsp-bar-fg"
+                       [class.high]="attackRating >= 100"
+                       [class.mid]="attackRating >= 75 && attackRating < 100"
+                       [class.low]="attackRating < 75"
+                       [style.width.%]="attackRating ? this.Math.min(attackRating, 200) / 2 : 0"></div>
+                </div>
+              </div>
+              <div class="tsp-rating-col">
+                <span class="tsp-rating-label">MID</span>
+                <span class="tsp-rating-val"
+                      [class.high]="midfieldRating >= 100"
+                      [class.mid]="midfieldRating >= 75 && midfieldRating < 100"
+                      [class.low]="midfieldRating < 75">
+                  {{ midfieldRating || '—' }}{{ midfieldRating ? '%' : '' }}
+                </span>
+                <div class="tsp-bar-bg">
+                  <div class="tsp-bar-fg"
+                       [class.high]="midfieldRating >= 100"
+                       [class.mid]="midfieldRating >= 75 && midfieldRating < 100"
+                       [class.low]="midfieldRating < 75"
+                       [style.width.%]="midfieldRating ? this.Math.min(midfieldRating, 200) / 2 : 0"></div>
+                </div>
+              </div>
+              <div class="tsp-rating-col">
+                <span class="tsp-rating-label">DEF</span>
+                <span class="tsp-rating-val"
+                      [class.high]="defenseRating >= 100"
+                      [class.mid]="defenseRating >= 75 && defenseRating < 100"
+                      [class.low]="defenseRating < 75">
+                  {{ defenseRating || '—' }}{{ defenseRating ? '%' : '' }}
+                </span>
+                <div class="tsp-bar-bg">
+                  <div class="tsp-bar-fg"
+                       [class.high]="defenseRating >= 100"
+                       [class.mid]="defenseRating >= 75 && defenseRating < 100"
+                       [class.low]="defenseRating < 75"
+                       [style.width.%]="defenseRating ? this.Math.min(defenseRating, 200) / 2 : 0"></div>
+                </div>
+              </div>
+            </div>
+            <div class="tsp-net-row">
+              <span class="tsp-net-label">Balance</span>
+              <span class="tsp-net-val"
+                    [class.attack-leaning]="attackRating > defenseRating + 5"
+                    [class.defense-leaning]="defenseRating > attackRating + 5">
+                <ng-container *ngIf="attackRating > defenseRating + 5">Ofensivo +{{ attackRating - defenseRating }}</ng-container>
+                <ng-container *ngIf="defenseRating > attackRating + 5">Defensivo +{{ defenseRating - attackRating }}</ng-container>
+                <ng-container *ngIf="attackRating <= defenseRating + 5 && defenseRating <= attackRating + 5">Equilibrado</ng-container>
+              </span>
+            </div>
+          </section>
+
+          <section class="tsp-section">
+            <h3 class="tsp-title">🧭 Shape & canales</h3>
+            <div class="tsp-shape-grid">
+              <div class="tsp-shape-row" *ngFor="let row of tacticalShapeMatrix">
+                <span class="tsp-shape-zone">{{ row.zone }}</span>
+                <span class="tsp-shape-cell"
+                      [class.empty]="row.left === 0"
+                      [class.strong]="row.left >= 2">L {{ row.left }}</span>
+                <span class="tsp-shape-cell"
+                      [class.empty]="row.center === 0"
+                      [class.strong]="row.center >= 2">C {{ row.center }}</span>
+                <span class="tsp-shape-cell"
+                      [class.empty]="row.right === 0"
+                      [class.strong]="row.right >= 2">R {{ row.right }}</span>
+              </div>
+            </div>
+            <div class="tsp-shape-chips">
+              <span class="tsp-shape-chip">Ancho {{ tacticalShapeSummary.width }}%</span>
+              <span class="tsp-shape-chip">Compact. {{ tacticalShapeSummary.compactness }}%</span>
+              <span class="tsp-shape-chip">Bloque {{ tacticalShapeSummary.blockHeight }}%</span>
+              <span class="tsp-shape-chip">Prof. DEF {{ tacticalShapeSummary.defensiveDepth }}%</span>
+            </div>
+            <div class="tsp-channel-breakdown" aria-label="Lectura de amenaza conexion y cobertura por canal">
+              <div class="tsp-channel-breakdown-row tsp-channel-breakdown-head">
+                <span>Canal</span>
+                <span>Amenaza</span>
+                <span>Conex.</span>
+                <span>Cobertura</span>
+              </div>
+              <div class="tsp-channel-breakdown-row" *ngFor="let row of tacticalChannelBreakdown">
+                <span class="tsp-shape-zone">{{ row.label }}</span>
+                <span [class.strong]="row.threat >= 66">{{ row.threat }}%</span>
+                <span [class.strong]="row.connection >= 66">{{ row.connection }}%</span>
+                <span [class.strong]="row.coverage >= 66">{{ row.coverage }}%</span>
+              </div>
+            </div>
+            <div class="tsp-warning-line" *ngIf="tacticalShapeWarnings.length">
+              {{ tacticalShapeWarnings[0] }}
+            </div>
+          </section>
+
+          <section class="tsp-section">
+            <h3 class="tsp-title">🧠 Lectura DT</h3>
+            <div *ngIf="lastCoachMoveRead as moveRead"
+                 class="tsp-coach-last-move"
+                 [class.good]="moveRead.level === 'good'"
+                 [class.warn]="moveRead.level === 'warn'"
+                 [class.danger]="moveRead.level === 'danger'"
+                 [class.info]="moveRead.level === 'info'">
+              <span class="tsp-coach-read-title">Último movimiento: {{ moveRead.title }}</span>
+              <span class="tsp-coach-read-body">{{ moveRead.body }}</span>
+            </div>
+            <div class="tsp-coach-read-list">
+              <div *ngFor="let note of tacticalCoachReads"
+                   class="tsp-coach-read"
+                   [class.good]="note.level === 'good'"
+                   [class.warn]="note.level === 'warn'"
+                   [class.danger]="note.level === 'danger'"
+                   [class.info]="note.level === 'info'">
+                <span class="tsp-coach-read-title">{{ note.title }}</span>
+                <span class="tsp-coach-read-body">{{ note.body }}</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="tsp-section" *ngIf="offRolePlayers.length">
+            <h3 class="tsp-title">⚠  Penalizaciones ({{ offRolePlayers.length }})</h3>
+            <div class="tsp-penalty-summary"
+                 [class.severe]="tacticalPenaltySummary.level === 'severe'"
+                 [class.warning]="tacticalPenaltySummary.level === 'warning'">
+              {{ tacticalPenaltySummary.message }}
+            </div>
+            <div class="tsp-offrole-list">
+              <div *ngFor="let o of offRolePlayers"
+                   class="tsp-offrole-row"
+                   [class.severe]="o.penaltyPct >= 25"
+                   [class.warning]="o.penaltyPct >= 10 && o.penaltyPct < 25">
+                <div class="tsp-offrole-name">{{ o.player.name }}</div>
+                <div class="tsp-offrole-detail">
+                  <span class="tsp-offrole-role">{{ o.naturalRole }}</span>
+                  <span class="tsp-offrole-arrow">→</span>
+                  <span class="tsp-offrole-zone">{{ o.actualZone }}</span>
+                </div>
+                <div class="tsp-offrole-penalty"
+                     [class.severe]="o.penaltyPct >= 25"
+                     [class.warning]="o.penaltyPct >= 10 && o.penaltyPct < 25">
+                  -{{ o.penaltyPct }}%
+                </div>
+                <div class="tsp-offrole-advice">{{ o.advice }}</div>
+              </div>
+            </div>
+          </section>
+
+          <section class="tsp-section">
+            <h3 class="tsp-title">🎯 Características</h3>
+            <div class="tsp-attr-row">
+              <span class="tsp-attr-label">⚡ Pace</span>
+              <div class="tsp-bar-bg">
+                <div class="tsp-bar-fg neutral" [style.width.%]="paceRating"></div>
+              </div>
+              <span class="tsp-attr-val">{{ paceRating }}</span>
+            </div>
+            <div class="tsp-attr-row">
+              <span class="tsp-attr-label">🧠 Technique</span>
+              <div class="tsp-bar-bg">
+                <div class="tsp-bar-fg neutral" [style.width.%]="techniqueRating"></div>
+              </div>
+              <span class="tsp-attr-val">{{ techniqueRating }}</span>
+            </div>
+            <div class="tsp-attr-row">
+              <span class="tsp-attr-label">🧱 Mentality</span>
+              <div class="tsp-bar-bg">
+                <div class="tsp-bar-fg neutral" [style.width.%]="mentalityRating"></div>
+              </div>
+              <span class="tsp-attr-val">{{ mentalityRating }}</span>
+            </div>
+          </section>
+
+          <section class="tsp-section">
+            <h3 class="tsp-title">📹 Zonas</h3>
+            <table class="tsp-table">
+              <thead>
+                <tr>
+                  <th class="tsp-th-zone">Zona</th>
+                  <th class="tsp-th-num">N</th>
+                  <th class="tsp-th-num">OVR</th>
+                  <th class="tsp-th-num">Eff</th>
+                  <th class="tsp-th-num">%</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let row of zoneBreakdown"
+                    [class.empty-row]="row.count === 0">
+                  <td class="tsp-zone-cell">{{ row.zone }}</td>
+                  <td class="tsp-num-cell">{{ row.count }}</td>
+                  <td class="tsp-num-cell">{{ row.count === 0 ? '—' : row.avgOverall }}</td>
+                  <td class="tsp-num-cell"
+                      [class.high]="row.avgEff >= 85"
+                      [class.mid]="row.avgEff >= 50 && row.avgEff < 85"
+                      [class.low]="row.avgEff < 50 && row.count > 0">
+                    {{ row.count === 0 ? '—' : row.avgEff + '%' }}
+                  </td>
+                  <td class="tsp-num-cell">{{ row.contributionPct }}%</td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+        </aside>
+
+        <div class="field-and-bench">
+
+      <div class="field-container">
+
+        <div class="field" #fieldContainer>
+
+          <div class="zone-label zone-attack-label">ATAQUE</div>
+          <div class="zone-label zone-midfield-label">MEDIO</div>
+          <div class="zone-label zone-defense-label">DEFENSA</div>
+
+          <div class="field-line center-line"></div>
+          <div class="field-line center-circle"></div>
+          <div class="field-line left-penalty-area"></div>
+          <div class="field-line right-penalty-area"></div>
+          <div class="field-line left-goal-area"></div>
+          <div class="field-line right-goal-area"></div>
+          <div class="field-line left-penalty-spot"></div>
+          <div class="field-line right-penalty-spot"></div>
+          <div class="field-line left-penalty-arc"></div>
+          <div class="field-line right-penalty-arc"></div>
+
+          <div class="corner-arc corner-tl"></div>
+          <div class="corner-arc corner-tr"></div>
+          <div class="corner-arc corner-bl"></div>
+          <div class="corner-arc corner-br"></div>
+
+          <div class="goal-post goal-post-top"></div>
+          <div class="goal-post goal-post-bottom"></div>
+
+          <div class="field-slots">
+            <ng-container *ngFor="let sub of subdivisions; let i = index">
+
+<ng-container *ngIf="shouldRenderSlot(sub)">
+
+              <ng-container *ngIf="sub.isGoalkeeper">
+<div class="slot slot-gk"
+                      cdkDropList
+                      [id]="'slot-' + sub.subdivisionId"
+[cdkDropListConnectedTo]="allDropListIds"
+                       [cdkDropListData]="sub"
+                       [style.left.%]="sub.left"
+                       [style.top.%]="sub.top"
+                       [style.width.%]="sub.width"
+                       [style.height.%]="sub.height"
+[class.occupied]="isSlotOccupied(sub)"
+[class.recommended]="isRecommendedSlot(sub)"
+                      (cdkDropListDropped)="handleSlotDrop($event)"
+                      (click)="onSlotClick(sub)">
+                </div>
+              </ng-container>
+
+              <ng-container *ngIf="!sub.isGoalkeeper">
+                <div class="slot"
+                     cdkDropList
+                     [id]="'slot-' + sub.subdivisionId"
+                     [cdkDropListConnectedTo]="allDropListIds"
+                     [cdkDropListData]="sub"
+                     [style.left.%]="sub.left"
+                     [style.top.%]="sub.top"
+                     [style.width.%]="sub.width"
+                     [style.height.%]="sub.height"
+                     [class.occupied]="isSlotOccupied(sub)"
+                     [class.recommended]="isRecommendedSlot(sub)"
+                     [class.attack]="sub.zone === 'ATTACK'"
+                     [class.midfield]="sub.zone === 'MIDFIELD'"
+                     [class.defense]="sub.zone === 'DEFENSE'"
+                     (cdkDropListDropped)="handleSlotDrop($event)"
+                     (click)="onSlotClick(sub)">
+                 </div>
+               </ng-container>
+              </ng-container>
+             </ng-container>
+            </div>
+
+<ng-container *ngFor="let player of homePlayers; trackBy: trackByPlayer; let i = index">
+
+              <div *ngIf="player.slotId"
+                   class="player-marker"
+                   cdkDrag
+                   [cdkDragDisabled]="isGoalkeeperPlayer(player)"
+                   [cdkDragData]="player"
+                   (cdkDragStarted)="onMarkerDragStarted($event)"
+                   (cdkDragEnded)="handleMarkerDragEnd($event, player)"
+                   (click)="onMarkerClick(player)"
+                   [style.left.%]="getMarkerX(player)"
+                   [style.top.%]="getMarkerY(player)"
+                   [class.gk-player]="player.role === 'GK'"
+                   [class.off-role]="isOffRole(player)"
+                   [class.eff-green]="getChipEffectivenessClass(player.slotId) === 'eff-good'"
+                   [class.eff-yellow]="getChipEffectivenessClass(player.slotId) === 'eff-warning'"
+                   [class.eff-red]="getChipEffectivenessClass(player.slotId) === 'eff-bad'"
+                   [ngClass]="getMarkerRoleClasses(player.role)">
+
+               <div class="player-number">{{i + 1}}</div>
+               <div class="player-name-label">{{player.name}}</div>
+               <div class="player-role-label">{{getMarkerRoleLabel(player)}}</div>
+
+               <div *ngIf="isOffRole(player)" class="off-role-badge">OFF</div>
+             </div>
+          </ng-container>
+
+          <div *ngIf="loadingFormation" class="field-loading-overlay">
+            <div class="field-spinner"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bench-container"
+           cdkDropList
+           [id]="BENCH_DROP_LIST_ID"
+           [cdkDropListConnectedTo]="slotDropListIds"
+           [cdkDropListData]="'bench'"
+           (cdkDropListDropped)="handleBenchDrop($event)">
+        <span class="bench-label">
+          Banca ({{ benchPlayers.length }})
+        </span>
+        <div class="bench-list">
+          <div *ngFor="let bp of benchPlayers"
+               class="bench-player"
+               cdkDrag
+               [cdkDragData]="bp">
+            <span class="bench-player-name">{{ bp.name }}</span>
+            <span class="bench-player-pos">({{ bp.position }})</span>
+          </div>
+          <span *ngIf="!benchPlayers || benchPlayers.length === 0"
+                class="bench-empty">
+            (vacía — todos en cancha)
+          </span>
+        </div>
+      </div>
+        </div>
+
+      </div>
+
+      <div class="squad-footer">
+        <div class="team-info home">
+          <strong>{{homeTeamName}}</strong>
+          <span>{{homeFormation}}</span>
+        </div>
+        <div class="field-orientation">
+          <span class="orientation-label">↑ ATAQUE</span>
+        </div>
+        <div class="bench-info">
+          <span>Slots: {{occupiedSlots}}/11</span>
+        </div>
+      </div>
+
+      <div *ngIf="selectedSlot" class="assignment-panel">
+        <div class="assignment-header">
+          <span>Slot: {{selectedSlot.subdivisionId}}</span>
+          <button mat-icon-button (click)="selectedSlot = null" title="Cerrar">×</button>
+        </div>
+        <div class="assignment-content">
+          <div *ngIf="getPlayerInSlot(selectedSlot) as player" class="assigned-player">
+            <strong>{{player.name}}</strong>
+            <span>{{player.position}}</span>
+            <button mat-button color="warn" (click)="removePlayerFromSlot(player)">
+              Quitar
+            </button>
+            <select [(ngModel)]="selectedPlayerToAssign" class="player-select">
+              <option value="">Cambiar por...</option>
+              <option *ngFor="let p of benchPlayers" [value]="p.playerId">
+                {{p.name}} ({{p.position}})
+              </option>
+            </select>
+            <button mat-raised-button color="primary"
+                    [disabled]="!selectedPlayerToAssign"
+                    (click)="assignPlayerToSlot()">
+              Cambiar
+            </button>
+          </div>
+          <div *ngIf="!getPlayerInSlot(selectedSlot)" class="unassigned-slot">
+            <span>Sin asignar</span>
+            <select [(ngModel)]="selectedPlayerToAssign" class="player-select">
+              <option value="">Seleccionar jugador...</option>
+              <option *ngFor="let p of benchPlayers" [value]="p.playerId">
+                {{p.name}} ({{p.position}})
+              </option>
+            </select>
+            <button mat-raised-button color="primary"
+                    [disabled]="!selectedPlayerToAssign"
+                    (click)="assignPlayerToSlot()">
+              Asignar
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div *ngIf="errorMessage" class="error-message">
+        <mat-icon>warning</mat-icon>
+        <span>{{errorMessage}}</span>
+      </div>
+
+      <div *ngIf="lineupWarning$ | async as w"
+           class="lineup-warning-banner"
+           [class.warning-warning]="w.severity === 'WARNING'"
+           [class.warning-error]="w.severity === 'ERROR'">
+        <mat-icon>
+          <ng-container [ngSwitch]="w.code">
+            <ng-container *ngSwitchCase="'LINEUP_NO_GOALKEEPER'">sports_handball</ng-container>
+            <ng-container *ngSwitchCase="'LINEUP_MINIMUM_PLAYERS_NOT_MET'">close</ng-container>
+            <ng-container *ngSwitchDefault>warning</ng-container>
+          </ng-container>
+        </mat-icon>
+        <span class="banner-text">{{w.message}}</span>
+        <button class="banner-close" (click)="lineupWarning$.next(null)" title="Cerrar">×</button>
+      </div>
+
+      <div *ngIf="conditionWarning" class="condition-warning-message">
+        <mat-icon>info</mat-icon>
+        <span>{{conditionWarning}}</span>
+      </div>
+    </div>
+  
