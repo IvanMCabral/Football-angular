@@ -55,7 +55,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * #3: track INJURY events that have already auto-opened
+   * Tracks injury events that already opened an automatic modal.
    * the substitution modal. Keyed by `matchId|minute|playerId` so the
    * same injury fired twice across SSE reconnects doesn't re-trigger
    * the modal. Cleared on round restart (the user navigates away and
@@ -64,7 +64,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
   private readonly autoModalShownEventIds = new Set<string>();
 
   /**
-   * #3: guard against overlapping auto-modals. When an INJURY
+   * Guards against overlapping automatic modals. When an injury
    * fires while the previous INJURY modal is still open, the second
    * event is queued (so the manager sees it next) instead of stacking
    * multiple dialogs on top of each other.
@@ -80,7 +80,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
   private releaseQueuedAutoModalResumeHold: (() => void) | null = null;
 
   /**
-   * : single gate for critical live-manager modals.
+   * Single gate for critical live-manager modals.
    * Substitution, Formation and Partido all pause/resume the live round,
    * so only one of them can be open at a time. Injury auto-modals queue
    * behind this gate instead of stacking over a manual modal.
@@ -125,7 +125,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
   pendingLiveModalNotice: string | null = null;
 
   /**
-   * : guard for the auto-start subscription so the
+   * Guard for the auto-start subscription so the
    * backend POST to {@code POST /api/v1/match-engine/rounds/start}
    * fires exactly once per component instance. Set to {@code true}
    * the moment the take(1) subscription observes the first vm$
@@ -143,7 +143,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
   private autoStartTriggered = false;
 
   /**
-   * : resolved roundId from the latest successful
+   * Resolved round id from the latest successful
    * {@code engineService.startRound(...)} POST response. The
    * backend registers the {@code RoundEngine} under THIS roundId  - 
    * not necessarily whatever string the request body sent (the
@@ -183,7 +183,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
   vm$: Observable<RoundLiveViewModel>;
 
   /**
-   * : initial-round-load indicator. True while the
+   * Initial round load indicator. True while the
    * {@code combineLatest([routeParams$, teams$, careerStatus$, fixtures$])}
    * chain in the constructor is still resolving (i.e. the manager hit
    * /games/:gameId/round/:round and the round has not yet rendered).
@@ -211,7 +211,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
     this.registerDeRoundLiveHook();
     setTimeout(() => this.registerDeRoundLiveHook(), 0);
 
-    // : auto-start the round as soon as the first vm$
+    // Auto-start the round as soon as the first vm$
     // emission shows NOT_STARTED matches. This replaces the previous
     // UX where the manager had to click the "Iniciar Todos" button on
     // every round-live mount  -  under normal flow (no refresh, no SSE
@@ -276,7 +276,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
     combineLatest([routeParams$, teams$, careerStatus$, fixtures$]).pipe(
       takeUntil(this.destroy$),
       tap(([params, teamMap, careerStatus, fixturesData]) => {
-        // : clear the initial-load spinner on the first
+        // Clear the initial-load spinner on the first
         // emission (success path). Done before the early-return redirects
         // so the manager doesn't see the spinner stick if we navigate
         // them to the champion screen.
@@ -362,7 +362,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
       }),
       catchError(err => {
         this.logDevError('[ROUND] Error:', err);
-        // : clear the spinner even on error so the empty/error
+        // Clear the spinner even on error so the empty/error
         // state becomes visible instead of a stuck spinner. The existing
         // vm.errorMsg / router.navigate fallbacks render the actual error
         // path.
@@ -604,7 +604,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
   }
 
   private startRoundEngine(gameId: string, matches: RoundMatchVM[]) {
-    // : roundId is NOT a local alias for gameId anymore.
+    // Round id is not a local alias for game id.
     // The backend registers the RoundEngine under whatever
     // `state.roundId` it returns from the POST response  -  frontend
     // cannot assume gameId is a parseable UUID or that the backend
@@ -619,7 +619,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
       awayTeamId: String(rm.match.awayTeamId)
     }));
 
-    // : the auto-start subscription above already calls
+    // The auto-start subscription above already calls
     // engineService.startRound once vm$ first emits with NOT_STARTED
     // matches. To avoid a duplicate POST to /match-engine/rounds/start
     // (which the backend may treat as a re-init, depending on the
@@ -657,7 +657,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
           })
         );
 
-    // : the SSE stream subscribes with the
+    // The SSE stream subscribes with the
     // backend-resolved roundId from resolvedRoundId$, NOT with
     // requestRoundId. The filter wait is the why: tryAutoStartRound
     // runs the POST synchronously, but the POST response is async,
@@ -725,7 +725,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
         this.applyDeFreezeIfNeeded(newVm);
         this.restorePersistedInjuryAutoModals(updatedMatches);
 
-        // #3: scan for new INJURY events on the manager team
+        // Scan for new injury events on the manager team
         // and auto-open the substitution modal. Runs AFTER the VM is
         // updated so the modal receives the latest matchState (with
         // currentMinute + playerRatings already populated by the SSE
@@ -746,7 +746,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * #3: walk the latest per-match state, find INJURY events
+   * Walks the latest per-match state, finds injury events
    * that arrived since the last tick on the manager team, and open
    * the substitution modal pre-populated with the injured player.
    *
@@ -977,7 +977,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * #3: open the auto-modal now, or queue it if a previous
+   * Opens the automatic modal now, or queues it if a previous
    * one is still on screen. Replaces any older queued entry (the
    * most recent injury is the most important).
    */
@@ -1013,7 +1013,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * : actually open the professional Partido modal with the
+   * Opens the Partido modal with the
    * INJURY pre-select. The old substitution-only modal still exists as
    * a manual shortcut, but forced injuries now open the full DT surface
    * so the manager can replace the player, change formation and tune
@@ -1266,7 +1266,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
     const roundId = vm.gameId;
     this.engineService.startRound(roundId, pending).subscribe({
       next: (state) => {
-        // : capture the backend-resolved roundId so any
+        // Capture the backend-resolved round id so any
         // subsequent SSE subscription (including a fresh mount via
         // tryAutoStartRound) uses the same registry key the backend
         // registered. Without this, a "Iniciar Todos" retry after a
@@ -1284,7 +1284,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * : auto-start the round once the first vm$ emission
+   * Auto-starts the round once the first vm$ emission
    * has NOT_STARTED matches. Triggered by the take(1) subscription
    * in the constructor  -  the explicit "Iniciar Todos" button in the
    * header remains as a manual fallback for refresh / recovery cases
@@ -1343,7 +1343,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
 
     this.engineService.startRound(vm.gameId, pending).subscribe({
       next: (state) => {
-        // : capture the backend-resolved roundId so the
+        // Capture the backend-resolved round id so the
         // SSE subscription started later by startRoundEngine (which
         // sees autoStartTriggered=true and short-circuits its own POST)
         // uses the SAME roundId as the registry key. Before this fix
@@ -1356,7 +1356,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
         }
       },
       error: (err) => {
-        // : a failed auto-start leaves the round stuck on
+        // A failed auto-start leaves the round stuck on
         // NOT_STARTED. The "Iniciar Todos" button stays visible (no
         // anyStarted flip) and the manager can re-trigger manually.
         this.logDevError('[ROUND-LIVE] Auto-start failed; user can retry with Iniciar Todos', err);
@@ -1382,10 +1382,10 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
     this.changeTactic(match, event.team, event.tactic);
   }
 
-  // ========== FE6: sub/formation shortcuts on user match card ==========
+  // User match card actions
 
   /**
-   * FE6: open the substitution modal for the user match. Called from the
+   * Opens the substitution modal for the user match. Called from the
    * match-card's (substitutionOpen) output. The actual lineup/squad fetch
    * + dialog opening is delegated to {@link LiveMatchModalsService}.
    */
@@ -1409,7 +1409,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * FE6: open the formation modal for the user match. Called from the
+   * Opens the formation modal for the user match. Called from the
    * match-card's (formationOpen) output.
    */
   onFormationOpen(match: Match, state: MatchState | undefined): void {
@@ -1445,7 +1445,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * : de/QA injury modals can exist only in component memory
+   * Debug injury modals can exist only in component memory
    * (e.g. `Test doble lesion` queues two forced-substitution dialogs without
    * creating backend INJURY events). If the page reloads while one is open or
    * queued, that obligation must not disappear. Persist only ids, then rebuild
@@ -1535,7 +1535,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * : one drain point for auto-modals waiting behind a
+   * Single drain point for automatic modals waiting behind a
    * manager-controlled modal. Priority is:
    * 1) forced injury substitution, because it affects playability;
    * 2) rival red-card awareness, because it is informational.
@@ -1571,7 +1571,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * : queued injury modals are revalidated just before
+   * Queued injury modals are revalidated just before
    * opening. Example: two injuries arrive, the second waits in queue, but
    * the manager already substituted that second injured player from the
    * first/manual modal. In that case the queued modal would be noise, so we
@@ -1595,7 +1595,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * : after the live formation modal confirms, update the
+   * After the live formation modal confirms, update the
    * visible card immediately. The backend/SSE remains the source of truth;
    * this is the local UX bridge so the manager sees their decision at once.
    */
@@ -1615,7 +1615,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * : open the Partido modal (dual-tab: Mi Formacion editable +
+   * Opens the Partido modal (dual-tab: Mi Formacion editable +
    * Formacion Rival read-only) for the user match. Called from the
    * match-card's (partidoOpen) output. Delegates to
    * {@link LiveMatchModalsService.openPartidoModal} which handles
