@@ -1,13 +1,8 @@
 /**
- * MVP1-lineup-cancha-1: basic spec para {@link SquadEditorModalComponent}.
+ * Unit tests for {@link SquadEditorModalComponent}.
  *
- * <p>Smoke test: el componente se crea sin errores y dispara las llamadas
- * esperadas al backend (subdivisions + formations + current) en init.
- *
- * <p>El componente es complejo (1293 líneas, click-to-assign con 82 slots)
- * y depende de Angular Material Dialog. Este spec se mantiene intencionalmente
- * mínimo — el flujo end-to-end (asignar jugador, confirmar, persistir) se
- * valida vía smoke de REVISOR y los E2E HTTP del back cubren la persistencia.
+ * Covers modal creation, editor bootstrapping, lineup persistence, chemistry
+ * preview, tactical drag-drop, responsive layout, and free positioning.
  */
 
 import { ComponentFixture, TestBed } from '@angular/core/testing';
@@ -18,7 +13,7 @@ import { of, timer } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { SquadEditorModalComponent } from './squad-editor-modal.component';
 
-describe('SquadEditorModalComponent — MVP1-lineup-cancha-1', () => {
+describe('SquadEditorModalComponent basic flow', () => {
   let component: SquadEditorModalComponent;
   let fixture: ComponentFixture<SquadEditorModalComponent>;
   let httpClientSpy: jasmine.SpyObj<HttpClient>;
@@ -103,7 +98,7 @@ describe('SquadEditorModalComponent — MVP1-lineup-cancha-1', () => {
       'ngOnInit should GET /api/v1/editor/subdivisions');
   });
 
-  it('V25D99.69: saveLineup sends free-position customX/customY to manual-select', () => {
+  it('saveLineup sends free-position customX/customY to manual-select', () => {
     const players = Array.from({ length: 7 }, (_, index) => ({
       playerId: `p${index + 1}`,
       name: `Player ${index + 1}`,
@@ -141,11 +136,10 @@ describe('SquadEditorModalComponent — MVP1-lineup-cancha-1', () => {
 });
 
 /**
- * MVP1-lineup-cancha-1.5: specs para los fixes F3 (loadSquadFromBackend usa
- * formation del response antes de role-match) y F4 (executeFormationChange
- * llama saveLineup después del auto-select).
+ * Regression tests for loading the backend formation before role matching and
+ * saving the lineup after auto-select.
  */
-describe('SquadEditorModalComponent — MVP1-lineup-cancha-1.5 fixes', () => {
+describe('SquadEditorModalComponent backend formation loading', () => {
   let component: SquadEditorModalComponent;
   let fixture: ComponentFixture<SquadEditorModalComponent>;
   let httpClientSpy: jasmine.SpyObj<HttpClient>;
@@ -237,9 +231,9 @@ describe('SquadEditorModalComponent — MVP1-lineup-cancha-1.5 fixes', () => {
     component = fixture.componentInstance;
   });
 
-  // ===== F3 — loadSquadFromBackend setea selectedFormation del response =====
+  // ===== loadSquadFromBackend sets selectedFormation from the response =====
 
-  it('F3 — loadSquadFromBackend setea selectedFormation del response antes del role-match', (done) => {
+  it('loadSquadFromBackend sets selectedFormation from the response before role matching', (done) => {
     // El back retorna formation 4-3-3 (no la default 4-4-2)
     httpClientSpy.get.and.callFake(((url: string) => {
       if (url.includes('/editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
