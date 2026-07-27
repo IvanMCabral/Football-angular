@@ -1203,12 +1203,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
         this.slotPlayerMap[player.slotId] = player;
       }
       resetSquadEditorDragSource(event.source);
-      this.saveLineup();
-      this.triggerChemistryPreview();
-      this.updateFormationDetection();
-      this.homePlayers$.next([...this.homePlayers$.value]);
-      this.cdr.markForCheck();
-      this.cdr.detectChanges();
+      this.refreshAfterLineupMutation();
       return;
     }
 
@@ -1259,12 +1254,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     this.captureRatingsFromFormationEffectiveness();
     this.requestRatingsPreview();
 
-    this.saveLineup();
-    this.triggerChemistryPreview();
-    this.updateFormationDetection();
-    this.homePlayers$.next([...this.homePlayers$.value]);
-    this.cdr.markForCheck();
-    this.cdr.detectChanges();
+    this.refreshAfterLineupMutation();
 
     const dragRef = getSquadEditorDragRef(event.source);
     if (dragRef) {
@@ -1352,12 +1342,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
       }
     }
 
-    this.saveLineup();
-    this.triggerChemistryPreview();
-    this.updateFormationDetection();
-    this.homePlayers$.next([...this.homePlayers$.value]);
-    this.cdr.markForCheck();
-    this.cdr.detectChanges();
+    this.refreshAfterLineupMutation();
   }
 
   private movePlayerToBench(player: PlayerOnFieldDto): void {
@@ -1371,7 +1356,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     this.beginCoachMoveImpactTracking();
     this.lastCoachMoveRead = {
       title: `${player.name} sale del XI`,
-      body: 'Lo mandaste al banco: baja ocupacion del dibujo y puede dejar una zona sin cobertura hasta reemplazarlo.',
+      body: 'Lo mandaste al banco: baja ocupación del dibujo y puede dejar una zona sin cobertura hasta reemplazarlo.',
       level: 'warn',
     };
     delete this.slotPlayerMap[player.slotId];
@@ -1386,6 +1371,10 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
       this.benchPlayers$.next([...this.benchPlayers$.value, player]);
     }
 
+    this.refreshAfterLineupMutation();
+  }
+
+  private refreshAfterLineupMutation(): void {
     this.saveLineup();
     this.triggerChemistryPreview();
     this.updateFormationDetection();
