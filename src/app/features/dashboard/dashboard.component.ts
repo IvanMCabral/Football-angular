@@ -16,6 +16,7 @@ import { PromotionsDialogComponent } from '../../components/promotions-dialog/pr
 import { PromotionResult } from '../../core/services/career.model';
 import { UserInfo } from '../../shared/models/auth.model';
 import { ConfirmActionDialogComponent } from '../../shared/components/confirm-action-dialog/confirm-action-dialog.component';
+import { readableErrorMessage } from '../../shared/utils/error-message';
 
 interface UserStats {
   matchesPlayed: number;
@@ -358,7 +359,7 @@ export class DashboardComponent implements OnInit {
         },
         error: (err) => {
           this.loading = false;
-          const errorMsg = err.error?.message || err.message || 'Error desconocido';
+          const errorMsg = readableErrorMessage(err);
           this.toastService.error('No se pudo avanzar: ' + errorMsg);
         }
       });
@@ -419,7 +420,7 @@ export class DashboardComponent implements OnInit {
       },
       error: (err) => {
         this.generatingPlayers = false;
-        this.toastService.error('Failed to generate players: ' + (err.error?.message || 'Unknown error'));
+      this.toastService.error('No se pudieron generar jugadores: ' + readableErrorMessage(err));
       }
     });
   }

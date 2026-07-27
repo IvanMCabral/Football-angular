@@ -9,6 +9,7 @@ import { MatchService } from '../../features/matches/services/match.service';
 import { DashboardFixtureModalComponent } from '../dashboard/dashboard-fixture-modal.component';
 import { DashboardUserInfoComponent } from '../dashboard/dashboard-user-info.component';
 import { Match } from '../../shared/models/match.model';
+import { readableErrorMessage } from '../../shared/utils/error-message';
 
 @Component({
   selector: 'app-game-detail',
@@ -74,7 +75,7 @@ export class GameDetailComponent implements OnInit {
               this.router.navigate(['/squad']);
             },
             error: (err) => {
-              this.errorMsg = err.error?.message || err.message || 'No se pudo avanzar a la siguiente fecha.';
+              this.errorMsg = readableErrorMessage(err, 'No se pudo avanzar a la siguiente fecha.');
               this.cdr.markForCheck();
             }
           });
@@ -84,7 +85,7 @@ export class GameDetailComponent implements OnInit {
         this.router.navigate(['/squad']);
       },
       error: (err) => {
-        this.errorMsg = err.error?.message || err.message || 'No se pudo leer el estado de la carrera.';
+        this.errorMsg = readableErrorMessage(err, 'No se pudo leer el estado de la carrera.');
         this.cdr.markForCheck();
       }
     });

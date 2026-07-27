@@ -6,6 +6,7 @@ import { CareerService } from '../../core/services/career.service';
 import { Observable, of } from 'rxjs';
 import { switchMap, catchError } from 'rxjs/operators';
 import { Location } from '@angular/common';
+import { readableErrorMessage } from '../../shared/utils/error-message';
 
 interface Champion {
   teamId: string;
@@ -157,7 +158,7 @@ export class TournamentChampionComponent implements OnInit {
         }
       },
       error: (err) => {
-        this.errorMsg = err.error?.message || 'Error al iniciar nueva temporada';
+        this.errorMsg = readableErrorMessage(err, 'Error al iniciar nueva temporada');
         this.cdr.markForCheck();
       }
     });

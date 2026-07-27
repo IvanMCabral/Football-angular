@@ -6,6 +6,7 @@ import { TeamService } from '../services/team.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { AppLoggerService } from '../../../core/services/app-logger.service';
 import { SessionTeam } from '../../../shared/models/team.model';
+import { readableErrorMessage } from '../../../shared/utils/error-message';
 
 @Component({
   selector: 'app-team-list',
@@ -38,7 +39,7 @@ export class TeamListComponent implements OnInit {
       error: (err) => {
         this.logger.error('[TEAM LIST] Error loading session teams:', err);
         this.loading = false;
-        this.errorMessage = err.error?.message || 'Error loading teams';
+        this.errorMessage = readableErrorMessage(err, 'Error cargando equipos');
       }
     });
   }

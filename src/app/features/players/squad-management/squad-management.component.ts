@@ -24,6 +24,7 @@ import { LineupSlotDTO } from 'app/shared/models/lineup/lineup-slot.dto';
 import { LineupWarningDTO } from 'app/shared/models/lineup/lineup-warning.dto';
 import { ALL_FORMATIONS, FormationCode } from 'app/shared/constants/formations';
 import { SquadEditorModalComponent } from 'app/components/squad-editor-modal/squad-editor-modal.component';
+import { readableErrorMessage } from 'app/shared/utils/error-message';
 
 interface AdvanceRoundResponse {
   success: boolean;
@@ -472,9 +473,7 @@ this.squad$ = combineLatest([
            .subscribe();
        },
        error: (err) => {
-         let userMsg = 'Error updating formation';
-         if (err.error?.message) { userMsg = err.error.message; }
-         else if (err.message) { userMsg = err.message; }
+         const userMsg = readableErrorMessage(err, 'Error actualizando formación');
          this.lineupError$.next(userMsg);
        }
      });
@@ -571,12 +570,7 @@ openVisualEditor(): void {
          this.lineupLoading$.next(false);
        },
        error: (err) => {
-         let userMsg = 'Error selecting lineup';
-         if (err.error?.message) {
-           userMsg = err.error.message;
-         } else if (err.message) {
-           userMsg = err.message;
-         }
+         const userMsg = readableErrorMessage(err, 'Error seleccionando alineación');
          this.lineupError$.next(userMsg);
          // Surface lineup validation errors in the warning banner.
          if (err.error?.code) {
@@ -649,7 +643,7 @@ this.http.post(`${environment.apiUrl}/career/lineup/confirm`, {}).subscribe({
                error: (err) => {
                  this.logDevError('[SQUAD] Error en next-round:', err);
                  this.lineupLoading$.next(false);
-                 this.lineupError$.next(err.error?.message || 'Error al avanzar de fecha');
+                 this.lineupError$.next(readableErrorMessage(err, 'Error al avanzar de fecha'));
                  this.resetLineupWarning();
                }
              });
@@ -664,7 +658,7 @@ this.http.post(`${environment.apiUrl}/career/lineup/confirm`, {}).subscribe({
          error: (err) => {
            this.logDevError('[SQUAD] Error confirmando lineup:', err);
            this.lineupLoading$.next(false);
-           this.lineupError$.next(err.error?.message || 'Error al confirmar lineup');
+           this.lineupError$.next(readableErrorMessage(err, 'Error al confirmar alineación'));
            this.resetLineupWarning();
          }
        });
@@ -697,7 +691,7 @@ this.http.post(`${environment.apiUrl}/career/lineup/confirm`, {}).subscribe({
         },
         error: (err) => {
           this.logDevError('[SQUAD] Error iniciando nueva temporada:', err);
-          this.lineupError$.next(err.error?.message || 'Error al iniciar nueva temporada');
+          this.lineupError$.next(readableErrorMessage(err, 'Error al iniciar nueva temporada'));
         }
       });
     }

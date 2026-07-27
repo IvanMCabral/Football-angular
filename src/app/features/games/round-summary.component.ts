@@ -7,6 +7,7 @@ import { BehaviorSubject, Observable, combineLatest, of } from 'rxjs';
 import { map, switchMap, tap, takeUntil, catchError, shareReplay } from 'rxjs/operators';
 import { Subject } from 'rxjs';
 import { RoundSummaryViewModel, SummaryMatchVM } from './models/round-summary.model';
+import { readableErrorMessage } from '../../shared/utils/error-message';
 
 @Component({
   selector: 'app-round-summary',
@@ -347,7 +348,7 @@ export class RoundSummaryComponent implements OnInit, OnDestroy {
       error: (err) => {
         this.vmSubject.next({
           ...this.vmSubject.value,
-          errorMsg: err.error?.message || 'Error al iniciar nueva temporada'
+          errorMsg: readableErrorMessage(err, 'Error al iniciar nueva temporada')
         });
       }
     });
