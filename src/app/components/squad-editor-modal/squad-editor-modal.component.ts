@@ -71,6 +71,11 @@ import {
   getSquadEditorDragRef,
   resetSquadEditorDragSource,
 } from './squad-editor-modal-drag.utils';
+import {
+  SquadEditorRect,
+  computeSquadEditorFieldDropPercent,
+  isPointOverAnyInsetRect,
+} from './squad-editor-modal-geometry.utils';
 
 @Component({
   selector: 'app-squad-editor-modal',
@@ -1169,21 +1174,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     const dropX = event.dropPoint?.x ?? rect.left;
     const dropY = event.dropPoint?.y ?? rect.top;
 
-    const benchCards = document.querySelectorAll('.bench-container .bench-player');
-    let overBenchCard = false;
-    for (const card of Array.from(benchCards)) {
-      const cr = (card as HTMLElement).getBoundingClientRect();
-      const insetLeft = cr.left + cr.width * 0.25;
-      const insetRight = cr.right - cr.width * 0.25;
-      const insetTop = cr.top + cr.height * 0.25;
-      const insetBottom = cr.bottom - cr.height * 0.25;
-      if (dropX >= insetLeft && dropX <= insetRight
-          && dropY >= insetTop && dropY <= insetBottom) {
-        overBenchCard = true;
-        break;
-      }
-    }
-    if (overBenchCard) {
+    if (this.isDropOverBenchCard(dropX, dropY)) {
       this.movePlayerToBench(player);
       return;
     }
@@ -1195,8 +1186,12 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     const markerRect = sourceEl?.getBoundingClientRect();
     const halfHeight = (markerRect?.height ?? 48) / 2;
 
-    const xPct = clampFieldPercent(((dropX - pickup.x + 35 - rect.left) / rect.width) * 100);
-    const yPct = clampFieldPercent(((dropY - pickup.y + halfHeight - rect.top) / rect.height) * 100);
+    const { xPct, yPct } = computeSquadEditorFieldDropPercent({
+      dropPoint: { x: dropX, y: dropY },
+      pickupOffset: pickup,
+      fieldRect: rect,
+      markerHalfHeight: halfHeight,
+    });
 
     if (this.isInsideGoalkeeperProtectedArea(xPct, yPct)) {
       this.pendingCoachMoveBaseline = null;
@@ -1263,6 +1258,14 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
       resetSquadEditorDragSource(event.source);
       clearSquadEditorDragTransform(dragRef);
     }
+  }
+
+  private isDropOverBenchCard(dropX: number, dropY: number): boolean {
+    const benchRects: SquadEditorRect[] = Array
+      .from(document.querySelectorAll('.bench-container .bench-player'))
+      .map((card) => (card as HTMLElement).getBoundingClientRect());
+
+    return isPointOverAnyInsetRect({ x: dropX, y: dropY }, benchRects);
   }
 
   private applySlotAssignment(
