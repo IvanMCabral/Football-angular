@@ -328,6 +328,10 @@
                 </mat-option>
               </mat-select>
             </mat-form-field>
+            <div class="action-section-title">
+              <span>Acciones principales</span>
+              <small>Repetir, comparar y validar cambios del DT</small>
+            </div>
             <div class="button-stack">
               <button
                 mat-raised-button
@@ -436,6 +440,13 @@
               >
                 Matriz minuto de cambio
               </button>
+            </div>
+            <details class="advanced-actions">
+              <summary>
+                <span>Laboratorios avanzados</span>
+                <small>Formaciones, roles, píxeles, escenarios y pruebas de estrés</small>
+              </summary>
+              <div class="button-stack advanced-action-grid">
               <button
                 mat-stroked-button
                 data-testid="player-swap-battery-button"
@@ -990,7 +1001,8 @@
               >
                 Simular fecha {{ selectedRoundModel ?? '-' }}
               </button>
-            </div>
+              </div>
+            </details>
             <p
               *ngIf="selectedMatchId() && !selectedMatchIncludesUserTeam()"
               class="harness-warning"
