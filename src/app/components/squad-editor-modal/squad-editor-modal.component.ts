@@ -37,6 +37,14 @@ import {
   tacticalLineFromY
 } from '../../shared/utils/tactical-shape-utils';
 import { computeSquadEditorAvgAttribute } from './squad-editor-modal-ratings.utils';
+import {
+  buildSquadEditorCoachChannelDeltas,
+  buildSquadEditorVisualChannelDeltas,
+  buildSquadEditorVisualEngineTension,
+  describeSquadEditorCoachDeltaSeverity,
+  pushSquadEditorCoachDelta,
+  squadEditorVisualDeltaHasHardWarning,
+} from './squad-editor-modal-move-impact.utils';
 import { buildSquadEditorTacticalCoachReads } from './squad-editor-modal-tactical-read.utils';
 
 @Component({
@@ -472,22 +480,32 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     const deltas: string[] = [];
     const magnitudes: number[] = [];
 
-    this.pushCoachDelta(deltas, magnitudes, 'ATT', this.attackRating - baseline.attack);
-    this.pushCoachDelta(deltas, magnitudes, 'MID', this.midfieldRating - baseline.midfield);
-    this.pushCoachDelta(deltas, magnitudes, 'DEF', this.defenseRating - baseline.defense);
+    pushSquadEditorCoachDelta(deltas, magnitudes, 'ATT', this.attackRating - baseline.attack);
+    pushSquadEditorCoachDelta(deltas, magnitudes, 'MID', this.midfieldRating - baseline.midfield);
+    pushSquadEditorCoachDelta(deltas, magnitudes, 'DEF', this.defenseRating - baseline.defense);
     if (baseline.chemistry !== null && currentChemistry !== null) {
-      this.pushCoachDelta(deltas, magnitudes, 'Chem', currentChemistry - baseline.chemistry);
+      pushSquadEditorCoachDelta(deltas, magnitudes, 'Chem', currentChemistry - baseline.chemistry);
     }
     const baseBody = this.lastCoachMoveRead.baseBody
       ?? this.lastCoachMoveRead.body.split(' Cambios:')[0];
-    const channelDeltas = this.buildCoachChannelDeltas(baseline.channels, magnitudes, baseBody);
-    const visualDeltas = this.buildCoachVisualChannelDeltas(baseline.visualChannels, magnitudes);
-    const visualEngineTension = this.buildVisualEngineTension(
+    const channelDeltas = buildSquadEditorCoachChannelDeltas(
+      baseline.channels,
+      this.getTacticalChannelScoresSnapshot(),
+      magnitudes,
+      baseBody
+    );
+    const visualDeltas = buildSquadEditorVisualChannelDeltas(
       baseline.visualChannels,
+      this.tacticalChannelBreakdown,
+      magnitudes
+    );
+    const visualEngineTension = buildSquadEditorVisualEngineTension(
+      baseline.visualChannels,
+      this.tacticalChannelBreakdown,
       this.attackRating - baseline.attack,
       this.defenseRating - baseline.defense
     );
-    const severity = this.describeCoachDeltaSeverity(magnitudes);
+    const severity = describeSquadEditorCoachDeltaSeverity(magnitudes);
     const channelImpact = channelDeltas.length > 0
       ? ` Canales: ${channelDeltas.join(' · ')}.`
       : '';
@@ -508,17 +526,10 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
       ...this.lastCoachMoveRead,
       baseBody,
       body: `${baseBody}${impact}`,
-      level: severity.includes('Impacto extremo') || this.visualDeltaHasHardWarning(visualDeltas) || !!visualEngineTension
+      level: severity.includes('Impacto extremo') || squadEditorVisualDeltaHasHardWarning(visualDeltas) || !!visualEngineTension
         ? 'danger'
         : this.lastCoachMoveRead.level,
     };
-  }
-
-  private pushCoachDelta(parts: string[], magnitudes: number[], label: string, delta: number): void {
-    if (!isFinite(delta) || Math.abs(delta) < 1) { return; }
-    const rounded = Math.round(delta);
-    magnitudes.push(Math.abs(rounded));
-    parts.push(`${label} ${rounded > 0 ? '+' : ''}${rounded}`);
   }
 
   private getTacticalChannelScoresSnapshot(): { left: number | null; center: number | null; right: number | null } {
@@ -533,124 +544,6 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   private readCoachChannelScore(scores: Record<string, number> | undefined, key: 'LEFT' | 'CENTER' | 'RIGHT'): number | null {
     const value = scores?.[key];
     return typeof value === 'number' && isFinite(value) ? value : null;
-  }
-
-  private buildCoachChannelDeltas(
-    baseline: { left: number | null; center: number | null; right: number | null },
-    magnitudes: number[],
-    baseBody = ''
-  ): string[] {
-    const current = this.getTacticalChannelScoresSnapshot();
-    const result: string[] = [];
-    this.pushCoachChannelDelta(result, magnitudes, 'L', baseline.left, current.left, baseBody);
-    this.pushCoachChannelDelta(result, magnitudes, 'C', baseline.center, current.center, baseBody);
-    this.pushCoachChannelDelta(result, magnitudes, 'R', baseline.right, current.right, baseBody);
-    return result;
-  }
-
-  private pushCoachChannelDelta(
-    parts: string[],
-    magnitudes: number[],
-    label: TacticalChannel,
-    before: number | null,
-    after: number | null,
-    baseBody = ''
-  ): void {
-    if (before === null || after === null) { return; }
-    const delta = Math.round(after - before);
-    if (Math.abs(delta) < 1) { return; }
-    magnitudes.push(Math.abs(delta));
-    const sign = delta > 0 ? '+' : '';
-    const isWideProjection = baseBody.includes('gana profundidad')
-      || baseBody.includes('Sube por banda')
-      || baseBody.includes('amenaza por banda');
-    const projectedWideTradeoff = delta < 0 && isWideProjection && label !== 'C';
-    const detail = projectedWideTradeoff
-      ? ' (mas profundidad, menos conexion/cobertura)'
-      : '';
-    parts.push(`${label} ${sign}${delta}${detail}`);
-  }
-
-  private buildCoachVisualChannelDeltas(
-    baseline: Array<{ label: TacticalChannel; threat: number; connection: number; coverage: number }>,
-    magnitudes: number[]
-  ): string[] {
-    const current = this.tacticalChannelBreakdown;
-    const result: string[] = [];
-    for (const before of baseline) {
-      const after = current.find(row => row.label === before.label);
-      if (!after) { continue; }
-      this.pushCoachVisualMetricDelta(result, magnitudes, before.label, 'Amenaza', before.threat, after.threat);
-      this.pushCoachVisualMetricDelta(result, magnitudes, before.label, 'Conexion', before.connection, after.connection);
-      this.pushCoachVisualMetricDelta(result, magnitudes, before.label, 'Cobertura', before.coverage, after.coverage);
-    }
-    return result.slice(0, 4);
-  }
-
-  private pushCoachVisualMetricDelta(
-    parts: string[],
-    magnitudes: number[],
-    channel: TacticalChannel,
-    label: 'Amenaza' | 'Conexion' | 'Cobertura',
-    before: number,
-    after: number
-  ): void {
-    const delta = Math.round(after - before);
-    if (!isFinite(delta) || Math.abs(delta) < 6) { return; }
-    magnitudes.push(Math.min(18, Math.ceil(Math.abs(delta) / 2)));
-    const sign = delta > 0 ? '+' : '';
-    parts.push(`${channel} ${label} ${sign}${delta}%`);
-  }
-
-  private visualDeltaHasHardWarning(visualDeltas: string[]): boolean {
-    return visualDeltas.some(delta =>
-      delta.includes('Cobertura -')
-      || delta.includes('Amenaza -')
-      || delta.includes('Conexion -'));
-  }
-
-  private buildVisualEngineTension(
-    baseline: Array<{ label: TacticalChannel; threat: number; connection: number; coverage: number }>,
-    attackDelta: number,
-    defenseDelta: number
-  ): string {
-    const current = this.tacticalChannelBreakdown;
-    let threatDelta = 0;
-    let coverageDelta = 0;
-    let connectionDelta = 0;
-    for (const before of baseline) {
-      const after = current.find(row => row.label === before.label);
-      if (!after) { continue; }
-      threatDelta += after.threat - before.threat;
-      coverageDelta += after.coverage - before.coverage;
-      connectionDelta += after.connection - before.connection;
-    }
-
-    if (threatDelta >= 12 && attackDelta <= -4) {
-      return 'sube la amenaza visual, pero baja ATT general. Probable penalizacion por rol/zona; conviene probarlo en harness.';
-    }
-    if (coverageDelta >= 12 && defenseDelta <= -4) {
-      return 'sube la cobertura visual, pero baja DEF general. Revisar si el motor penaliza el cambio de rol mas que la posicion.';
-    }
-    if (connectionDelta >= 12 && attackDelta + defenseDelta <= -10) {
-      return 'mejora la conexion visual, pero el balance general cae fuerte. Puede ser un tradeoff real o una frontera exagerada.';
-    }
-    return '';
-  }
-
-  private describeCoachDeltaSeverity(magnitudes: number[]): string {
-    if (magnitudes.length === 0) { return ''; }
-    const max = Math.max(...magnitudes);
-    if (max >= 25) {
-      return 'Impacto extremo: revisar si el movimiento representa un cambio táctico grande o si el motor está exagerando la frontera de zona.';
-    }
-    if (max >= 11) {
-      return 'Impacto fuerte: debería sentirse claramente en el partido.';
-    }
-    if (max >= 4) {
-      return 'Impacto medio: ajuste táctico perceptible, pero controlado.';
-    }
-    return 'Impacto leve: microajuste estable.';
   }
 
   private describeCoachMoveSpatialRead(
