@@ -7,6 +7,7 @@ import { Observable, forkJoin, merge, of, switchMap } from 'rxjs';
 import { catchError, ignoreElements, map, tap, timeout } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 import { MatchEngineService } from './match-engine.service';
+import { AppLoggerService } from './app-logger.service';
 import { CareerService } from './career.service';
 import { TeamService } from '../../features/teams/services/team.service';
 import { LiveFormationSlot, SubModalPlayer } from './match-engine.model';
@@ -35,6 +36,7 @@ export class LiveMatchModalsService {
   private careerService = inject(CareerService);
   private teamService = inject(TeamService);
   private engineService = inject(MatchEngineService);
+  private logger = inject(AppLoggerService);
   // Pause/resume endpoints are career-scoped; modal callers only pass matchId.
   // Read the active career from the route to keep the public modal API small.
   private router = inject(Router);
@@ -189,7 +191,7 @@ export class LiveMatchModalsService {
                 }
                 if (careerId && this.shouldResumeRoundAfterModalClose()) {
                   this.engineService.resumeRoundForMatch(careerId, matchId).subscribe({
-                    error: (err) => console.warn('Could not resume the round after closing the substitution modal:', err)
+                    error: (err) => this.logger.warn('Could not resume the round after closing the substitution modal:', err)
                   });
                 }
               }),
@@ -295,7 +297,7 @@ export class LiveMatchModalsService {
           tap(() => {
             if (careerId && this.shouldResumeRoundAfterModalClose()) {
               this.engineService.resumeRoundForMatch(careerId, matchId).subscribe({
-                error: (err) => console.warn('Could not resume the round after closing the formation modal:', err)
+                error: (err) => this.logger.warn('Could not resume the round after closing the formation modal:', err)
               });
             }
           }),
@@ -405,7 +407,7 @@ export class LiveMatchModalsService {
             this.rememberPartidoSavedSlots(matchId, closeResult);
             if (careerId && this.shouldResumeRoundAfterModalClose()) {
               this.engineService.resumeRoundForMatch(careerId, matchId).subscribe({
-                error: (err) => console.warn('Could not resume the round after closing the match modal:', err)
+                error: (err) => this.logger.warn('Could not resume the round after closing the match modal:', err)
               });
             }
         })).subscribe();
@@ -432,12 +434,12 @@ export class LiveMatchModalsService {
       return of(null);
     }
     if (!careerId) {
-      console.warn('could not resolve careerId from the current URL; the round will not be paused before opening the modal');
+      this.logger.warn('could not resolve careerId from the current URL; the round will not be paused before opening the modal');
       return of(null);
     }
     return this.engineService.pauseRoundForMatch(careerId, matchId).pipe(
       catchError(err => {
-        console.warn(`Could not pause the round before opening the ${modalName} modal:`, err);
+        this.logger.warn(`Could not pause the round before opening the ${modalName} modal:`, err);
         return of(null);
       })
     );

@@ -4,6 +4,7 @@ import { BehaviorSubject, Observable, Subject } from 'rxjs';
 import { map, switchMap } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 import { AuthService } from './auth.service';
+import { AppLoggerService } from './app-logger.service';
 import {
   MatchState,
   MatchCommand,
@@ -38,6 +39,7 @@ export class MatchEngineService {
   private http = inject(HttpClient);
   private ngZone = inject(NgZone);
   private authService = inject(AuthService);
+  private logger = inject(AppLoggerService);
   private apiUrl = `${environment.apiUrl}/match-engine`;
 
   // Starts the engine for one match.
@@ -204,7 +206,7 @@ export class MatchEngineService {
         degradedTimer = setTimeout(() => {
           // Only flag DEGRADED if the connection is supposed to be open.
           if (connected && !closed) {
-            console.warn(`[SSE-${label}] DEGRADED — no event in ${DEGRADED_GAP_MS}ms`);
+            this.logger.warn(`[SSE-${label}] DEGRADED - no event in ${DEGRADED_GAP_MS}ms`);
             setHealth('DEGRADED');
           }
         }, DEGRADED_GAP_MS);
@@ -256,9 +258,9 @@ export class MatchEngineService {
             reader.read().then(({ done, value }) => {
               if (done) {
                 if (!closed) {
-                  // Server closed the stream without us completing it —
+                  // Server closed the stream without us completing it.
                   // treat as a transient drop and reconnect.
-                  console.warn(`[SSE-${label}] Stream ended by server, reconnecting`);
+                  this.logger.warn(`[SSE-${label}] Stream ended by server, reconnecting`);
                   connected = false;
                   scheduleReconnect();
                 }
@@ -297,7 +299,7 @@ export class MatchEngineService {
                     }
                   });
                 } catch (error) {
-                  console.error(`[SSE-${label}] ❌ Error parsing SSE data:`, error);
+                  this.logger.error(`[SSE-${label}] Error parsing SSE data:`, error);
                 }
               }
 
@@ -311,7 +313,7 @@ export class MatchEngineService {
             connected = false;
             return;
           }
-          console.warn(`[SSE-${label}] fetch error:`, err);
+          this.logger.warn(`[SSE-${label}] fetch error:`, err);
           connected = false;
           scheduleReconnect();
         }
@@ -322,7 +324,7 @@ export class MatchEngineService {
           return;
         }
         if (attempt >= RECONNECT_MAX_ATTEMPTS) {
-          console.error(`[SSE-${label}] CLOSED — gave up after ${attempt} attempts`);
+          this.logger.error(`[SSE-${label}] CLOSED - gave up after ${attempt} attempts`);
           setHealth('CLOSED');
           return;
         }
