@@ -8,7 +8,7 @@ import { AppLoggerService } from '../../core/services/app-logger.service';
 import { environment } from '../../environments/environment';
 import { readableErrorMessage } from '../../shared/utils/error-message';
 import { Observable, BehaviorSubject, combineLatest, firstValueFrom, concat } from 'rxjs';
-import { map, switchMap, catchError, take, tap, startWith, distinctUntilChanged, shareReplay } from 'rxjs/operators';
+import { map, switchMap, catchError, take, startWith, distinctUntilChanged, shareReplay } from 'rxjs/operators';
 import { of } from 'rxjs';
 
 interface League {

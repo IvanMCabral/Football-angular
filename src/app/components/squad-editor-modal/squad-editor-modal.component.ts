@@ -1700,6 +1700,11 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     this.onFormationChange(newValue);
   }
 
+  onFormationSelectChange(event: Event): void {
+    const select = event.target instanceof HTMLSelectElement ? event.target : null;
+    this.onFormationSelect(select?.value ?? '');
+  }
+
   get userFormationLabel(): string {
     return USER_FORMATION_LABEL;
   }

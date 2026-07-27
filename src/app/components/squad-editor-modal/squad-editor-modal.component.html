@@ -7,7 +7,7 @@
           <label>Formación:</label>
 
           <select [value]="dropdownFormationValue"
-                  (change)="onFormationSelect($any($event.target).value)"
+                  (change)="onFormationSelectChange($event)"
                   [disabled]="isFormationChanging"
                   [title]="(isCustomLineup() ? 'Tu lineup personalizado no coincide con una formación canónica' : '')">
             <option *ngFor="let f of formations" [value]="f">{{f}}</option>

@@ -14,7 +14,7 @@ export function computeSquadEditorAvgAttribute(
   let count = 0;
 
   for (const player of players) {
-    const value = (player as unknown as Record<string, unknown>)[attr];
+    const value = player[attr];
     const rating = typeof value === 'number' && Number.isFinite(value)
       ? value
       : (typeof player.overall === 'number' ? player.overall : 70);

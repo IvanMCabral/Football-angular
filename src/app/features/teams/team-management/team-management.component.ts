@@ -9,7 +9,7 @@ import { AppLoggerService } from '../../../core/services/app-logger.service';
 import { environment } from '../../../environments/environment';
 import { readableErrorMessage } from '../../../shared/utils/error-message';
 import { Observable, of, BehaviorSubject, Subject, merge, combineLatest } from 'rxjs';
-import { switchMap, catchError, startWith, map, shareReplay, tap } from 'rxjs/operators';
+import { switchMap, catchError, startWith, map, shareReplay } from 'rxjs/operators';
 
 interface League {
   realLeagueId: string;
