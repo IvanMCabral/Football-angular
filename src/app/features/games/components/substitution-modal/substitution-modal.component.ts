@@ -17,6 +17,12 @@ import { concatMap, finalize, switchMap, timeout, toArray } from 'rxjs/operators
 import { MatchEngineService } from '../../../../core/services/match-engine.service';
 import { SubModalPlayer, SubstitutionResult, V24LivePlayerRating } from '../../../../core/services/match-engine.model';
 import { clampFieldPercentRounded, clampFieldPixelTweak } from '../../../../shared/utils/field-percent.utils';
+import { buildSubstitutionPitchLines, SubstitutionPitchLine } from './substitution-modal-pitch.utils';
+import {
+  CoachObjective,
+  RecommendedSubstitution,
+  scoreRecommendedSubstitution
+} from './substitution-modal-recommendation.utils';
 
 export interface SubstitutionDialogData {
   matchId: string;
@@ -42,14 +48,6 @@ export interface SubstitutionDialogData {
   reason?: 'INJURY_FORCED_SUBSTITUTION' | 'MANUAL';
 }
 
-type CoachObjective = 'NEED_GOAL' | 'PROTECT_RESULT' | 'NEUTRAL';
-
-/** Row rendered on the visual pitch inside the substitution modal. */
-interface PitchLine {
-  category: 'GK' | 'DEF' | 'MID' | 'WINGER' | 'ATT';
-  players: SubModalPlayer[];
-}
-
 interface PendingSubstitution {
   playerOffId: string;
   playerOnId: string;
@@ -60,14 +58,6 @@ interface PendingSubstitution {
 interface PlayerPositionTweak {
   x: number;
   y: number;
-}
-
-interface RecommendedSubstitution {
-  playerOff: SubModalPlayer;
-  playerOn: SubModalPlayer;
-  reason: string;
-  score: number;
-  kind?: 'medical' | 'tactical';
 }
 
 /**
@@ -929,7 +919,7 @@ export class SubstitutionModalComponent {
         : null;
       return benchPlayer ? { ...benchPlayer, isStarter: true } : starter;
     });
-    const visibleLines = this.buildPitchLines(finalXi);
+    const visibleLines = buildSubstitutionPitchLines(finalXi);
     const slots: Array<{
       sessionPlayerId: string;
       position: string;
@@ -1000,35 +990,8 @@ export class SubstitutionModalComponent {
   }
 
   // Visual pitch rows grouped by position category.
-  get pitchLines(): PitchLine[] {
-    return this.buildPitchLines(this.effectiveStartingXi);
-  }
-
-  private buildPitchLines(players: SubModalPlayer[]): PitchLine[] {
-    const lines: PitchLine[] = [
-      { category: 'GK',      players: [] },
-      { category: 'DEF',     players: [] },
-      { category: 'MID',     players: [] },
-      { category: 'WINGER',  players: [] },
-      { category: 'ATT',     players: [] }
-    ];
-    const categorize = (pos: string): number => {
-      const p = (pos || 'MID').toUpperCase();
-      if (p === 'GK' || p.startsWith('GK')) return 0;
-      if (p === 'DEF' || p === 'D' || p === 'CB' || p === 'LB' || p === 'RB' || p === 'LWB' || p === 'RWB') return 1;
-      // WINGER check is more specific than the generic MID/ATT checks below.
-      if (p === 'WINGER' || p === 'W' || p === 'LW' || p === 'RW' || p === 'LWF' || p === 'RWF') return 3;
-      if (p === 'MID' || p === 'M' || p === 'CM' || p === 'CDM' || p === 'CAM' || p === 'LM' || p === 'RM') return 2;
-      if (p === 'ATT' || p === 'A' || p === 'ST' || p === 'CF' || p === 'FW' || p === 'LF' || p === 'RF') return 4;
-      // Defensive default for unknown positions.
-      return 2;
-    };
-    for (const p of players) {
-      const bucket = categorize(p.position);
-      lines[bucket].players.push(p);
-    }
-    // Drop empty trailing lines so 4-3-3 doesn't render an empty WINGER row.
-    return lines.filter(line => line.players.length > 0);
+  get pitchLines(): SubstitutionPitchLine[] {
+    return buildSubstitutionPitchLines(this.effectiveStartingXi);
   }
 
   private basePercentForVisualSlot(
@@ -1065,100 +1028,14 @@ export class SubstitutionModalComponent {
     playerOn: SubModalPlayer,
     kind: 'medical' | 'tactical' = 'tactical'
   ): RecommendedSubstitution {
-    const offRating = playerOff.rating ?? 70;
-    const onRating = playerOn.rating ?? 70;
-    const ratingDelta = onRating - offRating;
-    const sameLine = this.positionGroup(playerOff.position) === this.positionGroup(playerOn.position);
-    const roleShiftPenalty = sameLine ? 0 : -2.5;
-    const injuryBonus = kind === 'medical' || this.isActiveInjuredStarter(playerOff.sessionPlayerId) ? 18 : 0;
-    let objectiveScore = 0;
-    let reason = '';
-    if (kind === 'medical') {
-      const sameProfile = this.positionProfile(playerOff.position) === this.positionProfile(playerOn.position);
-      const offLine = this.positionGroup(playerOff.position);
-      const onLine = this.positionGroup(playerOn.position);
-      const sameLine = offLine === onLine;
-      const adjacentAttackingCover = offLine === 'ATT' && onLine === 'WINGER' ? 3 : 0;
-      const centralMidCoverPenalty = offLine === 'ATT' && onLine === 'MID' ? -1 : 0;
-      const profileBonus = sameProfile ? 8 : sameLine ? 4 : -7;
-      const ratingSafety = Math.max(-3, ratingDelta * 0.35);
-      objectiveScore = 100
-        + profileBonus
-        + adjacentAttackingCover
-        + centralMidCoverPenalty
-        + ratingSafety
-        + this.balancedIntent(playerOn);
-      reason = `Prioridad médica: ${playerOff.displayName} está lesionado. Si lo dejás en cancha, el equipo sigue jugando con penalización.`;
-      return {
-        playerOff,
-        playerOn,
-        reason,
-        score: objectiveScore,
-        kind
-      };
-    }
-    if (this.coachObjective === 'NEED_GOAL') {
-      const sameProfile = this.positionProfile(playerOff.position) === this.positionProfile(playerOn.position);
-      const sameLine = this.positionGroup(playerOff.position) === this.positionGroup(playerOn.position);
-      const profileBonus = sameProfile ? 4 : sameLine ? 2 : -5;
-      const defensiveBreakPenalty = this.positionGroup(playerOff.position) === 'DEF' && this.positionGroup(playerOn.position) === 'ATT'
-        ? -8
-        : 0;
-      objectiveScore = this.attackIntent(playerOn) * 4
-        + Math.max(0, ratingDelta) * 0.55
-        + profileBonus
-        + defensiveBreakPenalty
-        + injuryBonus;
-      reason = this.data.preSelectedPlayerId === playerOff.sessionPlayerId
-        ? 'Prioriza un reemplazo que no apague el ataque.'
-        : 'Prioriza amenaza ofensiva y llegada.';
-    } else if (this.coachObjective === 'PROTECT_RESULT') {
-      const sameProfile = this.positionProfile(playerOff.position) === this.positionProfile(playerOn.position);
-      const onLine = this.positionGroup(playerOn.position);
-      const profileBonus = onLine === 'ATT'
-        ? -4
-        : onLine === 'WINGER'
-          ? -1
-          : sameProfile
-            ? 4
-            : sameLine
-              ? 1
-              : -5;
-      const protectionGain = this.protectIntent(playerOn) - this.protectIntent(playerOff);
-      const defensiveStarterPenalty = this.positionGroup(playerOff.position) === 'DEF' && !sameProfile
-        ? -4
-        : 0;
-      const attackingBenchPenalty = onLine === 'ATT'
-        ? -4
-        : onLine === 'WINGER'
-          ? -1.5
-          : 0;
-      objectiveScore = protectionGain * 3
-        + this.protectIntent(playerOn) * 1.2
-        + Math.max(0, ratingDelta) * 0.45
-        + profileBonus
-        + defensiveStarterPenalty
-        + attackingBenchPenalty
-        + injuryBonus;
-      reason = this.data.preSelectedPlayerId === playerOff.sessionPlayerId
-        ? 'Prioriza sostener estructura y bajar riesgo.'
-        : 'Prioriza estructura, marca y control del riesgo.';
-    } else {
-      objectiveScore = ratingDelta
-        + (sameLine ? 3 : -1.5)
-        + this.balancedIntent(playerOn) * 1.5
-        + injuryBonus;
-      reason = sameLine
-        ? 'Cambio natural para mejorar sin romper la estructura.'
-        : 'Mejora posible, pero cambia la estructura del equipo.';
-    }
-    return {
+    return scoreRecommendedSubstitution({
       playerOff,
       playerOn,
-      reason,
-      score: objectiveScore,
-      kind
-    };
+      kind,
+      coachObjective: this.coachObjective,
+      preSelectedPlayerId: this.data.preSelectedPlayerId,
+      isActiveInjuredStarter: playerId => this.isActiveInjuredStarter(playerId)
+    });
   }
 
   private activeInjuredStarter(): SubModalPlayer | null {
@@ -1181,58 +1058,12 @@ export class SubstitutionModalComponent {
     return (this.getRating(playerId)?.injuries ?? 0) > 0;
   }
 
-  private attackIntent(player: SubModalPlayer): number {
-    switch (this.positionGroup(player.position)) {
-      case 'ATT': return 3;
-      case 'WINGER': return 2.6;
-      case 'MID': return 1.5;
-      case 'DEF': return 0.4;
-      default: return 0;
-    }
-  }
-
-  private protectIntent(player: SubModalPlayer): number {
-    switch (this.positionGroup(player.position)) {
-      case 'DEF': return 3;
-      case 'MID': return 2.2;
-      case 'WINGER': return 1.1;
-      case 'ATT': return 0.3;
-      default: return 0;
-    }
-  }
-
-  private balancedIntent(player: SubModalPlayer): number {
-    const group = this.positionGroup(player.position);
-    return group === 'MID' ? 2 : group === 'DEF' || group === 'ATT' ? 1.4 : 1.2;
-  }
-
-  private positionGroup(position: string): PitchLine['category'] {
-    const p = (position || 'MID').toUpperCase();
-    if (p === 'GK' || p.startsWith('GK')) return 'GK';
-    if (p === 'DEF' || p === 'D' || p === 'CB' || p === 'LB' || p === 'RB' || p === 'LWB' || p === 'RWB') return 'DEF';
-    if (p === 'WINGER' || p === 'W' || p === 'LW' || p === 'RW' || p === 'LWF' || p === 'RWF') return 'WINGER';
-    if (p === 'ATT' || p === 'A' || p === 'ST' || p === 'CF' || p === 'FW' || p === 'LF' || p === 'RF') return 'ATT';
-    return 'MID';
-  }
-
-  private positionProfile(position: string): string {
-    const p = (position || 'MID').toUpperCase();
-    if (p === 'GK' || p.startsWith('GK')) return 'GK';
-    if (p === 'CB' || p === 'DEF') return 'CB';
-    if (p === 'LB' || p === 'RB' || p === 'LWB' || p === 'RWB') return 'FB';
-    if (p === 'LW' || p === 'RW' || p === 'WINGER' || p === 'LWF' || p === 'RWF') return 'WIDE';
-    if (p === 'ST' || p === 'CF' || p === 'FW' || p === 'ATT') return 'ST';
-    if (p === 'CAM' || p === 'AM') return 'AM';
-    if (p === 'CDM' || p === 'DM') return 'DM';
-    return 'CM';
-  }
-
   /**
    * : dot's category-class binding. Maps the pitch-line category
    * (GK / DEF / MID / WINGER / ATT) to the CSS class used by the inline
    * styles (is-gk / is-def / is-mid / is-winger / is-att).
    */
-  dotClass(lineCategory: PitchLine['category']): string {
+  dotClass(lineCategory: SubstitutionPitchLine['category']): string {
     return `is-${lineCategory.toLowerCase()}`;
   }
 
@@ -1263,7 +1094,7 @@ export class SubstitutionModalComponent {
    * tick).
    */
   trackByDot = (_idx: number, p: SubModalPlayer) => p.sessionPlayerId;
-  trackByLine = (_idx: number, line: PitchLine) => line.category;
+  trackByLine = (_idx: number, line: SubstitutionPitchLine) => line.category;
 
   ngOnDestroy(): void {
     this.destroy$.next();
