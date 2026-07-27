@@ -75,8 +75,12 @@ import {
   SquadEditorRect,
   computeSquadEditorSlotCenter,
   computeSquadEditorFieldDropPercent,
+  findClosestSquadEditorSubdivision,
+  getSquadEditorFormationPositionCoord,
+  getSquadEditorMarkerCoord,
   isPointOverAnyInsetRect,
   isSquadEditorDropNearSlotCenter,
+  squadEditorSubdivisionIdFromDropListId,
 } from './squad-editor-modal-geometry.utils';
 import {
   detectSquadEditorFormationFromFamilies,
@@ -1139,8 +1143,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   }
 
   private subdivisionIdFromDropListId(dropListId: string): string | null {
-    if (!dropListId || !dropListId.startsWith('slot-')) { return null; }
-    return dropListId.substring('slot-'.length);
+    return squadEditorSubdivisionIdFromDropListId(dropListId);
   }
 
   private markerPickupOffset = new Map<string, { x: number; y: number }>();
@@ -1412,20 +1415,14 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     yPct: number,
     player?: PlayerOnFieldDto
   ): FieldSubdivisionDTO | null {
-    let best: FieldSubdivisionDTO | null = null;
-    let bestDist = Infinity;
-    for (const sub of this.subdivisions) {
-      if (player && !this.canPlayerUseSlot(player, sub.subdivisionId)) {
-        continue;
-      }
-      const cx = sub.left + sub.width / 2;
-      const cy = sub.top + sub.height / 2;
-      const dx = cx - xPct;
-      const dy = cy - yPct;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < bestDist) { bestDist = dist; best = sub; }
-    }
-    return best;
+    return findClosestSquadEditorSubdivision({
+      xPct,
+      yPct,
+      subdivisions: this.subdivisions,
+      canUseSubdivision: player
+        ? (sub) => this.canPlayerUseSlot(player, sub.subdivisionId)
+        : undefined,
+    });
   }
 
   private persistLastModalMoveHarnessCase(
@@ -1464,35 +1461,29 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   }
 
   getMarkerX(player: PlayerOnFieldDto): number {
-    if (typeof player.xPercent === 'number' && isFinite(player.xPercent)) {
-      return clampFieldPercent(player.xPercent);
-    }
-    if (!player.slotId) { return 50; }
-    const formationX = this.getFormationPositionCoord(player.slotId, 'x');
-    if (formationX !== null) { return formationX; }
-    const cx = this.getSlotCenterX(player.slotId);
-    return isFinite(cx) ? cx : 50;
+    return getSquadEditorMarkerCoord({
+      player,
+      axis: 'x',
+      positions: this.formationPositions[this.selectedFormation],
+      subdivisions: this.subdivisions,
+    });
   }
 
   getMarkerY(player: PlayerOnFieldDto): number {
-    if (typeof player.yPercent === 'number' && isFinite(player.yPercent)) {
-      return clampFieldPercent(player.yPercent);
-    }
-    if (!player.slotId) { return 50; }
-    const formationY = this.getFormationPositionCoord(player.slotId, 'y');
-    if (formationY !== null) { return formationY; }
-    const cy = this.getSlotCenterY(player.slotId);
-    return isFinite(cy) ? cy : 50;
+    return getSquadEditorMarkerCoord({
+      player,
+      axis: 'y',
+      positions: this.formationPositions[this.selectedFormation],
+      subdivisions: this.subdivisions,
+    });
   }
 
   private getFormationPositionCoord(slotId: string, axis: 'x' | 'y'): number | null {
-    const positions = this.formationPositions[this.selectedFormation];
-    if (!positions || positions.length === 0) { return null; }
-    const pos = positions.find(p => p.subdivisionId === slotId);
-    if (!pos) { return null; }
-    const value = axis === 'x' ? pos.xPercent : pos.yPercent;
-    if (typeof value !== 'number' || !isFinite(value)) { return null; }
-    return clampFieldPercent(value);
+    return getSquadEditorFormationPositionCoord({
+      slotId,
+      axis,
+      positions: this.formationPositions[this.selectedFormation],
+    });
   }
 
   resetCustomPositions(): void {

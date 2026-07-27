@@ -1,4 +1,7 @@
 import { clampFieldPercent } from '../../shared/utils/field-percent.utils';
+import { FieldSubdivisionDTO } from '../../shared/models/lineup/field-subdivision.dto';
+import { FormationPositionDTO } from '../../shared/models/lineup/formation.dto';
+import { PlayerOnFieldDto } from '../../shared/models/lineup/player-on-field.dto';
 
 export interface SquadEditorPoint {
   x: number;
@@ -98,4 +101,81 @@ export function isSquadEditorDropNearSlotCenter(params: {
   }
 
   return Math.hypot(params.drop.xPct - params.center.x, params.drop.yPct - params.center.y) <= thresholdPct;
+}
+
+export function squadEditorSubdivisionIdFromDropListId(dropListId: string): string | null {
+  if (!dropListId || !dropListId.startsWith('slot-')) { return null; }
+  return dropListId.substring('slot-'.length);
+}
+
+export function findClosestSquadEditorSubdivision(params: {
+  xPct: number;
+  yPct: number;
+  subdivisions: readonly FieldSubdivisionDTO[];
+  canUseSubdivision?: (subdivision: FieldSubdivisionDTO) => boolean;
+}): FieldSubdivisionDTO | null {
+  let best: FieldSubdivisionDTO | null = null;
+  let bestDist = Infinity;
+
+  for (const sub of params.subdivisions) {
+    if (params.canUseSubdivision && !params.canUseSubdivision(sub)) {
+      continue;
+    }
+
+    const centerX = sub.left + sub.width / 2;
+    const centerY = sub.top + sub.height / 2;
+    const distance = Math.hypot(centerX - params.xPct, centerY - params.yPct);
+    if (distance < bestDist) {
+      bestDist = distance;
+      best = sub;
+    }
+  }
+
+  return best;
+}
+
+export function getSquadEditorFormationPositionCoord(params: {
+  slotId: string;
+  axis: 'x' | 'y';
+  positions: readonly FormationPositionDTO[] | undefined;
+}): number | null {
+  const pos = params.positions?.find(p => p.subdivisionId === params.slotId);
+  if (!pos) { return null; }
+
+  const value = params.axis === 'x' ? pos.xPercent : pos.yPercent;
+  if (typeof value !== 'number' || !isFinite(value)) { return null; }
+  return clampFieldPercent(value);
+}
+
+export function getSquadEditorMarkerCoord(params: {
+  player: PlayerOnFieldDto;
+  axis: 'x' | 'y';
+  positions: readonly FormationPositionDTO[] | undefined;
+  subdivisions: readonly FieldSubdivisionDTO[];
+  fallback?: number;
+}): number {
+  const override = params.axis === 'x'
+    ? params.player.xPercent
+    : params.player.yPercent;
+  const fallback = params.fallback ?? 50;
+
+  if (typeof override === 'number' && isFinite(override)) {
+    return clampFieldPercent(override);
+  }
+  if (!params.player.slotId) { return fallback; }
+
+  const formationCoord = getSquadEditorFormationPositionCoord({
+    slotId: params.player.slotId,
+    axis: params.axis,
+    positions: params.positions,
+  });
+  if (formationCoord !== null) { return formationCoord; }
+
+  const sub = params.subdivisions.find(s => s.subdivisionId === params.player.slotId);
+  if (!sub) { return fallback; }
+
+  const center = params.axis === 'x'
+    ? sub.left + sub.width / 2
+    : sub.top + sub.height / 2;
+  return isFinite(center) ? center : fallback;
 }
