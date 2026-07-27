@@ -2,7 +2,13 @@ import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
+import { AppLoggerService } from '../../core/services/app-logger.service';
 import { TeamService } from './services/team.service';
+import { Team } from '../../shared/models/team.model';
+
+type ChooseTeamOption = Team & {
+  nombre?: string;
+};
 
 @Component({
   selector: 'app-choose-team',
@@ -14,40 +20,38 @@ import { TeamService } from './services/team.service';
 export class ChooseTeamComponent implements OnInit {
   private teamService = inject(TeamService);
   private authService = inject(AuthService);
+  private logger = inject(AppLoggerService);
   private router = inject(Router);
-  teams: any[] = [];
+
+  teams: ChooseTeamOption[] = [];
   loading = true;
   errorMessage = '';
   successMessage = '';
-  selectedTeam: any = null;
+  selectedTeam: ChooseTeamOption | null = null;
   saving = false;
 
   ngOnInit(): void {
     this.teamService.getAllTeams().subscribe({
-      next: (teams: any[]) => {
-        if (Array.isArray(teams)) {
-          this.teams = teams;
-        } else {
-          this.teams = [];
-        }
+      next: (teams: ChooseTeamOption[]) => {
+        this.teams = Array.isArray(teams) ? teams : [];
         this.loading = false;
-        if (!teams || teams.length === 0) {
+        if (this.teams.length === 0) {
           this.errorMessage = 'No hay equipos disponibles.';
         }
       },
       error: (err) => {
-        console.error('[CHOOSE TEAM] Error al cargar equipos:', err);
+        this.logger.error('[CHOOSE TEAM] Error al cargar equipos:', err);
         this.errorMessage = 'No se pudieron cargar los equipos.';
         this.loading = false;
       }
     });
   }
 
-  chooseTeam(team: any) {
+  chooseTeam(team: ChooseTeamOption): void {
     this.selectedTeam = team;
   }
 
-  assignTeam() {
+  assignTeam(): void {
     if (!this.selectedTeam) return;
     this.saving = true;
     this.authService.assignTeamToUser(this.selectedTeam.id).subscribe({
@@ -59,7 +63,7 @@ export class ChooseTeamComponent implements OnInit {
       error: (err) => {
         this.errorMessage = 'No se pudo asignar el equipo.';
         this.saving = false;
-        console.error('[CHOOSE TEAM] Error en asignación:', err);
+        this.logger.error('[CHOOSE TEAM] Error en asignación:', err);
       }
     });
   }

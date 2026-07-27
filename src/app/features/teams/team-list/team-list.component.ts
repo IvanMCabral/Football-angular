@@ -4,6 +4,7 @@ import { RouterLink } from '@angular/router';
 import { Observable } from 'rxjs';
 import { TeamService } from '../services/team.service';
 import { ToastService } from '../../../core/services/toast.service';
+import { AppLoggerService } from '../../../core/services/app-logger.service';
 import { SessionTeam } from '../../../shared/models/team.model';
 
 @Component({
@@ -16,6 +17,7 @@ import { SessionTeam } from '../../../shared/models/team.model';
 export class TeamListComponent implements OnInit {
   private teamService = inject(TeamService);
   private toastService = inject(ToastService);
+  private logger = inject(AppLoggerService);
 
   sessionTeams$: Observable<SessionTeam[]> = this.teamService.sessionTeams$;
   loading = false;
@@ -34,7 +36,7 @@ export class TeamListComponent implements OnInit {
         this.loading = false;
       },
       error: (err) => {
-        console.error('[TEAM LIST] Error loading session teams:', err);
+        this.logger.error('[TEAM LIST] Error loading session teams:', err);
         this.loading = false;
         this.errorMessage = err.error?.message || 'Error loading teams';
       }
@@ -47,7 +49,7 @@ export class TeamListComponent implements OnInit {
         this.toastService.success(`Equipo "${team.name}" eliminado`);
       },
       error: (err) => {
-        console.error('[TEAM LIST] Error deleting team:', err);
+        this.logger.error('[TEAM LIST] Error deleting team:', err);
         this.toastService.error('Error al eliminar el equipo');
       }
     });

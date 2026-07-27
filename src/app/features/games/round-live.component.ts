@@ -1,8 +1,9 @@
-import { Component, inject, isDevMode, OnInit, OnDestroy } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 import { MatchEngineService } from '../../core/services/match-engine.service';
 import { CareerService } from '../../core/services/career.service';
+import { AppLoggerService } from '../../core/services/app-logger.service';
 import { LiveMatchModalsService } from '../../core/services/live-match-modals.service';
 import { Match } from '../../shared/models/match.model';
 import { BehaviorSubject, Observable, combineLatest, of } from 'rxjs';
@@ -81,19 +82,16 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
   private modals = inject(LiveMatchModalsService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
+  private logger = inject(AppLoggerService);
 
   private destroy$ = new Subject<void>();
 
   private logDevWarn(message: string, ...args: unknown[]): void {
-    if (isDevMode()) {
-      console.warn(message, ...args);
-    }
+    this.logger.warn(message, ...args);
   }
 
   private logDevError(message: string, ...args: unknown[]): void {
-    if (isDevMode()) {
-      console.error(message, ...args);
-    }
+    this.logger.error(message, ...args);
   }
 
   /**

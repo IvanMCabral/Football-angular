@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { environment } from '../../environments/environment';
 
 export interface League {
   id: string;
@@ -11,7 +12,7 @@ export interface League {
 
 @Injectable({ providedIn: 'root' })
 export class LeagueService {
-  private apiUrl = '/api/v1/leagues';
+  private apiUrl = `${environment.apiUrl}/leagues`;
 
   constructor(private http: HttpClient) {}
 

@@ -1,11 +1,18 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { FixtureResponse } from '../../models/fixture.model';
+import { environment } from '../../environments/environment';
+
+export interface CareerFixtureListResponse {
+  rounds?: unknown[];
+  matches?: unknown[];
+  [key: string]: unknown;
+}
 
 @Injectable({ providedIn: 'root' })
 export class FixtureService {
-  private apiUrl = '/api/v1/fixtures';
+  private apiUrl = `${environment.apiUrl}/fixtures`;
+  private careerApiUrl = `${environment.apiUrl}/career`;
 
   constructor(private http: HttpClient) {}
 
@@ -16,7 +23,7 @@ export class FixtureService {
   /**
    * Devuelve todos los fixtures de la carrera organizados por ronda
    */
-  getAllFixtures(): Observable<any> {
-    return this.http.get<any>(`/api/v1/career/fixtures/all`);
+  getAllFixtures(): Observable<CareerFixtureListResponse> {
+    return this.http.get<CareerFixtureListResponse>(`${this.careerApiUrl}/fixtures/all`);
   }
 }

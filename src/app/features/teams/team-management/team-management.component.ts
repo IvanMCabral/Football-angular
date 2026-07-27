@@ -5,6 +5,8 @@ import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { ToastService } from '../../../core/services/toast.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { AppLoggerService } from '../../../core/services/app-logger.service';
+import { environment } from '../../../environments/environment';
 import { Observable, of, BehaviorSubject, Subject, merge, combineLatest } from 'rxjs';
 import { switchMap, catchError, startWith, map, shareReplay, tap } from 'rxjs/operators';
 
@@ -30,6 +32,18 @@ interface Player {
   overallRating: number;
 }
 
+interface CurrentUser {
+  id: string;
+}
+
+interface WorldTeam {
+  worldTeamId: string;
+  name: string;
+  country: string;
+  city?: string;
+  realLeagueId?: string | number | null;
+}
+
 @Component({
   selector: 'app-team-management',
   standalone: true,
@@ -41,6 +55,8 @@ export class TeamManagementComponent {
   private http = inject(HttpClient);
   private toastService = inject(ToastService);
   private authService = inject(AuthService);
+  private logger = inject(AppLoggerService);
+  private apiUrl = environment.apiUrl;
 
   // Reactive state
   selectedLeagueId$ = new BehaviorSubject<string | null>(null);
@@ -49,10 +65,10 @@ export class TeamManagementComponent {
 
   // Leagues observable - usa world endpoint que tiene WorldLeague
   leagues$: Observable<League[]> = this.authService.getUserInfo().pipe(
-    switchMap((userInfo: any) =>
-      this.http.get<League[]>(`http://localhost:8080/api/v1/world/leagues?userId=${userInfo.id}`).pipe(
+    switchMap((userInfo: CurrentUser) =>
+      this.http.get<League[]>(`${this.apiUrl}/world/leagues?userId=${userInfo.id}`).pipe(
         catchError(err => {
-          console.error('Failed to load leagues:', err);
+          this.logger.error('Failed to load leagues:', err);
           this.toastService.error('Failed to load leagues');
           return of([]);
         })
@@ -80,9 +96,9 @@ export class TeamManagementComponent {
     startWith(null),
     switchMap(_ => 
       this.authService.getUserInfo().pipe(
-        switchMap((userInfo: any) => 
-          this.http.get<any[]>(`http://localhost:8080/api/v1/world/teams?userId=${userInfo.id}`).pipe(
-            map(worldTeams => worldTeams.map((wt: any) => ({
+        switchMap((userInfo: CurrentUser) => 
+          this.http.get<WorldTeam[]>(`${this.apiUrl}/world/teams?userId=${userInfo.id}`).pipe(
+            map(worldTeams => worldTeams.map((wt) => ({
               id: wt.worldTeamId,
               name: wt.name,
               country: wt.country,
@@ -90,13 +106,13 @@ export class TeamManagementComponent {
               leagueId: wt.realLeagueId?.toString() // El campo correcto es realLeagueId
             }))),
             catchError(err => {
-              console.error('Failed to load teams:', err);
+              this.logger.error('Failed to load teams:', err);
               return of([]);
             })
           )
         ),
         catchError(err => {
-          console.error('Failed to get user info:', err);
+          this.logger.error('Failed to get user info:', err);
           return of([]);
         })
       )
@@ -130,9 +146,9 @@ export class TeamManagementComponent {
   rosterPlayers$: Observable<Player[]> = this.selectedTeamForRoster$.pipe(
     switchMap(team => {
       if (!team) return of([]);
-      return this.http.get<Player[]>(`http://localhost:8080/api/v1/teams/${team.id}/roster`).pipe(
+      return this.http.get<Player[]>(`${this.apiUrl}/teams/${team.id}/roster`).pipe(
         catchError(err => {
-          console.error('Failed to load roster:', err);
+          this.logger.error('Failed to load roster:', err);
           this.toastService.error('Failed to load roster');
           return of([]);
         })
@@ -152,8 +168,8 @@ export class TeamManagementComponent {
     if (!leagueId) return;
 
     this.authService.getUserInfo().pipe(
-      switchMap((userInfo: any) =>
-        this.http.post(`http://localhost:8080/api/v1/world/leagues/${leagueId}/add-team`, {
+      switchMap((userInfo: CurrentUser) =>
+        this.http.post(`${this.apiUrl}/world/leagues/${leagueId}/add-team`, {
           userId: userInfo.id,
           teamId: team.id
         })
@@ -164,7 +180,7 @@ export class TeamManagementComponent {
         this.reloadTeams$.next();
       },
       error: (err) => {
-        console.error('Failed to add team:', err);
+        this.logger.error('Failed to add team:', err);
         this.toastService.error('Failed to add team');
       }
     });
@@ -175,8 +191,8 @@ export class TeamManagementComponent {
     if (!leagueId) return;
 
     this.authService.getUserInfo().pipe(
-      switchMap((userInfo: any) => 
-        this.http.delete(`http://localhost:8080/api/v1/world/leagues/${leagueId}/remove-team/${team.id}?userId=${userInfo.id}`)
+      switchMap((userInfo: CurrentUser) => 
+        this.http.delete(`${this.apiUrl}/world/leagues/${leagueId}/remove-team/${team.id}?userId=${userInfo.id}`)
       )
     ).subscribe({
       next: () => {
@@ -184,7 +200,7 @@ export class TeamManagementComponent {
         this.reloadTeams$.next();
       },
       error: (err) => {
-        console.error('Failed to remove team:', err);
+        this.logger.error('Failed to remove team:', err);
         this.toastService.error('Failed to remove team');
       }
     });
@@ -202,14 +218,14 @@ export class TeamManagementComponent {
     const team = this.selectedTeamForRoster$.value;
     if (!team) return;
 
-    this.http.delete(`http://localhost:8080/api/v1/teams/${team.id}/remove-player/${player.id}`).subscribe({
+    this.http.delete(`${this.apiUrl}/teams/${team.id}/remove-player/${player.id}`).subscribe({
       next: () => {
         this.toastService.success(`${player.name} removed from roster!`);
         // Reload roster by re-emitting the same team
         this.selectedTeamForRoster$.next(team);
       },
       error: (err) => {
-        console.error('Failed to remove player:', err);
+        this.logger.error('Failed to remove player:', err);
         this.toastService.error('Failed to remove player from roster');
       }
     });

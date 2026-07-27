@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../core/services/auth.service';
+import { AppLoggerService } from '../../core/services/app-logger.service';
 import { environment } from '../../environments/environment';
 import { Observable, BehaviorSubject, combineLatest, firstValueFrom, concat } from 'rxjs';
 import { map, switchMap, catchError, take, tap, startWith, distinctUntilChanged, shareReplay } from 'rxjs/operators';
@@ -28,6 +29,14 @@ interface DivisionPreview {
   divisionNumber: number;
   name: string;
   teams: TeamWithOVR[];
+}
+
+interface StartCareerPayload {
+  leagueId: string;
+  teamId: string;
+  difficulty: string;
+  gameSpeed: string;
+  teamsPerDivision?: number;
 }
 
 @Component({
@@ -88,7 +97,8 @@ export class CareerSetupComponent implements OnInit {
   constructor(
     private http: HttpClient,
     private router: Router,
-    private authService: AuthService
+    private authService: AuthService,
+    private logger: AppLoggerService
   ) {
     this.leagues$ = combineLatest([
       this.authService.getUserInfo(),
@@ -228,14 +238,14 @@ export class CareerSetupComponent implements OnInit {
             this.seedingWorld = false;
             const msg = err?.error?.message || err?.statusText || 'Error al inicializar el mundo';
             this.error$.next(`Error al inicializar el mundo: ${msg}`);
-            console.error('[CAREER-SETUP] seed error:', err);
+            this.logger.error('[CAREER-SETUP] seed error:', err);
           }
         });
       },
       error: (err) => {
         this.seedingWorld = false;
         this.error$.next('No se pudo obtener el usuario actual para inicializar el mundo.');
-        console.error('[CAREER-SETUP] getUserInfo error:', err);
+        this.logger.error('[CAREER-SETUP] getUserInfo error:', err);
       }
     });
   }
@@ -251,7 +261,7 @@ export class CareerSetupComponent implements OnInit {
 
       const totalTeams = await firstValueFrom(this.totalTeamsInLeague$);
 
-      const payload: any = {
+      const payload: StartCareerPayload = {
         leagueId: this.selectedLeagueId,
         teamId: this.selectedTeamId,
         difficulty: this.selectedDifficulty,
@@ -268,10 +278,24 @@ export class CareerSetupComponent implements OnInit {
       ).toPromise();
       
       await this.router.navigate(['/squad']);
-    } catch (err: any) {
-      console.error('[CAREER-SETUP] Error starting career:', err);
-      this.error$.next(err.error?.message || 'Error al iniciar carrera');
+    } catch (err: unknown) {
+      this.logger.error('[CAREER-SETUP] Error starting career:', err);
+      this.error$.next(this.readErrorMessage(err, 'Error al iniciar carrera'));
       this.creating = false;
     }
+  }
+
+  private readErrorMessage(err: unknown, fallback: string): string {
+    if (typeof err !== 'object' || err === null) {
+      return fallback;
+    }
+    const errorBody = 'error' in err ? (err as { error?: unknown }).error : null;
+    if (typeof errorBody === 'object' && errorBody !== null && 'message' in errorBody) {
+      const message = (errorBody as { message?: unknown }).message;
+      if (typeof message === 'string' && message.trim().length > 0) {
+        return message;
+      }
+    }
+    return fallback;
   }
 }

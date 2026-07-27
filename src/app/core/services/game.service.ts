@@ -1,11 +1,43 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { environment } from '../../environments/environment';
 import { Game } from '../../shared/models/game.model';
+
+export interface TournamentStatusResponse {
+  success?: boolean;
+  currentRound?: number;
+  totalRounds?: number;
+  status?: string;
+  careerPhase?: string;
+  tournamentFinished?: boolean;
+  [key: string]: unknown;
+}
+
+export interface GameStandingResponse {
+  teamId: string;
+  teamName: string;
+  played: number;
+  won: number;
+  drawn: number;
+  lost: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  goalDifference: number;
+  points: number;
+}
+
+export interface GameChampionResponse {
+  teamId: string;
+  teamName: string;
+  points: number;
+  wins: number;
+  goalDifference: number;
+}
 
 @Injectable({ providedIn: 'root' })
 export class GameService {
-  private apiUrl = '/api/v1/games';
+  private apiUrl = `${environment.apiUrl}/games`;
 
   constructor(private http: HttpClient) {}
 
@@ -25,15 +57,15 @@ export class GameService {
     return this.http.get<Game>(`${this.apiUrl}/${id}`);
   }
 
-  getTournamentStatus(gameId: string): Observable<any> {
-    return this.http.get<any>(`${this.apiUrl}/${gameId}/tournament-status`);
+  getTournamentStatus(gameId: string): Observable<TournamentStatusResponse> {
+    return this.http.get<TournamentStatusResponse>(`${this.apiUrl}/${gameId}/tournament-status`);
   }
 
-  getStandings(gameId: string): Observable<any[]> {
-    return this.http.get<any[]>(`${this.apiUrl}/${gameId}/standings`);
+  getStandings(gameId: string): Observable<GameStandingResponse[]> {
+    return this.http.get<GameStandingResponse[]>(`${this.apiUrl}/${gameId}/standings`);
   }
 
-  getChampion(gameId: string): Observable<any> {
-    return this.http.get<any>(`${this.apiUrl}/${gameId}/champion`);
+  getChampion(gameId: string): Observable<GameChampionResponse> {
+    return this.http.get<GameChampionResponse>(`${this.apiUrl}/${gameId}/champion`);
   }
 }

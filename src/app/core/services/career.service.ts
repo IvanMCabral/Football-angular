@@ -15,6 +15,16 @@ import {
   DivisionInfo
 } from './career.model';
 
+export interface CareerCommandResponse {
+  success?: boolean;
+  message?: string;
+  careerId?: string;
+  currentRound?: number;
+  careerPhase?: string;
+  tournamentFinished?: boolean;
+  [key: string]: unknown;
+}
+
 /**
  * CareerService - Service for Career Mode gameplay.
  *
@@ -72,20 +82,20 @@ export class CareerService {
    * Only works if careerPhase === 'WAITING_USER'
    * 
    * @param careerId The career ID
-   * @returns Observable<any>
+   * @returns Observable<CareerCommandResponse>
    */
-  advanceToNextRound(careerId: string): Observable<any> {
-    return this.http.post<any>(`${this.apiUrl}/${careerId}/next-round`, {});
+  advanceToNextRound(careerId: string): Observable<CareerCommandResponse> {
+    return this.http.post<CareerCommandResponse>(`${this.apiUrl}/${careerId}/next-round`, {});
   }
 
   /**
    * Continue to a new season (tournament)
    * Only works if careerPhase === 'FINISHED'
    * 
-   * @returns Observable<any>
+   * @returns Observable<CareerCommandResponse>
    */
-  continueToNewSeason(): Observable<any> {
-    return this.http.post<any>(`${this.apiUrl}/continue`, {});
+  continueToNewSeason(): Observable<CareerCommandResponse> {
+    return this.http.post<CareerCommandResponse>(`${this.apiUrl}/continue`, {});
   }
 
   /**

@@ -6,6 +6,7 @@ import { environment } from '../../environments/environment';
 import { AuthResponse, LoginRequest, RegisterRequest } from '../../shared/models/auth.model';
 import { RefreshRequest } from '../../shared/models/refresh-request.model';
 
+export type AssignTeamResponse = string;
 
 @Injectable({
   providedIn: 'root'
@@ -38,7 +39,7 @@ export class AuthService {
   }
 
   // Asigna un equipo al usuario actual
-  assignTeamToUser(teamId: string): Observable<any> {
+  assignTeamToUser(teamId: string): Observable<AssignTeamResponse> {
     return this.http.post(`${environment.apiUrl}/auth/assign-team`, { teamId }, { responseType: 'text' });
   }
 

@@ -392,7 +392,7 @@ export class DashboardComponent implements OnInit {
     this.generatingPlayers = true;
     const count = 10;
 
-    this.http.post('/api/v1/career/random-players', { count }).subscribe({
+    this.http.post(`${environment.apiUrl}/career/random-players`, { count }).subscribe({
       next: () => {
         this.generatingPlayers = false;
         this.toastService.success(`✨ ${count} jugadores generados correctamente`);

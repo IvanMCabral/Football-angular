@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, BehaviorSubject, catchError, of, switchMap, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { AppLoggerService } from '../../../core/services/app-logger.service';
 import { Team, CreateTeamRequest, SessionTeam, CreateSessionTeamRequest, RandomTeamsRequest, RandomTeamsResponse } from '../../../shared/models/team.model';
 import { Player, SessionPlayer } from '../../../shared/models/player.model';
 
@@ -10,6 +11,7 @@ import { Player, SessionPlayer } from '../../../shared/models/player.model';
 })
 export class TeamService {
   private http = inject(HttpClient);
+  private logger = inject(AppLoggerService);
   private apiUrl = `${environment.apiUrl}/teams`;
   private careerApiUrl = `${environment.apiUrl}/career`;
   private worldApiUrl = `${environment.apiUrl}/world`;
@@ -70,7 +72,7 @@ export class TeamService {
   refreshSessionTeams(): void {
     this.http.get<SessionTeam[]>(`${this.careerApiUrl}/session-teams`).subscribe({
       next: (teams) => this.sessionTeamsSubject.next(teams),
-      error: (err) => console.error('[TEAM] Error refreshing teams:', err)
+      error: (err) => this.logger.error('[TEAM] Error refreshing teams:', err)
     });
   }
 

@@ -4,6 +4,8 @@ import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { ToastService } from '../../../core/services/toast.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { AppLoggerService } from '../../../core/services/app-logger.service';
+import { environment } from '../../../environments/environment';
 import { Observable, of, BehaviorSubject, Subject, merge } from 'rxjs';
 import { switchMap, catchError, startWith, map } from 'rxjs/operators';
 
@@ -27,6 +29,21 @@ interface Player {
   overall: number;
 }
 
+interface WorldTeam {
+  worldTeamId: string;
+  name: string;
+  country: string;
+}
+
+interface WorldPlayer {
+  worldPlayerId: string;
+  worldTeamId?: string | null;
+  name: string;
+  position: string;
+  age: number;
+  overall: number;
+}
+
 @Component({
   selector: 'app-player-management',
   standalone: true,
@@ -38,12 +55,14 @@ export class PlayerManagementComponent {
   private http = inject(HttpClient);
   private toastService = inject(ToastService);
   private authService = inject(AuthService);
+  private logger = inject(AppLoggerService);
+  private apiUrl = environment.apiUrl;
 
   teamId$ = new BehaviorSubject<string | null>(null);
   reloadAvailablePlayers$ = new Subject<void>();
   reloadTeams$ = new Subject<void>();
 
-  leagues$: Observable<League[]> = this.http.get<League[]>('http://localhost:8080/api/v1/leagues').pipe(
+  leagues$: Observable<League[]> = this.http.get<League[]>(`${this.apiUrl}/leagues`).pipe(
     catchError(() => of([]))
   );
 
@@ -55,7 +74,7 @@ export class PlayerManagementComponent {
     switchMap(_ => 
       this.authService.getUserInfo().pipe(
         switchMap(userInfo => 
-          this.http.get<any[]>(`http://localhost:8080/api/v1/world/teams?userId=${userInfo.id}`).pipe(
+          this.http.get<WorldTeam[]>(`${this.apiUrl}/world/teams?userId=${userInfo.id}`).pipe(
             map(worldTeams => worldTeams.map(wt => ({
               sessionTeamId: wt.worldTeamId,
               name: wt.name,
@@ -77,7 +96,7 @@ export class PlayerManagementComponent {
       // Obtener jugadores del WorldTeam en WorldSnapshot
       return this.authService.getUserInfo().pipe(
         switchMap(userInfo => 
-          this.http.get<any[]>(`http://localhost:8080/api/v1/world/teams/${worldTeamId}/players?userId=${userInfo.id}`).pipe(
+          this.http.get<WorldPlayer[]>(`${this.apiUrl}/world/teams/${worldTeamId}/players?userId=${userInfo.id}`).pipe(
             map(worldPlayers => worldPlayers.map(wp => ({
               sessionPlayerId: wp.worldPlayerId, // Usar worldPlayerId como ID
               name: wp.name,
@@ -102,7 +121,7 @@ export class PlayerManagementComponent {
     switchMap(_ =>
       this.authService.getUserInfo().pipe(
         switchMap(userInfo => 
-          this.http.get<any[]>(`http://localhost:8080/api/v1/world/players?userId=${userInfo.id}`).pipe(
+          this.http.get<WorldPlayer[]>(`${this.apiUrl}/world/players?userId=${userInfo.id}`).pipe(
             map(worldPlayers => worldPlayers
               .filter(wp => !wp.worldTeamId) // Filtrar solo free agents (sin equipo)
               .map(wp => ({
@@ -136,7 +155,7 @@ export class PlayerManagementComponent {
         playerId: player.sessionPlayerId, // worldPlayerId
         teamId: this.selectedTeamId // worldTeamId
       };
-      this.http.post(`http://localhost:8080/api/v1/world/assign-player`, payload).subscribe({
+      this.http.post(`${this.apiUrl}/world/assign-player`, payload).subscribe({
         next: () => {
           this.toastService.success('Player assigned to team in WorldSnapshot');
           // Trigger reload
@@ -145,7 +164,7 @@ export class PlayerManagementComponent {
           this.reloadTeams$.next();
         },
         error: (err: any) => {
-          console.error('Failed to assign player:', err);
+          this.logger.error('Failed to assign player:', err);
           this.toastService.error(`Failed to assign player: ${err.error?.message || err.message || 'Unknown error'}`);
         }
       });
@@ -160,7 +179,7 @@ export class PlayerManagementComponent {
         userId: userInfo.id,
         playerId: player.sessionPlayerId // worldPlayerId
       };
-      this.http.post(`http://localhost:8080/api/v1/world/remove-player`, payload).subscribe({
+      this.http.post(`${this.apiUrl}/world/remove-player`, payload).subscribe({
         next: () => {
           this.toastService.success('Player removed from team in WorldSnapshot');
           // Trigger reload
@@ -169,7 +188,7 @@ export class PlayerManagementComponent {
           this.reloadTeams$.next();
         },
         error: (err: any) => {
-          console.error('Failed to remove player:', err);
+          this.logger.error('Failed to remove player:', err);
           this.toastService.error(`Failed to remove player: ${err.error?.message || err.message || 'Unknown error'}`);
         }
       });

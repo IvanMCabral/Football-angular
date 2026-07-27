@@ -7,6 +7,15 @@ import { RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { ToastService } from '../../../core/services/toast.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { environment } from '../../../environments/environment';
+
+interface CreatedPlayerResponse {
+  name: string;
+}
+
+interface RandomPlayersResponse {
+  count: number;
+}
 
 @Component({
   selector: 'app-player-create',
@@ -20,6 +29,7 @@ export class PlayerCreateComponent {
   private http = inject(HttpClient);
   private toastService = inject(ToastService);
   private authService = inject(AuthService);
+  private apiUrl = environment.apiUrl;
 
   playerForm: FormGroup;
   loading = false;
@@ -59,9 +69,9 @@ export class PlayerCreateComponent {
           ...this.playerForm.value,
           userId: userInfo.id
         };
-        return this.http.post('/api/v1/world/create-custom-player', payload);
+        return this.http.post<CreatedPlayerResponse>(`${this.apiUrl}/world/create-custom-player`, payload);
       }),
-      map((player: any) => {
+      map((player) => {
         const duration = performance.now() - start;
         this.loading = false;
         this.toastService.success(`Player \"${player.name}\" created successfully! (tardó ${duration.toFixed(0)} ms)`);
@@ -77,8 +87,8 @@ export class PlayerCreateComponent {
         });
         return player;
       }),
-      catchError((err: any) => {
-        this.errorMessage = err.error?.message || 'Error creating player';
+      catchError((err: unknown) => {
+        this.errorMessage = this.readErrorMessage(err, 'Error creating player');
         this.loading = false;
         this.toastService.error(this.errorMessage);
         return of(null);
@@ -90,14 +100,14 @@ export class PlayerCreateComponent {
     this.errorMessage = '';
     this.randomPlayers$ = this.authService.getUserInfo().pipe(
       switchMap(userInfo =>
-        this.http.post('/api/v1/world/create-random-player', { userId: userInfo.id })
+        this.http.post<CreatedPlayerResponse>(`${this.apiUrl}/world/create-random-player`, { userId: userInfo.id })
       ),
-      map((player: any) => {
+      map((player) => {
         this.toastService.success(`Player \"${player.name}\" created successfully!`);
         return { count: 1 };
       }),
-      catchError((err: any) => {
-        this.errorMessage = err.error?.message || 'Error generating random player';
+      catchError((err: unknown) => {
+        this.errorMessage = this.readErrorMessage(err, 'Error generating random player');
         this.toastService.error(this.errorMessage);
         return of(null);
       })
@@ -112,21 +122,31 @@ export class PlayerCreateComponent {
     this.errorMessage = '';
     this.randomPlayers$ = this.authService.getUserInfo().pipe(
       switchMap(userInfo =>
-        this.http.post<{ count: number }>('/api/v1/world/create-random-players', {
+        this.http.post<RandomPlayersResponse>(`${this.apiUrl}/world/create-random-players`, {
           userId: userInfo.id,
           count: this.randomCount
         })
       ),
-      map((res: any) => {
+      map((res) => {
         this.toastService.success(`${res?.count ?? this.randomCount} players generated successfully!`);
         return res;
       }),
-      catchError((err: any) => {
-        const backendMessage = err.error?.message || err.message || 'Server error';
+      catchError((err: unknown) => {
+        const backendMessage = this.readErrorMessage(err, 'Server error');
         this.errorMessage = `Error: ${backendMessage}`;
         this.toastService.error(this.errorMessage);
         return of(null);
       })
     );
+  }
+
+  private readErrorMessage(err: unknown, fallback: string): string {
+    if (typeof err !== 'object' || err === null) return fallback;
+    const maybeMessage = 'message' in err ? (err as { message?: unknown }).message : null;
+    if (typeof maybeMessage === 'string' && maybeMessage.trim()) return maybeMessage;
+    const errorBody = 'error' in err ? (err as { error?: unknown }).error : null;
+    if (typeof errorBody !== 'object' || errorBody === null || !('message' in errorBody)) return fallback;
+    const backendMessage = (errorBody as { message?: unknown }).message;
+    return typeof backendMessage === 'string' && backendMessage.trim() ? backendMessage : fallback;
   }
 }

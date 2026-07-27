@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
+import { AppLoggerService } from '../../../core/services/app-logger.service';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
 import { ErrorMessageComponent } from '../../../shared/components/error-message/error-message.component';
 
@@ -16,6 +17,7 @@ import { ErrorMessageComponent } from '../../../shared/components/error-message/
 export class LoginComponent {
   private fb = inject(FormBuilder);
   private authService = inject(AuthService);
+  private logger = inject(AppLoggerService);
   private router = inject(Router);
 
   loginForm: FormGroup;
@@ -43,7 +45,7 @@ export class LoginComponent {
         this.router.navigate(['/dashboard']);
       },
       error: (error) => {
-        console.error('[LOGIN] Error en login', error);
+        this.logger.error('[LOGIN] Error en login', error);
         this.errorMessage = error.message;
         this.loading = false;
       }

@@ -1,4 +1,4 @@
-import { Component, OnInit, HostListener, isDevMode } from '@angular/core';
+import { Component, OnInit, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink, Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
@@ -7,6 +7,7 @@ import { Observable, combineLatest, forkJoin, of, switchMap, map, tap, catchErro
 import { startWith, distinctUntilChanged } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 import { FixtureService } from 'app/core/services/fixture.service';
+import { AppLoggerService } from 'app/core/services/app-logger.service';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { FixtureModalComponent } from 'app/components/fixture-modal/fixture-modal.component';
 import { StandingsModalComponent } from 'app/components/standings-modal/standings-modal.component';
@@ -79,7 +80,8 @@ export class SquadManagementComponent implements OnInit {
       private http: HttpClient,
       private router: Router,
       private fixtureService: FixtureService,
-      private dialog: MatDialog
+      private dialog: MatDialog,
+      private logger: AppLoggerService
    ) {}
 
     async openFixtureModal(): Promise<void> {
@@ -743,9 +745,7 @@ this.http.post(`${environment.apiUrl}/career/lineup/confirm`, {}).subscribe({
     }
 
     private logDevError(message: string, error: unknown): void {
-      if (isDevMode()) {
-        console.error(message, error);
-      }
+      this.logger.error(message, error);
     }
 
 }
