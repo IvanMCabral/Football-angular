@@ -1,4 +1,5 @@
-import { csvCell, csvLines, downloadTextFile } from './test-harness-export-utils';
+import { csvCell, csvLines, downloadTextFile, playerSwapMatrixExportRow } from './test-harness-export-utils';
+import { PlayerSwapMatrixSummary } from '../models/test-harness.model';
 
 describe('test-harness-export-utils', () => {
   it('keeps simple CSV cells readable', () => {
@@ -60,5 +61,63 @@ describe('test-harness-export-utils', () => {
     expect(clickSpy).toHaveBeenCalled();
     expect(removeChildSpy).toHaveBeenCalledWith(anchor);
     expect(revokeObjectUrlSpy).toHaveBeenCalledWith('blob:test-url');
+  });
+
+  it('maps player swap summaries to flat export rows', () => {
+    const row = {
+      testCase: 'swap',
+      swapRead: 'review',
+      swapReadDetail: 'detail',
+      swapFit: 'profile',
+      swapFitDetail: 'fit detail',
+      signalScore: 1,
+      signalRead: 'signal',
+      signalDetail: 'signal detail',
+      tacticalAttackRead: 'attack',
+      tacticalCentralControlRead: 'control',
+      tacticalProtectionRead: 'protect',
+      tacticalChannelsRead: 'channels',
+      tacticalBreakdownDetail: 'breakdown',
+      formation: '4-4-2',
+      slotId: 'S1',
+      baselinePlayer: 'A',
+      swapPlayer: 'B',
+      baselinePlayerOverall: 70,
+      swapPlayerOverall: 75,
+      deltaPlayerOverall: 5,
+      seedStart: 1,
+      seedEnd: 3,
+      seedCount: 3,
+      deltaGoalsFor: 1,
+      deltaGoalsAgainst: 0,
+      deltaGoalDiff: 1,
+      deltaShotsFor: 2,
+      deltaShotsAgainst: -1,
+      deltaPossessionFor: 0.5,
+      deltaXgFor: 0.2,
+      deltaXgAgainst: -0.1,
+      deltaXgDiff: 0.3,
+      preAutoSubDeltaShotsFor: 1,
+      preAutoSubDeltaShotsAgainst: 0,
+      preAutoSubDeltaXgFor: 0.1,
+      preAutoSubDeltaXgAgainst: 0,
+      preAutoSubDeltaXgDiff: 0.1,
+      deltaCentralShotsFor: 1,
+      deltaWideShotsFor: 1,
+      deltaLongShotsFor: 0,
+      deltaCentralShotsAgainst: 0,
+      deltaWideShotsAgainst: -1,
+      deltaLongShotsAgainst: 0,
+      baseline: { avgXgFor: 1.1, avgXgAgainst: 0.8, avgXgDiff: 0.3 },
+      swapped: { avgXgFor: 1.3, avgXgAgainst: 0.7, avgXgDiff: 0.6 },
+      timestamp: 'now',
+    } as PlayerSwapMatrixSummary;
+
+    expect(playerSwapMatrixExportRow(row)).toEqual(jasmine.objectContaining({
+      testCase: 'swap',
+      formation: '4-4-2',
+      baselineAvgXgFor: 1.1,
+      swappedAvgXgDiff: 0.6,
+    }));
   });
 });

@@ -1,3 +1,5 @@
+import { PlayerSwapMatrixSummary } from '../models/test-harness.model';
+
 export function csvCell(value: unknown): string {
   if (value === null || value === undefined) return '';
   const text = String(value);
@@ -32,4 +34,59 @@ export function downloadTextFile(
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }
+}
+
+export function playerSwapMatrixExportRow(row: PlayerSwapMatrixSummary): Record<string, unknown> {
+  return {
+    testCase: row.testCase,
+    swapRead: row.swapRead,
+    swapReadDetail: row.swapReadDetail,
+    swapFit: row.swapFit,
+    swapFitDetail: row.swapFitDetail,
+    signalScore: row.signalScore,
+    signalRead: row.signalRead,
+    signalDetail: row.signalDetail,
+    tacticalAttackRead: row.tacticalAttackRead,
+    tacticalCentralControlRead: row.tacticalCentralControlRead,
+    tacticalProtectionRead: row.tacticalProtectionRead,
+    tacticalChannelsRead: row.tacticalChannelsRead,
+    tacticalBreakdownDetail: row.tacticalBreakdownDetail,
+    formation: row.formation,
+    slotId: row.slotId,
+    baselinePlayer: row.baselinePlayer,
+    swapPlayer: row.swapPlayer,
+    baselinePlayerOverall: row.baselinePlayerOverall,
+    swapPlayerOverall: row.swapPlayerOverall,
+    deltaPlayerOverall: row.deltaPlayerOverall,
+    seedStart: row.seedStart,
+    seedEnd: row.seedEnd,
+    seedCount: row.seedCount,
+    deltaGoalsFor: row.deltaGoalsFor,
+    deltaGoalsAgainst: row.deltaGoalsAgainst,
+    deltaGoalDiff: row.deltaGoalDiff,
+    deltaShotsFor: row.deltaShotsFor,
+    deltaShotsAgainst: row.deltaShotsAgainst,
+    deltaPossessionFor: row.deltaPossessionFor,
+    deltaXgFor: row.deltaXgFor,
+    deltaXgAgainst: row.deltaXgAgainst,
+    deltaXgDiff: row.deltaXgDiff,
+    preAutoSubDeltaShotsFor: row.preAutoSubDeltaShotsFor,
+    preAutoSubDeltaShotsAgainst: row.preAutoSubDeltaShotsAgainst,
+    preAutoSubDeltaXgFor: row.preAutoSubDeltaXgFor,
+    preAutoSubDeltaXgAgainst: row.preAutoSubDeltaXgAgainst,
+    preAutoSubDeltaXgDiff: row.preAutoSubDeltaXgDiff,
+    deltaCentralShotsFor: row.deltaCentralShotsFor,
+    deltaWideShotsFor: row.deltaWideShotsFor,
+    deltaLongShotsFor: row.deltaLongShotsFor,
+    deltaCentralShotsAgainst: row.deltaCentralShotsAgainst,
+    deltaWideShotsAgainst: row.deltaWideShotsAgainst,
+    deltaLongShotsAgainst: row.deltaLongShotsAgainst,
+    baselineAvgXgFor: row.baseline.avgXgFor,
+    baselineAvgXgAgainst: row.baseline.avgXgAgainst,
+    baselineAvgXgDiff: row.baseline.avgXgDiff,
+    swappedAvgXgFor: row.swapped.avgXgFor,
+    swappedAvgXgAgainst: row.swapped.avgXgAgainst,
+    swappedAvgXgDiff: row.swapped.avgXgDiff,
+    timestamp: row.timestamp,
+  };
 }

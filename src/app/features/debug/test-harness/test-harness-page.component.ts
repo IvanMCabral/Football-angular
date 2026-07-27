@@ -142,6 +142,7 @@ import {
   csvCell as formatCsvCell,
   csvLines as buildCsvLines,
   downloadTextFile as saveTextFile,
+  playerSwapMatrixExportRow,
 } from './test-harness-export-utils';
 import {
   deltaClassName,
@@ -1892,7 +1893,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       this.snackBar.open('Run Matriz cambio jugador first.', 'OK', { duration: 2500 });
       return;
     }
-    const exportRow = this.playerSwapExportRow(row);
+    const exportRow = playerSwapMatrixExportRow(row);
     const header = [
       'swapRead', 'swapReadDetail', 'swapFit', 'swapFitDetail',
       'tacticalAttackRead', 'tacticalCentralControlRead', 'tacticalProtectionRead', 'tacticalChannelsRead', 'tacticalBreakdownDetail',
@@ -1920,7 +1921,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       this.snackBar.open('Run Batería cambio jugador first.', 'OK', { duration: 2500 });
       return;
     }
-    const exportRows = rows.map((row) => this.playerSwapExportRow(row));
+    const exportRows = rows.map((row) => playerSwapMatrixExportRow(row));
     const header = [
       'swapRead', 'swapReadDetail', 'swapFit', 'swapFitDetail',
       'tacticalAttackRead', 'tacticalCentralControlRead', 'tacticalProtectionRead', 'tacticalChannelsRead', 'tacticalBreakdownDetail',
@@ -2006,60 +2007,6 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   }
   private downloadCsv(lines: string[], filename: string): void {
     saveTextFile(lines.join('\n'), filename, 'text/csv;charset=utf-8');
-  }
-  private playerSwapExportRow(row: PlayerSwapMatrixSummary): Record<string, unknown> {
-    return {
-      testCase: row.testCase,
-      swapRead: row.swapRead,
-      swapReadDetail: row.swapReadDetail,
-      swapFit: row.swapFit,
-      swapFitDetail: row.swapFitDetail,
-      signalScore: row.signalScore,
-      signalRead: row.signalRead,
-      signalDetail: row.signalDetail,
-      tacticalAttackRead: row.tacticalAttackRead,
-      tacticalCentralControlRead: row.tacticalCentralControlRead,
-      tacticalProtectionRead: row.tacticalProtectionRead,
-      tacticalChannelsRead: row.tacticalChannelsRead,
-      tacticalBreakdownDetail: row.tacticalBreakdownDetail,
-      formation: row.formation,
-      slotId: row.slotId,
-      baselinePlayer: row.baselinePlayer,
-      swapPlayer: row.swapPlayer,
-      baselinePlayerOverall: row.baselinePlayerOverall,
-      swapPlayerOverall: row.swapPlayerOverall,
-      deltaPlayerOverall: row.deltaPlayerOverall,
-      seedStart: row.seedStart,
-      seedEnd: row.seedEnd,
-      seedCount: row.seedCount,
-      deltaGoalsFor: row.deltaGoalsFor,
-      deltaGoalsAgainst: row.deltaGoalsAgainst,
-      deltaGoalDiff: row.deltaGoalDiff,
-      deltaShotsFor: row.deltaShotsFor,
-      deltaShotsAgainst: row.deltaShotsAgainst,
-      deltaPossessionFor: row.deltaPossessionFor,
-      deltaXgFor: row.deltaXgFor,
-      deltaXgAgainst: row.deltaXgAgainst,
-      deltaXgDiff: row.deltaXgDiff,
-      preAutoSubDeltaShotsFor: row.preAutoSubDeltaShotsFor,
-      preAutoSubDeltaShotsAgainst: row.preAutoSubDeltaShotsAgainst,
-      preAutoSubDeltaXgFor: row.preAutoSubDeltaXgFor,
-      preAutoSubDeltaXgAgainst: row.preAutoSubDeltaXgAgainst,
-      preAutoSubDeltaXgDiff: row.preAutoSubDeltaXgDiff,
-      deltaCentralShotsFor: row.deltaCentralShotsFor,
-      deltaWideShotsFor: row.deltaWideShotsFor,
-      deltaLongShotsFor: row.deltaLongShotsFor,
-      deltaCentralShotsAgainst: row.deltaCentralShotsAgainst,
-      deltaWideShotsAgainst: row.deltaWideShotsAgainst,
-      deltaLongShotsAgainst: row.deltaLongShotsAgainst,
-      baselineAvgXgFor: row.baseline.avgXgFor,
-      baselineAvgXgAgainst: row.baseline.avgXgAgainst,
-      baselineAvgXgDiff: row.baseline.avgXgDiff,
-      swappedAvgXgFor: row.swapped.avgXgFor,
-      swappedAvgXgAgainst: row.swapped.avgXgAgainst,
-      swappedAvgXgDiff: row.swapped.avgXgDiff,
-      timestamp: row.timestamp,
-    };
   }
   private playerSwapBatteryMarkdownReport(): string {
     const rows = this.playerSwapBatterySummaries();
