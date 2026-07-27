@@ -8,6 +8,7 @@ import { CareerService } from '../../core/services/career.service';
 import { MatchService } from '../../features/matches/services/match.service';
 import { DashboardFixtureModalComponent } from '../dashboard/dashboard-fixture-modal.component';
 import { DashboardUserInfoComponent } from '../dashboard/dashboard-user-info.component';
+import { Match } from '../../shared/models/match.model';
 
 @Component({
   selector: 'app-game-detail',
@@ -22,7 +23,7 @@ export class GameDetailComponent implements OnInit {
   username = '';
   teamName = '';
   showFixtureModal = false;
-  fixtureMatches: any[] = [];
+  fixtureMatches: Match[] = [];
   teamNameMap: { [id: string]: string } = {};
   errorMsg = '';
 
@@ -34,11 +35,11 @@ export class GameDetailComponent implements OnInit {
   private router = inject(Router);
 
 
-  getValue(val: any): string {
+  getValue(val: string | number | { value?: string | number | null } | null | undefined): string {
     if (val && typeof val === 'object' && 'value' in val) {
-      return val.value;
+      return String(val.value ?? '');
     }
-    return val ?? '';
+    return String(val ?? '');
   }
 
 

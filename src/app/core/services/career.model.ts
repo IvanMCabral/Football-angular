@@ -8,8 +8,9 @@ export interface SessionTeam {
   country: string;
   budget: number;
   formation?: string;
-  // Map to Team model for compatibility
-  id?: any; // Can be sessionTeamId or worldTeamId depending on context
+  // Map to Team model for compatibility.
+  // Can be sessionTeamId or worldTeamId depending on context.
+  id?: string;
 }
 
 // Career session status returned by the backend.

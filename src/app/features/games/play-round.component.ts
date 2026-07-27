@@ -5,6 +5,15 @@ import { MatchService } from '../matches/services/match.service';
 import { CareerService } from '../../core/services/career.service';
 import { Match, MatchEvent } from '../../shared/models/match.model';
 
+interface AnimatedMatch {
+  match: Match;
+  currentMinute: number;
+  partialHomeGoals: number;
+  partialAwayGoals: number;
+  currentEvent: MatchEvent | null;
+  finished: boolean;
+}
+
 @Component({
   selector: 'app-play-round',
   standalone: true,
@@ -14,7 +23,7 @@ import { Match, MatchEvent } from '../../shared/models/match.model';
 })
 export class PlayRoundComponent implements OnInit {
   matches: Match[] = [];
-  animatedMatches: any[] = [];
+  animatedMatches: AnimatedMatch[] = [];
   loading = true;
   teamNameMap: { [id: string]: string } = {};
   private matchService = inject(MatchService);
@@ -34,6 +43,9 @@ export class PlayRoundComponent implements OnInit {
         this.teamNameMap = {};
         teams.forEach(team => {
           const teamId = team.sessionTeamId || team.id;
+          if (!teamId) {
+            return;
+          }
           this.teamNameMap[teamId] = team.name;
         });
         this.simulateAndAnimateFirstRound();
@@ -120,14 +132,7 @@ export class PlayRoundComponent implements OnInit {
       let currentEventIdx = 0;
       let finished = false;
       let currentEvent = null;
-      const animObj: {
-        match: Match;
-        currentMinute: number;
-        partialHomeGoals: number;
-        partialAwayGoals: number;
-        currentEvent: MatchEvent | null;
-        finished: boolean;
-      } = {
+      const animObj: AnimatedMatch = {
         match,
         currentMinute,
         partialHomeGoals,
