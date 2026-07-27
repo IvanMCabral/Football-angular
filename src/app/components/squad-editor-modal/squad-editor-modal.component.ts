@@ -65,6 +65,12 @@ import {
   SquadEditorFormationChange,
   SquadEditorLineupPlayer,
 } from './squad-editor-modal.models';
+import {
+  clearSquadEditorDragTransform,
+  getSquadEditorDragData,
+  getSquadEditorDragRef,
+  resetSquadEditorDragSource,
+} from './squad-editor-modal-drag.utils';
 
 @Component({
   selector: 'app-squad-editor-modal',
@@ -372,7 +378,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     if (severeRows > 0 || totalPenalty >= 45) {
       return {
         level: 'severe',
-        message: `Impacto fuerte: ${rows.length} jugador(es) fuera de rol, ${totalPenalty}% acumulado. Cambia jugador o formacion si queres competir fino.`,
+        message: `Impacto fuerte: ${rows.length} jugador(es) fuera de rol, ${totalPenalty}% acumulado. Cambia jugador o formación si querés competir fino.`,
       };
     }
     return {
@@ -395,7 +401,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
         : 'Rueda de auxilio defensiva: protege, pero baja fluidez en medio.';
     }
     if (naturalFamily === 'ATT' && actualFamily === 'MID') {
-      return 'Aporta gol, pero pierde retorno y orden. Mejor como ST/CAM o con cobertura detras.';
+      return 'Aporta gol, pero pierde retorno y orden. Mejor como ST/CAM o con cobertura detrás.';
     }
     if (naturalFamily === 'MID' && actualFamily === 'DEF') {
       return 'Ayuda a salir jugando, pero no reemplaza un defensor natural.';
@@ -403,7 +409,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     if (actualFamily === 'ATT') {
       return 'Movimiento ofensivo agresivo: puede romper balance si no hay cobertura.';
     }
-    return 'Revisa si la formacion pide otro perfil natural para ese sector.';
+    return 'Revisa si la formación pide otro perfil natural para ese sector.';
   }
 
   get tacticalShapeMatrix(): Array<{ zone: 'ATT' | 'MID' | 'DEF'; left: number; center: number; right: number }> {
@@ -1094,7 +1100,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     return this.slotPlayerMap;
   }
 
-  handleSlotDrop(event: CdkDragDrop<any>): void {
+  handleSlotDrop(event: CdkDragDrop<FieldSubdivisionDTO>): void {
     const player = event.item.data as PlayerOnFieldDto | undefined;
     if (!player) { return; }
 
@@ -1114,7 +1120,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     this.applySlotAssignment(player, sourceSlotId, targetSubdivisionId, occupant);
   }
 
-  handleBenchDrop(event: CdkDragDrop<any>): void {
+  handleBenchDrop(event: CdkDragDrop<string>): void {
     const player = event.item.data as PlayerOnFieldDto | undefined;
     if (!player || !player.slotId) { return; }
     if (event.previousContainer.id === this.BENCH_DROP_LIST_ID) { return; }
@@ -1129,12 +1135,12 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   private markerPickupOffset = new Map<string, { x: number; y: number }>();
 
   onMarkerDragStarted(event: CdkDragStart): void {
-    const dragRef = (event.source as any)?._dragRef;
+    const dragRef = getSquadEditorDragRef(event.source);
     if (!dragRef) { return; }
-    const data = (event.source as any)?.data as PlayerOnFieldDto | undefined;
+    const data = getSquadEditorDragData<PlayerOnFieldDto>(event.source);
     if (!data?.playerId) { return; }
     if (this.isGoalkeeperPlayer(data)) {
-      event.source?.reset?.();
+      resetSquadEditorDragSource(event.source);
       return;
     }
     this.markerPickupOffset.set(data.playerId, {
@@ -1147,7 +1153,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     if (!player) { return; }
     if (this.isGoalkeeperPlayer(player)) {
       this.lockGoalkeeperToGoalArea(player);
-      event.source?.reset?.();
+      resetSquadEditorDragSource(event.source);
       this.homePlayers$.next([...this.homePlayers$.value]);
       this.cdr.markForCheck();
       return;
@@ -1185,7 +1191,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     const pickup = this.markerPickupOffset.get(player.playerId) ?? { x: 35, y: 24 };
     this.markerPickupOffset.delete(player.playerId);
 
-    const sourceEl = ((event.source as any)?._dragRef?.element?.nativeElement as HTMLElement | undefined);
+    const sourceEl = getSquadEditorDragRef(event.source)?.element?.nativeElement;
     const markerRect = sourceEl?.getBoundingClientRect();
     const halfHeight = (markerRect?.height ?? 48) / 2;
 
@@ -1199,7 +1205,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
         delete player.yPercent;
         this.slotPlayerMap[player.slotId] = player;
       }
-      event.source?.reset?.();
+      resetSquadEditorDragSource(event.source);
       this.saveLineup();
       this.triggerChemistryPreview();
       this.updateFormationDetection();
@@ -1252,16 +1258,10 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     this.cdr.markForCheck();
     this.cdr.detectChanges();
 
-    const dragRef = (event.source as any)?._dragRef;
+    const dragRef = getSquadEditorDragRef(event.source);
     if (dragRef) {
-      if (typeof event.source?.reset === 'function') {
-        event.source.reset();
-      }
-      const rootEl = dragRef.rootElement;
-      if (rootEl && rootEl.style) {
-        rootEl.style.transform = '';
-        rootEl.style.webkitTransform = '';
-      }
+      resetSquadEditorDragSource(event.source);
+      clearSquadEditorDragTransform(dragRef);
     }
   }
 
@@ -1303,8 +1303,8 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     this.lastCoachMoveRead = {
       title: `${player.name}: ${fromLine}${fromChannel} → ${toLine}${toChannel}`,
       body: fromLine !== toLine
-        ? `Cambio de slot con impacto estructural: revisa ATT/MID/DEF y la penalizacion de rol.${spatialRead}`
-        : `Reubicado en slot tactico: vuelve a una referencia limpia de formacion.${spatialRead}`,
+        ? `Cambio de slot con impacto estructural: revisa ATT/MID/DEF y la penalización de rol.${spatialRead}`
+        : `Reubicado en slot táctico: vuelve a una referencia limpia de formación.${spatialRead}`,
       level: fromLine !== toLine ? 'warn' : 'info',
     };
 
@@ -1534,7 +1534,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
         this.subdivisions && this.subdivisions.length > 0) {
       const closest = this.findClosestSubdivision(player.xPercent, player.yPercent, player);
       if (closest) {
-        const zone = (closest as any).zone ?? '';
+        const zone = closest.zone ?? '';
         if (zone === 'GK') return 'GK';
         if (zone === 'DEFENSE') return 'DEF';
         if (zone === 'MIDFIELD') return 'MID';
