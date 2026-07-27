@@ -14,4 +14,4 @@ export type FormationCode = typeof ALL_FORMATIONS[number];
  * UI-only label for a manually adjusted shape that no longer matches a
  * canonical formation. It is never sent to the backend.
  */
-export const USER_FORMATION_LABEL = 'Formación del User';
+export const USER_FORMATION_LABEL = 'Formación manual';

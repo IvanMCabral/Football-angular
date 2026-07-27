@@ -11,7 +11,7 @@
                   [disabled]="isFormationChanging"
                   [title]="(isCustomLineup() ? 'Tu lineup personalizado no coincide con una formación canónica' : '')">
             <option *ngFor="let f of formations" [value]="f">{{f}}</option>
-            <option [value]="userFormationLabel" [disabled]="true">Formación del User</option>
+            <option [value]="userFormationLabel" [disabled]="true">Formación manual</option>
           </select>
           <span *ngIf="isFormationChanging" class="formation-change-blocked">(espera...)</span>
         </div>

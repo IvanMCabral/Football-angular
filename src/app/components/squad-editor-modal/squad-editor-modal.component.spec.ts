@@ -3284,7 +3284,7 @@ describe('SquadEditorModalComponent free-formation cross-role drag/drop', () => 
     // silent canonical formation match.
     setTimeout(() => {
       const detected = (component as any).detectFormation();
-      expect(detected).toBe('Formación del User',
+      expect(detected).toBe('Formación manual',
         'Incomplete (< 11) lineup must be flagged as user-formation, not silently matched to a canonical');
       expect((component as any).isCustomLineup()).toBeTrue();
       done();
@@ -3427,19 +3427,19 @@ describe('SquadEditorModalComponent free-formation cross-role drag/drop', () => 
 
       fixture.detectChanges();
       // dropdownFormationValue getter reflects the post-drop state.
-      expect((component as any).dropdownFormationValue).toBe('Formación del User',
+      expect((component as any).dropdownFormationValue).toBe('Formación manual',
         'dropdownFormationValue must flip to user-formation label after cross-role drop');
       expect((component as any).isCustomLineup()).toBeTrue();
 
-      // The rendered <select> should have the disabled "Formación del User"
+      // The rendered <select> should have the disabled "Formación manual"
       // option selected. The select's <option> for the user-formation label
       // is appended after the canonical loop; we verify by checking the
       // selected option's textContent.
       const select = fixture.nativeElement.querySelector('.formation-selector select') as HTMLSelectElement;
       expect(select).toBeTruthy();
       const selectedOption = select.options[select.selectedIndex];
-      expect(selectedOption?.textContent?.trim()).toBe('Formación del User',
-        'The visible selected option text must be "Formación del User"');
+      expect(selectedOption?.textContent?.trim()).toBe('Formación manual',
+        'The visible selected option text must be "Formación manual"');
       done();
     }, 30);
   });
@@ -3895,7 +3895,7 @@ describe('SquadEditorModalComponent free positioning on field drop', () => {
     const sentinels = [
       { name: 'ó', pattern: /Formaci[^o]n[^c]?[^i]?[^o]/ }, // 'Formaci\u00f3n' rendered correctly
       { name: 'Mínimo 7', pattern: /M[^n]?nimo 7/ },
-      { name: 'Formación del User', pattern: /Formaci[^o]n del User/ },
+      { name: 'Formación manual', pattern: /Formaci[^o]n manual/ },
     ];
     let bad = 0;
     for (const s of sentinels) {

@@ -37,7 +37,7 @@
               <div *ngFor="let round of div.rounds" class="round-section" [class.current-round]="round.round === currentRound">
                 <div class="round-header" [class]="'round-header-color-' + (i % 4)">
                   <span class="round-title">Fecha {{ round.round }}</span>
-                  <span *ngIf="round.byeTeam" class="bye-badge">BYE: {{ round.byeTeam }}</span>
+                  <span *ngIf="round.byeTeam" class="bye-badge">Descansa: {{ round.byeTeam }}</span>
                 </div>
 
                 <div *ngIf="round.matches.length === 0" class="no-matches">

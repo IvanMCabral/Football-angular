@@ -9,7 +9,7 @@
     <ng-container *ngIf="rounds.length > 0; else legacyFallback">
       <ng-container *ngFor="let round of rounds">
         <h3 class="fixture-round">Fecha {{ round.round }}
-          <span *ngIf="round.byeTeam" class="bye-badge">BYE: {{ round.byeTeam }}</span>
+          <span *ngIf="round.byeTeam" class="bye-badge">Descansa: {{ round.byeTeam }}</span>
         </h3>
         <table class="fixture-table">
           <thead>
