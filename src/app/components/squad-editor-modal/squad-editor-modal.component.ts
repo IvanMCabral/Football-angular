@@ -64,6 +64,7 @@ import {
   SquadEditorCurrentLineupResponse,
   SquadEditorFormationChange,
   SquadEditorLineupPlayer,
+  SquadEditorMarkerMoveContext,
 } from './squad-editor-modal.models';
 import {
   clearSquadEditorDragTransform,
@@ -1207,49 +1208,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
       return;
     }
 
-    if (!player.slotId || player.slotId === '') {
-      const closest = this.findClosestSubdivision(xPct, yPct, player);
-      if (closest) { player.slotId = closest.subdivisionId; }
-    }
-
-    const owningSlot = player.slotId
-      ? this.subdivisions.find(s => s.subdivisionId === player.slotId) ?? null
-      : null;
-    const canonicalX = player.slotId ? this.getFormationPositionCoord(player.slotId, 'x') : null;
-    const canonicalY = player.slotId ? this.getFormationPositionCoord(player.slotId, 'y') : null;
-    const nativeCenter = computeSquadEditorSlotCenter({
-      canonicalX,
-      canonicalY,
-      slotRect: owningSlot,
-    });
-    const dropNearNativeCenter = isSquadEditorDropNearSlotCenter({
-      drop: { xPct, yPct },
-      center: nativeCenter,
-    });
-
-    if (dropNearNativeCenter) {
-      delete player.xPercent;
-      delete player.yPercent;
-      if (player.slotId) {
-        this.slotPlayerMap[player.slotId] = player;
-      }
-      this.setLastCoachMoveReadForDrag(
-        player,
-        previousX,
-        previousY,
-        nativeCenter.x ?? xPct,
-        nativeCenter.y ?? yPct,
-        true
-      );
-    } else {
-      player.xPercent = xPct;
-      player.yPercent = yPct;
-      if (player.slotId) {
-        delete this.slotPlayerMap[player.slotId];
-      }
-      this.setLastCoachMoveReadForDrag(player, previousX, previousY, xPct, yPct, false);
-      this.persistLastModalMoveHarnessCase(player, previousX, previousY, xPct, yPct);
-    }
+    this.applyMarkerFieldDrop(player, { previousX, previousY, xPct, yPct });
 
     this.captureRatingsFromFormationEffectiveness();
     this.requestRatingsPreview();
@@ -1269,6 +1228,68 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
       .map((card) => (card as HTMLElement).getBoundingClientRect());
 
     return isPointOverAnyInsetRect({ x: dropX, y: dropY }, benchRects);
+  }
+
+  private applyMarkerFieldDrop(player: PlayerOnFieldDto, move: SquadEditorMarkerMoveContext): void {
+    if (!player.slotId || player.slotId === '') {
+      const closest = this.findClosestSubdivision(move.xPct, move.yPct, player);
+      if (closest) { player.slotId = closest.subdivisionId; }
+    }
+
+    const owningSlot = player.slotId
+      ? this.subdivisions.find(s => s.subdivisionId === player.slotId) ?? null
+      : null;
+    const canonicalX = player.slotId ? this.getFormationPositionCoord(player.slotId, 'x') : null;
+    const canonicalY = player.slotId ? this.getFormationPositionCoord(player.slotId, 'y') : null;
+    const nativeCenter = computeSquadEditorSlotCenter({
+      canonicalX,
+      canonicalY,
+      slotRect: owningSlot,
+    });
+    const dropNearNativeCenter = isSquadEditorDropNearSlotCenter({
+      drop: { xPct: move.xPct, yPct: move.yPct },
+      center: nativeCenter,
+    });
+
+    if (dropNearNativeCenter) {
+      this.snapPlayerBackToSlotCenter(player, move, nativeCenter);
+      return;
+    }
+
+    this.keepPlayerAtFreeDropPosition(player, move);
+  }
+
+  private snapPlayerBackToSlotCenter(
+    player: PlayerOnFieldDto,
+    move: SquadEditorMarkerMoveContext,
+    nativeCenter: { x: number | null; y: number | null }
+  ): void {
+    delete player.xPercent;
+    delete player.yPercent;
+    if (player.slotId) {
+      this.slotPlayerMap[player.slotId] = player;
+    }
+    this.setLastCoachMoveReadForDrag(
+      player,
+      move.previousX,
+      move.previousY,
+      nativeCenter.x ?? move.xPct,
+      nativeCenter.y ?? move.yPct,
+      true
+    );
+  }
+
+  private keepPlayerAtFreeDropPosition(
+    player: PlayerOnFieldDto,
+    move: SquadEditorMarkerMoveContext
+  ): void {
+    player.xPercent = move.xPct;
+    player.yPercent = move.yPct;
+    if (player.slotId) {
+      delete this.slotPlayerMap[player.slotId];
+    }
+    this.setLastCoachMoveReadForDrag(player, move.previousX, move.previousY, move.xPct, move.yPct, false);
+    this.persistLastModalMoveHarnessCase(player, move.previousX, move.previousY, move.xPct, move.yPct);
   }
 
   private applySlotAssignment(

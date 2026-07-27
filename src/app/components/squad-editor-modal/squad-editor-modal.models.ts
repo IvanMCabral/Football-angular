@@ -59,3 +59,10 @@ export interface SquadEditorAutoSelectResponse {
   players?: SquadEditorLineupPlayer[];
   slots?: LineupSlotDTO[];
 }
+
+export interface SquadEditorMarkerMoveContext {
+  previousX: number;
+  previousY: number;
+  xPct: number;
+  yPct: number;
+}
