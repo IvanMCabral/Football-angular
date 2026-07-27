@@ -15,6 +15,9 @@ interface AllRoundsWithBye {
   rounds: RoundFixturesWithBye[];
 }
 
+type FixtureMatch = Fixture | Match;
+type MatchIdValue = string | number | { value?: string | number | null } | null | undefined;
+
 @Component({
   selector: 'app-dashboard-fixture-modal',
   standalone: true,
@@ -46,11 +49,11 @@ export class DashboardFixtureModalComponent implements OnInit {
   @Input() teamNameMap: { [id: string]: string } = {};
   @Input() gameId?: string;
 
-  getValue(val: any): string {
+  getValue(val: MatchIdValue): string {
     if (val && typeof val === 'object' && 'value' in val) {
-      return val.value;
+      return String(val.value ?? '');
     }
-    return val ?? '';
+    return String(val ?? '');
   }
 
   ngOnInit(): void {
@@ -80,37 +83,41 @@ export class DashboardFixtureModalComponent implements OnInit {
     });
   }
 
-  playLive(match: any) {
+  playLive(match: FixtureMatch): void {
     if (!this.gameId) {
       return;
     }
-    // UX-6: handle both Fixture (matchId) and legacy Match (id)
-    const matchId = this.getValue(match.matchId || match.id);
+    const matchId = this.getMatchId(match);
     this.router.navigate([`/games/${this.gameId}/match/${matchId}/live`]);
     this.close();
   }
 
-  getRounds(matches: any[]): number[] {
-    const rounds = Array.from(new Set(matches.map(m => m.round))).sort((a, b) => a - b);
+  getRounds(matches: Match[]): number[] {
+    const rounds = Array
+      .from(new Set(matches.map(m => m.round).filter((round): round is number => typeof round === 'number')))
+      .sort((a, b) => a - b);
     return rounds;
   }
 
-  getMatchesForRound(round: number): any[] {
-    const filtered = this.matches.filter((m: any) => m.round === round);
+  getMatchesForRound(round: number): Match[] {
+    const filtered = this.matches.filter((m) => m.round === round);
     return filtered;
   }
 
-  goToMatchDetail(match: any): void {
+  goToMatchDetail(match: FixtureMatch): void {
     if (!this._careerId) {
       return;
     }
-    // UX-6: handle both Fixture (matchId) and legacy Match (id)
-    const matchId = this.getValue(match.matchId || match.id);
+    const matchId = this.getMatchId(match);
     this.router.navigate(['/careers', this._careerId, 'matches', matchId, 'detail']);
     this.close();
   }
 
-  canShowDetail(match: any): boolean {
-    return match.status === 'COMPLETED' && !!this._careerId;
+  canShowDetail(match: FixtureMatch): boolean {
+    return (match.status === 'COMPLETED' || match.status === 'SIMULATED') && !!this._careerId;
+  }
+
+  private getMatchId(match: FixtureMatch): string {
+    return this.getValue('matchId' in match ? match.matchId : match.id);
   }
 }
