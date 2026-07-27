@@ -163,9 +163,9 @@ export class PlayerManagementComponent {
           this.reloadAvailablePlayers$.next();
           this.reloadTeams$.next();
         },
-        error: (err: any) => {
+        error: (err: unknown) => {
           this.logger.error('Failed to assign player:', err);
-          this.toastService.error(`Failed to assign player: ${err.error?.message || err.message || 'Unknown error'}`);
+          this.toastService.error(`Failed to assign player: ${this.readErrorMessage(err)}`);
         }
       });
     });
@@ -187,12 +187,28 @@ export class PlayerManagementComponent {
           this.reloadAvailablePlayers$.next();
           this.reloadTeams$.next();
         },
-        error: (err: any) => {
+        error: (err: unknown) => {
           this.logger.error('Failed to remove player:', err);
-          this.toastService.error(`Failed to remove player: ${err.error?.message || err.message || 'Unknown error'}`);
+          this.toastService.error(`Failed to remove player: ${this.readErrorMessage(err)}`);
         }
       });
     });
+  }
+
+  private readErrorMessage(err: unknown): string {
+    if (typeof err !== 'object' || err === null) {
+      return 'Unknown error';
+    }
+
+    const maybeError = err as { message?: unknown; error?: { message?: unknown } };
+    if (typeof maybeError.error?.message === 'string') {
+      return maybeError.error.message;
+    }
+    if (typeof maybeError.message === 'string') {
+      return maybeError.message;
+    }
+
+    return 'Unknown error';
   }
 }
 

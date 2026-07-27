@@ -57,6 +57,14 @@ import {
   describeSquadEditorCoachMoveSpatialRead,
 } from './squad-editor-modal-move-read.utils';
 import { buildSquadEditorTacticalCoachReads } from './squad-editor-modal-tactical-read.utils';
+import {
+  SquadEditorAutoSelectResponse,
+  SquadEditorCoachBaseline,
+  SquadEditorCoachMoveReadView,
+  SquadEditorCurrentLineupResponse,
+  SquadEditorFormationChange,
+  SquadEditorLineupPlayer,
+} from './squad-editor-modal.models';
 
 @Component({
   selector: 'app-squad-editor-modal',
@@ -71,7 +79,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
 
   private destroy$ = new Subject<void>();
 
-  @Output() formationChanged = new EventEmitter<{formation: string, players: any[]}>();
+  @Output() formationChanged = new EventEmitter<SquadEditorFormationChange>();
 
   private formationChangeCompleteSubject = new Subject<void>();
 
@@ -83,26 +91,9 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
 
   benchPlayers$ = new BehaviorSubject<PlayerOnFieldDto[]>([]);
 
-  lastCoachMoveRead: {
-    title: string;
-    body: string;
-    baseBody?: string;
-    level: 'good' | 'warn' | 'danger' | 'info';
-  } | null = null;
+  lastCoachMoveRead: SquadEditorCoachMoveReadView | null = null;
 
-  private pendingCoachMoveBaseline: {
-    attack: number;
-    midfield: number;
-    defense: number;
-    chemistry: number | null;
-    channels: { left: number | null; center: number | null; right: number | null };
-    visualChannels: Array<{
-      label: 'L' | 'C' | 'R';
-      threat: number;
-      connection: number;
-      coverage: number;
-    }>;
-  } | null = null;
+  private pendingCoachMoveBaseline: SquadEditorCoachBaseline | null = null;
 
   selectedSlot: FieldSubdivisionDTO | null = null;
 
@@ -731,7 +722,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   }
 
   private loadSquadFromBackend(): void {
-    this.http.get<any>(`${environment.apiUrl}/career/lineup/current`).subscribe({
+    this.http.get<SquadEditorCurrentLineupResponse>(`${environment.apiUrl}/career/lineup/current`).subscribe({
       next: (response) => {
         this.currentChemistryScore = (typeof response?.chemistryScore === 'number')
             ? response.chemistryScore
@@ -760,7 +751,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
           this.executeAutoSelect(formationName);
         }
 
-        const squadSource: any[] = (this.data?.squad && this.data.squad.length > 0)
+        const squadSource: SquadEditorLineupPlayer[] = (this.data?.squad && this.data.squad.length > 0)
           ? this.data.squad.map((sp: SessionPlayer) => ({
               playerId: sp.sessionPlayerId,
               name: sp.name,
@@ -771,21 +762,21 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
             }))
           : playersList;
 
-        const squadById = new Map<string, any>();
-        squadSource.forEach((p: any) => squadById.set(p.playerId, p));
+        const squadById = new Map<string, SquadEditorLineupPlayer>();
+        squadSource.forEach((p) => squadById.set(p.playerId, p));
 
-        const selectedPlayerIds = new Set((playersList || []).map((p: any) => p.playerId).filter(Boolean));
+        const selectedPlayerIds = new Set((playersList || []).map((p) => p.playerId).filter(Boolean));
         const orderedSource = selectedPlayerIds.size > 0
           ? [
-              ...(playersList || []).map((p: any) => ({
+              ...(playersList || []).map((p) => ({
                 ...(squadById.get(p.playerId) || {}),
                 ...p
               })),
-              ...squadSource.filter((p: any) => !selectedPlayerIds.has(p.playerId))
+              ...squadSource.filter((p) => !selectedPlayerIds.has(p.playerId))
             ]
           : squadSource;
 
-        const allPlayers: PlayerOnFieldDto[] = orderedSource.map((p: any) => ({
+        const allPlayers: PlayerOnFieldDto[] = orderedSource.map((p) => ({
           playerId: p.playerId,
           name: p.name,
           position: p.position,
@@ -1757,7 +1748,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   private executeAutoSelect(formation: string): void {
     this.loadingFormation$.next(true);
 
-    this.http.post<any>(`${environment.apiUrl}/career/lineup/auto-select`, {
+    this.http.post<SquadEditorAutoSelectResponse>(`${environment.apiUrl}/career/lineup/auto-select`, {
       formation: formation
     }).subscribe({
       next: (response) => {
@@ -1774,12 +1765,16 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     });
   }
 
-  private applyLineupToSlots(formationName: string, playersList: any[], backendSlots: LineupSlotDTO[] = []): void {
+  private applyLineupToSlots(
+    formationName: string,
+    playersList: SquadEditorLineupPlayer[],
+    backendSlots: LineupSlotDTO[] = []
+  ): void {
     this.slotPlayerMap = {};
 
     const positions = this.formationPositions[formationName] || [];
 
-    const squadSource: any[] = (this.data?.squad && this.data.squad.length > 0)
+    const squadSource: SquadEditorLineupPlayer[] = (this.data?.squad && this.data.squad.length > 0)
       ? this.data.squad.map((sp: SessionPlayer) => ({
           playerId: sp.sessionPlayerId,
           name: sp.name,
@@ -1795,15 +1790,15 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
         }))
       : playersList;
 
-    const selectedPlayerIds = new Set((playersList || []).map((p: any) => p.playerId).filter(Boolean));
+    const selectedPlayerIds = new Set((playersList || []).map((p) => p.playerId).filter(Boolean));
     const orderedSource = selectedPlayerIds.size > 0
       ? [
-          ...squadSource.filter((p: any) => selectedPlayerIds.has(p.playerId)),
-          ...squadSource.filter((p: any) => !selectedPlayerIds.has(p.playerId))
+          ...squadSource.filter((p) => selectedPlayerIds.has(p.playerId)),
+          ...squadSource.filter((p) => !selectedPlayerIds.has(p.playerId))
         ]
       : squadSource;
 
-    const allPlayers: PlayerOnFieldDto[] = orderedSource.map((p: any) => ({
+    const allPlayers: PlayerOnFieldDto[] = orderedSource.map((p) => ({
       playerId: p.playerId,
       name: p.name,
       position: p.position,
