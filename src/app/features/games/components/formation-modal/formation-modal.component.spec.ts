@@ -931,15 +931,7 @@ describe('FormationModalComponent auto-fill empty slots', () => {
     expect(playerIds).toContain('p4');
   });
 
-  // ============================================================
-  // Backend auto-selection tests: onFormationChange must
-  // POST /career/lineup/auto-select so the backend re-runs the
-  // HELPER-BASED slot assignment with the new formation. Pre-fix,
-  // the modal only updated local slotAssignments and the squad
-  // page kept reading the stale /career/lineup/current response.
-  // Symptom: chem header showed 83/20% on the modal vs 91/60% on
-  // the squad page (state divergence).
-  // ============================================================
+  // Formation changes are persisted through backend auto-select so modal and squad stay synchronized.
 
   let httpClientSpy: jasmine.SpyObj<HttpClient>;
 

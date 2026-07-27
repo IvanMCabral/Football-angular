@@ -144,8 +144,7 @@ describe('SquadManagementComponent', () => {
     component = fixture.componentInstance;
     fixture.detectChanges();
 
-    // Capture dialogSpy from the real MatDialog and set up the open spy
-    // AFTER detectChanges so the component's careerStatus$ is initialised.
+    // Capture MatDialog after the component has initialized its streams.
     const realDialog = TestBed.inject(MatDialog);
     dialogSpy = realDialog as unknown as jasmine.SpyObj<MatDialog>;
     dialogRefSpy = jasmine.createSpyObj('MatDialogRef', ['close', 'afterClosed']);
@@ -936,9 +935,7 @@ describe('SquadManagementComponent', () => {
     });
 
     it('refreshSquad() triggers a re-fetch (squadLoading$ flips true then false)', (done: DoneFn) => {
-      // Install a counter mock AFTER ngOnInit (the initial mount already
-      // fired with the beforeEach mock). refreshSquad() should fire a NEW
-      // HTTP request that we can count.
+      // Count only refreshSquad() requests, not the initial component load.
       const httpSpy = TestBed.inject(HttpClient) as jasmine.SpyObj<HttpClient>;
       let squadCallCount = 0;
       httpSpy.get.and.callFake(((url: string) => {
@@ -951,7 +948,7 @@ describe('SquadManagementComponent', () => {
       // Wait for initial mount to settle (squad$ emits once with the
       // beforeEach mock — not counted here, which is intentional).
       fixture.whenStable().then(() => {
-        // Subscribe AFTER initial mount so we capture the refetch transition.
+        // Subscribe after the initial mount to capture the refetch transition.
         const emissions: boolean[] = [];
         const sub = component.squadLoading$.subscribe(v => emissions.push(v));
 
@@ -988,11 +985,7 @@ describe('SquadManagementComponent', () => {
         fixture.detectChanges();
         const overlay = fixture.nativeElement.querySelector(
           '[data-testid="squad-loading-overlay"]');
-        // The overlay MAY have already disappeared if the synchronous HTTP
-        // resolved before the second detectChanges. The KEY assertion is
-        // that the element EXISTS in the DOM tree at SOME point during the
-        // initial mount cycle. We verify this by checking that the element
-        // is referenced in the compiled template (via TestBed).
+          // Synchronous mocks may hide the overlay before this assertion cycle.
         const compiled = fixture.nativeElement;
         expect(compiled).toBeDefined();
         // Sanity: the squadLoading$ subscription confirms the observable works.
@@ -1113,7 +1106,7 @@ describe('SquadManagementComponent', () => {
       expect(postBody.slots[10].playerId).toBe('p10');
       expect(postBody.slots[10].subdivisionId).toBe('NEW-10');
 
-      // GET /career/lineup/current was called exactly once (post-fix: refetch after POST).
+      // Confirm the persisted lineup is reloaded after POST.
       expect(getCurrentCalls).withContext('GET /career/lineup/current must be called').toBe(1);
 
       // lineupSubject$ now reflects the back's updated lineup.

@@ -3,7 +3,7 @@
  *
  * The Squad → Stats tab in browser E2E regressed because the component
  * silently fell back to the all-player endpoint when `teamId` was empty.
- * The fix introduces a `scope: 'team' | 'global'` input:
+ * The `scope: 'team' | 'global'` input defines the endpoint contract:
  *
  *   - scope='team'   + teamId='xyz' → /teams/{teamId}/player-stats
  *   - scope='team'   + teamId=''    → NO FETCH (waiting-team state)

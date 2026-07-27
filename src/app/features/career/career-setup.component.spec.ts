@@ -185,9 +185,7 @@ describe('CareerSetupComponent — setup flow', () => {
       // This test verifies the underlying mechanism (seedingWorld flag) is in place.
       component.seedWorld(); // second call (after first completes)
 
-      // Both calls should fire since each completes synchronously
-      // The KEY assertion is that seedingWorld guard exists in seedWorld() (it does).
-      // The debounce is a UX nicety; not strictly necessary for correctness.
+      // Both calls can complete synchronously; this keeps coverage on the guard path.
       expect(postCount).toBeGreaterThanOrEqual(1);
       done();
     });
@@ -281,7 +279,7 @@ describe('CareerSetupComponent — setup flow', () => {
       component.selectedLeagueId = LA_LIGA.realLeagueId;
       component.onLeagueChange();
 
-      // Subscribe AFTER the league-change so we capture the transition.
+      // Subscribe after the league change to capture the transition.
       const emissions: boolean[] = [];
       const sub = component.loadingTeams$.subscribe(v => emissions.push(v));
 

@@ -583,8 +583,7 @@ describe('DashboardComponent — displayNameOf helper', () => {
   });
 
   it('falls back to email when displayName is missing', () => {
-    // Pre-fix showed username; post-fix shows the email until backend
-    // starts emitting displayName.
+    // Email is the preferred fallback until the backend sends displayName.
     expect(component.displayNameOf({
       displayName: null,
       email: 'smoke-c55.7.4-20260701160000@test.com',

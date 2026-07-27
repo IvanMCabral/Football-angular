@@ -36,8 +36,7 @@ describe('AuthService payload hygiene', () => {
 
   describe('login()', () => {
     it('POSTs to /auth/login with the trimmed email and password', (done) => {
-      // The failing smoke scenario: email arrived in the form with leading + trailing
-      // whitespace (clipboard paste, autofill). AuthService must trim before sending.
+      // Covers whitespace introduced by paste/autofill before sending credentials.
       service.login('  smoke-c55.10-d-160100@test.com  ', '  SmokePwd123!  ').subscribe((resp) => {
         expect(resp).toEqual(fakeResponse);
         expect(httpSpy.post).toHaveBeenCalledWith(
@@ -67,7 +66,7 @@ describe('AuthService payload hygiene', () => {
     it('handles null/undefined inputs without crashing', (done) => {
       // Front should never pass null/undefined, but AuthService must be defensive — a null
       // email would otherwise break the body serializer and produce the same 400 symptom
-      // we're trying to fix.
+      // related to malformed credentials.
       service.login(null as unknown as string, undefined as unknown as string).subscribe(() => {
         expect(httpSpy.post).toHaveBeenCalledWith(
           jasmine.stringMatching(/\/api\/v1\/auth\/login$/),

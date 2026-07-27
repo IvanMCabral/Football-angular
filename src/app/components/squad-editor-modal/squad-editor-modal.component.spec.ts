@@ -1326,9 +1326,7 @@ describe('SquadEditorModalComponent responsive modal breakpoints', () => {
       const fieldRule = block.match(/\.field\s*\{[^}]*\}/);
       expect(fieldRule).withContext('mobile .field rule must exist').toBeTruthy();
       expect(fieldRule![0]).toMatch(/aspect-ratio:\s*1\.15\s*\/\s*1/);
-      // The original bug: max-height: 50vh overrode aspect-ratio in jsdom
-      // and real browsers alike, leaving the field wider than tall.
-      // The fix sets max-height:none. Assert neither vh nor px cap is present.
+      // Mobile layout keeps the field ratio without a fixed height cap.
       expect(fieldRule![0]).not.toMatch(/max-height:\s*\d+(vh|px)/);
     });
   });
