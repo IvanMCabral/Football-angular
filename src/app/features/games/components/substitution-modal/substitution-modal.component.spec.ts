@@ -1,4 +1,4 @@
-// Unit tests for the live substitution modal.
+﻿// Unit tests for the live substitution modal.
 
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
@@ -6,7 +6,8 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { HttpClient } from '@angular/common/http';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { of, throwError } from 'rxjs';
-import { SubstitutionModalComponent, SubstitutionDialogData } from './substitution-modal.component';
+import { SubstitutionModalComponent } from './substitution-modal.component';
+import { SubstitutionDialogData } from './substitution-modal.models';
 import { SubModalPlayer } from '../../../../core/services/match-engine.model';
 import { MatchEngineService } from '../../../../core/services/match-engine.service';
 
@@ -57,7 +58,7 @@ describe('SubstitutionModalComponent', () => {
     fixture.detectChanges();
   });
 
-  it('initial state — no selection, canConfirm is false, no error', () => {
+  it('initial state â€” no selection, canConfirm is false, no error', () => {
     expect(component.playerOffId).toBeNull();
     expect(component.playerOnId).toBeNull();
     expect(component.canConfirm).toBeFalse();
@@ -99,7 +100,7 @@ describe('SubstitutionModalComponent', () => {
     );
   });
 
-  it('confirm success → snackbar + dialog close', () => {
+  it('confirm success â†’ snackbar + dialog close', () => {
     engineServiceSpy.substitutePlayer.and.returnValue(of({
       success: true, minuteApplied: 35, substitutionsRemaining: 2
     }));
@@ -263,7 +264,7 @@ describe('SubstitutionModalComponent', () => {
     expect(dialogRefSpy.close).not.toHaveBeenCalled();
   });
 
-  it('confirm backend error → "Error de red" message, no close', () => {
+  it('confirm backend error â†’ "Error de red" message, no close', () => {
     engineServiceSpy.substitutePlayer.and.returnValue(throwError(() => new Error('network')));
     component.selectOff(SAMPLE_PLAYERS[0]);
     component.selectOn(SAMPLE_PLAYERS[4]);
@@ -359,7 +360,7 @@ describe('SubstitutionModalComponent', () => {
     expect(rec?.kind).toBe('medical');
     expect(rec?.playerOff.sessionPlayerId).toBe('p4');
     expect(rec?.playerOn.position).toBe('ATT');
-    expect(component.recommendedSubstitutionText).toContain('Prioridad médica');
+    expect(component.recommendedSubstitutionText).toContain('Prioridad mÃ©dica');
     expect(alt).not.toBeNull();
     expect(alt?.kind).toBe('tactical');
     expect(alt?.playerOff.sessionPlayerId).not.toBe('p4');
@@ -464,7 +465,7 @@ describe('SubstitutionModalComponent', () => {
     };
 
     expect(component.recommendedSubstitution).toBeNull();
-    expect(component.recommendedSubstitutionText).toContain('Sin recomendación clara');
+    expect(component.recommendedSubstitutionText).toContain('Sin recomendaciÃ³n clara');
   });
 
   it('applyRecommendedSubstitution selects the suggested off and on players', () => {
@@ -699,12 +700,12 @@ describe('Substitution modal visual pitch, stats chips, and remaining substituti
       '[data-testid="chip-yc-p4"]') as HTMLElement;
     expect(stYc?.textContent?.trim()).toBe('1Y');
 
-    // p2 (CB) — yellow + keyPasses (no goals, no injuries, no fouls in this setup for p2's KPs).
+    // p2 (CB) â€” yellow + keyPasses (no goals, no injuries, no fouls in this setup for p2's KPs).
     const cbKp = fixture.nativeElement.querySelector(
       '[data-testid="chip-kp-p2"]') as HTMLElement;
     expect(cbKp?.textContent?.trim()).toBe('3KP');
 
-    // p3 (CDM) — injury (1I).
+    // p3 (CDM) â€” injury (1I).
     const cdmInj = fixture.nativeElement.querySelector(
       '[data-testid="chip-inj-p3"]') as HTMLElement;
     expect(cdmInj?.textContent?.trim()).toBe('1I');
@@ -719,7 +720,7 @@ describe('Substitution modal visual pitch, stats chips, and remaining substituti
     // should have at least one dot; the GK line should be a single dot
     // (GK category always 1); DEF line should hold any CB/CDM players;
     // ATT line should hold any ST/CF players. The lines are categorized,
-    // not formation-line-counts (4-4-2 → 4 lines, etc.) — this is the
+    // not formation-line-counts (4-4-2 â†’ 4 lines, etc.) â€” this is the
     // Category grouping is documented in the pitchLines getter.
     const pitchLines = fixture.nativeElement.querySelectorAll(
       '.v25d79-pitch .v25d79-pitch-line');
@@ -740,12 +741,12 @@ describe('Substitution modal visual pitch, stats chips, and remaining substituti
     expect(attDots.length).toBeGreaterThanOrEqual(1, 'ATT line should hold p4 (ST)');
 
     // All dots must be clickable (click-only, no drag). The (click) handler
-    // is selectOff — verify clicking a dot sets playerOffId.
+    // is selectOff â€” verify clicking a dot sets playerOffId.
     const p4Dot = attLine!.querySelector(
       '.v25d79-pitch-dot[aria-label*="Home ST"]') as HTMLElement;
     expect(p4Dot).withContext('ST player p4 dot should be in the ATT line').not.toBeNull();
     p4Dot.click();
-    // OnPush component — re-run change detection so the [class.selected]
+    // OnPush component â€” re-run change detection so the [class.selected]
     // binding re-evaluates with the new playerOffId.
     fixture.detectChanges();
     expect(component.playerOffId).toBe('p4', 'clicking the dot must set playerOffId = p4');
@@ -754,7 +755,7 @@ describe('Substitution modal visual pitch, stats chips, and remaining substituti
     expect(p4Dot.classList.contains('selected'))
       .withContext('selected dot must carry the .selected class for visual feedback').toBeTrue();
 
-    // Empty WINGER row must NOT render — sanity for the empty-line filter.
+    // Empty WINGER row must NOT render â€” sanity for the empty-line filter.
     const wingerLine = Array.from(pitchLines as NodeListOf<HTMLElement>).find(
       line => line.getAttribute('data-category') === 'WINGER');
     expect(wingerLine).withContext('WINGER line is filtered out when no WINGER players').toBeUndefined();
@@ -769,13 +770,13 @@ describe('Substitution modal visual pitch, stats chips, and remaining substituti
     // one with subs=3 (positive case), one with subs=0 (zero case). Each
     // gets a fresh component instance so the OnPush change-detection
     // binds reliably on first render.
-    expect(component.isOutOfSubs).withContext('3 remaining (initial) → NOT out of subs').toBeFalse();
+    expect(component.isOutOfSubs).withContext('3 remaining (initial) â†’ NOT out of subs').toBeFalse();
 
     component.selectOff({ sessionPlayerId: 'p4', displayName: 'Home ST',
       position: 'ST', rating: 82, isStarter: true } as SubModalPlayer);
     component.selectOn({ sessionPlayerId: 'b1', displayName: 'Bench CB',
       position: 'CB', rating: 70, isStarter: false } as SubModalPlayer);
-    expect(component.canConfirm).withContext('selection is valid + subs remaining → canConfirm = true').toBeTrue();
+    expect(component.canConfirm).withContext('selection is valid + subs remaining â†’ canConfirm = true').toBeTrue();
 
     // Rebuild the test bed with substitutionsRemaining=0 so the modal
     // renders the .is-zero class on first detection (no mutation, no CD
@@ -797,7 +798,7 @@ describe('Substitution modal visual pitch, stats chips, and remaining substituti
     zeroFixture.detectChanges();
     const zeroComponent = zeroFixture.componentInstance;
 
-    expect(zeroComponent.isOutOfSubs).withContext('0 remaining → isOutOfSubs must be true on fresh render').toBeTrue();
+    expect(zeroComponent.isOutOfSubs).withContext('0 remaining â†’ isOutOfSubs must be true on fresh render').toBeTrue();
     expect(zeroComponent.canConfirm).withContext('canConfirm must be false when 0 subs remaining').toBeFalse();
 
     // Also verify the styled remaining-tag carries the is-zero class for
@@ -891,7 +892,7 @@ describe('Substitution modal visual pitch, stats chips, and remaining substituti
     const reasonBadge = f.nativeElement.querySelector('.reason-badge') as HTMLElement;
     expect(reasonBadge).not.toBeNull();
     expect(reasonBadge.getAttribute('data-reason')).toBe('injury');
-    expect(reasonBadge.textContent).toContain('Sustitución por lesión');
+    expect(reasonBadge.textContent).toContain('SustituciÃ³n por lesiÃ³n');
   });
 
   it('reason=undefined (manual open) does NOT render the reason badge', () => {
@@ -923,9 +924,9 @@ describe('Substitution modal visual pitch, stats chips, and remaining substituti
 
     const guide = f.nativeElement.querySelector('[data-testid="sub-flow-guide"]') as HTMLElement;
     expect(guide).not.toBeNull();
-    expect(guide.textContent).toContain('1. Elegí quién sale');
-    expect(guide.textContent).toContain('2. Elegí quién entra');
-    expect(guide.textContent).toContain('3. Confirmá el cambio');
+    expect(guide.textContent).toContain('1. ElegÃ­ quiÃ©n sale');
+    expect(guide.textContent).toContain('2. ElegÃ­ quiÃ©n entra');
+    expect(guide.textContent).toContain('3. ConfirmÃ¡ el cambio');
 
     const context = f.nativeElement.querySelector('[data-testid="injury-context"]') as HTMLElement;
     expect(context).not.toBeNull();
@@ -936,5 +937,3 @@ describe('Substitution modal visual pitch, stats chips, and remaining substituti
     expect(injuredDot.textContent).toContain('Starter 2');
   });
 });
-
-

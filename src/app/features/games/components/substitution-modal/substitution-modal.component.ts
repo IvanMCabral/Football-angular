@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, ChangeDetectorRef, Component, inject } from '@angular/core';
+﻿import { ChangeDetectionStrategy, ChangeDetectorRef, Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   MAT_DIALOG_DATA,
@@ -16,56 +16,40 @@ import { Subject, from, of, takeUntil } from 'rxjs';
 import { concatMap, finalize, switchMap, timeout, toArray } from 'rxjs/operators';
 import { MatchEngineService } from '../../../../core/services/match-engine.service';
 import { SubModalPlayer, SubstitutionResult, V24LivePlayerRating } from '../../../../core/services/match-engine.model';
-import { clampFieldPercentRounded, clampFieldPixelTweak } from '../../../../shared/utils/field-percent.utils';
+import { clampFieldPixelTweak } from '../../../../shared/utils/field-percent.utils';
 import { buildSubstitutionPitchLines, SubstitutionPitchLine } from './substitution-modal-pitch.utils';
 import {
   CoachObjective,
   RecommendedSubstitution,
   scoreRecommendedSubstitution
 } from './substitution-modal-recommendation.utils';
+import {
+  applyPendingSubstitutionsToStartingXi,
+  buildSubstitutionLiveFormationSlots,
+  SubstitutionLiveFormationSlot,
+} from './substitution-modal-live-slots.utils';
+import { PendingSubstitution, PlayerPositionTweak, SubstitutionDialogData } from './substitution-modal.models';
+import { formatSubstitutionError, isAlreadyAppliedSubstitutionResult } from './substitution-modal-result.utils';
 
-export interface SubstitutionDialogData {
-  matchId: string;
-  currentMinute: number;
-  score?: {
-    home: number;
-    away: number;
-  };
-  startingXi: SubModalPlayer[];
-  bench: SubModalPlayer[];
-  substitutionsRemaining: number;
-    /** Position effectiveness by player id, from 0 to 1. */
-  effectivenessMap?: Record<string, number>;
-    /** Live formation of the manager team, for example "4-4-2". */
-  formation?: string;
-    /** Per-player live stats shown as chips on the visual pitch. */
-  playerRatings?: V24LivePlayerRating[];
-    /** Side of the match controlled by the manager. */
-  managerSide?: 'HOME' | 'AWAY';
-    /** Optional starter id to preselect as the player leaving the pitch. */
-  preSelectedPlayerId?: string;
-    /** Reason shown in the modal header when it was opened automatically. */
-  reason?: 'INJURY_FORCED_SUBSTITUTION' | 'MANUAL';
-}
+import {
+  findSubstitutionPlayerRating,
+  hasSubstitutionRatingChip,
+  isInjuredFromSubstitutionRatings
+} from './substitution-modal-ratings.utils';
+import {
+  inferSubstitutionCoachObjective,
+  recommendedSubstitutionText,
+  substitutionCoachObjectiveClass,
+  substitutionCoachObjectiveLabel,
+  substitutionCoachObjectiveText
+} from './substitution-modal-coach-objective.utils';
+import {
+  isSubstitutionGoalkeeper,
+  substitutionEffectivenessBadge,
+  substitutionEffectivenessClass,
+  SubstitutionEffectivenessClass
+} from './substitution-modal-player-view.utils';
 
-interface PendingSubstitution {
-  playerOffId: string;
-  playerOnId: string;
-  playerOffName: string;
-  playerOnName: string;
-}
-
-interface PlayerPositionTweak {
-  x: number;
-  y: number;
-}
-
-/**
- * Substitution modal used during live matches.
- *
- * Shows the current XI on a visual pitch, lets the manager select the player
- * leaving the pitch, and lists available bench players as swap-in candidates.
- */
 @Component({
   selector: 'app-substitution-modal',
   standalone: true,
@@ -78,381 +62,14 @@ interface PlayerPositionTweak {
   ],
   templateUrl: './substitution-modal.component.html',
   styleUrls: ['./substitution-modal.component.css'],
-  // Pitch and chip styles stay inline because visual tests inspect component styles.
-  styles: [`
-    .v25d79-pitch {
-      position: relative;
-      background: linear-gradient(180deg, #2e7d32 0%, #1b5e20 100%);
-      border-radius: 8px;
-      padding: 0.6rem 0.4rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.4rem;
-      border: 2px solid #fff;
-      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
-      min-height: 280px;
-      justify-content: space-around;
-      margin-bottom: 0.75rem;
-      overflow: hidden;
-    }
-    .v25d79-pitch::before {
-      content: '';
-      position: absolute;
-      left: 0;
-      right: 0;
-      top: 50%;
-      height: 2px;
-      background: rgba(255, 255, 255, 0.68);
-      transform: translateY(-50%);
-      pointer-events: none;
-    }
-    .v25d79-pitch::after {
-      content: '';
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      width: 64px;
-      height: 64px;
-      border: 2px solid rgba(255, 255, 255, 0.72);
-      border-radius: 50%;
-      transform: translate(-50%, -50%);
-      pointer-events: none;
-    }
-    .v25d79-pitch-line {
-      display: flex;
-      justify-content: space-around;
-      align-items: center;
-      min-height: 36px;
-      gap: 6px;
-      position: relative;
-      z-index: 1;
-    }
-    .v25d79-pitch-dot {
-      position: relative;
-      width: 56px;
-      height: 56px;
-      border-radius: 50%;
-      background: #fff;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      border: 2px solid #1e3c72;
-      font-size: 0.65rem;
-      font-weight: 700;
-      color: #1e3c72;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-      cursor: pointer;
-      padding: 2px;
-      box-sizing: border-box;
-      --nudge-x: 0px;
-      --nudge-y: 0px;
-      --dot-scale: 1;
-      transform: translate(var(--nudge-x), var(--nudge-y)) scale(var(--dot-scale));
-      transition: transform 0.1s ease;
-      user-select: none;
-    }
-    .v25d79-pitch-dot:hover { --dot-scale: 1.06; }
-    .v25d79-pitch-dot.is-gk  { background: #ffc107; border-color: #ff6f00; }
-    .v25d79-pitch-dot.is-def { background: #bbdefb; }
-    .v25d79-pitch-dot.is-mid,
-    .v25d79-pitch-dot.is-winger { background: #c8e6c9; }
-    .v25d79-pitch-dot.is-att { background: #ffcdd2; border-color: #b71c1c; color: #b71c1c; }
-    .v25d79-pitch-dot.selected {
-      box-shadow: 0 0 0 3px #d32f2f, 0 1px 3px rgba(0, 0, 0, 0.3);
-      --dot-scale: 1.08;
-    }
-    .v25d79-pitch-dot.is-injury-target {
-      box-shadow: 0 0 0 3px #dc2626, 0 0 16px rgba(220, 38, 38, 0.55), 0 1px 3px rgba(0, 0, 0, 0.3);
-    }
-    .v25d79-pitch-dot.is-injury-target::after {
-      content: 'LES';
-      position: absolute;
-      right: -8px;
-      bottom: -8px;
-      padding: 2px 5px;
-      border-radius: 999px;
-      background: #dc2626;
-      color: #fff;
-      font-size: 0.5rem;
-      font-weight: 900;
-      letter-spacing: 0.04em;
-    }
-    .v25d79-pitch-dot.eff-good   { border-color: #10b981; }
-    .v25d79-pitch-dot.eff-warning { border-color: #f59e0b; }
-    .v25d79-pitch-dot.eff-bad    { border-color: #ef4444; }
-    .v25d79-pitch-dot.is-disabled {
-      cursor: not-allowed;
-      opacity: 0.55;
-    }
-    .v25d79-pitch-dot.is-disabled:hover { --dot-scale: 1; }
-    .v25d79-dot-pos {
-      font-size: 0.6rem;
-      font-weight: 800;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      line-height: 1;
-    }
-    .v25d79-dot-name {
-      font-size: 0.55rem;
-      font-weight: 500;
-      line-height: 1;
-      max-width: 50px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      color: #374151;
-    }
-    .v25d79-dot-rating {
-      font-size: 0.85rem;
-      font-weight: 700;
-      color: #1e3c72;
-      line-height: 1;
-    }
-    .v25d79-dot-chips {
-      position: absolute;
-      top: -6px;
-      left: 50%;
-      transform: translateX(-50%);
-      display: flex;
-      gap: 2px;
-      flex-wrap: wrap;
-      max-width: 70px;
-      justify-content: center;
-    }
-    .v25d79-chip {
-      display: inline-block;
-      padding: 1px 4px;
-      border-radius: 999px;
-      font-size: 0.55rem;
-      font-weight: 700;
-      background: #1e3c72;
-      color: #fff;
-      line-height: 1;
-      min-width: 12px;
-      text-align: center;
-    }
-    .v25d79-chip-goals      { background: #16a34a; }
-    .v25d79-chip-key-passes  { background: #0891b2; }
-    .v25d79-chip-yellows     { background: #f59e0b; }
-    .v25d79-chip-fouls       { background: #6b7280; }
-    .v25d79-chip-injuries    { background: #dc2626; }
-    .v25d79-actions-summary {
-      margin-top: 0.5rem;
-      padding: 0.5rem 0.6rem;
-      background: #f5f7fa;
-      border-radius: 6px;
-      border: 1px solid #d1d5db;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      flex-wrap: wrap;
-    }
-    .v25d79-actions-summary .label {
-      font-size: 0.78rem;
-      color: #5a6473;
-      font-weight: 600;
-    }
-    .v25d79-actions-summary .name {
-      font-size: 0.85rem;
-      color: #1e3c72;
-      font-weight: 700;
-    }
-    .v25d79-actions-summary .arrow {
-      font-size: 1.1rem;
-      color: #2e7d32;
-      font-weight: 700;
-    }
-    .v25d79-remaining {
-      display: inline-block;
-      padding: 0.2rem 0.55rem;
-      background: #e0e0e0;
-      color: #1e3c72;
-      border-radius: 999px;
-      font-size: 0.78rem;
-      font-weight: 600;
-    }
-    .v25d79-remaining.is-zero {
-      background: #ffebee;
-      color: #b71c1c;
-    }
-    /* Reason badge shown when the modal opens from an injury prompt. */
-    .reason-badge {
-      display: inline-block;
-      margin-left: 0.5rem;
-      padding: 0.15rem 0.6rem;
-      background: #fee2e2;
-      color: #b91c1c;
-      border: 1px solid #fca5a5;
-      border-radius: 999px;
-      font-size: 0.7rem;
-      font-weight: 700;
-      letter-spacing: 0.02em;
-      vertical-align: middle;
-    }
-    .sub-flow-guide {
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-      margin: 0 0 0.65rem;
-      padding: 0.45rem 0.55rem;
-      border: 1px solid #bfdbfe;
-      border-radius: 8px;
-      background: #eff6ff;
-      color: #1e3a8a;
-      flex-wrap: wrap;
-    }
-    .flow-step {
-      padding: 0.18rem 0.5rem;
-      border-radius: 999px;
-      background: #dbeafe;
-      font-size: 0.74rem;
-      font-weight: 700;
-    }
-    .flow-step.active {
-      background: #1d4ed8;
-      color: #fff;
-    }
-    .flow-step.done {
-      background: #dcfce7;
-      color: #166534;
-    }
-    .flow-arrow {
-      color: #64748b;
-      font-weight: 800;
-    }
-    .banner-injury-context {
-      background: #fff1f2;
-      color: #9f1239;
-      border: 1px solid #fecdd3;
-      margin-bottom: 0.65rem;
-    }
-    .injury-pill {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0.1rem 0.4rem;
-      border-radius: 999px;
-      background: #dc2626;
-      color: #fff;
-      font-size: 0.65rem;
-      font-weight: 900;
-      letter-spacing: 0.04em;
-    }
-    .queue-change-btn {
-      margin-top: 0.5rem;
-      width: 100%;
-    }
-    .fine-tune-panel {
-      border: 1px solid rgba(148, 163, 184, 0.35);
-      border-radius: 10px;
-      padding: 0.65rem;
-      background: rgba(15, 23, 42, 0.04);
-      margin-top: 0.65rem;
-    }
-    .fine-tune-title {
-      font-weight: 800;
-      color: #0f172a;
-      margin-bottom: 0.35rem;
-    }
-    .fine-tune-text {
-      font-size: 0.82rem;
-      color: #475569;
-      margin-bottom: 0.45rem;
-    }
-    .fine-tune-controls {
-      display: grid;
-      grid-template-columns: repeat(3, 36px);
-      grid-template-rows: repeat(3, 32px);
-      gap: 4px;
-      justify-content: center;
-      align-items: center;
-    }
-    .fine-tune-controls button {
-      min-width: 0;
-      padding: 0;
-      line-height: 1;
-    }
-    .fine-tune-controls .up { grid-column: 2; grid-row: 1; }
-    .fine-tune-controls .left { grid-column: 1; grid-row: 2; }
-    .fine-tune-controls .reset { grid-column: 2; grid-row: 2; font-size: 0.68rem; }
-    .fine-tune-controls .right { grid-column: 3; grid-row: 2; }
-    .fine-tune-controls .down { grid-column: 2; grid-row: 3; }
-    .fine-tune-coords {
-      text-align: center;
-      margin-top: 0.35rem;
-      color: #0f766e;
-      font-weight: 800;
-      font-size: 0.76rem;
-    }
-    .pending-sub-list {
-      margin-top: 0.75rem;
-      padding: 0.65rem;
-      border: 1px solid #bbf7d0;
-      border-radius: 8px;
-      background: #f0fdf4;
-    }
-    .pending-sub-list h3 {
-      margin: 0 0 0.45rem;
-      color: #14532d;
-      font-size: 0.9rem;
-      font-weight: 800;
-    }
-    .pending-sub-row {
-      display: grid;
-      grid-template-columns: auto 1fr auto 1fr auto;
-      gap: 0.4rem;
-      align-items: center;
-      padding: 0.35rem 0.45rem;
-      border-radius: 6px;
-      background: #fff;
-      border: 1px solid #dcfce7;
-      margin-bottom: 0.35rem;
-    }
-    .pending-index {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 1.25rem;
-      height: 1.25rem;
-      border-radius: 50%;
-      background: #16a34a;
-      color: #fff;
-      font-size: 0.72rem;
-      font-weight: 900;
-    }
-    .pending-name {
-      font-weight: 700;
-      color: #1e3a8a;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .pending-name.off {
-      color: #991b1b;
-    }
-    .pending-name.on {
-      color: #166534;
-    }
-    .pending-arrow {
-      color: #15803d;
-      font-weight: 900;
-    }
-    .pending-remove {
-      min-width: auto;
-      padding: 0 0.35rem;
-    }
-  `],
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class SubstitutionModalComponent {
-
   readonly data: SubstitutionDialogData = inject(MAT_DIALOG_DATA);
   private dialogRef = inject(MatDialogRef<SubstitutionModalComponent>);
   private engineService = inject(MatchEngineService);
   private snackBar = inject(MatSnackBar);
   private cdr = inject(ChangeDetectorRef);
-
   playerOffId: string | null = null;
   playerOnId: string | null = null;
   pendingChanges: PendingSubstitution[] = [];
@@ -461,8 +78,6 @@ export class SubstitutionModalComponent {
   errorMsg: string = '';
   isSubmitting = false;
   private destroy$ = new Subject<void>();
-
-  // Pre-select the outgoing player when the modal opens from an injury prompt.
   ngOnInit(): void {
     if (this.data.preSelectedPlayerId) {
       const target = this.data.startingXi.find(
@@ -474,28 +89,23 @@ export class SubstitutionModalComponent {
       }
     }
   }
-
   get playerOff(): SubModalPlayer | null {
     return this.data.startingXi.find(p => p.sessionPlayerId === this.playerOffId) ?? null;
   }
-
   get playerOn(): SubModalPlayer | null {
     return this.data.bench.find(p => p.sessionPlayerId === this.playerOnId) ?? null;
   }
-
   get availableBench(): SubModalPlayer[] {
     const pendingOnIds = new Set(this.pendingChanges.map(change => change.playerOnId));
     return this.data.bench.filter(p =>
       !pendingOnIds.has(p.sessionPlayerId) || p.sessionPlayerId === this.playerOnId
     );
   }
-
   get canConfirm(): boolean {
     return !this.isSubmitting
       && this.data.substitutionsRemaining > 0
       && (this.pendingChanges.length > 0 || this.canAddPendingChange);
   }
-
   get canAddPendingChange(): boolean {
     return !!(this.playerOffId && this.playerOnId
       && this.playerOffId !== this.playerOnId
@@ -504,68 +114,24 @@ export class SubstitutionModalComponent {
         change.playerOffId === this.playerOffId || change.playerOnId === this.playerOnId
       ));
   }
-
   get isOutOfSubs(): boolean {
     return this.data.substitutionsRemaining <= 0;
   }
-
   get coachObjective(): CoachObjective {
-    const minute = this.data.currentMinute ?? 0;
-    const home = this.data.score?.home ?? 0;
-    const away = this.data.score?.away ?? 0;
-    const managerGoals = this.data.managerSide === 'AWAY' ? away : home;
-    const rivalGoals = this.data.managerSide === 'AWAY' ? home : away;
-    const delta = managerGoals - rivalGoals;
-    if (delta < 0) {
-      return 'NEED_GOAL';
-    }
-    if (delta > 0 && minute >= 60) {
-      return 'PROTECT_RESULT';
-    }
-    if (delta === 0 && minute >= 75) {
-      return 'NEED_GOAL';
-    }
-    return 'NEUTRAL';
+    return inferSubstitutionCoachObjective(this.data);
   }
-
   get coachObjectiveLabel(): string {
-    switch (this.coachObjective) {
-      case 'NEED_GOAL': return 'Necesito gol';
-      case 'PROTECT_RESULT': return 'Cuidar resultado';
-      default: return 'Neutral';
-    }
+    return substitutionCoachObjectiveLabel(this.coachObjective);
   }
-
   get coachObjectiveClass(): string {
-    switch (this.coachObjective) {
-      case 'NEED_GOAL': return 'objective-attack';
-      case 'PROTECT_RESULT': return 'objective-protect';
-      default: return 'objective-neutral';
-    }
+    return substitutionCoachObjectiveClass(this.coachObjective);
   }
-
   get coachObjectiveText(): string {
-    const minute = this.data.currentMinute ?? 0;
-    const home = this.data.score?.home ?? 0;
-    const away = this.data.score?.away ?? 0;
-    const managerGoals = this.data.managerSide === 'AWAY' ? away : home;
-    const rivalGoals = this.data.managerSide === 'AWAY' ? home : away;
-    const delta = managerGoals - rivalGoals;
-    if (this.coachObjective === 'NEED_GOAL') {
-      return delta < 0
-        ? `Vas ${Math.abs(delta)} abajo al ${minute}'. Prioridad: sumar amenaza, tiros y llegada.`
-        : `Empate avanzado al ${minute}'. Prioridad: encontrar un cambio que aumente peligro sin romper el equipo.`;
-    }
-    if (this.coachObjective === 'PROTECT_RESULT') {
-      return `Vas ${delta} arriba al ${minute}'. Prioridad: bajar riesgo rival y sostener estructura.`;
-    }
-    return `Partido equilibrado al ${minute}'. Prioridad: mantener coherencia y mejorar sin forzar.`;
+    return substitutionCoachObjectiveText({ ...this.data, objective: this.coachObjective });
   }
-
   get recommendedSubstitution(): RecommendedSubstitution | null {
     return this.medicalRecommendedSubstitution ?? this.tacticalRecommendedSubstitution;
   }
-
   get tacticalAlternativeSubstitution(): RecommendedSubstitution | null {
     const medical = this.medicalRecommendedSubstitution;
     if (!medical) {
@@ -573,37 +139,30 @@ export class SubstitutionModalComponent {
     }
     return this.buildTacticalRecommendedSubstitution(new Set([medical.playerOff.sessionPlayerId]));
   }
-
   private get medicalRecommendedSubstitution(): RecommendedSubstitution | null {
     const starting = this.data.startingXi.filter(p => !this.isGoalkeeper(p));
     const bench = this.availableBench.filter(p => !this.isGoalkeeper(p));
     if (starting.length === 0 || bench.length === 0 || this.isOutOfSubs) {
       return null;
     }
-
     const injured = this.activeInjuredStarter();
     if (!injured) {
       return null;
     }
-
     const pairs = bench
       .filter(on => on.sessionPlayerId !== injured.sessionPlayerId)
       .map(on => this.scoreRecommendedSubstitution(injured, on, 'medical'));
-
     return pairs.sort((a, b) => b.score - a.score)[0] ?? null;
   }
-
   private get tacticalRecommendedSubstitution(): RecommendedSubstitution | null {
     return this.buildTacticalRecommendedSubstitution();
   }
-
   private buildTacticalRecommendedSubstitution(excludedOffIds: Set<string> = new Set()): RecommendedSubstitution | null {
     const starting = this.data.startingXi.filter(p => !this.isGoalkeeper(p));
     const bench = this.availableBench.filter(p => !this.isGoalkeeper(p));
     if (starting.length === 0 || bench.length === 0 || this.isOutOfSubs) {
       return null;
     }
-
     const forcedOff = this.data.preSelectedPlayerId
       ? starting.find(p => p.sessionPlayerId === this.data.preSelectedPlayerId) ?? null
       : null;
@@ -624,18 +183,16 @@ export class SubstitutionModalComponent {
     }
     return best;
   }
-
   get recommendedSubstitutionText(): string {
     const rec = this.recommendedSubstitution;
     if (!rec) {
       if (this.coachObjective === 'PROTECT_RESULT') {
-        return 'Sin recomendación clara para cerrar: no hay un cambio automático suficientemente seguro. Mantené estructura o elegí manualmente.';
+        return 'Sin recomendaciÃ³n clara para cerrar: no hay un cambio automÃ¡tico suficientemente seguro. MantenÃ© estructura o elegÃ­ manualmente.';
       }
-      return 'Sin recomendación clara: faltan suplentes válidos o no quedan cambios.';
+      return 'Sin recomendaciÃ³n clara: faltan suplentes vÃ¡lidos o no quedan cambios.';
     }
-    return `${rec.playerOff.displayName} → ${rec.playerOn.displayName}. ${rec.reason}`;
+    return `${rec.playerOff.displayName} â†’ ${rec.playerOn.displayName}. ${rec.reason}`;
   }
-
   applyRecommendedSubstitution(): void {
     const rec = this.recommendedSubstitution;
     if (!rec) {
@@ -644,21 +201,19 @@ export class SubstitutionModalComponent {
     this.selectOff(rec.playerOff);
     this.selectOn(rec.playerOn);
   }
-
   selectOff(p: SubModalPlayer): void {
     if (this.isOutOfSubs) { return; }
     if (this.pendingChanges.some(change => change.playerOffId === p.sessionPlayerId)) {
-      this.errorMsg = 'Ese jugador ya está preparado para salir en otro cambio.';
+      this.errorMsg = 'Ese jugador ya estÃ¡ preparado para salir en otro cambio.';
       return;
     }
     this.playerOffId = p.sessionPlayerId;
     this.selectedFineTunePlayerId = p.sessionPlayerId;
     this.errorMsg = '';
   }
-
   selectOn(p: SubModalPlayer): void {
     if (this.pendingChanges.some(change => change.playerOnId === p.sessionPlayerId)) {
-      this.errorMsg = 'Ese suplente ya está preparado para entrar en otro cambio.';
+      this.errorMsg = 'Ese suplente ya estÃ¡ preparado para entrar en otro cambio.';
       return;
     }
     this.playerOnId = p.sessionPlayerId;
@@ -667,7 +222,6 @@ export class SubstitutionModalComponent {
     }
     this.errorMsg = '';
   }
-
   handlePitchPlayerClick(p: SubModalPlayer): void {
     const isIncomingPreview = this.playerOnId === p.sessionPlayerId
       || this.pendingChanges.some(change => change.playerOnId === p.sessionPlayerId);
@@ -677,22 +231,18 @@ export class SubstitutionModalComponent {
     }
     this.selectOff(p);
   }
-
   isInjuryTarget(sessionPlayerId: string): boolean {
     return this.data.reason === 'INJURY_FORCED_SUBSTITUTION'
       && this.data.preSelectedPlayerId === sessionPlayerId;
   }
-
   clearOff(event: Event): void {
     event.stopPropagation();
     this.playerOffId = null;
   }
-
   clearOn(event: Event): void {
     event.stopPropagation();
     this.playerOnId = null;
   }
-
   addPendingChange(): void {
     if (!this.canAddPendingChange || !this.playerOff || !this.playerOn || !this.playerOffId || !this.playerOnId) {
       return;
@@ -710,11 +260,9 @@ export class SubstitutionModalComponent {
     this.playerOnId = null;
     this.errorMsg = '';
   }
-
   removePendingChange(index: number): void {
     this.pendingChanges = this.pendingChanges.filter((_change, idx) => idx !== index);
   }
-
   selectFineTunePlayer(p: SubModalPlayer, event?: Event): void {
     event?.stopPropagation();
     if (this.isOutOfSubs || this.isGoalkeeper(p)) {
@@ -723,13 +271,11 @@ export class SubstitutionModalComponent {
     this.selectedFineTunePlayerId = p.sessionPlayerId;
     this.errorMsg = '';
   }
-
   canFineTuneSelectedPlayer(): boolean {
     const player = this.effectiveStartingXi.find(p => p.sessionPlayerId === this.selectedFineTunePlayerId)
       ?? this.data.startingXi.find(p => p.sessionPlayerId === this.selectedFineTunePlayerId);
     return !!player && !this.isGoalkeeper(player);
   }
-
   nudgeSelectedPlayer(dx: number, dy: number): void {
     if (!this.selectedFineTunePlayerId || !this.canFineTuneSelectedPlayer()) {
       return;
@@ -740,38 +286,33 @@ export class SubstitutionModalComponent {
       y: this.clampPixelTweak(current.y + dy)
     });
   }
-
   resetSelectedPlayerPosition(): void {
     if (!this.selectedFineTunePlayerId) {
       return;
     }
     this.positionTweaks.delete(this.selectedFineTunePlayerId);
   }
-
   getFineTuneX(sessionPlayerId: string): number {
     return this.positionTweaks.get(sessionPlayerId)?.x ?? 0;
   }
-
   getFineTuneY(sessionPlayerId: string): number {
     return this.positionTweaks.get(sessionPlayerId)?.y ?? 0;
   }
-
   getFineTuneLabel(): string {
     const player = this.effectiveStartingXi.find(p => p.sessionPlayerId === this.selectedFineTunePlayerId)
       ?? this.data.startingXi.find(p => p.sessionPlayerId === this.selectedFineTunePlayerId);
     if (!player) {
-      return 'Seleccioná un jugador de cancha para ajustar píxeles.';
+      return 'SeleccionÃ¡ un jugador de cancha para ajustar pÃ­xeles.';
     }
     if (this.isGoalkeeper(player)) {
-      return 'El arquero queda fijo en el área chica.';
+      return 'El arquero queda fijo en el Ã¡rea chica.';
     }
     const tweak = this.positionTweaks.get(player.sessionPlayerId);
     if (!tweak) {
-      return `${player.displayName}: posición base`;
+      return `${player.displayName}: posiciÃ³n base`;
     }
-    return `${player.displayName}: X ${tweak.x}px · Y ${tweak.y}px`;
+    return `${player.displayName}: X ${tweak.x}px Â· Y ${tweak.y}px`;
   }
-
   confirm(): void {
     if (!this.canConfirm) {
       return;
@@ -822,7 +363,7 @@ export class SubstitutionModalComponent {
             this.snackBar.open(
               changes.length > 1
                 ? `Sustituciones realizadas (${changes.length})`
-                : `Sustitución realizada (minuto ${results[0]?.minuteApplied ?? this.data.currentMinute})`,
+                : `SustituciÃ³n realizada (minuto ${results[0]?.minuteApplied ?? this.data.currentMinute})`,
               'OK',
               { duration: 3000, panelClass: 'success-toast' }
             );
@@ -838,54 +379,24 @@ export class SubstitutionModalComponent {
               playerOnId: firstChange.playerOnId
             });
           } else {
-            this.errorMsg = failed.error || 'Sustitución rechazada por el servidor';
+            this.errorMsg = failed.error || 'SustituciÃ³n rechazada por el servidor';
             this.cdr.markForCheck();
           }
         },
         error: (err) => {
           this.errorMsg = formationSaveAttempted
-            ? 'La sustitución se aplicó, pero falló el guardado del ajuste de posición. Podés cerrar y reabrir Partido/Formación para revisar la táctica.'
+            ? 'La sustituciÃ³n se aplicÃ³, pero fallÃ³ el guardado del ajuste de posiciÃ³n. PodÃ©s cerrar y reabrir Partido/FormaciÃ³n para revisar la tÃ¡ctica.'
             : this.formatSubstitutionError(err);
           this.cdr.markForCheck();
         }
       });
   }
-
   private isAlreadyAppliedSubstitutionResult(result: SubstitutionResult): boolean {
-    if (result.success) {
-      return false;
-    }
-    const error = (result.error || '').toLowerCase();
-    return error.includes('already been substituted off')
-      || error.includes('already been substituted on')
-      || error.includes('is on the pitch already');
+    return isAlreadyAppliedSubstitutionResult(result);
   }
-
   private formatSubstitutionError(err: unknown): string {
-    const candidate = err as {
-      error?: { error?: string; message?: string; detail?: string } | string;
-      message?: string;
-      status?: number;
-    };
-    if (typeof candidate.error === 'string' && candidate.error.trim()) {
-      return candidate.error;
-    }
-    const serverError = typeof candidate.error === 'object' && candidate.error !== null
-      ? candidate.error
-      : null;
-    const serverMessage = serverError?.error || serverError?.message || serverError?.detail;
-    if (serverMessage) {
-      return serverMessage;
-    }
-    if (candidate.status && candidate.status >= 400 && candidate.status < 500) {
-      return `Sustitución rechazada por el servidor (HTTP ${candidate.status}).`;
-    }
-    if (candidate.message && candidate.message !== 'network') {
-      return candidate.message;
-    }
-    return 'Error de red al intentar la sustitución';
+    return formatSubstitutionError(err);
   }
-
   private currentSelectionAsPending(): PendingSubstitution[] {
     if (!this.playerOff || !this.playerOn || !this.playerOffId || !this.playerOnId || !this.canAddPendingChange) {
       return [];
@@ -897,132 +408,45 @@ export class SubstitutionModalComponent {
       playerOnName: this.playerOn.displayName
     }];
   }
-
   private stagedChanges(): PendingSubstitution[] {
     const current = this.currentSelectionAsPending();
     return current.length > 0
       ? [...this.pendingChanges, ...current]
       : this.pendingChanges;
   }
-
-  private buildLiveFormationSlots(changes: PendingSubstitution[]): Array<{
-    sessionPlayerId: string;
-    position: string;
-    slotIndex: number;
-    customXPercent?: number | null;
-    customYPercent?: number | null;
-  }> {
-    const finalXi = this.data.startingXi.map(starter => {
-      const change = changes.find(c => c.playerOffId === starter.sessionPlayerId);
-      const benchPlayer = change
-        ? this.data.bench.find(p => p.sessionPlayerId === change.playerOnId)
-        : null;
-      return benchPlayer ? { ...benchPlayer, isStarter: true } : starter;
+  private buildLiveFormationSlots(changes: PendingSubstitution[]): SubstitutionLiveFormationSlot[] {
+    return buildSubstitutionLiveFormationSlots({
+      startingXi: this.data.startingXi,
+      bench: this.data.bench,
+      changes,
+      positionTweaks: this.positionTweaks
     });
-    const visibleLines = buildSubstitutionPitchLines(finalXi);
-    const slots: Array<{
-      sessionPlayerId: string;
-      position: string;
-      slotIndex: number;
-      customXPercent?: number | null;
-      customYPercent?: number | null;
-    }> = [];
-    let slotIndex = 0;
-    visibleLines.forEach((line, lineIndex) => {
-      line.players.forEach((player, playerIndex) => {
-        const base = this.basePercentForVisualSlot(lineIndex, playerIndex, line.players.length, visibleLines.length);
-        const incomingChange = changes.find(change => change.playerOnId === player.sessionPlayerId);
-        const tweak = this.positionTweaks.get(player.sessionPlayerId)
-          ?? (incomingChange ? this.positionTweaks.get(incomingChange.playerOffId) : undefined);
-        const percentPerPixel = 0.12;
-        slots.push({
-          sessionPlayerId: player.sessionPlayerId,
-          position: player.position || line.category,
-          slotIndex,
-          customXPercent: tweak ? this.clampPercent(base.x + tweak.x * percentPerPixel) : null,
-          customYPercent: tweak ? this.clampPercent(base.y + tweak.y * percentPerPixel) : null
-        });
-        slotIndex++;
-      });
-    });
-    return slots;
   }
-
   cancel(): void {
     this.dialogRef.close({ success: false, reason: 'cancelled' });
   }
-
   get effectiveStartingXi(): SubModalPlayer[] {
-    const changes = this.stagedChanges();
-    if (changes.length === 0) {
-      return this.data.startingXi;
-    }
-    return this.data.startingXi.map(starter => {
-      const change = changes.find(c => c.playerOffId === starter.sessionPlayerId);
-      if (!change) {
-        return starter;
-      }
-      const benchPlayer = this.data.bench.find(p => p.sessionPlayerId === change.playerOnId);
-      if (!benchPlayer) {
-        return starter;
-      }
-      return { ...benchPlayer, isStarter: true };
-    });
+    return applyPendingSubstitutionsToStartingXi(this.data.startingXi, this.data.bench, this.stagedChanges());
   }
-
-  /** trackBy for *ngFor on player lists. */
   trackByPlayer = (_idx: number, p: SubModalPlayer) => p.sessionPlayerId;
-
-  // Effectiveness class used by SALE/ENTRA chips.
-  getEffClass(sessionPlayerId: string): 'eff-good' | 'eff-warning' | 'eff-bad' | null {
-    const v = this.data.effectivenessMap?.[sessionPlayerId];
-    if (v == null) { return null; }
-    if (v >= 0.9) { return 'eff-good'; }
-    if (v >= 0.7) { return 'eff-warning'; }
-    return 'eff-bad';
+  getEffClass(sessionPlayerId: string): SubstitutionEffectivenessClass {
+    return substitutionEffectivenessClass(this.data.effectivenessMap, sessionPlayerId);
   }
-
-  // Effectiveness percentage label for a player, when available.
   getEffBadge(sessionPlayerId: string): string | null {
-    const v = this.data.effectivenessMap?.[sessionPlayerId];
-    if (v == null) { return null; }
-    return `${Math.round(v * 100)}%`;
+    return substitutionEffectivenessBadge(this.data.effectivenessMap, sessionPlayerId);
   }
-
-  // Visual pitch rows grouped by position category.
   get pitchLines(): SubstitutionPitchLine[] {
     return buildSubstitutionPitchLines(this.effectiveStartingXi);
   }
-
-  private basePercentForVisualSlot(
-    lineIndex: number,
-    playerIndex: number,
-    playersInLine: number,
-    linesCount: number
-  ): { x: number; y: number } {
-    const x = ((playerIndex + 1) / (playersInLine + 1)) * 100;
-    const y = ((lineIndex + 1) / (linesCount + 1)) * 100;
-    return { x: Number(x.toFixed(2)), y: Number(y.toFixed(2)) };
-  }
-
-  private clampPercent(value: number): number {
-    if (!Number.isFinite(value)) {
-      return 50;
-    }
-    return clampFieldPercentRounded(value);
-  }
-
   private clampPixelTweak(value: number): number {
     if (!Number.isFinite(value)) {
       return 0;
     }
     return clampFieldPixelTweak(value);
   }
-
   private isGoalkeeper(player: SubModalPlayer): boolean {
-    return (player.position || '').toUpperCase().startsWith('GK');
+    return isSubstitutionGoalkeeper(player);
   }
-
   private scoreRecommendedSubstitution(
     playerOff: SubModalPlayer,
     playerOn: SubModalPlayer,
@@ -1037,7 +461,6 @@ export class SubstitutionModalComponent {
       isActiveInjuredStarter: playerId => this.isActiveInjuredStarter(playerId)
     });
   }
-
   private activeInjuredStarter(): SubModalPlayer | null {
     const preselected = this.data.preSelectedPlayerId
       ? this.data.startingXi.find(p => p.sessionPlayerId === this.data.preSelectedPlayerId && !this.isGoalkeeper(p)) ?? null
@@ -1053,49 +476,20 @@ export class SubstitutionModalComponent {
         return injuriesB - injuriesA;
       })[0] ?? null;
   }
-
   private isActiveInjuredStarter(playerId: string): boolean {
-    return (this.getRating(playerId)?.injuries ?? 0) > 0;
+    return isInjuredFromSubstitutionRatings(this.data.playerRatings, playerId);
   }
-
-  /**
-   * : dot's category-class binding. Maps the pitch-line category
-   * (GK / DEF / MID / WINGER / ATT) to the CSS class used by the inline
-   * styles (is-gk / is-def / is-mid / is-winger / is-att).
-   */
   dotClass(lineCategory: SubstitutionPitchLine['category']): string {
     return `is-${lineCategory.toLowerCase()}`;
   }
-
-  // Per-player live rating entry, when available.
   getRating(playerId: string): V24LivePlayerRating | null {
-    if (!this.data.playerRatings) { return null; }
-    for (const r of this.data.playerRatings) {
-      if (r.playerId === playerId) { return r; }
-    }
-    return null;
+    return findSubstitutionPlayerRating(this.data.playerRatings, playerId);
   }
-
-  /**
-   * : count of non-zero chips for a player — used by the template
-   * to decide if any chip strip is worth rendering. Empty rating or
-   * zero across all stats → no strip.
-   */
   hasAnyChip(playerId: string): boolean {
-    const r = this.getRating(playerId);
-    if (!r) { return false; }
-    return r.goals > 0 || r.keyPasses > 0 || r.yellowCards > 0
-        || r.fouls > 0 || r.injuries > 0;
+    return hasSubstitutionRatingChip(this.getRating(playerId));
   }
-
-  /**
-   * : trackBy for the dot *ngFor so DOM nodes are reused across
-   * re-renders triggered by the SSE consumer (playerRatings change every
-   * tick).
-   */
   trackByDot = (_idx: number, p: SubModalPlayer) => p.sessionPlayerId;
   trackByLine = (_idx: number, line: SubstitutionPitchLine) => line.category;
-
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();

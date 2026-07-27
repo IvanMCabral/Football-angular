@@ -1,0 +1,300 @@
+.hint {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+  color: #5a6473;
+  margin: 0;
+  padding: 0.18rem 0.35rem;
+  background: #f5f7fa;
+  border-radius: 10px;
+  line-height: 1.3;
+}
+.hint mat-icon {
+  font-size: 1rem;
+  width: 1rem;
+  height: 1rem;
+}
+
+/* ========== : tab styling (mat-tab overrides) ========== */
+
+.partido-tabs ::ng-deep .mat-mdc-tab-header {
+  background: #f5f7fa;
+  border-radius: 6px 6px 0 0;
+}
+
+.submit-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: rgba(255, 255, 255, 0.85);
+  z-index: 10;
+  font-size: 0.9rem;
+  color: #1e3c72;
+  border-radius: 6px;
+}
+
+.partido-modal-actions {
+  padding: 0.55rem 1rem 0.65rem;
+  background: #f8fafc;
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+  position: relative;
+  z-index: 2;
+}
+
+/* Success toast styling. */
+:host ::ng-deep .success-toast {
+  --mdc-snackbar-container-color: #2e7d32;
+  --mdc-snackbar-supporting-text-color: #ffffff;
+  --mat-snack-bar-button-color: #c8e6c9;
+  font-weight: 600;
+}
+
+/* ========== Responsive  -  mirror ========== */
+
+@media (max-width: 600px) {
+  .partido-modal-root {
+    min-width: 0;
+    max-width: 100vw;
+    padding: 0 0.25rem;
+  }
+  /* : also override the dialog container cap at
+     mobile so the 95vw base rule doesn't fight the 100vw mobile
+     rule (CSS cascade picks the later rule, which is this one). */
+  :host ::ng-deep .mat-mdc-dialog-container {
+    max-width: 100vw;
+    width: 100vw;
+  }
+  .partido-modal-title,
+  :host ::ng-deep .mat-mdc-dialog-container h2.mat-mdc-dialog-title {
+    gap: 0.35rem;
+    padding: 0.55rem 0.65rem;
+  }
+  .minute-tag {
+    font-size: 0.68rem;
+    padding: 0.12rem 0.42rem;
+  }
+  :host ::ng-deep .mat-mdc-dialog-container .mat-mdc-dialog-content {
+    max-height: calc(100vh - 108px);
+  }
+  .pitch {
+    padding: 0.35rem 0.25rem;
+    gap: 0.2rem;
+    /* : mobile pitch keeps the smaller dot scale so
+       11 dots still fit on a portrait phone (320-360px viewport).
+       320px is enough for 11 x ~24px dots with ~5px gaps. */
+    min-height: min(48vh, 340px);
+  }
+  .pitch::after {
+    width: 48px;
+    height: 48px;
+  }
+  .pitch-line {
+    gap: 4px;
+    min-height: 36px;
+  }
+  .player-dot {
+    /* : mobile dot scale  -  still bigger than the
+       legacy 18px so the role label below the name stays legible,
+       but small enough that 11 dots fit on a 320px viewport with
+       the standard pitch-line gap. */
+    width: 42px;
+    height: 36px;
+    min-width: 22px;
+    max-width: 38px;
+    border-radius: 9px;
+    font-size: 0.58rem;
+    padding: 1px 1px;
+  }
+  .dot-player-name {
+    font-size: 0.55rem;
+    line-height: 1.05;
+    max-width: 40px;
+  }
+  .dot-role {
+    font-size: 0.45rem;
+  }
+  .dot-label {
+    font-size: 0.6rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+  .formation-select {
+    max-width: 100%;
+  }
+  .formation-row {
+    margin: 0.4rem 0.35rem 0.45rem;
+    align-items: stretch;
+  }
+  .coach-brief {
+    margin: 0.45rem 0.35rem 0.35rem;
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .coach-brief-chips {
+    justify-content: flex-start;
+  }
+  .pitch-zone-label {
+    right: 0.45rem;
+    font-size: 0.56rem;
+  }
+  .formation-grid { padding: 0 0.35rem; }
+  .col-pitch,
+  .col-bench { padding: 0.4rem; }
+  .nudge-panel {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .nudge-copy {
+    min-width: 0;
+  }
+  .bench-list {
+    max-height: 180px;
+  }
+  .partido-modal-actions {
+    padding: 0.45rem 0.65rem 0.5rem;
+  }
+  .score-chip {
+    font-size: 0.75rem;
+    padding: 0.15rem 0.5rem;
+    min-width: 2.2rem;
+  }
+}
+
+@media (min-width: 601px) and (max-width: 1024px) {
+  /* : tablet  -  drop the 460px cap so the modal uses
+     the full 95vw from the base rule. Keep a sensible min-width
+     (320px) so the pitch doesn't get squashed on portrait tablets. */
+  .partido-modal-root {
+    min-width: 320px;
+    max-width: 100%;
+  }
+  .pitch { padding: 0.4rem 0.3rem; gap: 0.3rem; min-height: 340px; }
+  .pitch::after { width: 54px; height: 54px; }
+  .pitch-line { gap: 8px; min-height: 48px; }
+  .player-dot {
+    /* : tablet scale  -  bigger than mobile, smaller
+       than the 56px desktop base. Gives portrait tablets (~768px)
+       enough room for 11 dots without the names overflowing the
+       4-3-3 / 4-4-2 lines. */
+    width: 54px;
+    height: 46px;
+    min-width: 32px;
+    max-width: 46px;
+    font-size: 0.7rem;
+    padding: 2px 2px;
+  }
+  .dot-player-name {
+    font-size: 0.62rem;
+    line-height: 1.05;
+    max-width: 48px;
+  }
+  .dot-role { font-size: 0.5rem; }
+  .dot-label { font-size: 0.7rem; }
+}
+
+@media (max-height: 760px) and (min-width: 601px) {
+  :host ::ng-deep .mat-mdc-dialog-container .mat-mdc-dialog-content {
+    max-height: calc(100vh - 160px);
+  }
+  .coach-brief {
+    margin: 0.35rem 0.5rem 0.25rem;
+    padding: 0.48rem 0.65rem;
+    border-radius: 13px;
+  }
+  .formation-row {
+    margin: 0.25rem 0.5rem 0.35rem;
+    padding: 0.3rem 0.5rem;
+  }
+  .pitch {
+    min-height: 180px;
+    padding-top: 0.28rem;
+    padding-bottom: 0.28rem;
+  }
+  .manager-pitch {
+    padding-bottom: 0.55rem;
+  }
+  .pitch-line {
+    min-height: 32px;
+  }
+  .player-dot {
+    width: 46px;
+    height: 34px;
+    font-size: 0.56rem;
+  }
+  .dot-player-name {
+    font-size: 0.52rem;
+    max-width: 40px;
+  }
+  .dot-role {
+    font-size: 0.43rem;
+  }
+  .hint {
+    display: none;
+  }
+  .bench-list {
+    max-height: 180px;
+  }
+}
+
+@media (min-width: 1600px) {
+  /* : xlarge viewport  -  keep the player-dot scale-up
+     but DROP the 800px max-width cap so the 95vw base rule applies.
+     On a 1920px+ monitor the modal now fills 95% of the width
+     (~1824px) instead of being capped at 800px. */
+  .partido-modal-root { max-width: 100%; }
+  .player-dot {
+    /* : xlarge scale  -  bigger than the 56px base
+       so the dot feels proportional to the wider modal. The 4-4-2
+       line has 4 dots, so on a 1824px modal each dot can claim
+       ~440px of horizontal space; 64px leaves room for ~9 chars
+       on a single line (e.g. "Vinicius"). */
+    width: 82px;
+    height: 68px;
+    font-size: 0.78rem;
+  }
+  .dot-player-name {
+    font-size: 0.75rem;
+    max-width: 58px;
+  }
+  .dot-role { font-size: 0.6rem; }
+}
+
+/* ========== : z-index layering for the Formation
+   mat-select dropdown so it stays visible above the partido
+   modal backdrop. Material CDK renders each overlay in its own
+   cdk-overlay-container div appended to the body, and the cdk
+   assigns z-indices by pane-creation order (last pane wins by
+   default, but the partido modal cdk-overlay-backdrop is a
+   sibling that absorbs clicks). We bump the partido modal pane
+   above the default Material z-index (1000) and push the
+   mat-select panel one step further so the dropdown options
+   render on top of the partido backdrop.
+
+   The partido modal pane class is "partido-modal-pane" (added via
+   MatDialogConfig.panelClass in so
+   both the substitution / formation / partido / rival-card modals
+   can share the layer). The mat-select panel class is
+   "formation-select-panel" (added via MatSelectConfig.panelClass
+   or on the mat-select element). These two classes are the
+   handles we override here.
+
+   Why not just raise the whole cdk-overlay-container z-index?
+   Because Material uses multiple sibling overlays and globally
+   raising them would also re-stack the snackbar (which lives
+   above 1050). Per-pane targeting keeps the change scoped. */
+:host ::ng-deep .cdk-overlay-pane.partido-modal-pane {
+  z-index: 1050;
+}
+:host ::ng-deep .cdk-overlay-pane.formation-select-panel {
+  z-index: 1060;
+}
+:host ::ng-deep .formation-select {
+  z-index: 1100;
+}

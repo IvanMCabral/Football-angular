@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, ChangeDetectorRef, Component, computed, inject, signal } from '@angular/core';
+﻿import { ChangeDetectionStrategy, ChangeDetectorRef, Component, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
@@ -16,8 +16,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { from, of, Subject, takeUntil } from 'rxjs';
-import { concatMap, finalize, switchMap, timeout, toArray } from 'rxjs/operators';
+import { Subject } from 'rxjs';
 import { MatchEngineService } from '../../../../core/services/match-engine.service';
 import { ALL_FORMATIONS, FormationCode } from '../../../../shared/constants/formations';
 import { SessionPlayer } from '../../../../shared/models/player.model';
@@ -36,6 +35,47 @@ import {
   readPartidoPlayerCoords,
   writePartidoPlayerCoords
 } from './partido-modal-player-coords-storage.utils';
+import {
+  basePartidoSlotCoords,
+  buildPartidoSlotListForBackend,
+  capturePartidoSlotCoordsSnapshot,
+  partidoSlotsDifferFromInitial,
+  roleLabelForPartidoSlot,
+  swapPartidoFreeSlotCoords
+} from './partido-modal-slot-state.utils';
+import {
+  describePartidoSaveError,
+  isAlreadyAppliedPartidoSubstitutionResult,
+  savePartidoModal
+} from './partido-modal-save-flow.utils';
+import {
+  partidoAutoFillEmptySlots,
+  partidoCompatibleGroupForRole,
+  partidoCoordsFromPointerEvent,
+  partidoFocusPreSelectedPlayerIfPresent,
+  partidoHydrateRememberedPlayerCoords,
+  partidoIsGoalkeeperSlot,
+  partidoNudgeSelectedSlot,
+  partidoOnFormationChange,
+  partidoOnPitchDrop,
+  partidoOnPitchPointerMove,
+  partidoOnPitchPointerUp,
+  partidoOnPitchSlotClick,
+  partidoOnPitchSlotPointerDown,
+  partidoOnSlotDragStart,
+  partidoOnSlotDrop,
+  partidoPendingSubstitutionRows,
+  partidoPersistLastNudgeHarnessCase,
+  partidoRegisterPendingSubstitution,
+  partidoRememberCurrentPlayerCoord,
+  partidoRememberPlayerCoordsForSavedSlots,
+  partidoRemovePendingSubstitution,
+  partidoResetSelectedSlotPosition,
+  partidoResolveAutoFillSourcePlayerId,
+  partidoSanitizeDuplicateSlotAssignments,
+  partidoSelectNudgeSlot,
+  partidoTryFillSlot
+} from './partido-modal-interactions.utils';
 
 interface PendingPartidoSubstitution {
   playerOffId: string;
@@ -88,7 +128,7 @@ export interface PartidoDialogData {
 }
 
 /** Role labels rendered by each formation line in the live pitch. */
-const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
+export const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
   '4-4-2':       [['GK'], ['LB', 'CB', 'CB', 'RB'], ['LM', 'CM', 'CM', 'RM'], ['ST', 'ST']],
   '4-3-3':       [['GK'], ['LB', 'CB', 'CB', 'RB'], ['CM', 'CM', 'CM'], ['LW', 'ST', 'RW']],
   '3-5-2':       [['GK'], ['CB', 'CB', 'CB'], ['LWB', 'CM', 'CM', 'CM', 'RWB'], ['ST', 'ST']],
@@ -130,20 +170,12 @@ export class PartidoModalComponent {
   private snackBar = inject(MatSnackBar);
   private cdr = inject(ChangeDetectorRef);
 
-  /** Available formations (12 codes from the shared constants). */
   readonly formations: readonly string[] = ALL_FORMATIONS;
 
-  // ========== Tab state ==========
-
-  /** Currently visible tab. Default = 'mine' (manager formation first). */
   readonly activeTab = signal<'mine' | 'rival'>('mine');
 
-  // ========== Live match stats ==========
-
-  // Snapshot events used by stats and timeline sections.
   private readonly eventList = (): MatchEvent[] => this.data.events ?? [];
 
-  // Derived match stats shown in both manager and rival tabs.
   statsRows(): PartidoStatRow[] {
     return buildPartidoStatsRows({
       events: this.eventList(),
@@ -155,50 +187,30 @@ export class PartidoModalComponent {
     });
   }
 
-  /**
-   * : last 6 events, most recent first. Drives the timeline section
-   * below the stats. Capped at 6 so the section stays within ~140px (the
-   * modal's available height after the pitch + bench + stats + footer).
-   * No pagination  -  the timeline is a glance, not a full event log; the
-   * match-card already has a fuller feed on the round-live page.
-   */
   recentEvents(): MatchEvent[] {
     return recentPartidoEvents(this.eventList());
   }
 
-  /**
-   * : true when the modal has received at least one event. Drives
-   * the "stats disponibles cuando arranque el partido" empty state.
-   */
   hasEvents(): boolean {
     return this.eventList().length > 0;
   }
 
-  /**
-   * : current minute accessor used by the template header tag.
-   * Falls back to 0 when the modal opens while the round hasn't ticked
-   * yet (NOT_STARTED  ->  minute 0).
-   */
   currentMinute(): number {
     return this.data.currentMinute ?? 0;
   }
 
-  // Home score accessor used by the title chip and stats header.
   homeScore(): number {
     return this.data.score?.home ?? 0;
   }
 
-  /** Away score accessor. */
   awayScore(): number {
     return this.data.score?.away ?? 0;
   }
 
-  /** Remaining manager substitutions. */
   substitutionsRemaining(): number {
     return this.data.substitutionsRemaining ?? 5;
   }
 
-  /** Human-readable event icon for the timeline. */
   getEventIcon(eventType: string): string {
     return getPartidoEventIcon(eventType);
   }
@@ -211,20 +223,12 @@ export class PartidoModalComponent {
     return displayPartidoEventDescription(event);
   }
 
-  // ========== Manager-tab formation state ==========
-
-  /** Currently selected formation (signal-based for OnPush). */
   readonly selectedFormation = signal<FormationCode>(
     this.normalizeFormation(this.data.currentFormation)
   );
 
-  // Mutable slot-to-player map used by the visual pitch and drag/drop flow.
   slotAssignments: Map<number, string | null> = new Map();
 
-  /**
-   * : free-position overrides for the live Partido pitch.
-   * Keyed by slot index; values are percentages relative to the pitch.
-   */
   freeSlotCoords: Map<number, { x: number; y: number }> = new Map();
   private readonly freePositionRevision = signal(0);
 
@@ -236,7 +240,6 @@ export class PartidoModalComponent {
   private initialSlotAssignments: Map<number, string | null> = new Map();
   private initialFreeSlotCoords: Map<number, { x: number; y: number }> = new Map();
 
-  /** id of the slot currently being dragged (or null when idle). */
   dragSourceSlotIdx: number | null = null;
   dragSourceIsBench = false;
   activePointerDragSlotIdx: number | null = null;
@@ -244,18 +247,15 @@ export class PartidoModalComponent {
   private pointerDragMoved = false;
   private suppressNextSlotClick = false;
 
-  /** Slots that were filled by the auto-fill pass  -  render a lock icon. */
   readonly autoFilledSlots = new Map<number, string>();
   readonly autoFillSourcePlayerBySlot = new Map<number, string>();
 
-  /** Warning surfaced when at least one slot could not be auto-filled. */
   warningMsg = '';
 
   isSubmitting = false;
   errorMsg = '';
   private destroy$ = new Subject<void>();
 
-  /** Position groups used to fill compatible bench players. */
   private static readonly POSITION_GROUPS: Record<string, string[]> = {
     GK:  ['GK'],
     DEF: ['DEF', 'CB', 'LB', 'RB', 'LWB', 'RWB'],
@@ -263,7 +263,6 @@ export class PartidoModalComponent {
     ATT: ['ATT', 'ST', 'CF', 'LW', 'RW']
   };
 
-  /** True when formation, slot positions or pending substitutions changed. */
   readonly hasPendingChanges = computed(() => {
     const formationChanged = this.selectedFormation() !== this.data.currentFormation;
     this.freePositionRevision();
@@ -272,15 +271,11 @@ export class PartidoModalComponent {
     return formationChanged || slotsChanged || this.pendingSubstitutions.length > 0;
   });
 
-  // ========== Rival-tab formation ==========
-
-  // Read-only rival formation, normalized for safe rendering.
   readonly rivalFormation = signal<FormationCode>(
     this.normalizeFormation(this.data.rivalFormation)
   );
 
   constructor() {
-    // : initialize slotAssignments from the dialog data.
     for (const s of this.data.currentSlots ?? []) {
       this.slotAssignments.set(s.slotIndex, s.sessionPlayerId || null);
       if (this.isFinitePercent(s.customXPercent) && this.isFinitePercent(s.customYPercent)) {
@@ -300,20 +295,7 @@ export class PartidoModalComponent {
     this.focusPreSelectedPlayerIfPresent();
   }
 
-  private focusPreSelectedPlayerIfPresent(): void {
-    const playerId = this.data.preSelectedPlayerId;
-    if (!playerId) {
-      return;
-    }
-    const slotIdx = this.slotIndexByPlayerId(playerId);
-    if (slotIdx === null) {
-      return;
-    }
-    this.selectedNudgeSlotIdx = slotIdx;
-    if (this.data.reason === 'INJURY_FORCED_SUBSTITUTION') {
-      this.errorMsg = `${this.playerNameById(playerId)} está lesionado: elegí un suplente y tocá su ficha para preparar el cambio. También podés ajustar formación y píxeles antes de guardar.`;
-    }
-  }
+  private focusPreSelectedPlayerIfPresent(): void { partidoFocusPreSelectedPlayerIfPresent(this); }
 
   private slotIndexByPlayerId(playerId: string): number | null {
     for (const [slotIdx, assignedPlayerId] of this.slotAssignments.entries()) {
@@ -332,80 +314,13 @@ export class PartidoModalComponent {
     return '4-4-2';
   }
 
-  // ========== Manager-tab event handlers ==========
+  onFormationChange(value: string): void { partidoOnFormationChange(this, value); }
 
-  onFormationChange(value: string): void {
-    const newFormation = this.normalizeFormation(value);
-    this.selectedFormation.set(newFormation);
-    const currentXi = Array.from(this.slotAssignments.values()).filter((playerId): playerId is string => !!playerId);
-    const autoFilledPlayerIds = new Set(Array.from(this.autoFilledSlots.values()).filter(Boolean));
-    const autoFillSourceByPlayerId = new Map<string, string>();
-    for (const [slotIdx, playerId] of this.autoFilledSlots) {
-      const sourcePlayerId = this.autoFillSourcePlayerBySlot.get(slotIdx);
-      if (playerId && sourcePlayerId) {
-        autoFillSourceByPlayerId.set(playerId, sourcePlayerId);
-      }
-    }
-    const coordsByPlayerId = new Map<string, { x: number; y: number }>();
-    for (const [slotIdx, playerId] of this.slotAssignments) {
-      if (!playerId) {
-        continue;
-      }
-      const coords = this.freeSlotCoords.get(slotIdx);
-      if (coords) {
-        coordsByPlayerId.set(playerId, coords);
-      }
-    }
-    const newLineCount = (FORMATION_LINES_BY_FORMATION[newFormation] ?? []).reduce(
-      (sum, line) => sum + line.length, 0
-    );
-    this.slotAssignments = new Map();
-    this.freeSlotCoords.clear();
-    this.autoFilledSlots.clear();
-    this.autoFillSourcePlayerBySlot.clear();
-    this.bumpFreePositionRevision();
-    for (let i = 0; i < newLineCount; i++) {
-      const playerId = currentXi[i] ?? null;
-      this.slotAssignments.set(i, playerId);
-      if (playerId) {
-        const coords = coordsByPlayerId.get(playerId);
-        if (coords) {
-          this.freeSlotCoords.set(i, coords);
-        }
-        if (autoFilledPlayerIds.has(playerId)) {
-          this.autoFilledSlots.set(i, playerId);
-          const sourcePlayerId = autoFillSourceByPlayerId.get(playerId);
-          if (sourcePlayerId) {
-            this.autoFillSourcePlayerBySlot.set(i, sourcePlayerId);
-          }
-        }
-      }
-    }
-    this.errorMsg = '';
-    this.selectedNudgeSlotIdx = null;
-  }
-
-  /** Tab change handler  -  drives the "Mi Formacion" / "Formacion Rival" UI. */
   onTabChange(idx: number): void {
     this.activeTab.set(idx === 0 ? 'mine' : 'rival');
   }
 
-  // ========== Drag-and-drop handlers ==========
-
-  onSlotDragStart(event: DragEvent, slotIdx: number): void {
-    if (!event.dataTransfer) {
-      return;
-    }
-    if (this.isGoalkeeperSlot(slotIdx)) {
-      event.preventDefault();
-      this.onSlotDragEnd();
-      return;
-    }
-    this.dragSourceSlotIdx = slotIdx;
-    this.dragSourceIsBench = false;
-    event.dataTransfer.setData('text/plain', `slot:${slotIdx}`);
-    event.dataTransfer.effectAllowed = 'move';
-  }
+  onSlotDragStart(event: DragEvent, slotIdx: number): void { partidoOnSlotDragStart(this, event, slotIdx); }
 
   onBenchDragStart(event: DragEvent, playerId: string): void {
     if (!event.dataTransfer) {
@@ -425,57 +340,7 @@ export class PartidoModalComponent {
     event.dataTransfer.dropEffect = 'move';
   }
 
-  onSlotDrop(event: DragEvent, targetSlotIdx: number): void {
-    event.preventDefault();
-    if (this.dragSourceSlotIdx === null) {
-      return;
-    }
-    if (this.isGoalkeeperSlot(targetSlotIdx) || this.isGoalkeeperSlot(this.dragSourceSlotIdx)) {
-      this.onSlotDragEnd();
-      return;
-    }
-    if (this.dragSourceIsBench) {
-      const raw = event.dataTransfer?.getData('text/plain') ?? '';
-      const playerId = raw.startsWith('bench:') ? raw.substring(6) : null;
-      if (!playerId) {
-        return;
-      }
-      const playerOffId = this.playerOffIdForBenchPlacement(targetSlotIdx, playerId);
-      if (this.isAutoFilledSlot(targetSlotIdx) && !playerOffId && !this.isConfirmingSameAutoPlayer(targetSlotIdx, playerId)) {
-        this.errorMsg = 'No se puede confirmar AUTO porque falta identificar quién sale. Usá un cambio manual o reabrí el modal.';
-        this.onSlotDragEnd();
-        return;
-      }
-      if (playerOffId && playerOffId !== playerId) {
-        if (!this.registerPendingSubstitution(playerOffId, playerId, targetSlotIdx)) {
-          this.onSlotDragEnd();
-          return;
-        }
-      }
-      this.slotAssignments.set(targetSlotIdx, playerId);
-      this.clearAutoFillMarker(targetSlotIdx);
-      this.freeSlotCoords.delete(targetSlotIdx);
-      this.bumpFreePositionRevision();
-    } else {
-      const sourceSlot = this.dragSourceSlotIdx;
-      if (sourceSlot === targetSlotIdx) {
-        return;
-      }
-      const sourcePlayer = this.slotAssignments.get(sourceSlot) ?? null;
-      const targetPlayer = this.slotAssignments.get(targetSlotIdx) ?? null;
-      this.slotAssignments.set(targetSlotIdx, sourcePlayer);
-      this.slotAssignments.set(sourceSlot, targetPlayer);
-      this.swapFreeSlotCoords(sourceSlot, targetSlotIdx);
-      this.clearAutoFillMarker(targetSlotIdx);
-      this.clearAutoFillMarker(sourceSlot);
-    }
-    this.dragSourceSlotIdx = null;
-    this.dragSourceIsBench = false;
-    // Force CD by bumping the formation signal (signals don't track Map
-    // mutations, so we need a tick to re-render the dots + the
-    // hasPendingChanges computed).
-    this.selectedFormation.set(this.selectedFormation());
-  }
+  onSlotDrop(event: DragEvent, targetSlotIdx: number): void { partidoOnSlotDrop(this, event, targetSlotIdx); }
 
   onSlotDragEnd(): void {
     this.dragSourceSlotIdx = null;
@@ -490,95 +355,13 @@ export class PartidoModalComponent {
     event.dataTransfer.dropEffect = 'move';
   }
 
-  onPitchDrop(event: DragEvent): void {
-    event.preventDefault();
-    if (this.dragSourceSlotIdx === null || this.dragSourceIsBench || this.dragSourceSlotIdx < 0) {
-      this.onSlotDragEnd();
-      return;
-    }
-    if (this.isGoalkeeperSlot(this.dragSourceSlotIdx)) {
-      this.onSlotDragEnd();
-      return;
-    }
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    if (!rect.width || !rect.height) {
-      this.onSlotDragEnd();
-      return;
-    }
-    const x = this.clampPercent(((event.clientX - rect.left) / rect.width) * 100);
-    const y = this.clampPercent(((event.clientY - rect.top) / rect.height) * 100);
-    this.freeSlotCoords.set(this.dragSourceSlotIdx, {
-      x: Number(x.toFixed(2)),
-      y: Number(y.toFixed(2))
-    });
-    this.bumpFreePositionRevision();
-    this.clearAutoFillMarker(this.dragSourceSlotIdx);
-    this.onSlotDragEnd();
-    this.selectedFormation.set(this.selectedFormation());
-  }
+  onPitchDrop(event: DragEvent): void { partidoOnPitchDrop(this, event); }
 
-  onPitchSlotPointerDown(event: PointerEvent, slotIdx: number): void {
-    if (event.button !== 0 || this.isGoalkeeperSlot(slotIdx) || !this.playerAtSlot(slotIdx)) {
-      return;
-    }
-    this.activePointerDragSlotIdx = slotIdx;
-    this.selectedNudgeSlotIdx = slotIdx;
-    this.pointerDragStartCoords = this.freeSlotCoords.get(slotIdx) ?? this.baseSlotCoords(slotIdx);
-    this.pointerDragMoved = false;
-    this.suppressNextSlotClick = false;
-    this.errorMsg = '';
-    (event.currentTarget as HTMLElement).setPointerCapture?.(event.pointerId);
-    event.preventDefault();
-    event.stopPropagation();
-  }
+  onPitchSlotPointerDown(event: PointerEvent, slotIdx: number): void { partidoOnPitchSlotPointerDown(this, event, slotIdx); }
 
-  onPitchPointerMove(event: PointerEvent): void {
-    if (this.activePointerDragSlotIdx === null) {
-      return;
-    }
-    const target = event.currentTarget as HTMLElement;
-    const next = this.coordsFromPointerEvent(event, target);
-    if (!next) {
-      return;
-    }
-    const slotIdx = this.activePointerDragSlotIdx;
-    const current = this.freeSlotCoords.get(slotIdx) ?? this.baseSlotCoords(slotIdx);
-    const moved = Math.abs(current.x - next.x) >= 0.05 || Math.abs(current.y - next.y) >= 0.05;
-    if (!moved) {
-      return;
-    }
-    this.pointerDragMoved = true;
-    this.freeSlotCoords.set(slotIdx, next);
-    this.clearAutoFillMarker(slotIdx);
-    this.bumpFreePositionRevision();
-    this.selectedFormation.set(this.selectedFormation());
-    this.cdr.markForCheck();
-    event.preventDefault();
-  }
+  onPitchPointerMove(event: PointerEvent): void { partidoOnPitchPointerMove(this, event); }
 
-  onPitchPointerUp(event: PointerEvent): void {
-    if (this.activePointerDragSlotIdx === null) {
-      return;
-    }
-    const slotIdx = this.activePointerDragSlotIdx;
-    const start = this.pointerDragStartCoords ?? this.baseSlotCoords(slotIdx);
-    const target = event.currentTarget as HTMLElement;
-    const next = this.coordsFromPointerEvent(event, target) ?? this.freeSlotCoords.get(slotIdx) ?? start;
-    if (this.pointerDragMoved) {
-      this.freeSlotCoords.set(slotIdx, next);
-      this.clearAutoFillMarker(slotIdx);
-      this.bumpFreePositionRevision();
-      this.persistLastNudgeHarnessCase(slotIdx, start, next);
-      this.rememberCurrentPlayerCoord(slotIdx, next);
-      this.suppressNextSlotClick = true;
-    }
-    this.activePointerDragSlotIdx = null;
-    this.pointerDragStartCoords = null;
-    this.pointerDragMoved = false;
-    this.selectedFormation.set(this.selectedFormation());
-    this.cdr.markForCheck();
-    event.preventDefault();
-  }
+  onPitchPointerUp(event: PointerEvent): void { partidoOnPitchPointerUp(this, event); }
 
   onPitchPointerCancel(event: PointerEvent): void {
     if (this.activePointerDragSlotIdx === null) {
@@ -591,80 +374,28 @@ export class PartidoModalComponent {
     event.preventDefault();
   }
 
-  private coordsFromPointerEvent(event: PointerEvent, pitchEl: HTMLElement): { x: number; y: number } | null {
-    const rect = pitchEl.getBoundingClientRect();
-    if (!rect.width || !rect.height) {
-      return null;
-    }
-    const x = this.clampPercent(((event.clientX - rect.left) / rect.width) * 100);
-    const y = this.clampPercent(((event.clientY - rect.top) / rect.height) * 100);
-    return {
-      x: Number(x.toFixed(2)),
-      y: Number(y.toFixed(2)),
-    };
-  }
+  private coordsFromPointerEvent(event: PointerEvent, pitchEl: HTMLElement): { x: number; y: number } | null { return partidoCoordsFromPointerEvent(this, event, pitchEl); }
 
-  onPitchSlotClick(slotIdx: number): void {
-    if (this.suppressNextSlotClick) {
-      this.suppressNextSlotClick = false;
-      return;
-    }
-    if (!this.selectedBenchPlayerId) {
-      this.selectNudgeSlot(slotIdx);
-      return;
-    }
-    if (this.isGoalkeeperSlot(slotIdx)) {
-      this.errorMsg = 'El arquero no se puede reemplazar desde este flujo.';
-      return;
-    }
-    const playerOnId = this.selectedBenchPlayerId;
-    const playerOffId = this.playerOffIdForBenchPlacement(slotIdx, playerOnId);
-    if (this.isAutoFilledSlot(slotIdx) && !playerOffId && !this.isConfirmingSameAutoPlayer(slotIdx, playerOnId)) {
-      this.errorMsg = 'No se puede confirmar AUTO porque falta identificar quién sale. Usá un cambio manual o reabrí el modal.';
-      return;
-    }
-    if (playerOffId && playerOffId !== playerOnId) {
-      if (!this.registerPendingSubstitution(playerOffId, playerOnId, slotIdx)) {
-        return;
-      }
-    }
-    this.slotAssignments.set(slotIdx, playerOnId);
-    this.clearAutoFillMarker(slotIdx);
-    this.selectedBenchPlayerId = null;
-    this.errorMsg = '';
-    this.selectedFormation.set(this.selectedFormation());
-  }
+  onPitchSlotClick(slotIdx: number): void { partidoOnPitchSlotClick(this, slotIdx); }
 
-  selectNudgeSlot(slotIdx: number): void {
-    if (this.isGoalkeeperSlot(slotIdx)) {
-      this.selectedNudgeSlotIdx = null;
-      this.errorMsg = 'El arquero queda fijo en el área chica y no se puede mover manualmente.';
-      return;
-    }
-    if (!this.playerAtSlot(slotIdx)) {
-      this.selectedNudgeSlotIdx = null;
-      return;
-    }
-    this.selectedNudgeSlotIdx = slotIdx;
-    this.errorMsg = '';
-  }
+  selectNudgeSlot(slotIdx: number): void { partidoSelectNudgeSlot(this, slotIdx); }
 
   selectedNudgePlayerName(): string {
     if (this.selectedNudgeSlotIdx === null) {
-      return 'Ningún jugador seleccionado';
+      return 'NingÃºn jugador seleccionado';
     }
-    return this.playerAtSlot(this.selectedNudgeSlotIdx)?.name ?? 'Slot vacío';
+    return this.playerAtSlot(this.selectedNudgeSlotIdx)?.name ?? 'Slot vacÃ­o';
   }
 
   selectedNudgeCoordsLabel(): string {
     if (this.selectedNudgeSlotIdx === null) {
-      return 'Seleccioná una ficha del XI para ajustar píxeles.';
+      return 'SeleccionÃ¡ una ficha del XI para ajustar pÃ­xeles.';
     }
     const coords = this.freeSlotCoords.get(this.selectedNudgeSlotIdx);
     if (!coords) {
-      return 'En posición base de la formación.';
+      return 'En posiciÃ³n base de la formaciÃ³n.';
     }
-    return `X ${coords.x.toFixed(1)}% · Y ${coords.y.toFixed(1)}%`;
+    return `X ${coords.x.toFixed(1)}% Â· Y ${coords.y.toFixed(1)}%`;
   }
 
   canNudgeSelectedSlot(): boolean {
@@ -673,97 +404,18 @@ export class PartidoModalComponent {
       && !!this.playerAtSlot(this.selectedNudgeSlotIdx);
   }
 
-  nudgeSelectedSlot(dx: number, dy: number): void {
-    if (!this.canNudgeSelectedSlot() || this.selectedNudgeSlotIdx === null) {
-      return;
-    }
-    const slotIdx = this.selectedNudgeSlotIdx;
-    const base = this.baseSlotCoords(slotIdx);
-    const current = this.freeSlotCoords.get(slotIdx) ?? base;
-    const next = {
-      x: Number(this.clampPercent(current.x + dx).toFixed(2)),
-      y: Number(this.clampPercent(current.y + dy).toFixed(2)),
-    };
-    this.freeSlotCoords.set(slotIdx, {
-      x: next.x,
-      y: next.y,
-    });
-    this.persistLastNudgeHarnessCase(slotIdx, current, next);
-    this.clearAutoFillMarker(slotIdx);
-    this.bumpFreePositionRevision();
-    this.selectedFormation.set(this.selectedFormation());
-  }
+  nudgeSelectedSlot(dx: number, dy: number): void { partidoNudgeSelectedSlot(this, dx, dy); }
 
-  resetSelectedSlotPosition(): void {
-    if (this.selectedNudgeSlotIdx === null) {
-      return;
-    }
-    this.freeSlotCoords.delete(this.selectedNudgeSlotIdx);
-    const playerId = this.slotAssignments.get(this.selectedNudgeSlotIdx) ?? null;
-    if (playerId) {
-      this.forgetRememberedPlayerCoord(playerId);
-    }
-    this.bumpFreePositionRevision();
-    this.selectedFormation.set(this.selectedFormation());
-  }
+  resetSelectedSlotPosition(): void { partidoResetSelectedSlotPosition(this); }
 
   onBenchPlayerClick(playerId: string): void {
     this.selectedBenchPlayerId = this.selectedBenchPlayerId === playerId ? null : playerId;
     this.errorMsg = '';
   }
 
-  // ========== Auto-fill empty slots ==========
+  autoFillEmptySlots(): void { partidoAutoFillEmptySlots(this); }
 
-  autoFillEmptySlots(): void {
-    this.autoFilledSlots.clear();
-    this.autoFillSourcePlayerBySlot.clear();
-    this.warningMsg = '';
-    this.sanitizeDuplicateSlotAssignments();
-    const lines = FORMATION_LINES_BY_FORMATION[this.selectedFormation()] ?? [];
-    let slotIdx = 0;
-    let unfilled = 0;
-    for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
-      const line = lines[lineIdx];
-      for (let dotIdx = 0; dotIdx < line.length; dotIdx++) {
-        const current = this.slotAssignments.get(slotIdx);
-        if (current) {
-          slotIdx++;
-          continue;
-        }
-        const roleLabel = line[dotIdx];
-        const filled = this.tryFillSlot(slotIdx, roleLabel);
-        if (!filled) {
-          unfilled++;
-        }
-        slotIdx++;
-      }
-    }
-    if (unfilled > 0) {
-      this.warningMsg = this.hasLocalDebugPartidoEvent()
-        ? `${unfilled} posición(es) quedaron sin AUTO porque no tienen una lesión propia asociada. Revisá el estado de la fecha o usá un cambio manual.`
-        : `${unfilled} posición(es) no se pudieron completar; no hay suficientes jugadores en el banquillo con posición compatible.`;
-    }
-    this.selectedFormation.set(this.selectedFormation());
-  }
-
-  private tryFillSlot(slotIdx: number, roleLabel: string): boolean {
-    const compatibleGroups = this.compatibleGroupForRole(roleLabel);
-    const bench = this.benchPlayers.filter(p => this.isPlayerAvailableForAutoFill(p));
-    const pick = bench.find(p => compatibleGroups.includes((p.position || '').toUpperCase()));
-    if (!pick) {
-      return false;
-    }
-    const sourcePlayerId = this.resolveAutoFillSourcePlayerId(roleLabel);
-    if (this.hasLocalDebugPartidoEvent() && !sourcePlayerId) {
-      return false;
-    }
-    this.slotAssignments.set(slotIdx, pick.sessionPlayerId);
-    this.autoFilledSlots.set(slotIdx, pick.sessionPlayerId);
-    if (sourcePlayerId) {
-      this.autoFillSourcePlayerBySlot.set(slotIdx, sourcePlayerId);
-    }
-    return true;
-  }
+  private tryFillSlot(slotIdx: number, roleLabel: string): boolean { return partidoTryFillSlot(this, slotIdx, roleLabel); }
 
   private playerOffIdForBenchPlacement(slotIdx: number, playerOnId: string): string | null {
     const autoSourcePlayerId = this.autoFillSourcePlayerBySlot.get(slotIdx) ?? null;
@@ -780,43 +432,7 @@ export class PartidoModalComponent {
       && (this.slotAssignments.get(slotIdx) ?? null) === playerOnId;
   }
 
-  private resolveAutoFillSourcePlayerId(roleLabel: string): string | null {
-    const assigned = new Set(Array.from(this.slotAssignments.values()).filter((id): id is string => !!id));
-    const alreadyLinkedSources = new Set(this.autoFillSourcePlayerBySlot.values());
-    const compatibleGroups = this.compatibleGroupForRole(roleLabel);
-    const squadIds = new Set((this.data.squad ?? []).map(player => player.sessionPlayerId).filter(Boolean));
-    const candidates = [...(this.data.events ?? [])]
-      .filter(event => event.eventType === 'INJURY' && !!event.playerId)
-      .filter(event => !event.teamId || event.teamId === this.data.homeTeamId || squadIds.has(event.playerId ?? ''))
-      .sort((a, b) => (b.minute ?? 0) - (a.minute ?? 0))
-      .map(event => event.playerId as string)
-      .find(playerId => {
-        if (assigned.has(playerId) || alreadyLinkedSources.has(playerId)) {
-          return false;
-        }
-        return true;
-      });
-    if (!candidates) {
-      return null;
-    }
-    const compatibleCandidate = [...(this.data.events ?? [])]
-      .filter(event => event.eventType === 'INJURY' && !!event.playerId)
-      .filter(event => !event.teamId || event.teamId === this.data.homeTeamId || squadIds.has(event.playerId ?? ''))
-      .sort((a, b) => (b.minute ?? 0) - (a.minute ?? 0))
-      .map(event => event.playerId as string)
-      .find(playerId => {
-        if (assigned.has(playerId) || alreadyLinkedSources.has(playerId)) {
-          return false;
-        }
-        const player = (this.data.squad ?? []).find(p => p.sessionPlayerId === playerId);
-        if (!player) {
-          return false;
-        }
-        const position = (player.position || '').toUpperCase();
-        return compatibleGroups.includes(position);
-      });
-    return compatibleCandidate ?? candidates;
-  }
+  private resolveAutoFillSourcePlayerId(roleLabel: string): string | null { return partidoResolveAutoFillSourcePlayerId(this, roleLabel); }
 
   private hasLocalDebugPartidoEvent(): boolean {
     return (this.data.events ?? []).some(event =>
@@ -826,21 +442,7 @@ export class PartidoModalComponent {
     );
   }
 
-  private compatibleGroupForRole(roleLabel: string): string[] {
-    const upper = (roleLabel || '').toUpperCase();
-    for (const group of Object.keys(PartidoModalComponent.POSITION_GROUPS)) {
-      if (PartidoModalComponent.POSITION_GROUPS[group].includes(upper)) {
-        return PartidoModalComponent.POSITION_GROUPS[group];
-      }
-    }
-    const groups = PartidoModalComponent.POSITION_GROUPS;
-    return [
-      ...groups['GK'],
-      ...groups['DEF'],
-      ...groups['MID'],
-      ...groups['ATT']
-    ];
-  }
+  private compatibleGroupForRole(roleLabel: string): string[] { return partidoCompatibleGroupForRole(this, roleLabel); }
 
   isAutoFilledSlot(slotIdx: number): boolean {
     return this.autoFilledSlots.has(slotIdx);
@@ -850,60 +452,13 @@ export class PartidoModalComponent {
     return !player.injured && !player.suspended;
   }
 
-  /**
-   * Defensive integrity pass for live/Partido state races.
-   *
-   * During a live match the modal can be opened while SSE, local saved slots and
-   * just-confirmed substitutions are converging. If two slots carry the same
-   * sessionPlayerId, the UI may look like a 12-player/10-player XI depending on
-   * which surface reads it. Keep the first tactical occurrence, clear later
-   * duplicates, and let auto-fill repair the empty slot from the bench.
-   */
-  private sanitizeDuplicateSlotAssignments(): void {
-    const seen = new Set<string>();
-    let changed = false;
-    for (const [slotIdx, playerId] of Array.from(this.slotAssignments.entries()).sort((a, b) => a[0] - b[0])) {
-      if (!playerId) {
-        continue;
-      }
-      if (seen.has(playerId)) {
-        this.slotAssignments.set(slotIdx, null);
-        this.freeSlotCoords.delete(slotIdx);
-        this.clearAutoFillMarker(slotIdx);
-        changed = true;
-        continue;
-      }
-      seen.add(playerId);
-    }
-    if (changed) {
-      this.bumpFreePositionRevision();
-      if (!this.warningMsg) {
-        this.warningMsg = 'Se corrigió un XI duplicado antes de guardar.';
-      }
-    }
-  }
+  private sanitizeDuplicateSlotAssignments(): void { partidoSanitizeDuplicateSlotAssignments(this); }
 
   isFreePositionedSlot(slotIdx: number): boolean {
     return this.freeSlotCoords.has(slotIdx);
   }
 
-  isGoalkeeperSlot(slotIdx: number): boolean {
-    if (slotIdx < 0) {
-      return false;
-    }
-    const lines = FORMATION_LINES_BY_FORMATION[this.selectedFormation()] ?? [];
-    let current = 0;
-    for (const line of lines) {
-      for (const role of line) {
-        if (current === slotIdx) {
-          return (role || '').toUpperCase() === 'GK';
-        }
-        current++;
-      }
-    }
-    const player = this.playerAtSlot(slotIdx);
-    return (player?.position || '').toUpperCase() === 'GK';
-  }
+  isGoalkeeperSlot(slotIdx: number): boolean { return partidoIsGoalkeeperSlot(this, slotIdx); }
 
   freePositionLeftPercent(slotIdx: number): number | null {
     const coords = this.freeSlotCoords.get(slotIdx);
@@ -922,81 +477,14 @@ export class PartidoModalComponent {
   }
 
   private baseSlotCoords(slotIdx: number): { x: number; y: number } {
-    const lines = FORMATION_LINES_BY_FORMATION[this.selectedFormation()] ?? [];
-    let current = 0;
-    const lineGap = lines.length <= 1 ? 50 : 100 / (lines.length - 1);
-    for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
-      const line = lines[lineIdx];
-      for (let dotIdx = 0; dotIdx < line.length; dotIdx++) {
-        if (current === slotIdx) {
-          const x = line.length <= 1
-            ? 50
-            : ((dotIdx + 1) / (line.length + 1)) * 100;
-          const y = lines.length <= 1 ? 50 : lineIdx * lineGap;
-          return {
-            x: Number(this.clampPercent(x).toFixed(2)),
-            y: Number(this.clampPercent(y).toFixed(2)),
-          };
-        }
-        current++;
-      }
-    }
-    return { x: 50, y: 50 };
+    return basePartidoSlotCoords(FORMATION_LINES_BY_FORMATION, this.selectedFormation(), slotIdx);
   }
 
   private roleLabelForSlot(slotIdx: number): string | null {
-    const lines = FORMATION_LINES_BY_FORMATION[this.selectedFormation()] ?? [];
-    let current = 0;
-    for (const line of lines) {
-      for (const role of line) {
-        if (current === slotIdx) {
-          return role;
-        }
-        current++;
-      }
-    }
-    return null;
+    return roleLabelForPartidoSlot(FORMATION_LINES_BY_FORMATION, this.selectedFormation(), slotIdx);
   }
 
-  private persistLastNudgeHarnessCase(
-    slotIdx: number,
-    from: { x: number; y: number },
-    target: { x: number; y: number }
-  ): void {
-    const player = this.playerAtSlot(slotIdx);
-    if (!player || this.isGoalkeeperSlot(slotIdx)) {
-      return;
-    }
-    const distance = Math.hypot(target.x - from.x, target.y - from.y);
-    if (!Number.isFinite(distance) || distance < 0.5) {
-      return;
-    }
-    const role = this.roleLabelForSlot(slotIdx);
-    const payload = {
-      version: 1,
-      createdAt: new Date().toISOString(),
-      source: 'partido-modal-nudge',
-      formation: this.selectedFormation(),
-      playerId: player.sessionPlayerId,
-      playerName: player.name,
-      playerPosition: player.position ?? role,
-      playerRole: role,
-      slotId: null,
-      fromXPercent: Number(from.x.toFixed(3)),
-      fromYPercent: Number(from.y.toFixed(3)),
-      targetXPercent: Number(target.x.toFixed(3)),
-      targetYPercent: Number(target.y.toFixed(3)),
-      deltaXPercent: Number((target.x - from.x).toFixed(3)),
-      deltaYPercent: Number((target.y - from.y).toFixed(3)),
-      coachReadTitle: 'Partido modal nudge',
-      coachReadBody: `${player.name}: ${from.x.toFixed(1)},${from.y.toFixed(1)} -> ${target.x.toFixed(1)},${target.y.toFixed(1)}`,
-    };
-    try {
-      window.localStorage.setItem('manager:last-modal-position-move', JSON.stringify(payload));
-    } catch {
-      // Local QA metadata is best-effort; the user-facing save flow must continue.
-    }
-  }
+  private persistLastNudgeHarnessCase(slotIdx: number, from: { x: number; y: number }, target: { x: number; y: number }): void { partidoPersistLastNudgeHarnessCase(this, slotIdx, from, target); }
 
   private clearAutoFillMarker(slotIdx: number): void {
     if (this.autoFilledSlots.has(slotIdx)) {
@@ -1004,8 +492,6 @@ export class PartidoModalComponent {
     }
     this.autoFillSourcePlayerBySlot.delete(slotIdx);
   }
-
-  // ========== Pitch helpers ==========
 
   playerAtSlot(slotIdx: number): SessionPlayer | null {
     const pid = this.slotAssignments.get(slotIdx);
@@ -1050,12 +536,6 @@ export class PartidoModalComponent {
     return lines[lineIdx][n] ?? '';
   }
 
-  // ========== : rival-tab helpers ==========
-
-  /**
-   * Pitch lines for the rival formation. Mirrors the manager tab's
-   * {@link formationLines} but uses {@link rivalFormation} (read-only).
-   */
   get rivalFormationLines(): number[] {
     const lines = FORMATION_LINES_BY_FORMATION[this.rivalFormation()];
     if (!lines || lines.length === 0) {
@@ -1064,7 +544,6 @@ export class PartidoModalComponent {
     return lines.map(line => line.length);
   }
 
-  /** Role label for a rival dot  -  no player name (rival XI not exposed). */
   getRivalDotLabel(lineIdx: number, dotIdx: number): string {
     const lines = FORMATION_LINES_BY_FORMATION[this.rivalFormation()];
     if (!lines || !lines[lineIdx]) {
@@ -1073,91 +552,32 @@ export class PartidoModalComponent {
     return lines[lineIdx][dotIdx] ?? '';
   }
 
-  // ========== : diff + save ==========
-
   private slotsDifferFromInitial(): boolean {
-    if (this.slotAssignments.size !== this.initialSlotAssignments.size) {
-      return true;
-    }
-    for (const [idx, pid] of this.slotAssignments) {
-      const initialPid = this.initialSlotAssignments.get(idx) ?? '';
-      if ((pid ?? '') !== initialPid) {
-        return true;
-      }
-    }
-    if (this.freeSlotCoords.size !== this.initialFreeSlotCoords.size) {
-      return true;
-    }
-    for (const [idx, coords] of this.freeSlotCoords) {
-      const initialSlotCoords = this.initialFreeSlotCoords.get(idx);
-      if (!initialSlotCoords) {
-        return true;
-      }
-      if (Math.abs(coords.x - initialSlotCoords.x) > 0.001
-          || Math.abs(coords.y - initialSlotCoords.y) > 0.001) {
-        return true;
-      }
-    }
-    return false;
+    return partidoSlotsDifferFromInitial(
+      this.slotAssignments,
+      this.initialSlotAssignments,
+      this.freeSlotCoords,
+      this.initialFreeSlotCoords
+    );
   }
 
   private captureInitialSlotSnapshot(): void {
     this.initialSlotAssignments = new Map(this.slotAssignments);
-    this.initialFreeSlotCoords = new Map(
-      Array.from(this.freeSlotCoords.entries()).map(([slotIdx, coords]) => [
-        slotIdx,
-        { x: this.clampPercent(coords.x), y: this.clampPercent(coords.y) }
-      ])
-    );
+    this.initialFreeSlotCoords = capturePartidoSlotCoordsSnapshot(this.freeSlotCoords);
     this.bumpFreePositionRevision();
   }
 
-  private buildSlotListForBackend(): Array<{
-    sessionPlayerId: string;
-    position: string;
-    slotIndex: number;
-    customXPercent?: number | null;
-    customYPercent?: number | null;
-  }> {
-    const lines = FORMATION_LINES_BY_FORMATION[this.selectedFormation()] ?? [];
-    const slots: Array<{
-      sessionPlayerId: string;
-      position: string;
-      slotIndex: number;
-      customXPercent?: number | null;
-      customYPercent?: number | null;
-    }> = [];
-    let slotIdx = 0;
-    for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
-      const line = lines[lineIdx];
-      for (let dotIdx = 0; dotIdx < line.length; dotIdx++) {
-        const coords = this.freeSlotCoords.get(slotIdx);
-        slots.push({
-          sessionPlayerId: this.slotAssignments.get(slotIdx) ?? '',
-          position: line[dotIdx],
-          slotIndex: slotIdx,
-          customXPercent: coords?.x ?? null,
-          customYPercent: coords?.y ?? null
-        });
-        slotIdx++;
-      }
-    }
-    return slots;
+  private buildSlotListForBackend() {
+    return buildPartidoSlotListForBackend(
+      FORMATION_LINES_BY_FORMATION,
+      this.selectedFormation(),
+      this.slotAssignments,
+      this.freeSlotCoords
+    );
   }
 
   private swapFreeSlotCoords(a: number, b: number): void {
-    const aCoords = this.freeSlotCoords.get(a);
-    const bCoords = this.freeSlotCoords.get(b);
-    if (bCoords) {
-      this.freeSlotCoords.set(a, bCoords);
-    } else {
-      this.freeSlotCoords.delete(a);
-    }
-    if (aCoords) {
-      this.freeSlotCoords.set(b, aCoords);
-    } else {
-      this.freeSlotCoords.delete(b);
-    }
+    this.freeSlotCoords = swapPartidoFreeSlotCoords(this.freeSlotCoords, a, b);
     this.bumpFreePositionRevision();
   }
 
@@ -1177,7 +597,6 @@ export class PartidoModalComponent {
     try {
       writePartidoPlayerCoords(window.localStorage, this.data.matchId, coordsByPlayerId);
     } catch {
-      // Non-fatal: service memory/backend save still carry the tactical change.
     }
   }
 
@@ -1185,62 +604,15 @@ export class PartidoModalComponent {
     this.freePositionRevision.update(value => value + 1);
   }
 
-  private hydrateRememberedPlayerCoords(): void {
-    const remembered = this.readRememberedPlayerCoords();
-    let changed = false;
-    for (const [slotIdx, playerId] of this.slotAssignments) {
-      if (!playerId) {
-        continue;
-      }
-      const coords = remembered[playerId];
-      if (!coords) {
-        continue;
-      }
-      this.freeSlotCoords.set(slotIdx, {
-        x: this.clampPercent(coords.x),
-        y: this.clampPercent(coords.y)
-      });
-      changed = true;
-    }
-    if (changed) {
-      this.bumpFreePositionRevision();
-    }
-  }
+  private hydrateRememberedPlayerCoords(): void { partidoHydrateRememberedPlayerCoords(this); }
 
   private rememberPlayerCoordsForSavedSlots(slots: Array<{
     sessionPlayerId: string;
     customXPercent?: number | null;
     customYPercent?: number | null;
-  }>): void {
-    const remembered = this.readRememberedPlayerCoords();
-    for (const slot of slots) {
-      if (!slot.sessionPlayerId) {
-        continue;
-      }
-      if (this.isFinitePercent(slot.customXPercent) && this.isFinitePercent(slot.customYPercent)) {
-        remembered[slot.sessionPlayerId] = {
-          x: this.clampPercent(slot.customXPercent),
-          y: this.clampPercent(slot.customYPercent)
-        };
-      } else {
-        delete remembered[slot.sessionPlayerId];
-      }
-    }
-    this.writeRememberedPlayerCoords(remembered);
-  }
+  }>): void { partidoRememberPlayerCoordsForSavedSlots(this, slots); }
 
-  private rememberCurrentPlayerCoord(slotIdx: number, coords: { x: number; y: number }): void {
-    const playerId = this.slotAssignments.get(slotIdx);
-    if (!playerId) {
-      return;
-    }
-    const remembered = this.readRememberedPlayerCoords();
-    remembered[playerId] = {
-      x: this.clampPercent(coords.x),
-      y: this.clampPercent(coords.y)
-    };
-    this.writeRememberedPlayerCoords(remembered);
-  }
+  private rememberCurrentPlayerCoord(slotIdx: number, coords: { x: number; y: number }): void { partidoRememberCurrentPlayerCoord(this, slotIdx, coords); }
 
   private forgetRememberedPlayerCoord(playerId: string): void {
     const remembered = this.readRememberedPlayerCoords();
@@ -1251,220 +623,32 @@ export class PartidoModalComponent {
     this.writeRememberedPlayerCoords(remembered);
   }
 
-  private registerPendingSubstitution(playerOffId: string, playerOnId: string, slotIndex: number): boolean {
-    const nextSubstitutions = this.pendingSubstitutions
-      .filter(sub => sub.playerOffId !== playerOffId && sub.playerOnId !== playerOnId);
-
-    if (nextSubstitutions.length >= this.substitutionsRemaining()) {
-      this.errorMsg = 'No quedan sustituciones disponibles para preparar otro cambio.';
-      return false;
-    }
-    this.pendingSubstitutions = [
-      ...nextSubstitutions,
-      { playerOffId, playerOnId, slotIndex }
-    ];
-    this.pendingSubstitutionRevision.update(value => value + 1);
-    return true;
-  }
+  private registerPendingSubstitution(playerOffId: string, playerOnId: string, slotIndex: number): boolean { return partidoRegisterPendingSubstitution(this, playerOffId, playerOnId, slotIndex); }
 
   pendingSubstitutionRows(): Array<{
     playerOffName: string;
     playerOnName: string;
     slotIndex: number;
-  }> {
-    this.pendingSubstitutionRevision();
-    return this.pendingSubstitutions.map(sub => ({
-      playerOffName: this.playerNameById(sub.playerOffId),
-      playerOnName: this.playerNameById(sub.playerOnId),
-      slotIndex: sub.slotIndex
-    }));
-  }
+  }> { return partidoPendingSubstitutionRows(this); }
 
-  removePendingSubstitution(index: number): void {
-    const sub = this.pendingSubstitutions[index];
-    if (!sub) {
-      return;
-    }
-    const currentSlotPlayerId = this.slotAssignments.get(sub.slotIndex) ?? null;
-    if (!currentSlotPlayerId || currentSlotPlayerId === sub.playerOnId) {
-      this.slotAssignments.set(sub.slotIndex, sub.playerOffId);
-      this.freeSlotCoords.delete(sub.slotIndex);
-      this.clearAutoFillMarker(sub.slotIndex);
-      this.bumpFreePositionRevision();
-    }
-    this.pendingSubstitutions = this.pendingSubstitutions.filter((_item, idx) => idx !== index);
-    this.pendingSubstitutionRevision.update(value => value + 1);
-    this.selectedBenchPlayerId = null;
-    this.errorMsg = '';
-    this.selectedFormation.set(this.selectedFormation());
-  }
+  removePendingSubstitution(index: number): void { partidoRemovePendingSubstitution(this, index); }
 
   private playerNameById(playerId: string): string {
     return (this.data.squad ?? []).find(p => p.sessionPlayerId === playerId)?.name ?? playerId;
   }
 
-  // ========== Footer actions ==========
-
-  /** Persist formation, position and substitution changes. */
   save(): void {
-    if (this.isSubmitting) {
-      return;
-    }
-    if (this.autoFilledSlots.size > 0) {
-      this.errorMsg = 'No se puede guardar con jugadores AUTO: elegí manualmente el reemplazo para que cuente como sustitución real.';
-      this.cdr.markForCheck();
-      return;
-    }
-    if (!this.hasPendingChanges()) {
-      // No changes  -  close immediately without API call.
-      this.dialogRef.close({ success: false, reason: 'no-change' });
-      return;
-    }
-    this.isSubmitting = true;
-    const saveToken = Symbol('partido-save');
-    this.activeSaveToken = saveToken;
-    window.setTimeout(() => {
-      if (this.activeSaveToken === saveToken && this.isSubmitting) {
-        this.isSubmitting = false;
-        this.errorMsg = 'No hubo respuesta al guardar el cambio del partido. Probá de nuevo o reiniciá el live desde el harness.';
-        this.cdr.markForCheck();
-      }
-    }, 15000);
-    this.errorMsg = '';
-    this.sanitizeDuplicateSlotAssignments();
-    if (this.autoFilledSlots.size > 0) {
-      this.isSubmitting = false;
-      this.activeSaveToken = null;
-      this.errorMsg = 'No se puede guardar con jugadores AUTO: elegí manualmente el reemplazo para que cuente como sustitución real.';
-      this.cdr.markForCheck();
-      return;
-    }
-    const slots = this.buildSlotListForBackend();
-    this.rememberPlayerCoordsForSavedSlots(slots);
-    if (slots.some(slot => !slot.sessionPlayerId)) {
-      this.isSubmitting = false;
-      this.errorMsg = 'No se puede confirmar: todos los slots visibles deben tener un jugador real. Cerrá y reabrí el modal si ves sólo roles.';
-      return;
-    }
-    const substitutionFlow$ = this.pendingSubstitutions.length > 0
-      ? from(this.pendingSubstitutions).pipe(
-          concatMap(sub => this.engineService.substitutePlayer(
-            this.data.matchId,
-            sub.playerOffId,
-            sub.playerOnId
-          )),
-          toArray()
-        )
-      : of([]);
-
-    substitutionFlow$.pipe(
-      switchMap((substitutionResults) => {
-        const failedSubstitution = substitutionResults.find(result => !result.success && !this.isAlreadyAppliedSubstitutionResult(result));
-        if (failedSubstitution) {
-          return of({
-            formationResult: null,
-            substitutionResults,
-            failedSubstitution
-          });
-        }
-        return this.engineService.changeFormation(this.data.matchId, slots, this.selectedFormation()).pipe(
-          switchMap(formationResult => of({
-            formationResult,
-            substitutionResults,
-            failedSubstitution: null
-          }))
-        );
-      }),
-      timeout(15000),
-      finalize(() => {
-        this.isSubmitting = false;
-        if (this.activeSaveToken === saveToken) {
-          this.activeSaveToken = null;
-        }
-        this.cdr.markForCheck();
-      }),
-      takeUntil(this.destroy$)
-    )
-      .subscribe({
-        next: ({ formationResult, substitutionResults, failedSubstitution }) => {
-          if (failedSubstitution) {
-            this.errorMsg = failedSubstitution.error || 'Cambio de jugador rechazado por el servidor';
-            this.cdr.markForCheck();
-            return;
-          }
-          if (formationResult?.success) {
-            const appliedSubstitutions = this.pendingSubstitutions.length;
-            this.snackBar.open(
-              appliedSubstitutions > 0
-                ? `Cambios aplicados (${appliedSubstitutions}) y formación ${this.selectedFormation()} guardada`
-                : `Formación cambiada a ${this.selectedFormation()}`,
-              'OK',
-              { duration: 3000, panelClass: 'success-toast' }
-            );
-            this.dialogRef.close({
-              success: true,
-              result: formationResult,
-              substitutionResults,
-              formation: this.selectedFormation(),
-              savedSlots: slots,
-              substitutionsApplied: appliedSubstitutions,
-              substitutions: this.pendingSubstitutions.map(sub => ({
-                playerOffId: sub.playerOffId,
-                playerOnId: sub.playerOnId
-              }))
-            });
-          } else {
-            this.errorMsg = formationResult?.error || 'Cambio de formación rechazado por el servidor';
-          }
-        },
-        error: (err) => {
-          this.errorMsg = this.describeSaveError(err);
-          this.cdr.markForCheck();
-        }
-      });
+    savePartidoModal(this);
   }
 
   private isAlreadyAppliedSubstitutionResult(result: { success: boolean; error?: string | null }): boolean {
-    if (result.success) {
-      return false;
-    }
-    const error = (result.error || '').toLowerCase();
-    return error.includes('already been substituted off')
-      || error.includes('already been substituted on')
-      || error.includes('is on the pitch already');
+    return isAlreadyAppliedPartidoSubstitutionResult(result);
   }
 
   private describeSaveError(err: unknown): string {
-    const candidate = err as {
-      status?: number;
-      statusText?: string;
-      error?: unknown;
-      message?: string;
-    };
-    const backendError = candidate?.error;
-    if (backendError && typeof backendError === 'object') {
-      const shaped = backendError as { error?: string; message?: string; detail?: string; code?: string };
-      const message = shaped.error ?? shaped.message ?? shaped.detail;
-      if (message) {
-        return `${candidate.status ?? 'Error'} ${shaped.code ? shaped.code + ': ' : ''}${message}`;
-      }
-    }
-    if (typeof backendError === 'string' && backendError.trim()) {
-      return `${candidate.status ?? 'Error'} ${backendError}`;
-    }
-    if (candidate?.message) {
-      if (!candidate.status) {
-        return `Error de red al intentar aplicar cambios del partido: ${candidate.message}`;
-      }
-      return `${candidate.status ?? 'Error'} ${candidate.message}`;
-    }
-    return 'Error de red al intentar aplicar cambios del partido';
+    return describePartidoSaveError(err);
   }
 
-  /**
-   * Footer "Descartar" handler. Closes the dialog without saving, so the live
-   * match keeps the original formation until the manager applies a new change.
-   */
   discard(): void {
     this.dialogRef.close({ success: false, reason: 'discarded' });
   }

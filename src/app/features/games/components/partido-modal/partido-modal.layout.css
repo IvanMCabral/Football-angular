@@ -1,0 +1,299 @@
+/* : full-width modal. The cap (540px) made
+   the modal look like it floated in a corner of the viewport on
+   desktop  -  early visual tests showed too much empty white space to the right of
+   a 540px modal on a 1920px screen. New target: use 95% of the
+   viewport width so the pitch + bench + stats + events layout
+   has room to breathe. We keep the compact spacing for
+   internal padding/margins  -  only the outer container expands. */
+.partido-modal-root {
+  min-width: 0;
+  max-width: 100%;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+}
+
+/* : override Angular Material MDC dialog container
+   to fill the viewport instead of capping at 540px. Both width AND
+   max-width are set so the dialog actually takes the requested
+   width (Material's default behavior with max-width alone leaves
+   the container at content-size). align-self: center ensures the
+   expanded container stays horizontally centered in the overlay
+   pane (Material defaults to flex-start which is what produced
+   the "modal pegado a la izquierda" appearance). */
+:host ::ng-deep .mat-mdc-dialog-container {
+  max-width: 95vw;
+  width: 95vw;
+  align-self: center;
+}
+
+/* : override Angular Material MDC dialog default
+   padding so the title bar and content hug the modal edges.
+   Without these overrides Material adds ~24px padding around the
+   title and the content body  -  that's the bulk of the "espacio
+   blanco lateral / superior" seen in the screenshot.
+   : also cap max-height + enable vertical scroll so the
+   expanded modal doesn't overflow the viewport on shorter screens
+   (the pitch + bench + stats + events stack can exceed 100vh on
+   laptops with the height of the formation pitch + stats header +
+   8 stat rows + 6 events + footer). */
+:host ::ng-deep .mat-mdc-dialog-container .mat-mdc-dialog-title {
+  padding: 0;
+  margin: 0;
+}
+:host ::ng-deep .mat-mdc-dialog-container .mat-mdc-dialog-content {
+  padding: 0;
+  max-height: calc(92vh - 116px);
+  overflow-y: auto;
+}
+.partido-modal-title,
+:host ::ng-deep .mat-mdc-dialog-container h2.mat-mdc-dialog-title {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.75rem 1rem;
+  margin: 0;
+  background:
+    radial-gradient(circle at 8% 0%, rgba(74, 222, 128, 0.22), transparent 34%),
+    linear-gradient(135deg, #061b10 0%, #0f2f1d 48%, #102a43 100%);
+  color: #f8fafc;
+  border-bottom: 1px solid rgba(187, 247, 208, 0.22);
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.08);
+}
+:host ::ng-deep .mat-mdc-dialog-container .mat-mdc-tab-body-content {
+  padding: 0.35rem 0.6rem 0.5rem;
+  overflow: hidden;
+}
+:host ::ng-deep .mat-mdc-dialog-container .mdc-dialog__content {
+  padding: 0;
+}
+
+.title-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  margin-right: 0.1rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+}
+
+.minute-tag {
+  display: inline-block;
+  margin-left: 0.15rem;
+  padding: 0.18rem 0.6rem;
+  background: rgba(226, 232, 240, 0.15);
+  color: #dbeafe;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  vertical-align: middle;
+  border: 1px solid rgba(219, 234, 254, 0.18);
+}
+
+/* : score chip in the modal title bar  -  sits between
+   the icon and the minute tag. Same pill visual vocabulary as the
+   minute tag so the title looks like a single coherent chip row.
+   Background uses the score-themed green (not the neutral grey of
+   the minute tag) so the eye lands on it first  -  it's the most
+   information-dense element of the modal. */
+.score-chip {
+  display: inline-block;
+  margin-left: auto;
+  padding: 0.24rem 0.8rem;
+  background: linear-gradient(135deg, #16a34a 0%, #15803d 52%, #166534 100%);
+  color: #fff;
+  border-radius: 999px;
+  font-size: 0.92rem;
+  font-weight: 900;
+  vertical-align: middle;
+  letter-spacing: 0.04em;
+  min-width: 2.6rem;
+  text-align: center;
+  box-shadow: 0 8px 20px rgba(22, 163, 74, 0.22);
+}
+
+.partido-modal-content { padding-top: 0; padding-bottom: 0; }
+
+:host ::ng-deep .mat-mdc-dialog-surface {
+  border-radius: 18px;
+  overflow: hidden;
+  background: linear-gradient(180deg, #f8fafc 0%, #eef6ef 100%);
+  box-shadow: 0 28px 80px rgba(2, 6, 23, 0.35);
+}
+
+.coach-brief {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0.55rem 0.6rem 0.4rem;
+  padding: 0.65rem 0.8rem;
+  border-radius: 16px;
+  color: #ecfdf5;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(34, 197, 94, 0.28), transparent 34%),
+    linear-gradient(135deg, #052e16 0%, #14532d 58%, #0f172a 100%);
+  border: 1px solid rgba(187, 247, 208, 0.18);
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.18);
+}
+.coach-brief strong {
+  display: block;
+  font-size: 0.95rem;
+  letter-spacing: 0.01em;
+}
+.coach-brief span {
+  display: block;
+  color: #bbf7d0;
+  font-size: 0.78rem;
+  margin-top: 0.12rem;
+}
+.coach-brief-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+.coach-brief-chips span {
+  margin: 0;
+  padding: 0.22rem 0.55rem;
+  border-radius: 999px;
+  color: #f8fafc;
+  background: rgba(255, 255, 255, 0.13);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  font-weight: 800;
+}
+
+/* Status banners. */
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  margin-bottom: 0.35rem;
+}
+.banner mat-icon {
+  font-size: 1.2rem;
+  width: 1.2rem;
+  height: 1.2rem;
+}
+.banner-error {
+  background: #ffebee;
+  color: #b71c1c;
+  border: 1px solid #ffcdd2;
+}
+.banner-warning {
+  background: #fff8e1;
+  color: #8a5300;
+  border: 1px solid #ffe0a0;
+}
+/* Rival-tab information banner. */
+.banner-info-ai {
+  background: #e3f2fd;
+  color: #0d47a1;
+  border: 1px solid #bbdefb;
+}
+
+/* ========== Visual pitch (shared between manager + rival tabs) ========== */
+
+.formation-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin: 0.55rem 0.6rem 0.65rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid rgba(20, 83, 45, 0.12);
+  border-radius: 14px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(236, 253, 245, 0.92));
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+}
+
+.formation-select {
+  width: 100%;
+  max-width: 220px;
+}
+
+/* Editable/read-only pitch surface. */
+.pitch {
+  position: relative;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.12), transparent 14%),
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.035) 0 8%, rgba(0,0,0,0.04) 8% 16%),
+    linear-gradient(180deg, #2f8b46 0%, #166534 55%, #0f4d2a 100%);
+  border-radius: 14px;
+  padding: clamp(0.45rem, 1vw, 0.9rem) clamp(0.35rem, 0.9vw, 0.75rem);
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  border: 2px solid rgba(255, 255, 255, 0.92);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.25),
+    inset 0 28px 70px rgba(255, 255, 255, 0.06),
+    inset 0 -28px 80px rgba(0, 0, 0, 0.14),
+    0 22px 42px rgba(15, 23, 42, 0.22);
+  min-height: clamp(300px, 36vh, 460px);
+  justify-content: space-around;
+  margin-bottom: 0.25rem;
+  overflow: hidden;
+  touch-action: none;
+}
+/* Halfway line. */
+.pitch::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1.5px;
+  background: rgba(255, 255, 255, 0.65);
+  transform: translateY(-50%);
+  pointer-events: none;
+  z-index: 0;
+}
+/* Center circle. */
+.pitch::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 56px;
+  height: 56px;
+  border: 1.5px solid rgba(255, 255, 255, 0.65);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+}
+.pitch-zone-label {
+  position: absolute;
+  right: 0.8rem;
+  z-index: 1;
+  color: rgba(236, 253, 245, 0.76);
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+.pitch-zone-attack { top: 0.8rem; }
+.pitch-zone-mid { top: 48%; }
+.pitch-zone-defense { bottom: 0.8rem; }
+/* Lift pitch lines above the pseudo-element lines so dots are visible. */
+.pitch > .pitch-line {
+  position: relative;
+  z-index: 1;
+}
+
+.pitch-line {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  min-height: 64px;
+}
