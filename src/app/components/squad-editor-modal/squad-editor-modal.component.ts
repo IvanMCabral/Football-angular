@@ -86,6 +86,11 @@ import {
   detectSquadEditorFormationFromFamilies,
   isSquadEditorTacticalRoleMismatch,
 } from './squad-editor-modal-formation-detection.utils';
+import {
+  applySquadEditorSlotDropMutation,
+  assignSquadEditorBenchPlayerToSlot,
+  moveSquadEditorPlayerToBench,
+} from './squad-editor-modal-lineup-mutation.utils';
 
 @Component({
   selector: 'app-squad-editor-modal',
@@ -1047,30 +1052,19 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
 
     this.showConditionWarning(player);
 
-    if (player.slotId) {
-      delete this.slotPlayerMap[player.slotId];
-    }
-
-    const occupant = this.slotPlayerMap[this.selectedSlot.subdivisionId];
-    if (occupant && occupant.playerId !== player.playerId) {
-      occupant.slotId = '';
-      delete occupant.xPercent;
-      delete occupant.yPercent;
-      if (!this.benchPlayers$.value.some(p => p.playerId === occupant.playerId)) {
-        this.benchPlayers$.next([...this.benchPlayers$.value, occupant]);
-      }
-      this.homePlayers$.next(
-        this.homePlayers$.value.filter(p => p.playerId !== occupant.playerId)
-      );
-    }
-
     const slotId = this.selectedSlot.subdivisionId;
-    player.slotId = slotId;
-    this.slotPlayerMap[slotId] = player;
-
-    const newBench = this.benchPlayers$.value.filter(p => p.playerId !== player.playerId);
-    this.benchPlayers$.next(newBench);
-    this.homePlayers$.next([...this.homePlayers$.value, player]);
+    const mutation = assignSquadEditorBenchPlayerToSlot({
+      player,
+      targetSlotId: slotId,
+      state: {
+        homePlayers: this.homePlayers$.value,
+        benchPlayers: this.benchPlayers$.value,
+        slotPlayerMap: this.slotPlayerMap,
+      },
+    });
+    this.slotPlayerMap = mutation.slotPlayerMap;
+    this.benchPlayers$.next(mutation.benchPlayers);
+    this.homePlayers$.next(mutation.homePlayers);
 
     this.selectedSlot = null;
     this.selectedPlayerToAssign = '';
@@ -1083,12 +1077,17 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   removePlayerFromSlot(player: PlayerOnFieldDto): void {
     if (!player.slotId) return;
 
-    delete this.slotPlayerMap[player.slotId];
-    player.slotId = '';
-
-    const newHome = this.homePlayers$.value.filter(p => p.playerId !== player.playerId);
-    this.homePlayers$.next(newHome);
-    this.benchPlayers$.next([...this.benchPlayers$.value, player]);
+    const mutation = moveSquadEditorPlayerToBench({
+      player,
+      state: {
+        homePlayers: this.homePlayers$.value,
+        benchPlayers: this.benchPlayers$.value,
+        slotPlayerMap: this.slotPlayerMap,
+      },
+    });
+    this.slotPlayerMap = mutation.slotPlayerMap;
+    this.homePlayers$.next(mutation.homePlayers);
+    this.benchPlayers$.next(mutation.benchPlayers);
 
     this.selectedSlot = null;
     this.saveLineup();
@@ -1316,13 +1315,18 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     const fromY = this.getMarkerY(player);
     const fromLine = this.visualLineFromCoords(fromY);
     const fromChannel = this.visualChannelFromCoords(fromX);
-    player.slotId = targetSlotId;
-    this.slotPlayerMap[targetSlotId] = player;
-    // snaps to the new slot center. Without this, a player who was
-    // free-dropped (xPercent/yPercent set) then dragged to a slot would
-    // stay visually pinned at the OLD override position.
-    delete player.xPercent;
-    delete player.yPercent;
+    const mutation = applySquadEditorSlotDropMutation({
+      player,
+      sourceSlotId,
+      targetSlotId,
+      occupant,
+      state: {
+        homePlayers: this.homePlayers$.value,
+        benchPlayers: this.benchPlayers$.value,
+        slotPlayerMap: this.slotPlayerMap,
+      },
+    });
+    this.slotPlayerMap = mutation.slotPlayerMap;
     const targetX = this.getFormationPositionCoord(targetSlotId, 'x') ?? this.getMarkerX(player);
     const targetY = this.getFormationPositionCoord(targetSlotId, 'y') ?? this.getMarkerY(player);
     const toLine = this.visualLineFromCoords(targetY);
@@ -1341,33 +1345,8 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
       level: fromLine !== toLine ? 'warn' : 'info',
     };
 
-    if (occupant && occupant.playerId !== player.playerId) {
-      if (sourceSlotId) {
-        // SWAP: push the occupant back into the source slot.
-        occupant.slotId = sourceSlotId;
-        this.slotPlayerMap[sourceSlotId] = occupant;
-        delete occupant.xPercent;
-        delete occupant.yPercent;
-      } else {
-        // Source was bench -> evict the occupant to the bench.
-        occupant.slotId = '';
-        delete occupant.xPercent;
-        delete occupant.yPercent;
-        this.benchPlayers$.next([...this.benchPlayers$.value, occupant]);
-        this.homePlayers$.next(
-          this.homePlayers$.value.filter(p => p.playerId !== occupant.playerId)
-        );
-      }
-    }
-
-    if (!sourceSlotId) {
-      this.benchPlayers$.next(
-        this.benchPlayers$.value.filter(p => p.playerId !== player.playerId)
-      );
-      if (!this.homePlayers$.value.some(p => p.playerId === player.playerId)) {
-        this.homePlayers$.next([...this.homePlayers$.value, player]);
-      }
-    }
+    this.benchPlayers$.next(mutation.benchPlayers);
+    this.homePlayers$.next(mutation.homePlayers);
 
     this.refreshAfterLineupMutation();
   }
@@ -1386,17 +1365,17 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
       body: 'Lo mandaste al banco: baja ocupación del dibujo y puede dejar una zona sin cobertura hasta reemplazarlo.',
       level: 'warn',
     };
-    delete this.slotPlayerMap[player.slotId];
-    player.slotId = '';
-    delete player.xPercent;
-    delete player.yPercent;
-
-    this.homePlayers$.next(
-      this.homePlayers$.value.filter(p => p.playerId !== player.playerId)
-    );
-    if (!this.benchPlayers$.value.some(p => p.playerId === player.playerId)) {
-      this.benchPlayers$.next([...this.benchPlayers$.value, player]);
-    }
+    const mutation = moveSquadEditorPlayerToBench({
+      player,
+      state: {
+        homePlayers: this.homePlayers$.value,
+        benchPlayers: this.benchPlayers$.value,
+        slotPlayerMap: this.slotPlayerMap,
+      },
+    });
+    this.slotPlayerMap = mutation.slotPlayerMap;
+    this.homePlayers$.next(mutation.homePlayers);
+    this.benchPlayers$.next(mutation.benchPlayers);
 
     this.refreshAfterLineupMutation();
   }
