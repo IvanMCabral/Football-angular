@@ -73,8 +73,10 @@ import {
 } from './squad-editor-modal-drag.utils';
 import {
   SquadEditorRect,
+  computeSquadEditorSlotCenter,
   computeSquadEditorFieldDropPercent,
   isPointOverAnyInsetRect,
+  isSquadEditorDropNearSlotCenter,
 } from './squad-editor-modal-geometry.utils';
 
 @Component({
@@ -1216,15 +1218,19 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     }
 
     const owningSlot = player.slotId
-      ? this.subdivisions.find(s => s.subdivisionId === player.slotId)
+      ? this.subdivisions.find(s => s.subdivisionId === player.slotId) ?? null
       : null;
     const canonicalX = player.slotId ? this.getFormationPositionCoord(player.slotId, 'x') : null;
     const canonicalY = player.slotId ? this.getFormationPositionCoord(player.slotId, 'y') : null;
-    const centerX = canonicalX ?? (owningSlot ? owningSlot.left + owningSlot.width / 2 : null);
-    const centerY = canonicalY ?? (owningSlot ? owningSlot.top + owningSlot.height / 2 : null);
-    const dropNearNativeCenter =
-      centerX !== null && centerY !== null
-      && Math.hypot(xPct - centerX, yPct - centerY) <= 1.5;
+    const nativeCenter = computeSquadEditorSlotCenter({
+      canonicalX,
+      canonicalY,
+      slotRect: owningSlot,
+    });
+    const dropNearNativeCenter = isSquadEditorDropNearSlotCenter({
+      drop: { xPct, yPct },
+      center: nativeCenter,
+    });
 
     if (dropNearNativeCenter) {
       delete player.xPercent;
@@ -1232,7 +1238,14 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
       if (player.slotId) {
         this.slotPlayerMap[player.slotId] = player;
       }
-      this.setLastCoachMoveReadForDrag(player, previousX, previousY, centerX ?? xPct, centerY ?? yPct, true);
+      this.setLastCoachMoveReadForDrag(
+        player,
+        previousX,
+        previousY,
+        nativeCenter.x ?? xPct,
+        nativeCenter.y ?? yPct,
+        true
+      );
     } else {
       player.xPercent = xPct;
       player.yPercent = yPct;

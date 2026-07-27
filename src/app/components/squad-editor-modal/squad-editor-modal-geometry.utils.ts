@@ -19,6 +19,22 @@ export interface SquadEditorFieldDropPercent {
   yPct: number;
 }
 
+export interface SquadEditorSlotCenterInput {
+  canonicalX: number | null;
+  canonicalY: number | null;
+  slotRect: {
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  } | null;
+}
+
+export interface SquadEditorSlotCenter {
+  x: number | null;
+  y: number | null;
+}
+
 export function isPointInsideInsetRect(
   point: SquadEditorPoint,
   rect: SquadEditorRect,
@@ -62,4 +78,24 @@ export function computeSquadEditorFieldDropPercent(params: {
         / params.fieldRect.height) * 100
     ),
   };
+}
+
+export function computeSquadEditorSlotCenter(input: SquadEditorSlotCenterInput): SquadEditorSlotCenter {
+  return {
+    x: input.canonicalX ?? (input.slotRect ? input.slotRect.left + input.slotRect.width / 2 : null),
+    y: input.canonicalY ?? (input.slotRect ? input.slotRect.top + input.slotRect.height / 2 : null),
+  };
+}
+
+export function isSquadEditorDropNearSlotCenter(params: {
+  drop: SquadEditorFieldDropPercent;
+  center: SquadEditorSlotCenter;
+  thresholdPct?: number;
+}): boolean {
+  const thresholdPct = params.thresholdPct ?? 1.5;
+  if (params.center.x === null || params.center.y === null) {
+    return false;
+  }
+
+  return Math.hypot(params.drop.xPct - params.center.x, params.drop.yPct - params.center.y) <= thresholdPct;
 }

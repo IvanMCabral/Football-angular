@@ -1,7 +1,9 @@
 import {
+  computeSquadEditorSlotCenter,
   computeSquadEditorFieldDropPercent,
   isPointInsideInsetRect,
   isPointOverAnyInsetRect,
+  isSquadEditorDropNearSlotCenter,
 } from './squad-editor-modal-geometry.utils';
 
 describe('squad-editor-modal-geometry utils', () => {
@@ -44,5 +46,37 @@ describe('squad-editor-modal-geometry utils', () => {
 
     expect(clamped.xPct).toBe(0);
     expect(clamped.yPct).toBe(100);
+  });
+
+  it('prefers canonical formation coordinates for slot centers', () => {
+    const center = computeSquadEditorSlotCenter({
+      canonicalX: 44,
+      canonicalY: 66,
+      slotRect: { left: 0, top: 0, width: 100, height: 100 },
+    });
+
+    expect(center).toEqual({ x: 44, y: 66 });
+  });
+
+  it('falls back to the visual subdivision center when canonical coordinates are missing', () => {
+    const center = computeSquadEditorSlotCenter({
+      canonicalX: null,
+      canonicalY: null,
+      slotRect: { left: 10, top: 20, width: 30, height: 40 },
+    });
+
+    expect(center).toEqual({ x: 25, y: 40 });
+  });
+
+  it('uses an explicit threshold to decide whether a free drop should snap back to slot center', () => {
+    expect(isSquadEditorDropNearSlotCenter({
+      drop: { xPct: 51, yPct: 50 },
+      center: { x: 50, y: 50 },
+    })).toBeTrue();
+
+    expect(isSquadEditorDropNearSlotCenter({
+      drop: { xPct: 52, yPct: 50 },
+      center: { x: 50, y: 50 },
+    })).toBeFalse();
   });
 });
