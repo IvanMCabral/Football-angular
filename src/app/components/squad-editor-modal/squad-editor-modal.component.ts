@@ -91,6 +91,7 @@ import {
   assignSquadEditorBenchPlayerToSlot,
   moveSquadEditorPlayerToBench,
 } from './squad-editor-modal-lineup-mutation.utils';
+import { remapSquadEditorCurrentXiToFormation } from './squad-editor-modal-lineup-remap.utils';
 
 @Component({
   selector: 'app-squad-editor-modal',
@@ -1819,56 +1820,20 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     const positions = this.formationPositions[formationName] || [];
     if (positions.length === 0) { return; }
 
-    const currentXi = this.getUniqueValidHomePlayers().slice(0, 11);
-    this.slotPlayerMap = {};
+    const mutation = remapSquadEditorCurrentXiToFormation({
+      positions,
+      currentXi: this.getUniqueValidHomePlayers().slice(0, 11),
+      currentHomePlayers: this.homePlayers$.value,
+      currentBenchPlayers: this.benchPlayers$.value,
+      isGoalkeeper: player => this.isGoalkeeperPlayer(player),
+      canPlayerUseSlot: (player, slotId) => this.canPlayerUseSlot(player, slotId),
+      roleFamily: role => this.getRoleFamily(role ?? ''),
+      goalkeeperSlotId: SQUAD_EDITOR_GOALKEEPER_SLOT_ID,
+    });
 
-    const usedPositionIndexes = new Set<number>();
-    const indexedPositions = positions.map((position, index) => ({ position, index }));
-
-    const assignPlayer = (player: PlayerOnFieldDto, candidates: Array<{ position: FormationPositionDTO; index: number }>): boolean => {
-      const candidate = candidates.find(entry =>
-        !usedPositionIndexes.has(entry.index)
-        && this.canPlayerUseSlot(player, entry.position.subdivisionId)
-      );
-      if (!candidate) { return false; }
-      player.slotId = candidate.position.subdivisionId;
-      delete player.xPercent;
-      delete player.yPercent;
-      this.slotPlayerMap[candidate.position.subdivisionId] = player;
-      usedPositionIndexes.add(candidate.index);
-      return true;
-    };
-
-    for (const player of currentXi) {
-      if (this.isGoalkeeperPlayer(player)) {
-        assignPlayer(player, indexedPositions.filter(entry => entry.position.subdivisionId === 'GK-1'));
-      }
-    }
-
-    for (const player of currentXi) {
-      if (this.isGoalkeeperPlayer(player) || player.slotId === 'GK-1') { continue; }
-      const playerFamily = this.getRoleFamily(player.role ?? player.position);
-      assignPlayer(player, indexedPositions.filter(entry => this.getRoleFamily(entry.position.role) === playerFamily));
-    }
-
-    for (const player of currentXi) {
-      if (player.slotId && this.slotPlayerMap[player.slotId] === player) { continue; }
-      assignPlayer(player, indexedPositions);
-    }
-
-    const starters = currentXi.filter(player => player.slotId && this.slotPlayerMap[player.slotId] === player);
-    const starterIds = new Set(starters.map(player => player.playerId));
-    const benchById = new Map<string, PlayerOnFieldDto>();
-    for (const player of [...this.benchPlayers$.value, ...this.homePlayers$.value]) {
-      if (starterIds.has(player.playerId)) { continue; }
-      player.slotId = '';
-      delete player.xPercent;
-      delete player.yPercent;
-      benchById.set(player.playerId, player);
-    }
-
-    this.homePlayers$.next(starters);
-    this.benchPlayers$.next(Array.from(benchById.values()));
+    this.slotPlayerMap = mutation.slotPlayerMap;
+    this.homePlayers$.next(mutation.homePlayers);
+    this.benchPlayers$.next(mutation.benchPlayers);
     this.selectedFormation = formationName;
     this.homeFormation$.next(formationName);
     this._isCustomLineup = false;
