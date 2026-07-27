@@ -1,4 +1,4 @@
-import { Component, Input, OnInit, OnChanges, inject, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
+import { Component, Input, OnInit, OnChanges, SimpleChanges, inject, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { PlayerSeasonStatsService } from '../../services/player-season-stats.service';
 import {
@@ -87,20 +87,20 @@ export class SeasonStatsTabComponent implements OnInit, OnChanges {
     }
   }
 
-  ngOnChanges(changes: { careerId?: any; season?: any; teamId?: any; scope?: any }): void {
+  ngOnChanges(changes: SimpleChanges): void {
     // Detect when teamId changes from empty to non-empty → trigger refetch
-    if (changes.teamId && this.teamId && !this.previousTeamId && this.careerId) {
+    if (changes['teamId'] && this.teamId && !this.previousTeamId && this.careerId) {
       this.previousTeamId = this.teamId;
       this.fetchStats();
     } else if (this.careerId) {
       this.fetchStats();
     }
-    if (changes.teamId) {
+    if (changes['teamId']) {
       this.previousTeamId = this.teamId;
     }
     // If scope flips to 'team' but teamId is still empty, settle into waiting-team
     // without firing a fetch. (This can happen if the parent re-renders.)
-    if (changes.scope && this.scope === 'team' && !this.teamId) {
+    if (changes['scope'] && this.scope === 'team' && !this.teamId) {
       this.loadingState = 'waiting-team';
       this.players = [];
       this.metadata = null;
