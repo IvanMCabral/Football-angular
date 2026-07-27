@@ -307,9 +307,10 @@ export class MatchEngineService {
             });
 
           await pump();
-        } catch (err: any) {
+        } catch (err: unknown) {
           // Unsubscribe-driven abort: stay quiet, do not reschedule.
-          if (err?.name === 'AbortError' || closed) {
+          const isAbortError = err instanceof DOMException && err.name === 'AbortError';
+          if (isAbortError || closed) {
             connected = false;
             return;
           }

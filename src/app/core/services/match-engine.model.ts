@@ -54,9 +54,9 @@ export interface MatchState {
   homeTactic?: string;
   awayTactic?: string;
   events: MatchEvent[];
-  cards: any[];
-  substitutions: any[];
-  players: any[];
+  cards: unknown[];
+  substitutions: unknown[];
+  players: unknown[];
   /** Per-player live stats for the home team. */
   homePlayerRatings?: V24LivePlayerRating[];
   /** Per-player live stats for the away team. */

@@ -19,6 +19,16 @@ import { PartidoModalComponent, PartidoDialogData } from '../../features/games/c
 import { RivalCardInfoComponent, RivalCardInfoDialogData } from '../../features/games/components/rival-card-info/rival-card-info.component';
 import { MatchState } from './match-engine.model';
 
+interface LiveSubstitutionCloseResult {
+  success?: boolean;
+  playerOffId?: string;
+  playerOnId?: string;
+  substitutions?: Array<{
+    playerOffId?: string;
+    playerOnId?: string;
+  }>;
+}
+
 /**
  * Coordinates the live-match tactical modals.
  *
@@ -179,7 +189,8 @@ export class LiveMatchModalsService {
 
             // Resume the round when the modal closes, confirmed or cancelled.
             return merge(dialogRef.afterClosed().pipe(
-              tap((closeResult: any) => {
+              map(closeResult => closeResult as LiveSubstitutionCloseResult | undefined),
+              tap((closeResult) => {
                 if (closeResult?.success && Array.isArray(closeResult.substitutions)) {
                   for (const substitution of closeResult.substitutions) {
                     if (substitution.playerOffId && substitution.playerOnId) {
