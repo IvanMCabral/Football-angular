@@ -11,7 +11,7 @@ import { filter, map, switchMap, tap, take, takeUntil, catchError, shareReplay }
 import { Subject } from 'rxjs';
 import { MatchCardComponent } from '../../shared/components/match-card/match-card.component';
 import { RoundLiveViewModel, RoundMatchVM } from './models/round-live.model';
-import { MatchState, RoundState } from '../../core/services/match-engine.model';
+import { MatchEvent, MatchState, RoundState } from '../../core/services/match-engine.model';
 import {
   buildPersistedInjuryAutoModalPayload,
   buildPendingRoundStartMatches,
@@ -54,6 +54,11 @@ declare global {
 interface PersistedInjuryAutoModal {
   matchId: string;
   preSelectedPlayerId: string;
+}
+
+interface RoundFormationModalCloseResult {
+  success?: boolean;
+  formation?: string;
 }
 
 interface InjuryAutoModalPayload {
@@ -938,9 +943,10 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
     }
     this.isCriticalLiveModalOpen = true;
     this.modals.openFormationModal(String(match.id), state)
+      .pipe(map(result => result as RoundFormationModalCloseResult | undefined))
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        next: (result: any) => {
+        next: (result: RoundFormationModalCloseResult | undefined) => {
           if (result?.success && result.formation) {
             this.patchVisibleFormation(String(match.id), state, String(result.formation));
           }
@@ -1111,7 +1117,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
       });
   }
 
-  getTeamName(teamId: any, teamNameMap: { [id: string]: string } | null): string {
+  getTeamName(teamId: unknown, teamNameMap: { [id: string]: string } | null): string {
     return getRoundTeamName(teamId, teamNameMap);
   }
 
@@ -1123,7 +1129,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
     return getRoundEventIcon(eventType);
   }
 
-  getLastEvents(events: any[], count: number): any[] {
+  getLastEvents(events: MatchEvent[], count: number): MatchEvent[] {
     return getLastRoundEvents(events, count);
   }
 
