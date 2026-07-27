@@ -37,6 +37,7 @@ import {
   tacticalLineFromY
 } from '../../shared/utils/tactical-shape-utils';
 import { computeSquadEditorAvgAttribute } from './squad-editor-modal-ratings.utils';
+import { buildSquadEditorTacticalCoachReads } from './squad-editor-modal-tactical-read.utils';
 
 @Component({
   selector: 'app-squad-editor-modal',
@@ -439,146 +440,18 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
 
   get tacticalCoachReads(): Array<{ title: string; body: string; level: 'good' | 'warn' | 'danger' | 'info' }> {
     const players = this.getUniqueValidHomePlayers().filter(p => !this.isGoalkeeperPlayer(p));
-    if (players.length < 10) {
-      return [{
-        title: 'Lineup incompleto',
-        body: 'Completa los 11 para leer ataque, cobertura y bandas con sentido.',
-        level: 'warn',
-      }];
-    }
-
-    const matrix = this.tacticalShapeMatrix;
-    const summary = this.tacticalShapeSummary;
-    const notes: Array<{ title: string; body: string; level: 'good' | 'warn' | 'danger' | 'info' }> = [];
-    const attRow = matrix.find(row => row.zone === 'ATT');
-    const defRow = matrix.find(row => row.zone === 'DEF');
-    const totalLeft = matrix.reduce((acc, row) => acc + row.left, 0);
-    const totalCenter = matrix.reduce((acc, row) => acc + row.center, 0);
-    const totalRight = matrix.reduce((acc, row) => acc + row.right, 0);
-    const attCount = (attRow?.left ?? 0) + (attRow?.center ?? 0) + (attRow?.right ?? 0);
-    const defCount = (defRow?.left ?? 0) + (defRow?.center ?? 0) + (defRow?.right ?? 0);
     const wideHigh = players.filter(p => Math.abs(this.getMarkerX(p) - 50) >= 32 && this.getMarkerY(p) < 58).length;
     const wideCover = players.filter(p => Math.abs(this.getMarkerX(p) - 50) >= 32 && this.getMarkerY(p) >= 58).length;
-    const offRoleCount = this.offRolePlayers.length;
-    const severeOffRoleCount = this.offRolePlayers.filter(row => row.penaltyPct >= 20).length;
 
-    if (summary.width < 45) {
-      notes.push({
-        title: 'Equipo cerrado',
-        body: 'Concentras jugadores por dentro: podes combinar, pero te pueden entrar por fuera.',
-        level: 'warn',
-      });
-    } else if (summary.width > 75) {
-      notes.push({
-        title: 'Equipo muy ancho',
-        body: 'Das amplitud, pero si no hay medio suficiente el bloque puede partirse.',
-        level: 'warn',
-      });
-    } else {
-      notes.push({
-        title: 'Ancho sano',
-        body: 'La ocupacion lateral es razonable: hay bandas sin romper demasiado el centro.',
-        level: 'good',
-      });
-    }
-
-    if (totalLeft <= 1 || totalRight <= 1) {
-      notes.push({
-        title: 'Banda descubierta',
-        body: `${totalLeft <= 1 ? 'Izquierda' : 'Derecha'} queda con poca ayuda. El rival puede atacar ese costado.`,
-        level: 'danger',
-      });
-    } else if (Math.abs(totalLeft - totalRight) >= 3) {
-      notes.push({
-        title: 'Equipo inclinado',
-        body: totalLeft > totalRight
-          ? 'Cargas mas la izquierda: generas superioridad ahi, pero ojo el lado derecho.'
-          : 'Cargas mas la derecha: generas superioridad ahi, pero ojo el lado izquierdo.',
-        level: 'info',
-      });
-    }
-
-    if (totalCenter <= 2) {
-      notes.push({
-        title: 'Centro liviano',
-        body: 'Hay poca presencia interior: cuesta sostener posesion y defender segunda jugada.',
-        level: 'warn',
-      });
-    } else if (totalCenter >= 5) {
-      notes.push({
-        title: 'Centro fuerte',
-        body: 'Tenes buena presencia interior: mejora control, pero revisa que no falte amplitud.',
-        level: 'good',
-      });
-    }
-
-    if (wideHigh >= 2 && wideCover <= 1) {
-      notes.push({
-        title: 'Carrileros altos',
-        body: 'Hay proyeccion por banda, pero poca cobertura detras. Plan ofensivo con riesgo.',
-        level: 'warn',
-      });
-    } else if (wideCover >= 2 && wideHigh <= 1) {
-      notes.push({
-        title: 'Bandas protegidas',
-        body: 'Los costados quedan cubiertos. Mejor para cuidar resultado, menos agresivo arriba.',
-        level: 'good',
-      });
-    } else if (wideHigh >= 1 && wideCover >= 1) {
-      notes.push({
-        title: 'Banda compensada',
-        body: 'Tenes salida por fuera y una ayuda cercana para no quedar tan largo.',
-        level: 'good',
-      });
-    }
-
-    if (summary.compactness < 45) {
-      notes.push({
-        title: 'Bloque largo',
-        body: 'Las lineas estan separadas: puede aparecer espacio entre defensa y medio.',
-        level: 'warn',
-      });
-    } else if (summary.compactness >= 68) {
-      notes.push({
-        title: 'Bloque compacto',
-        body: 'Las lineas estan cerca: ayuda a presionar y recuperar, aunque puede faltar profundidad.',
-        level: 'good',
-      });
-    }
-
-    if (attCount >= 4 && defCount <= 3) {
-      notes.push({
-        title: 'Plan agresivo',
-        body: 'Muchos jugadores arriba y pocos atras: puede generar ocasiones, pero concede transiciones.',
-        level: 'warn',
-      });
-    } else if (defCount >= 5 && attCount <= 2) {
-      notes.push({
-        title: 'Plan conservador',
-        body: 'Mucha cobertura defensiva. Sirve para proteger, pero puede aislar a los delanteros.',
-        level: 'info',
-      });
-    }
-
-    if (severeOffRoleCount > 0) {
-      notes.push({
-        title: 'Roles forzados',
-        body: `${severeOffRoleCount} jugador(es) estan muy fuera de rol. El motor lo va a penalizar.`,
-        level: 'danger',
-      });
-    } else if (offRoleCount > 0) {
-      notes.push({
-        title: 'Ajustes de rol',
-        body: `${offRoleCount} jugador(es) fuera de zona natural. Es jugable, pero revisa si tiene sentido.`,
-        level: 'warn',
-      });
-    }
-
-    return notes.length > 0 ? notes.slice(0, 5) : [{
-      title: 'Forma estable',
-      body: 'No hay alertas claras: el dibujo se ve coherente para probar en partido.',
-      level: 'good',
-    }];
+    return buildSquadEditorTacticalCoachReads({
+      outfieldPlayerCount: players.length,
+      matrix: this.tacticalShapeMatrix,
+      summary: this.tacticalShapeSummary,
+      wideHigh,
+      wideCover,
+      offRoleCount: this.offRolePlayers.length,
+      severeOffRoleCount: this.offRolePlayers.filter(row => row.penaltyPct >= 20).length,
+    });
   }
 
   private beginCoachMoveImpactTracking(): void {
