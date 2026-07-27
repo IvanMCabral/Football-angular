@@ -6200,13 +6200,13 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
                 })),
                 defaultIfEmpty({
                   label: this.calibrationLabel(match, preset.label),
-                  row: null as any,
+                  row: null as PositionPixelMatrixSummaryRow | null,
                   empty: true,
                   error: null,
                 }),
                 catchError((err) => of({
                   label: this.calibrationLabel(match, preset.label),
-                  row: null as any,
+                  row: null as PositionPixelMatrixSummaryRow | null,
                   empty: false,
                   error: this.fmtError(err, 'position pixel request failed'),
                 }))
@@ -6232,9 +6232,9 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         const validItems = items
           .map((item) => ({
             ...item,
-            row: (item.row as any)?.body ?? (item.row as any)?.data ?? item.row,
+            row: this.unwrapHarnessResponseRow(item.row),
           }))
-          .filter((item) => item.row);
+          .filter((item): item is typeof item & { row: PositionPixelMatrixSummaryRow } => item.row !== null);
         const emptyCount = items.filter((item) => item.empty).length;
         const errorItems = items.filter((item) => item.error);
         const rows: PositionPixelMatrixSummary[] = [];
@@ -10862,8 +10862,29 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       this.selectedSwapBenchIdModel = null;
     }
   }
-  private fmtError(err: any, fallback: string): string {
-    return err?.error?.message ?? err?.message ?? fallback;
+  private unwrapHarnessResponseRow(row: PositionPixelMatrixSummaryRow | null): PositionPixelMatrixSummaryRow | null {
+    if (row && typeof row === 'object') {
+      const payload = row as PositionPixelMatrixSummaryRow & {
+        body?: PositionPixelMatrixSummaryRow;
+        data?: PositionPixelMatrixSummaryRow;
+      };
+      return payload.body ?? payload.data ?? row;
+    }
+    return row;
+  }
+
+  private fmtError(err: unknown, fallback: string): string {
+    if (err && typeof err === 'object') {
+      const nested = (err as { error?: { message?: unknown } }).error;
+      if (nested?.message) {
+        return String(nested.message);
+      }
+      const message = (err as { message?: unknown }).message;
+      if (message) {
+        return String(message);
+      }
+    }
+    return fallback;
   }
 }
 
