@@ -2,7 +2,6 @@ import { CommonModule } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
-  isDevMode,
   OnDestroy,
   OnInit,
   computed,
@@ -21,6 +20,7 @@ import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { HttpClient } from '@angular/common/http';
 import { Observable, catchError, concatMap, defaultIfEmpty, finalize, forkJoin, from, map, mergeMap, of, switchMap, take, timeout, toArray } from 'rxjs';
 import { CareerService } from '../../../core/services/career.service';
+import { AppLoggerService } from '../../../core/services/app-logger.service';
 import { Fixture } from '../../../core/services/career.model';
 import { environment } from '../../../environments/environment';
 import { MatchDetailApiService } from '../../match-detail/services/match-detail-api.service';
@@ -370,6 +370,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   private snackBar = inject(MatSnackBar);
   private dialog = inject(MatDialog);
   private http = inject(HttpClient);
+  private logger = inject(AppLoggerService);
   private readonly AUTO_PLAYER_SWAP_STARTER = AUTO_PLAYER_SWAP_STARTER;
   private readonly AUTO_PLAYER_SWAP_BENCH = AUTO_PLAYER_SWAP_BENCH;
   private readonly formationPositionsByName = signal<Record<string, FormationDTO['positions']>>({});
@@ -1351,9 +1352,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   }
 
   private logHarnessRestoreWarning(err: unknown): void {
-    if (isDevMode()) {
-      console.warn('[TEST-HARNESS] Failed to restore lineup after last modal move smoke:', err);
-    }
+    this.logger.warn('[TEST-HARNESS] Failed to restore lineup after last modal move smoke:', err);
   }
   // ============== Lifecycle ==============
   ngOnInit(): void {

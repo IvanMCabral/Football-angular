@@ -6,6 +6,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { FormsModule } from '@angular/forms';
 import { CareerService } from '../../core/services/career.service';
 import { PalmaresEntry, TeamTitleCount, DivisionInfo } from '../../core/services/career.model';
+import { AppLoggerService } from '../../core/services/app-logger.service';
 
 @Component({
   selector: 'app-palmares-dialog',
@@ -24,6 +25,7 @@ export class PalmaresDialogComponent implements OnInit {
   loadingTops = false;
 
   private careerService = inject(CareerService);
+  private logger = inject(AppLoggerService);
 
   constructor(
     public dialogRef: MatDialogRef<PalmaresDialogComponent>,
@@ -58,7 +60,7 @@ export class PalmaresDialogComponent implements OnInit {
         }
       },
       error: (err) => {
-        console.error('[PalmaresDialog] Error loading divisions:', err);
+        this.logger.error('[PalmaresDialog] Error loading divisions:', err);
         // Fallback to data.divisions if available
         if (this.divisions.length > 0 && this.selectedDivisionId) {
           this.loadData();
@@ -82,7 +84,7 @@ export class PalmaresDialogComponent implements OnInit {
         this.loadingChampions = false;
       },
       error: (err) => {
-        console.error('[PalmaresDialog] Error loading champions:', err);
+        this.logger.error('[PalmaresDialog] Error loading champions:', err);
         this.loadingChampions = false;
       }
     });
@@ -95,7 +97,7 @@ export class PalmaresDialogComponent implements OnInit {
         this.loadingTops = false;
       },
       error: (err) => {
-        console.error('[PalmaresDialog] Error loading tops:', err);
+        this.logger.error('[PalmaresDialog] Error loading tops:', err);
         this.loadingTops = false;
       }
     });
