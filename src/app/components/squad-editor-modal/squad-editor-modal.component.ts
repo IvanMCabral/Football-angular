@@ -45,6 +45,10 @@ import {
   pushSquadEditorCoachDelta,
   squadEditorVisualDeltaHasHardWarning,
 } from './squad-editor-modal-move-impact.utils';
+import {
+  buildSquadEditorCoachMoveRead,
+  describeSquadEditorCoachMoveSpatialRead,
+} from './squad-editor-modal-move-read.utils';
 import { buildSquadEditorTacticalCoachReads } from './squad-editor-modal-tactical-read.utils';
 
 @Component({
@@ -546,83 +550,6 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     return typeof value === 'number' && isFinite(value) ? value : null;
   }
 
-  private describeCoachMoveSpatialRead(
-    fromX: number,
-    fromY: number,
-    toX: number,
-    toY: number
-  ): string {
-    const fromChannel = this.visualChannelFromCoords(fromX);
-    const toChannel = this.visualChannelFromCoords(toX);
-    const fromLine = this.visualLineFromCoords(fromY);
-    const toLine = this.visualLineFromCoords(toY);
-    const channelLabel = this.coachChannelLabel(toChannel);
-    const notes: string[] = [channelLabel];
-
-    if (fromChannel !== toChannel) {
-      notes.push(`${this.coachChannelLabel(fromChannel)} -> ${channelLabel}`);
-    }
-    if (toLine === 'ATT' && Math.abs(toX - 50) >= 28) {
-      notes.push('amenaza por banda');
-    }
-    if (toLine === 'DEF' && Math.abs(toX - 50) >= 28) {
-      notes.push('cobertura lateral');
-    }
-    if (toLine === 'MID' && toChannel === 'C') {
-      notes.push('control central');
-    }
-    if (toLine === 'ATT' && fromLine !== 'ATT') {
-      notes.push('riesgo espalda');
-    }
-    if (toLine === 'DEF' && fromLine !== 'DEF') {
-      notes.push('baja el bloque');
-    }
-    if (Math.abs(toX - 50) > Math.abs(fromX - 50) + 2.5) {
-      notes.push('mas amplitud');
-    }
-    if (Math.abs(toX - 50) < Math.abs(fromX - 50) - 2.5) {
-      notes.push('mas interior');
-    }
-
-    return ` Zona: ${notes.join(' · ')}.`;
-  }
-
-  private coachChannelLabel(channel: TacticalChannel): string {
-    if (channel === 'L') { return 'izquierda'; }
-    if (channel === 'R') { return 'derecha'; }
-    return 'centro';
-  }
-
-  private describeCoachMoveFineTrace(
-    fromX: number,
-    fromY: number,
-    toX: number,
-    toY: number
-  ): string {
-    const dx = toX - fromX;
-    const dy = toY - fromY;
-    const distance = Math.hypot(dx, dy);
-    const horizontal = Math.abs(dx) < 0.2
-      ? 'mismo carril'
-      : dx < 0
-      ? `${Math.abs(dx).toFixed(1)}% hacia izquierda`
-      : `${Math.abs(dx).toFixed(1)}% hacia derecha`;
-    const vertical = Math.abs(dy) < 0.2
-      ? 'misma altura'
-      : dy < 0
-      ? `${Math.abs(dy).toFixed(1)}% mas alto`
-      : `${Math.abs(dy).toFixed(1)}% mas bajo`;
-    const scale = distance < 1
-      ? 'micro'
-      : distance < 4
-      ? 'fino'
-      : distance < 10
-      ? 'medio'
-      : 'grande';
-
-    return ` Traza fina: ${scale}, ${distance.toFixed(1)} pts de cancha (${horizontal}, ${vertical}); coords ${fromX.toFixed(1)}/${fromY.toFixed(1)} -> ${toX.toFixed(1)}/${toY.toFixed(1)}.`;
-  }
-
   private setLastCoachMoveReadForDrag(
     player: PlayerOnFieldDto,
     fromX: number,
@@ -631,150 +558,16 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     toY: number,
     snappedToNative: boolean
   ): void {
-    const dx = toX - fromX;
-    const dy = toY - fromY;
-    const distance = Math.hypot(dx, dy);
-    const fineTrace = this.describeCoachMoveFineTrace(fromX, fromY, toX, toY);
-    if (snappedToNative) {
-      this.lastCoachMoveRead = {
-        title: `${player.name} vuelve a base`,
-        body: `Volvio cerca de su punto natural: se limpia el ajuste manual y se recupera la referencia de la formacion.${fineTrace}`,
-        level: 'info',
-      };
-      return;
-    }
-    if (distance < 1.0) {
-      this.lastCoachMoveRead = {
-        title: `${player.name} microajuste`,
-        body: `Movimiento muy chico: deberia ser estable y no provocar saltos fuertes, pero queda registrado como ajuste manual.${fineTrace}`,
-        level: 'info',
-      };
-      return;
-    }
-
-    const fromLine = this.visualLineFromCoords(fromY);
-    const toLine = this.visualLineFromCoords(toY);
-    const fromChannel = this.visualChannelFromCoords(fromX);
-    const toChannel = this.visualChannelFromCoords(toX);
-    const movedUp = dy <= -3.5;
-    const movedDown = dy >= 3.5;
-    const movedWide = Math.abs(toX - 50) > Math.abs(fromX - 50) + 2.5;
-    const movedInside = Math.abs(toX - 50) < Math.abs(fromX - 50) - 2.5;
-    const naturalFamily = this.getRoleFamily(player.role);
-    const forcedRole = naturalFamily && naturalFamily !== toLine;
-    const spatialRead = `${this.describeCoachMoveSpatialRead(fromX, fromY, toX, toY)}${fineTrace}`;
-    const lateralTradeoff = movedWide
-      ? ' Ademas se abre: gana amplitud, pero puede aislarse o abrir espalda en ese costado.'
-      : movedInside
-      ? ' Ademas se cierra: gana conexion interior, pero puede liberar la banda.'
-      : '';
-
-    if (fromLine !== toLine) {
-      const attackerDrop = naturalFamily === 'ATT' && toLine !== 'ATT' && toY > fromY;
-      const defenderStep = naturalFamily === 'DEF' && toLine !== 'DEF' && toY < fromY;
-      this.lastCoachMoveRead = {
-        title: `${player.name}: ${fromLine} → ${toLine}`,
-        body: attackerDrop
-          ? `Baja un delantero: cambia el dibujo y puede dar cobertura contextual, pero no asumir mejora defensiva real hasta probar riesgo en harness.${lateralTradeoff}${spatialRead}`
-          : defenderStep
-          ? `Sube un defensor: puede sumar salida, presion o amenaza, pero abre espalda y debe validarse como tradeoff de riesgo en harness.${lateralTradeoff}${spatialRead}`
-          : forcedRole
-          ? `Cambio fuerte de zona: ahora juega como ${toLine}, pero su rol natural es ${player.role}. El motor puede penalizarlo.${lateralTradeoff}${spatialRead}`
-          : `Cambio fuerte de zona: modifica la estructura real de la formacion y deberia sentirse en el motor.${lateralTradeoff}${spatialRead}`,
-        level: attackerDrop || defenderStep || forcedRole ? 'danger' : 'warn',
-      };
-      return;
-    }
-
-    if (movedWide && movedUp) {
-      this.lastCoachMoveRead = {
-        title: `${player.name} se proyecta abierto`,
-        body: `Diagonal hacia banda y adelante: gana profundidad y amplitud, pero puede quedar aislado y dejar espalda si no hay cobertura. Tradeoff de amplitud/profundidad.${spatialRead}`,
-        level: 'warn',
-      };
-      return;
-    }
-    if (movedWide && movedDown) {
-      this.lastCoachMoveRead = {
-        title: `${player.name} baja abierto`,
-        body: `Diagonal hacia banda y atras: suma cobertura exterior, pero puede alejarse del circuito interior y bajar amenaza. Tradeoff cobertura/amplitud.${spatialRead}`,
-        level: 'info',
-      };
-      return;
-    }
-    if (movedInside && movedUp) {
-      this.lastCoachMoveRead = {
-        title: `${player.name} ataca por dentro`,
-        body: `Diagonal hacia dentro y adelante: suma presencia central/ofensiva, pero puede liberar la banda y partir ayudas. Tradeoff interior/profundidad.${spatialRead}`,
-        level: 'warn',
-      };
-      return;
-    }
-    if (movedInside && movedDown) {
-      this.lastCoachMoveRead = {
-        title: `${player.name} cierra para cubrir`,
-        body: `Diagonal hacia dentro y atras: puede compactar el bloque, pero reduce amplitud y puede dejar el costado sin salida. Tradeoff compactacion/amplitud.${spatialRead}`,
-        level: 'info',
-      };
-      return;
-    }
-
-    if (movedUp && Math.abs(fromX - 50) >= 30) {
-      this.lastCoachMoveRead = {
-        title: `${player.name} se proyecta`,
-        body: `Sube por banda: gana profundidad ofensiva, pero puede dejar espalda si no hay cobertura.${spatialRead}`,
-        level: 'warn',
-      };
-      return;
-    }
-    if (movedDown && Math.abs(fromX - 50) >= 30) {
-      this.lastCoachMoveRead = {
-        title: `${player.name} baja a cubrir`,
-        body: `Baja por banda: mejora la proteccion del costado, con menor agresividad arriba.${spatialRead}`,
-        level: 'good',
-      };
-      return;
-    }
-    if (movedUp) {
-      this.lastCoachMoveRead = {
-        title: `${player.name} mas alto`,
-        body: `Gana metros para presionar o atacar, pero revisa que no se rompa la distancia con su linea.${spatialRead}`,
-        level: 'info',
-      };
-      return;
-    }
-    if (movedDown) {
-      this.lastCoachMoveRead = {
-        title: `${player.name} mas bajo`,
-        body: naturalFamily === 'ATT'
-          ? `Baja un delantero: puede sumar apoyo contextual, pero valida en harness si realmente protege o si solo pierde amenaza.${spatialRead}`
-          : `Da mas cobertura y apoyo atras; puede perder llegada si queda demasiado retrasado.${spatialRead}`,
-        level: naturalFamily === 'ATT' ? 'warn' : 'info',
-      };
-      return;
-    }
-    if (movedWide) {
-      this.lastCoachMoveRead = {
-        title: `${player.name} abre la cancha`,
-        body: `Gana amplitud y amenaza por fuera, pero puede aislarse, separar ayudas y abrir espalda si el rival explota ese costado. Tradeoff de amplitud: validalo en harness/partido.${spatialRead}`,
-        level: 'warn',
-      };
-      return;
-    }
-    if (movedInside) {
-      this.lastCoachMoveRead = {
-        title: `${player.name} se cierra`,
-        body: `Mejora conexion interior y control central, pero puede liberar la banda y dejar al equipo sin amplitud. Tradeoff interior/exterior: validalo en harness/partido.${spatialRead}`,
-        level: 'warn',
-      };
-      return;
-    }
-
-    this.lastCoachMoveRead = {
-      title: `${player.name}: ajuste ${fromChannel} → ${toChannel}`,
-      body: `Ajuste lateral leve: mira si mejora conexiones o deja una banda menos cubierta.${spatialRead}`,
-      level: 'info',
-    };
+    this.lastCoachMoveRead = buildSquadEditorCoachMoveRead({
+      playerName: player.name,
+      playerRole: player.role,
+      naturalFamily: this.getRoleFamily(player.role),
+      fromX,
+      fromY,
+      toX,
+      toY,
+      snappedToNative,
+    });
   }
 
   private visualChannelFromCoords(x: number): TacticalChannel {
@@ -1513,7 +1306,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     const targetY = this.getFormationPositionCoord(targetSlotId, 'y') ?? this.getMarkerY(player);
     const toLine = this.visualLineFromCoords(targetY);
     const toChannel = this.visualChannelFromCoords(targetX);
-    const spatialRead = this.describeCoachMoveSpatialRead(
+    const spatialRead = describeSquadEditorCoachMoveSpatialRead(
       fromX,
       fromY,
       targetX,

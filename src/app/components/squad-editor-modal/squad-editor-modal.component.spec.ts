@@ -4133,7 +4133,7 @@ describe('SquadEditorModalComponent free positioning on field drop', () => {
       (component as any).setLastCoachMoveReadForDrag(midfielder, 82, 44, 50, 62, false);
 
       expect((component as any).lastCoachMoveRead.title).toContain('cierra para cubrir');
-      expect((component as any).lastCoachMoveRead.body).toContain('Tradeoff compactacion/amplitud');
+      expect((component as any).lastCoachMoveRead.body).toContain('Tradeoff compactación/amplitud');
       expect((component as any).lastCoachMoveRead.level).toBe('info');
       done();
     }, 30);
