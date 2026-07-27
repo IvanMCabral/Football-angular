@@ -22,18 +22,20 @@ import { MatchEngineService } from '../../../../core/services/match-engine.servi
 import { ALL_FORMATIONS, FormationCode } from '../../../../shared/constants/formations';
 import { SessionPlayer } from '../../../../shared/models/player.model';
 import { MatchEvent } from '../../../../core/services/match-engine.model';
-import { clampFieldPercent } from '../../../../shared/utils/field-percent.utils';
-
-/**
- * Single row in the stats grid. Each row maps one match-event counter to
- * its home/away value. The flat shape keeps the template simple and makes
- * every stat render with the same layout.
- */
-export interface PartidoStatRow {
-  label: string;
-  home: string;
-  away: string;
-}
+import {
+  buildPartidoStatsRows,
+  displayPartidoEventDescription,
+  displayPartidoPosition,
+  getPartidoEventIcon,
+  PartidoStatRow,
+  recentPartidoEvents
+} from './partido-modal-match-view.utils';
+import {
+  clampPartidoPercent,
+  isFinitePercent,
+  readPartidoPlayerCoords,
+  writePartidoPlayerCoords
+} from './partido-modal-player-coords-storage.utils';
 
 interface PendingPartidoSubstitution {
   playerOffId: string;
@@ -143,73 +145,14 @@ export class PartidoModalComponent {
 
   // Derived match stats shown in both manager and rival tabs.
   statsRows(): PartidoStatRow[] {
-    const events = this.eventList();
-    const homeId = String(this.data.homeTeamId ?? '');
-    const awayId = String(this.data.awayTeamId ?? '');
-
-    let homeShots = 0, awayShots = 0;
-    let homeShotsOnTarget = 0, awayShotsOnTarget = 0;
-    let homeCorners = 0, awayCorners = 0;
-    let homeFouls = 0, awayFouls = 0;
-    let homeOffsides = 0, awayOffsides = 0;
-    let homeYellow = 0, awayYellow = 0;
-    let homeRed = 0, awayRed = 0;
-
-    for (const ev of events) {
-      if (!ev) { continue; }
-      const teamId = String(ev.teamId ?? '');
-      const isHome = teamId === homeId;
-      const isAway = teamId === awayId;
-      if (!isHome && !isAway) { continue; }
-      const bucket = isHome
-        ? { shots: () => homeShots++, sot: () => homeShotsOnTarget++,
-            corner: () => homeCorners++, foul: () => homeFouls++,
-            offside: () => homeOffsides++, yellow: () => homeYellow++, red: () => homeRed++ }
-        : { shots: () => awayShots++, sot: () => awayShotsOnTarget++,
-            corner: () => awayCorners++, foul: () => awayFouls++,
-            offside: () => awayOffsides++, yellow: () => awayYellow++, red: () => awayRed++ };
-      switch (ev.eventType) {
-        case 'SHOT':
-        case 'SHOT_ON_TARGET':
-          bucket.shots();
-          if (ev.eventType === 'SHOT_ON_TARGET') { bucket.sot(); }
-          break;
-        case 'CORNER':
-          bucket.corner();
-          break;
-        case 'FOUL':
-          bucket.foul();
-          break;
-        case 'OFFSIDE':
-          bucket.offside();
-          break;
-        case 'YELLOW_CARD':
-          bucket.yellow();
-          break;
-        case 'RED_CARD':
-          bucket.red();
-          break;
-        default:
-          // GOAL / INJURY / SUBSTITUTION / etc. not part of the stats grid
-          // (goles comes from state.score; the rest is shown in the timeline).
-          break;
-      }
-    }
-
-    const score = this.data.score ?? { home: 0, away: 0 };
-    const homePoss = this.data.homePossession ?? 50;
-    const awayPoss = this.data.awayPossession ?? 50;
-
-    return [
-      { label: 'Posesión',           home: `${homePoss}%`,                   away: `${awayPoss}%` },
-      { label: 'Goles',              home: String(score.home),               away: String(score.away) },
-      { label: 'Tiros totales',      home: String(homeShots),                away: String(awayShots) },
-      { label: 'Tiros a puerta',     home: String(homeShotsOnTarget),        away: String(awayShotsOnTarget) },
-      { label: 'Corners',            home: String(homeCorners),              away: String(awayCorners) },
-      { label: 'Faltas',             home: String(homeFouls),                away: String(awayFouls) },
-      { label: 'Offsides',           home: String(homeOffsides),             away: String(awayOffsides) },
-      { label: 'Tarjetas A:R',       home: `${homeYellow}:${homeRed}`,       away: `${awayYellow}:${awayRed}` }
-    ];
+    return buildPartidoStatsRows({
+      events: this.eventList(),
+      homeTeamId: this.data.homeTeamId,
+      awayTeamId: this.data.awayTeamId ?? '',
+      score: this.data.score,
+      homePossession: this.data.homePossession,
+      awayPossession: this.data.awayPossession
+    });
   }
 
   /**
@@ -220,7 +163,7 @@ export class PartidoModalComponent {
    * match-card already has a fuller feed on the round-live page.
    */
   recentEvents(): MatchEvent[] {
-    return this.eventList().slice(-6).reverse();
+    return recentPartidoEvents(this.eventList());
   }
 
   /**
@@ -257,101 +200,15 @@ export class PartidoModalComponent {
 
   /** Human-readable event icon for the timeline. */
   getEventIcon(eventType: string): string {
-    const iconMap: Record<string, string> = {
-      'GOAL': 'GOL',
-      'SHOT': 'TIR',
-      'SHOT_ON_TARGET': 'TIR',
-      'MISS': 'ERR',
-      'BLOCK': 'BLO',
-      'SAVE': 'ATA',
-      'CHANCE_CREATED': 'OC',
-      'FOUL': 'FAL',
-      'YELLOW_CARD': 'TA',
-      'RED_CARD': 'TR',
-      'INJURY': 'LES',
-      'CORNER': 'COR',
-      'OFFSIDE': 'OFF',
-      'SUBSTITUTION': 'SUB',
-      'CARD': 'TA',
-      'TACTICAL_CHANGE': 'TAC'
-    };
-    return iconMap[eventType] || 'EV';
+    return getPartidoEventIcon(eventType);
   }
 
   displayPosition(position: string | null | undefined): string {
-    const map: Record<string, string> = {
-      GK: 'ARQ',
-      DEF: 'DEF',
-      MID: 'MED',
-      WINGER: 'EXT',
-      ATT: 'DEL'
-    };
-    return map[(position || '').toUpperCase()] || position || '';
+    return displayPartidoPosition(position);
   }
 
   displayEventDescription(event: MatchEvent | null | undefined): string {
-    if (!event) return '';
-    const description = event.description || '';
-    const playerName = event.playerName || 'Jugador';
-    const relatedName = event.relatedPlayerName || '';
-
-    if (event.eventType === 'SUBSTITUTION') {
-      const match = description.match(/^Substitution:\s+(.+?)\s+on for\s+(.+)$/i);
-      if (match) {
-        return `Cambio: entra ${match[1]}, sale ${match[2]}`;
-      }
-      if (relatedName) {
-        return `Cambio: entra ${playerName}, sale ${relatedName}`;
-      }
-      return description || 'Cambio realizado';
-    }
-
-    if (event.eventType === 'INJURY') {
-      return `${playerName} se lesionó`;
-    }
-
-    if (description === 'Shot saved') {
-      return 'Remate atajado';
-    }
-
-    if (description === 'Shot missed') {
-      return 'Remate desviado';
-    }
-
-    if (description === 'Goal') {
-      return 'Gol';
-    }
-
-    if (description === 'Shot blocked') {
-      return 'Remate bloqueado';
-    }
-
-    const yellowCardMatch = description.match(/^(.+?) received a yellow card$/i);
-    if (yellowCardMatch) {
-      return `${yellowCardMatch[1]} recibió amarilla`;
-    }
-
-    const redCardMatch = description.match(/^(.+?) received a red card$/i);
-    if (redCardMatch) {
-      return `${redCardMatch[1]} recibió roja`;
-    }
-
-    const foulMatch = description.match(/^(.+?) committed a foul$/i);
-    if (foulMatch) {
-      return `${foulMatch[1]} cometió una falta`;
-    }
-
-    const chanceMatch = description.match(/^Chance created for (.+)$/i);
-    if (chanceMatch) {
-      return `Chance creada para ${chanceMatch[1]}`;
-    }
-
-    const formationMatch = description.match(/^Formation changed from (.+?) to (.+?)(?: \| pixels: (.*))?$/i);
-    if (formationMatch) {
-      return `Cambio táctico: ${formationMatch[1]} → ${formationMatch[2]}`;
-    }
-
-    return description;
+    return displayPartidoEventDescription(event);
   }
 
   // ========== Manager-tab formation state ==========
@@ -1305,52 +1162,27 @@ export class PartidoModalComponent {
   }
 
   private clampPercent(value: number): number {
-    if (!Number.isFinite(value)) {
-      return 50;
-    }
-    return clampFieldPercent(value);
+    return clampPartidoPercent(value);
   }
 
   private isFinitePercent(value: number | null | undefined): value is number {
-    return typeof value === 'number' && Number.isFinite(value);
-  }
-
-  private bumpFreePositionRevision(): void {
-    this.freePositionRevision.update(value => value + 1);
-  }
-
-  private rememberedPlayerCoordsStorageKey(): string {
-    return `manager:partido-player-coords:${this.data.matchId}`;
+    return isFinitePercent(value);
   }
 
   private readRememberedPlayerCoords(): Record<string, { x: number; y: number }> {
-    try {
-      const raw = window.localStorage.getItem(this.rememberedPlayerCoordsStorageKey());
-      if (!raw) {
-        return {};
-      }
-      const parsed = JSON.parse(raw) as Record<string, { x?: number; y?: number }>;
-      const clean: Record<string, { x: number; y: number }> = {};
-      for (const [playerId, coords] of Object.entries(parsed ?? {})) {
-        if (this.isFinitePercent(coords?.x) && this.isFinitePercent(coords?.y)) {
-          clean[playerId] = {
-            x: this.clampPercent(coords.x),
-            y: this.clampPercent(coords.y)
-          };
-        }
-      }
-      return clean;
-    } catch {
-      return {};
-    }
+    return readPartidoPlayerCoords(window.localStorage, this.data.matchId);
   }
 
   private writeRememberedPlayerCoords(coordsByPlayerId: Record<string, { x: number; y: number }>): void {
     try {
-      window.localStorage.setItem(this.rememberedPlayerCoordsStorageKey(), JSON.stringify(coordsByPlayerId));
+      writePartidoPlayerCoords(window.localStorage, this.data.matchId, coordsByPlayerId);
     } catch {
       // Non-fatal: service memory/backend save still carry the tactical change.
     }
+  }
+
+  private bumpFreePositionRevision(): void {
+    this.freePositionRevision.update(value => value + 1);
   }
 
   private hydrateRememberedPlayerCoords(): void {
