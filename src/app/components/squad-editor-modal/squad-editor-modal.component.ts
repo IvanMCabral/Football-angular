@@ -22,7 +22,6 @@ import { ChemistryPreviewService } from '../../core/services/chemistry-preview.s
 import { SessionPlayer } from '../../shared/models/player.model';
 import {
   PlayerRoleFamily,
-  countRoleFamily as countRolesByFamily,
   getMarkerRoleClasses as getRoleMarkerClasses,
   getRoleFamily as resolveRoleFamily,
   rolesMatch as roleFamiliesMatch
@@ -79,6 +78,10 @@ import {
   isPointOverAnyInsetRect,
   isSquadEditorDropNearSlotCenter,
 } from './squad-editor-modal-geometry.utils';
+import {
+  detectSquadEditorFormationFromFamilies,
+  isSquadEditorTacticalRoleMismatch,
+} from './squad-editor-modal-formation-detection.utils';
 
 @Component({
   selector: 'app-squad-editor-modal',
@@ -1571,59 +1574,23 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     return this.getRoleFamily(player.role);
   }
 
-  private countRoleFamily(roles: string[]): { gk: number; def: number; mid: number; att: number } {
-    return countRolesByFamily(roles);
-  }
-
   detectFormation(): string {
     const players = this.homePlayers.filter(p => !!p.slotId);
 
-    if (players.length < 11) {
-      this._isCustomLineup = true;
-      return USER_FORMATION_LABEL;
-    }
-
     // position, not their underlying role. This makes the formation
     // label reflect drag-drop changes (see getPositionRoleFamily).
-    const positions: ('GK' | 'DEF' | 'MID' | 'ATT' | null)[] = players.map(p => this.getPositionRoleFamily(p));
-    const lineupCounts = { gk: 0, def: 0, mid: 0, att: 0 };
-    for (const fam of positions) {
-      if (fam === 'GK') lineupCounts.gk++;
-      else if (fam === 'DEF') lineupCounts.def++;
-      else if (fam === 'MID') lineupCounts.mid++;
-      else if (fam === 'ATT') lineupCounts.att++;
-    }
-
-    for (const f of ALL_FORMATIONS) {
-      const canonicalRoles = (this.formationPositions[f] || []).map(p => p.role);
-      const canonicalCounts = { gk: 0, def: 0, mid: 0, att: 0 };
-      for (const role of canonicalRoles) {
-        const fam = this.getRoleFamily(role);
-        if (fam === 'GK') canonicalCounts.gk++;
-        else if (fam === 'DEF') canonicalCounts.def++;
-        else if (fam === 'MID') canonicalCounts.mid++;
-        else if (fam === 'ATT') canonicalCounts.att++;
-      }
-      if (lineupCounts.gk === canonicalCounts.gk &&
-          lineupCounts.def === canonicalCounts.def &&
-          lineupCounts.mid === canonicalCounts.mid &&
-          lineupCounts.att === canonicalCounts.att) {
-        this._isCustomLineup = false;
-        //
-        // The manager-selected formation is tactical intent. A manual drag
-        // can make the current shape *look* like another canonical by count
-        // for one frame (e.g. a 4-4-2 MID crosses into ATT and count-based
-        // detection says 4-3-3). If we mutate selectedFormation here, the
-        // preview-ratings request switches formation base instantly and ATT /
-        // DEF jump radically for a one-pixel move. Keep the dropdown anchored
-        // to the user's explicit choice; changing formation should happen via
-        // the select/autoselect flow, not as a side effect of free positioning.
-        return f;
-      }
-    }
-
-    this._isCustomLineup = true;
-    return USER_FORMATION_LABEL;
+    const result = detectSquadEditorFormationFromFamilies(
+      players.map(p => this.getPositionRoleFamily(p)),
+      this.formationPositions,
+    );
+    this._isCustomLineup = result.isCustomLineup;
+    //
+    // The manager-selected formation is tactical intent. A manual drag can
+    // make the current shape *look* like another canonical by count for one
+    // frame (e.g. a 4-4-2 MID crosses into ATT and count-based detection says
+    // 4-3-3). Keep the dropdown anchored to explicit manager choice; changing
+    // formation should happen via the select/autoselect flow, not free drag.
+    return result.label;
   }
 
   updateFormationDetection(): void {
@@ -1648,43 +1615,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     tacticalRole: string | undefined,
     actualZone?: 'GK' | 'DEF' | 'MID' | 'ATT' | null
   ): boolean {
-    if (!playerRole || !tacticalRole) { return false; }
-    if (this.tacticalRoleFitsPlayerRole(playerRole, tacticalRole)) { return false; }
-    const playerFamily = this.getRoleFamily(playerRole);
-    const recommendedFamily = this.getRoleFamily(tacticalRole);
-    if (playerFamily === null || recommendedFamily === null) { return false; }
-    if (actualZone && playerFamily !== actualZone) { return true; }
-    return playerFamily !== recommendedFamily;
-  }
-
-  private tacticalRoleFitsPlayerRole(playerRole: string | undefined, tacticalRole: string | undefined): boolean {
-    const player = String(playerRole ?? '').trim().toUpperCase();
-    const role = String(tacticalRole ?? '').trim().toUpperCase();
-    if (!player || !role) { return false; }
-    if (player === role) { return true; }
-    const fitGroups: Record<string, string[]> = {
-      GK: ['GK'],
-      CB: ['CB', 'DEF'],
-      LB: ['LB', 'LWB', 'DEF'],
-      RB: ['RB', 'RWB', 'DEF'],
-      LWB: ['LWB', 'LB', 'LM', 'LW', 'WINGER'],
-      RWB: ['RWB', 'RB', 'RM', 'RW', 'WINGER'],
-      CDM: ['CDM', 'DM', 'CM', 'MID'],
-      CM: ['CM', 'CDM', 'DM', 'CAM', 'MID'],
-      CAM: ['CAM', 'AM', 'CM', 'CF', 'MID'],
-      LM: ['LM', 'LW', 'LWB', 'WINGER', 'MID'],
-      RM: ['RM', 'RW', 'RWB', 'WINGER', 'MID'],
-      LW: ['LW', 'LM', 'WINGER'],
-      RW: ['RW', 'RM', 'WINGER'],
-      CF: ['CF', 'ST', 'CAM', 'ATT'],
-      ST: ['ST', 'CF', 'ATT'],
-    };
-    if (fitGroups[role]) {
-      return fitGroups[role].includes(player);
-    }
-    const playerFamily = this.getRoleFamily(player);
-    const roleFamily = this.getRoleFamily(role);
-    return playerFamily !== null && playerFamily === roleFamily;
+    return isSquadEditorTacticalRoleMismatch(playerRole, tacticalRole, actualZone);
   }
 
   onFormationSelect(newValue: string): void {

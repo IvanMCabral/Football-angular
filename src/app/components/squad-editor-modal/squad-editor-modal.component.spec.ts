@@ -12,6 +12,7 @@ import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { of, timer } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { SquadEditorModalComponent } from './squad-editor-modal.component';
+import { countSquadEditorFormationRoleFamilies } from './squad-editor-modal-formation-detection.utils';
 
 describe('SquadEditorModalComponent basic flow', () => {
   let component: SquadEditorModalComponent;
@@ -3399,11 +3400,16 @@ describe('SquadEditorModalComponent free-formation cross-role drag/drop', () => 
   });
 
   it('countRoleFamily buckets roles into the 4 families', () => {
-    // Direct unit test of the role-family counter with explicit input.
-    // Bypasses the canonical-formations + lineup machinery to isolate
-    // the counting logic from the matching logic.
-    const counts = (component as any).countRoleFamily(
+    const counts = countSquadEditorFormationRoleFamilies(
       ['GK', 'CB', 'LB', 'RB', 'CM', 'CDM', 'CAM', 'ST', 'LW', 'CF', 'WINGER']
+        .map((role, index) => ({
+          index,
+          role,
+          xPercent: 50,
+          yPercent: 50,
+          actionRangePercent: 8,
+          subdivisionId: `slot-${index}`,
+        }))
     );
     //   GK    -> 1
     //   CB LB RB -> 3 DEF
