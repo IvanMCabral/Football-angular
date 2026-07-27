@@ -337,6 +337,10 @@ import {
   positionPixelVisualLine as getPositionPixelVisualLine,
   PositionPixelVisualLine,
   positionPixelWideChannelReason as getPositionPixelWideChannelReason,
+  clampFieldPercent,
+  parseFieldSubdivision,
+  subdivisionXPercent,
+  subdivisionYPercent,
 } from './position-pixel-analysis';
 /**
  * Debug page for replaying and comparing match-engine scenarios.
@@ -2882,7 +2886,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return 'out';
   }
   private positionMovementPresets(fromX: number, fromY: number): Array<{ label: string; x: number; y: number; dx: number; dy: number }> {
-    const clamp = (value: number) => Math.max(0, Math.min(100, Math.round(value * 100) / 100));
+    const clamp = clampFieldPercent;
     const wideDelta = fromX <= 50 ? -5 : 5;
     const centerDelta = fromX <= 50 ? 5 : -5;
     const crossDelta = fromY <= 50 ? 18 : -18;
@@ -2904,7 +2908,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     fromY: number,
     candidate: PositionPixelCandidate
   ): Array<{ label: string; x: number; y: number; dx: number; dy: number }> {
-    const clamp = (value: number) => Math.max(0, Math.min(100, Math.round(value * 100) / 100));
+    const clamp = clampFieldPercent;
     const line = this.positionPixelVisualLine(fromY);
     const toCenter = clamp(50) - clamp(fromX);
     const smallCenterStep = Math.max(-5, Math.min(5, toCenter));
@@ -2940,7 +2944,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     fromY: number,
     candidate: PositionPixelCandidate
   ): Array<{ label: string; x: number; y: number; dx: number; dy: number }> {
-    const clamp = (value: number) => Math.max(0, Math.min(100, Math.round(value * 100) / 100));
+    const clamp = clampFieldPercent;
     const slotSide = this.wingbackSlotSide(candidate.slotId);
     const wideDelta = slotSide === 'left' ? -4 : slotSide === 'right' ? 4 : fromX <= 50 ? -4 : 4;
     const centerDelta = -wideDelta;
@@ -2952,7 +2956,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     ];
   }
   private wingbackSlotSide(slotId: string | null | undefined): 'left' | 'right' | null {
-    const parsed = this.parseSubdivision(slotId);
+    const parsed = parseFieldSubdivision(slotId);
     if (!parsed) return null;
     const [, subIndex] = parsed;
     if (subIndex === 1) return 'left';
@@ -2964,7 +2968,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     fromY: number,
     candidate: PositionPixelCandidate
   ): Array<{ label: string; x: number; y: number; dx: number; dy: number }> {
-    const clamp = (value: number) => Math.max(0, Math.min(100, Math.round(value * 100) / 100));
+    const clamp = clampFieldPercent;
     const line = this.strictPositionPixelLine(candidate.starterPosition) ?? this.positionPixelVisualLine(fromY);
     const sideX = fromX <= 50 ? 18 : 82;
     const halfSpaceX = fromX <= 50 ? 38 : 62;
@@ -2997,7 +3001,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       .filter((preset) => Math.abs(preset.dx) + Math.abs(preset.dy) >= 6);
   }
   private positionMicroMovementPresets(fromX: number, fromY: number): Array<{ label: string; x: number; y: number; dx: number; dy: number }> {
-    const clamp = (value: number) => Math.max(0, Math.min(100, Math.round(value * 100) / 100));
+    const clamp = clampFieldPercent;
     const wideDelta = fromX <= 50 ? -1 : 1;
     const centerDelta = fromX <= 50 ? 1 : -1;
     return [
@@ -3017,56 +3021,39 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   private canonicalXPercent(formation: string | null | undefined, slot: LineupSlotDTO | null | undefined): number | null {
     const position = this.canonicalFormationPosition(formation, slot);
     if (position && Number.isFinite(position.xPercent)) {
-      return this.clampPercent(position.xPercent);
+      return clampFieldPercent(position.xPercent);
     }
-    const parsed = this.parseSubdivision(slot?.subdivisionId);
+    const parsed = parseFieldSubdivision(slot?.subdivisionId);
     if (!parsed) return null;
     const [sector, subIndex] = parsed;
     const sectorCol = (sector - 1) % 3;
     const left = (sectorCol * 3 + (subIndex - 1)) * 11.11;
-    return this.clampPercent(left + 11.11 / 2);
+    return clampFieldPercent(left + 11.11 / 2);
   }
   private canonicalYPercent(formation: string | null | undefined, slot: LineupSlotDTO | null | undefined): number | null {
     const position = this.canonicalFormationPosition(formation, slot);
     if (position && Number.isFinite(position.yPercent)) {
-      return this.clampPercent(position.yPercent);
+      return clampFieldPercent(position.yPercent);
     }
     if (slot?.subdivisionId === 'GK-1') return 93;
-    const parsed = this.parseSubdivision(slot?.subdivisionId);
+    const parsed = parseFieldSubdivision(slot?.subdivisionId);
     if (!parsed) return null;
     const [sector] = parsed;
     const sectorRow = Math.floor((sector - 1) / 3);
     const top = sectorRow * 11.11;
-    return this.clampPercent(top + 11.11 / 2);
+    return clampFieldPercent(top + 11.11 / 2);
   }
   private matchContextXPercent(slot: LineupSlotDTO | null | undefined): number | null {
     if (typeof slot?.customXPercent === 'number' && Number.isFinite(slot.customXPercent)) {
-      return this.clampPercent(slot.customXPercent);
+      return clampFieldPercent(slot.customXPercent);
     }
-    return this.subdivisionXPercent(slot?.subdivisionId);
+    return subdivisionXPercent(slot?.subdivisionId);
   }
   private matchContextYPercent(slot: LineupSlotDTO | null | undefined): number | null {
     if (typeof slot?.customYPercent === 'number' && Number.isFinite(slot.customYPercent)) {
-      return this.clampPercent(slot.customYPercent);
+      return clampFieldPercent(slot.customYPercent);
     }
-    return this.subdivisionYPercent(slot?.subdivisionId);
-  }
-  private subdivisionXPercent(subdivisionId: string | null | undefined): number | null {
-    const parsed = this.parseSubdivision(subdivisionId);
-    if (!parsed) return null;
-    const [sector, subIndex] = parsed;
-    const sectorCol = (sector - 1) % 3;
-    const left = (sectorCol * 3 + (subIndex - 1)) * 11.11;
-    return this.clampPercent(left + 11.11 / 2);
-  }
-  private subdivisionYPercent(subdivisionId: string | null | undefined): number | null {
-    if (subdivisionId === 'GK-1') return 93;
-    const parsed = this.parseSubdivision(subdivisionId);
-    if (!parsed) return null;
-    const [sector] = parsed;
-    const sectorRow = Math.floor((sector - 1) / 3);
-    const top = sectorRow * 11.11;
-    return this.clampPercent(top + 11.11 / 2);
+    return subdivisionYPercent(slot?.subdivisionId);
   }
   private canonicalFormationPosition(
     formation: string | null | undefined,
@@ -3077,19 +3064,6 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     if (!formationName || !slotId) return null;
     const positions = this.formationPositionsByName()[formationName] ?? [];
     return positions.find((p) => p.subdivisionId === slotId) ?? null;
-  }
-  private parseSubdivision(subdivisionId: string | null | undefined): [number, number] | null {
-    if (!subdivisionId?.startsWith('S')) return null;
-    const dash = subdivisionId.indexOf('-');
-    if (dash < 0 || dash >= subdivisionId.length - 1) return null;
-    const sector = Number(subdivisionId.slice(1, dash));
-    const subIndex = Number(subdivisionId.slice(dash + 1));
-    if (!Number.isInteger(sector) || !Number.isInteger(subIndex)) return null;
-    if (sector < 1 || sector > 27 || subIndex < 1 || subIndex > 3) return null;
-    return [sector, subIndex];
-  }
-  private clampPercent(value: number): number {
-    return Math.max(0, Math.min(100, Math.round(value * 100) / 100));
   }
   private currentLineupSampleMetrics(
     fixture: MatchFixture,
@@ -6809,10 +6783,10 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   roleSlotImpactKindForSlot(slotId: string): 'wideAtt' | 'att' | 'mid' | 'def' {
     const preset = this.roleSlotImpactSlotOptions.find((option) => option.slotId === slotId)?.kind;
     if (preset) return preset;
-    const y = this.subdivisionYPercent(slotId);
+    const y = subdivisionYPercent(slotId);
     if (typeof y === 'number') {
       if (y <= 35) {
-        const x = this.subdivisionXPercent(slotId) ?? 50;
+        const x = subdivisionXPercent(slotId) ?? 50;
         return typeof x === 'number' && Math.abs(x - 50) >= 28 ? 'wideAtt' : 'att';
       }
       if (y <= 68) return 'mid';

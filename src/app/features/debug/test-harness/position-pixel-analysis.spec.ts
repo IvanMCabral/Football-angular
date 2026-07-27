@@ -1,4 +1,6 @@
 import {
+  clampFieldPercent,
+  parseFieldSubdivision,
   positionPixelAttackGainScore,
   positionPixelAttackLossScore,
   positionPixelChannelBreakdown,
@@ -46,6 +48,8 @@ import {
   positionPixelVisualLine,
   positionPixelWideChannelReason,
   strictPositionPixelLine,
+  subdivisionXPercent,
+  subdivisionYPercent,
 } from './position-pixel-analysis';
 
 describe('position-pixel-analysis', () => {
@@ -83,6 +87,21 @@ describe('position-pixel-analysis', () => {
 
   const formatDelta = (value: number): string => (value >= 0 ? `+${value}` : `${value}`);
   const formatMicro = (value: number): string => (value >= 0 ? `+${value.toFixed(3)}` : value.toFixed(3));
+
+  describe('field subdivision geometry', () => {
+    it('parses valid tactical subdivision ids', () => {
+      expect(parseFieldSubdivision('S16-2')).toEqual([16, 2]);
+      expect(parseFieldSubdivision('GK-1')).toBeNull();
+      expect(parseFieldSubdivision('S28-1')).toBeNull();
+    });
+
+    it('maps subdivisions to stable field percentages', () => {
+      expect(clampFieldPercent(105.555)).toBe(100);
+      expect(clampFieldPercent(44.444)).toBe(44.44);
+      expect(subdivisionXPercent('S17-2')).toBeCloseTo(50, 2);
+      expect(subdivisionYPercent('GK-1')).toBe(93);
+    });
+  });
 
   it('calculates movement distance and confidence bands', () => {
     expect(positionPixelDistance({ ...baseRow, targetXPercent: 53, targetYPercent: 54 })).toBe(5);
@@ -150,7 +169,8 @@ describe('position-pixel-analysis', () => {
       deltaCentralShotsFor: 1,
       deltaWideShotsFor: 1,
       deltaLeftWideXgFor: 0.03,
-    } as any;
+  } as any;
+
     const attackLoss = {
       ...attackingMove,
       deltaXgFor: -0.14,

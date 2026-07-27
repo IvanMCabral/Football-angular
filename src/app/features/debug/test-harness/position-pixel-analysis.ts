@@ -62,6 +62,40 @@ export type PositionPixelSmokeVerdict =
 export type PositionPixelVisualChannel = 'L' | 'C' | 'R';
 export type PositionPixelVisualLine = 'ATT' | 'MID' | 'DEF';
 
+export function clampFieldPercent(value: number): number {
+  return Math.max(0, Math.min(100, Math.round(value * 100) / 100));
+}
+
+export function parseFieldSubdivision(subdivisionId: string | null | undefined): [number, number] | null {
+  if (!subdivisionId?.startsWith('S')) return null;
+  const dash = subdivisionId.indexOf('-');
+  if (dash < 0 || dash >= subdivisionId.length - 1) return null;
+  const sector = Number(subdivisionId.slice(1, dash));
+  const subIndex = Number(subdivisionId.slice(dash + 1));
+  if (!Number.isInteger(sector) || !Number.isInteger(subIndex)) return null;
+  if (sector < 1 || sector > 27 || subIndex < 1 || subIndex > 3) return null;
+  return [sector, subIndex];
+}
+
+export function subdivisionXPercent(subdivisionId: string | null | undefined): number | null {
+  const parsed = parseFieldSubdivision(subdivisionId);
+  if (!parsed) return null;
+  const [sector, subIndex] = parsed;
+  const sectorCol = (sector - 1) % 3;
+  const left = (sectorCol * 3 + (subIndex - 1)) * 11.11;
+  return clampFieldPercent(left + 11.11 / 2);
+}
+
+export function subdivisionYPercent(subdivisionId: string | null | undefined): number | null {
+  if (subdivisionId === 'GK-1') return 93;
+  const parsed = parseFieldSubdivision(subdivisionId);
+  if (!parsed) return null;
+  const [sector] = parsed;
+  const sectorRow = Math.floor((sector - 1) / 3);
+  const top = sectorRow * 11.11;
+  return clampFieldPercent(top + 11.11 / 2);
+}
+
 export function strictPositionPixelLine(position: string | null | undefined): PositionPixelVisualLine | null {
   const normalized = (position ?? '').toUpperCase();
   if (normalized === 'GK') return 'DEF';
