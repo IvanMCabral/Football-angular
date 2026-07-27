@@ -1,64 +1,157 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
-import { DashboardComponent } from './features/dashboard/dashboard.component';
-import { LoginComponent } from './features/auth/login/login.component';
-import { RegisterComponent } from './features/auth/register/register.component';
-import { TeamListComponent } from './features/teams/team-list/team-list.component';
-import { TeamDetailComponent } from './features/teams/team-detail/team-detail.component';
-import { TeamCreateComponent } from './features/teams/team-create/team-create.component';
-import { TeamManagementComponent } from './features/teams/team-management/team-management.component';
-import { ChooseTeamComponent } from './features/teams/choose-team.component';
-import { PlayerCreateComponent } from './features/players/player-create/player-create.component';
-import { PlayerManagementComponent } from './features/players/player-management/player-management.component';
-import { SquadManagementComponent } from './features/players/squad-management/squad-management.component';
-import { CareerSetupComponent } from './features/career/career-setup.component';
 
-import { MatchListComponent } from './features/matches/match-list/match-list.component';
-import { MatchDetailComponent } from './features/matches/match-detail/match-detail.component';
-import { MatchCreateComponent } from './features/matches/match-create/match-create.component';
-import { V24MatchDetailPageComponent } from './features/match-detail/pages/v24-match-detail-page.component';
-import { MatchComparePageComponent } from './features/match-detail/pages/match-compare-page.component';
-
-import { StandingsPageComponent } from './pages/standings/standings-page.component';
-
-import { GameDetailComponent } from './features/games/game-detail.component';
-import { PlayRoundComponent } from './features/games/play-round.component';
-import { MatchLiveComponent } from './features/games/match-live.component';
-import { RoundLiveComponent } from './features/games/round-live.component';
-import { RoundSummaryComponent } from './features/games/round-summary.component';
-import { TournamentChampionComponent } from './features/games/tournament-champion.component';
-
-import { TestHarnessPageComponent } from './features/debug/test-harness/test-harness-page.component';
+const guarded = [authGuard];
 
 export const routes: Routes = [
   { path: '', redirectTo: '/dashboard', pathMatch: 'full' },
-  { path: 'login', component: LoginComponent },
-  { path: 'register', component: RegisterComponent },
-  { path: 'dashboard', component: DashboardComponent, canActivate: [authGuard] },
-  { path: 'career/setup', component: CareerSetupComponent, canActivate: [authGuard] },
-  { path: 'teams', component: TeamListComponent, canActivate: [authGuard] },
-  { path: 'teams/create', component: TeamCreateComponent, canActivate: [authGuard] },
-  { path: 'teams/manage', component: TeamManagementComponent, canActivate: [authGuard] },
-  { path: 'teams/:id', component: TeamDetailComponent, canActivate: [authGuard] },
-  { path: 'choose-team', component: ChooseTeamComponent, canActivate: [authGuard] },
-  { path: 'players/create', component: PlayerCreateComponent, canActivate: [authGuard] },
-  { path: 'players/manage', component: PlayerManagementComponent, canActivate: [authGuard] },
-  { path: 'squad', component: SquadManagementComponent, canActivate: [authGuard] },
-  { path: 'standings', component: StandingsPageComponent, canActivate: [authGuard] },
-  { path: 'matches', component: MatchListComponent, canActivate: [authGuard] },
-  { path: 'matches/create', component: MatchCreateComponent, canActivate: [authGuard] },
-  { path: 'matches/:id', component: MatchDetailComponent, canActivate: [authGuard] },
-  { path: 'careers/:careerId/matches/:matchId/detail', component: V24MatchDetailPageComponent, canActivate: [authGuard] },
-  { path: 'careers/:careerId/matches/:matchId/compare', component: MatchComparePageComponent, canActivate: [authGuard] },
-  // Debug surface for replay, scenario and match-engine QA.
-  // No profile-guard here; the backend returns 404 in prod for the harness
-  // endpoints, and the authGuard ensures the user is logged in.
-  { path: 'debug/test-harness', component: TestHarnessPageComponent, canActivate: [authGuard] },
-  { path: 'games/:id', component: GameDetailComponent, canActivate: [authGuard] },
-  { path: 'games/:gameId/round/:round/live', component: RoundLiveComponent, canActivate: [authGuard] },
-  { path: 'games/:gameId/round/:round/summary', component: RoundSummaryComponent, canActivate: [authGuard] },
-  { path: 'games/:gameId/champion', component: TournamentChampionComponent, canActivate: [authGuard] },
-  { path: 'games/:gameId/match/:matchId/live', component: MatchLiveComponent, canActivate: [authGuard] },
-  { path: 'games/:id/play-round', component: PlayRoundComponent, canActivate: [authGuard] },
-  { path: '**', redirectTo: '/dashboard' }
+  {
+    path: 'login',
+    loadComponent: () => import('./features/auth/login/login.component')
+      .then((m) => m.LoginComponent),
+  },
+  {
+    path: 'register',
+    loadComponent: () => import('./features/auth/register/register.component')
+      .then((m) => m.RegisterComponent),
+  },
+  {
+    path: 'dashboard',
+    loadComponent: () => import('./features/dashboard/dashboard.component')
+      .then((m) => m.DashboardComponent),
+    canActivate: guarded,
+  },
+  {
+    path: 'career/setup',
+    loadComponent: () => import('./features/career/career-setup.component')
+      .then((m) => m.CareerSetupComponent),
+    canActivate: guarded,
+  },
+  {
+    path: 'teams',
+    loadComponent: () => import('./features/teams/team-list/team-list.component')
+      .then((m) => m.TeamListComponent),
+    canActivate: guarded,
+  },
+  {
+    path: 'teams/create',
+    loadComponent: () => import('./features/teams/team-create/team-create.component')
+      .then((m) => m.TeamCreateComponent),
+    canActivate: guarded,
+  },
+  {
+    path: 'teams/manage',
+    loadComponent: () => import('./features/teams/team-management/team-management.component')
+      .then((m) => m.TeamManagementComponent),
+    canActivate: guarded,
+  },
+  {
+    path: 'teams/:id',
+    loadComponent: () => import('./features/teams/team-detail/team-detail.component')
+      .then((m) => m.TeamDetailComponent),
+    canActivate: guarded,
+  },
+  {
+    path: 'choose-team',
+    loadComponent: () => import('./features/teams/choose-team.component')
+      .then((m) => m.ChooseTeamComponent),
+    canActivate: guarded,
+  },
+  {
+    path: 'players/create',
+    loadComponent: () => import('./features/players/player-create/player-create.component')
+      .then((m) => m.PlayerCreateComponent),
+    canActivate: guarded,
+  },
+  {
+    path: 'players/manage',
+    loadComponent: () => import('./features/players/player-management/player-management.component')
+      .then((m) => m.PlayerManagementComponent),
+    canActivate: guarded,
+  },
+  {
+    path: 'squad',
+    loadComponent: () => import('./features/players/squad-management/squad-management.component')
+      .then((m) => m.SquadManagementComponent),
+    canActivate: guarded,
+  },
+  {
+    path: 'standings',
+    loadComponent: () => import('./pages/standings/standings-page.component')
+      .then((m) => m.StandingsPageComponent),
+    canActivate: guarded,
+  },
+  {
+    path: 'matches',
+    loadComponent: () => import('./features/matches/match-list/match-list.component')
+      .then((m) => m.MatchListComponent),
+    canActivate: guarded,
+  },
+  {
+    path: 'matches/create',
+    loadComponent: () => import('./features/matches/match-create/match-create.component')
+      .then((m) => m.MatchCreateComponent),
+    canActivate: guarded,
+  },
+  {
+    path: 'matches/:id',
+    loadComponent: () => import('./features/matches/match-detail/match-detail.component')
+      .then((m) => m.MatchDetailComponent),
+    canActivate: guarded,
+  },
+  {
+    path: 'careers/:careerId/matches/:matchId/detail',
+    loadComponent: () => import('./features/match-detail/pages/v24-match-detail-page.component')
+      .then((m) => m.V24MatchDetailPageComponent),
+    canActivate: guarded,
+  },
+  {
+    path: 'careers/:careerId/matches/:matchId/compare',
+    loadComponent: () => import('./features/match-detail/pages/match-compare-page.component')
+      .then((m) => m.MatchComparePageComponent),
+    canActivate: guarded,
+  },
+  {
+    path: 'debug/test-harness',
+    loadComponent: () => import('./features/debug/test-harness/test-harness-page.component')
+      .then((m) => m.TestHarnessPageComponent),
+    canActivate: guarded,
+  },
+  {
+    path: 'games/:id',
+    loadComponent: () => import('./features/games/game-detail.component')
+      .then((m) => m.GameDetailComponent),
+    canActivate: guarded,
+  },
+  {
+    path: 'games/:gameId/round/:round/live',
+    loadComponent: () => import('./features/games/round-live.component')
+      .then((m) => m.RoundLiveComponent),
+    canActivate: guarded,
+  },
+  {
+    path: 'games/:gameId/round/:round/summary',
+    loadComponent: () => import('./features/games/round-summary.component')
+      .then((m) => m.RoundSummaryComponent),
+    canActivate: guarded,
+  },
+  {
+    path: 'games/:gameId/champion',
+    loadComponent: () => import('./features/games/tournament-champion.component')
+      .then((m) => m.TournamentChampionComponent),
+    canActivate: guarded,
+  },
+  {
+    path: 'games/:gameId/match/:matchId/live',
+    loadComponent: () => import('./features/games/match-live.component')
+      .then((m) => m.MatchLiveComponent),
+    canActivate: guarded,
+  },
+  {
+    path: 'games/:id/play-round',
+    loadComponent: () => import('./features/games/play-round.component')
+      .then((m) => m.PlayRoundComponent),
+    canActivate: guarded,
+  },
+  { path: '**', redirectTo: '/dashboard' },
 ];
