@@ -358,6 +358,25 @@ import {
   wingbackMovementPresets as buildWingbackMovementPresets,
   wingbackSlotSide as getWingbackSlotSide,
 } from './position-movement-presets';
+import {
+  buildLineupSlots as buildLineupSlotsFromLineup,
+  canonicalXPercent as getCanonicalXPercent,
+  canonicalYPercent as getCanonicalYPercent,
+  countCustomMovableSlots as countCustomMovableLineupSlots,
+  fallbackYForPosition as getFallbackYForPosition,
+  isAttackingPosition as isAttackingPlayerPosition,
+  lineupPlayerIdsFromSlots as getLineupPlayerIdsFromSlots,
+  matchContextXPercent as getMatchContextXPercent,
+  matchContextYPercent as getMatchContextYPercent,
+  positionPixelLine as getPositionPixelLine,
+  strictPositionPixelLine as getStrictPositionPixelLine,
+  swapLineupSlot as swapLineupSlotPlayer,
+} from './lineup-position-utils';
+import {
+  currentLineupSampleMetrics as buildCurrentLineupSampleMetrics,
+  isShotLikeEvent as checkShotLikeEvent,
+  summarizeShotZones as summarizeMatchShotZones,
+} from './match-sample-metrics-utils';
 /**
  * Debug page for replaying and comparing match-engine scenarios.
  */
@@ -2887,48 +2906,19 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return buildPositionMicroMovementPresets(fromX, fromY);
   }
   private fallbackYForPosition(position: string | null | undefined): number {
-    const p = String(position ?? '').toUpperCase();
-    if (p === 'GK') return 94;
-    if (p === 'DEF') return 78;
-    if (p === 'ATT' || p === 'WINGER' || p === 'ST' || p === 'CF' || p === 'LW' || p === 'RW') return 18;
-    return 52;
+    return getFallbackYForPosition(position);
   }
   private canonicalXPercent(formation: string | null | undefined, slot: LineupSlotDTO | null | undefined): number | null {
-    const position = this.canonicalFormationPosition(formation, slot);
-    if (position && Number.isFinite(position.xPercent)) {
-      return clampFieldPercent(position.xPercent);
-    }
-    const parsed = parseFieldSubdivision(slot?.subdivisionId);
-    if (!parsed) return null;
-    const [sector, subIndex] = parsed;
-    const sectorCol = (sector - 1) % 3;
-    const left = (sectorCol * 3 + (subIndex - 1)) * 11.11;
-    return clampFieldPercent(left + 11.11 / 2);
+    return getCanonicalXPercent(slot, this.canonicalFormationPosition(formation, slot));
   }
   private canonicalYPercent(formation: string | null | undefined, slot: LineupSlotDTO | null | undefined): number | null {
-    const position = this.canonicalFormationPosition(formation, slot);
-    if (position && Number.isFinite(position.yPercent)) {
-      return clampFieldPercent(position.yPercent);
-    }
-    if (slot?.subdivisionId === 'GK-1') return 93;
-    const parsed = parseFieldSubdivision(slot?.subdivisionId);
-    if (!parsed) return null;
-    const [sector] = parsed;
-    const sectorRow = Math.floor((sector - 1) / 3);
-    const top = sectorRow * 11.11;
-    return clampFieldPercent(top + 11.11 / 2);
+    return getCanonicalYPercent(slot, this.canonicalFormationPosition(formation, slot));
   }
   private matchContextXPercent(slot: LineupSlotDTO | null | undefined): number | null {
-    if (typeof slot?.customXPercent === 'number' && Number.isFinite(slot.customXPercent)) {
-      return clampFieldPercent(slot.customXPercent);
-    }
-    return subdivisionXPercent(slot?.subdivisionId);
+    return getMatchContextXPercent(slot);
   }
   private matchContextYPercent(slot: LineupSlotDTO | null | undefined): number | null {
-    if (typeof slot?.customYPercent === 'number' && Number.isFinite(slot.customYPercent)) {
-      return clampFieldPercent(slot.customYPercent);
-    }
-    return subdivisionYPercent(slot?.subdivisionId);
+    return getMatchContextYPercent(slot);
   }
   private canonicalFormationPosition(
     formation: string | null | undefined,
@@ -2958,31 +2948,10 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     wideShotsAgainst: number;
     longShotsAgainst: number;
   } {
-    const zoneSummary = this.summarizeShotZones(detail);
-    const userIsHome = this.selectedUserTeamIsHome();
-    const zonesFor = userIsHome ? zoneSummary.home : zoneSummary.away;
-    const zonesAgainst = userIsHome ? zoneSummary.away : zoneSummary.home;
-    return {
-      goalsFor: userIsHome ? fixture?.result?.homeGoals ?? 0 : fixture?.result?.awayGoals ?? 0,
-      goalsAgainst: userIsHome ? fixture?.result?.awayGoals ?? 0 : fixture?.result?.homeGoals ?? 0,
-      possessionFor: userIsHome ? fixture?.result?.homePossession ?? 0 : fixture?.result?.awayPossession ?? 0,
-      shotsFor: userIsHome ? fixture?.result?.homeShots ?? 0 : fixture?.result?.awayShots ?? 0,
-      shotsAgainst: userIsHome ? fixture?.result?.awayShots ?? 0 : fixture?.result?.homeShots ?? 0,
-      xgFor: userIsHome ? detail?.homeXg ?? 0 : detail?.awayXg ?? 0,
-      xgAgainst: userIsHome ? detail?.awayXg ?? 0 : detail?.homeXg ?? 0,
-      centralShotsFor: zonesFor.central,
-      wideShotsFor: zonesFor.wide,
-      longShotsFor: zonesFor.long,
-      centralShotsAgainst: zonesAgainst.central,
-      wideShotsAgainst: zonesAgainst.wide,
-      longShotsAgainst: zonesAgainst.long,
-    };
+    return buildCurrentLineupSampleMetrics(fixture, detail, this.selectedUserTeamIsHome());
   }
   private buildLineupSlots(lineup: LineupDTO): LineupSlotDTO[] {
-    const slotsByPlayer = new Map((lineup.slots ?? []).map((slot) => [slot.playerId, slot]));
-    return (lineup.players ?? [])
-      .map((player) => slotsByPlayer.get(player.playerId))
-      .filter((slot): slot is LineupSlotDTO => !!slot?.playerId && !!slot?.subdivisionId);
+    return buildLineupSlotsFromLineup(lineup);
   }
   private lowBlockVariantSlots(lineup: LineupDTO, secondLineY: number): LineupSlotDTO[] {
     const playerById = new Map((lineup.players ?? []).map((player) => [player.playerId, player]));
@@ -3339,48 +3308,26 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return getBackFiveFamilyClass(key, deltaXgFor, deltaXgAgainst, deltaWideShotsFor, deltaWideShotsAgainst);
   }
   private countCustomMovableSlots(lineup: LineupDTO): number {
-    const playerPositionById = new Map((lineup.players ?? []).map((player) => [
-      player.playerId,
-      String(player.position ?? '').toUpperCase(),
-    ]));
-    return (lineup.slots ?? []).filter((slot) => {
-      const isCustom = Number.isFinite(slot.customXPercent) || Number.isFinite(slot.customYPercent);
-      return isCustom && playerPositionById.get(slot.playerId) !== 'GK';
-    }).length;
+    return countCustomMovableLineupSlots(lineup);
   }
   private swapLineupSlot(
     slots: LineupSlotDTO[],
     starterPlayerId: string,
     benchPlayerId: string
   ): LineupSlotDTO[] {
-    return slots.map((slot) =>
-      slot.playerId === starterPlayerId
-        ? { ...slot, playerId: benchPlayerId }
-        : { ...slot }
-    );
+    return swapLineupSlotPlayer(slots, starterPlayerId, benchPlayerId);
   }
   private lineupPlayerIdsFromSlots(slots: LineupSlotDTO[]): string[] {
-    return slots.map((slot) => slot.playerId);
+    return getLineupPlayerIdsFromSlots(slots);
   }
   private isAttackingPosition(position: string | null | undefined): boolean {
-    return ['ST', 'CF', 'LW', 'RW', 'LM', 'RM', 'CAM', 'WINGER', 'ATT'].includes(String(position ?? '').toUpperCase());
+    return isAttackingPlayerPosition(position);
   }
   private positionPixelLine(position: string | null | undefined): 'DEF' | 'MID' | 'ATT' | null {
-    const p = String(position ?? '').toUpperCase();
-    if (p === 'GK') return null;
-    if (['DEF', 'CB', 'LB', 'RB', 'LWB', 'RWB'].includes(p)) return 'DEF';
-    if (['MID', 'CM', 'CDM', 'DM', 'CAM', 'AM', 'LM', 'RM'].includes(p)) return 'MID';
-    if (this.isAttackingPosition(p)) return 'ATT';
-    return 'MID';
+    return getPositionPixelLine(position);
   }
   private strictPositionPixelLine(position: string | null | undefined): 'DEF' | 'MID' | 'ATT' | null {
-    const p = String(position ?? '').trim().toUpperCase();
-    if (!p || p === 'UNKNOWN' || p === 'NONE') return null;
-    if (p === 'GK') return null;
-    if (['DEF', 'CB', 'LB', 'RB', 'LWB', 'RWB'].includes(p)) return 'DEF';
-    if (['MID', 'CM', 'CDM', 'DM', 'CAM', 'AM', 'LM', 'RM'].includes(p)) return 'MID';
-    if (this.isAttackingPosition(p)) return 'ATT';
-    return null;
+    return getStrictPositionPixelLine(position);
   }
   private positionPixelLineFromSlot(
     formation: string | null | undefined,
@@ -4130,36 +4077,10 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     home: { central: number; wide: number; long: number };
     away: { central: number; wide: number; long: number };
   } {
-    const summary = {
-      home: { central: 0, wide: 0, long: 0 },
-      away: { central: 0, wide: 0, long: 0 },
-    };
-    if (!detail) return summary;
-    for (const event of detail.timeline ?? []) {
-      if (!this.isShotLikeEvent(event)) continue;
-      const bucket = event.teamId === detail.homeTeamId ? summary.home : summary.away;
-      const location = event.shotCoordinate?.location;
-      if (location === 'PENALTY_AREA_WIDE') {
-        bucket.wide++;
-      } else if (location === 'OUTSIDE_BOX' || location === 'LONG_RANGE') {
-        bucket.long++;
-      } else {
-        bucket.central++;
-      }
-    }
-    return summary;
+    return summarizeMatchShotZones(detail);
   }
   private isShotLikeEvent(event: MatchEvent): boolean {
-    return (
-        event.type === 'SHOT'
-        || event.type === 'SHOT_ON_TARGET'
-        || event.type === 'MISS'
-        || event.type === 'BLOCK'
-        || event.type === 'GOAL'
-      )
-      && event.xg !== null
-      && event.xg !== undefined
-      && event.xg > 0;
+    return checkShotLikeEvent(event);
   }
   /**
    * Opens the same visual editor used by /squad, directly from the replay lab.
