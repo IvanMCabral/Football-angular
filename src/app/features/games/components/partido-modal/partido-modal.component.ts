@@ -22,6 +22,7 @@ import { MatchEngineService } from '../../../../core/services/match-engine.servi
 import { ALL_FORMATIONS, FormationCode } from '../../../../shared/constants/formations';
 import { SessionPlayer } from '../../../../shared/models/player.model';
 import { MatchEvent } from '../../../../core/services/match-engine.model';
+import { clampFieldPercent } from '../../../../shared/utils/field-percent.utils';
 
 /**
  * Single row in the stats grid. Each row maps one match-event counter to
@@ -1307,7 +1308,7 @@ export class PartidoModalComponent {
     if (!Number.isFinite(value)) {
       return 50;
     }
-    return Math.max(0, Math.min(100, value));
+    return clampFieldPercent(value);
   }
 
   private isFinitePercent(value: number | null | undefined): value is number {

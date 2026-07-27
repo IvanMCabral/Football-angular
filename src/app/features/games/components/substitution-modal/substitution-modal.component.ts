@@ -16,6 +16,7 @@ import { Subject, from, of, takeUntil } from 'rxjs';
 import { concatMap, finalize, switchMap, timeout, toArray } from 'rxjs/operators';
 import { MatchEngineService } from '../../../../core/services/match-engine.service';
 import { SubModalPlayer, SubstitutionResult, V24LivePlayerRating } from '../../../../core/services/match-engine.model';
+import { clampFieldPercentRounded, clampFieldPixelTweak } from '../../../../shared/utils/field-percent.utils';
 
 export interface SubstitutionDialogData {
   matchId: string;
@@ -1045,14 +1046,14 @@ export class SubstitutionModalComponent {
     if (!Number.isFinite(value)) {
       return 50;
     }
-    return Number(Math.max(0, Math.min(100, value)).toFixed(2));
+    return clampFieldPercentRounded(value);
   }
 
   private clampPixelTweak(value: number): number {
     if (!Number.isFinite(value)) {
       return 0;
     }
-    return Math.max(-80, Math.min(80, value));
+    return clampFieldPixelTweak(value);
   }
 
   private isGoalkeeper(player: SubModalPlayer): boolean {

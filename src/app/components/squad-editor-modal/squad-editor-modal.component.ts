@@ -36,6 +36,7 @@ import {
   tacticalChannelFromX,
   tacticalLineFromY
 } from '../../shared/utils/tactical-shape-utils';
+import { clampFieldPercent } from '../../shared/utils/field-percent.utils';
 import { computeSquadEditorAvgAttribute } from './squad-editor-modal-ratings.utils';
 import {
   SQUAD_EDITOR_GOALKEEPER_SLOT_ID,
@@ -813,10 +814,10 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
             if (usedSubdivisionIds.has(slot.subdivisionId)) continue;
             player.slotId = slot.subdivisionId;
             if (typeof slot.customXPercent === 'number' && isFinite(slot.customXPercent)) {
-              player.xPercent = Math.max(0, Math.min(100, slot.customXPercent));
+              player.xPercent = clampFieldPercent(slot.customXPercent);
             }
             if (typeof slot.customYPercent === 'number' && isFinite(slot.customYPercent)) {
-              player.yPercent = Math.max(0, Math.min(100, slot.customYPercent));
+              player.yPercent = clampFieldPercent(slot.customYPercent);
             }
             this.slotPlayerMap[slot.subdivisionId] = player;
             usedSubdivisionIds.add(slot.subdivisionId);
@@ -1197,8 +1198,8 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     const markerRect = sourceEl?.getBoundingClientRect();
     const halfHeight = (markerRect?.height ?? 48) / 2;
 
-    const xPct = Math.max(0, Math.min(100, ((dropX - pickup.x + 35 - rect.left) / rect.width) * 100));
-    const yPct = Math.max(0, Math.min(100, ((dropY - pickup.y + halfHeight - rect.top) / rect.height) * 100));
+    const xPct = clampFieldPercent(((dropX - pickup.x + 35 - rect.left) / rect.width) * 100);
+    const yPct = clampFieldPercent(((dropY - pickup.y + halfHeight - rect.top) / rect.height) * 100);
 
     if (this.isInsideGoalkeeperProtectedArea(xPct, yPct)) {
       this.pendingCoachMoveBaseline = null;
@@ -1444,7 +1445,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
 
   getMarkerX(player: PlayerOnFieldDto): number {
     if (typeof player.xPercent === 'number' && isFinite(player.xPercent)) {
-      return Math.max(0, Math.min(100, player.xPercent));
+      return clampFieldPercent(player.xPercent);
     }
     if (!player.slotId) { return 50; }
     const formationX = this.getFormationPositionCoord(player.slotId, 'x');
@@ -1455,7 +1456,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
 
   getMarkerY(player: PlayerOnFieldDto): number {
     if (typeof player.yPercent === 'number' && isFinite(player.yPercent)) {
-      return Math.max(0, Math.min(100, player.yPercent));
+      return clampFieldPercent(player.yPercent);
     }
     if (!player.slotId) { return 50; }
     const formationY = this.getFormationPositionCoord(player.slotId, 'y');
@@ -1471,7 +1472,7 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     if (!pos) { return null; }
     const value = axis === 'x' ? pos.xPercent : pos.yPercent;
     if (typeof value !== 'number' || !isFinite(value)) { return null; }
-    return Math.max(0, Math.min(100, value));
+    return clampFieldPercent(value);
   }
 
   resetCustomPositions(): void {
@@ -1836,10 +1837,10 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
         }
         player.slotId = slot.subdivisionId;
         if (typeof slot.customXPercent === 'number' && isFinite(slot.customXPercent)) {
-          player.xPercent = Math.max(0, Math.min(100, slot.customXPercent));
+          player.xPercent = clampFieldPercent(slot.customXPercent);
         }
         if (typeof slot.customYPercent === 'number' && isFinite(slot.customYPercent)) {
-          player.yPercent = Math.max(0, Math.min(100, slot.customYPercent));
+          player.yPercent = clampFieldPercent(slot.customYPercent);
         }
         this.slotPlayerMap[slot.subdivisionId] = player;
         usedSubdivisionIds.add(slot.subdivisionId);
