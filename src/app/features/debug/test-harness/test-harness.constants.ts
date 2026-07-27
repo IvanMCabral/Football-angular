@@ -1,6 +1,10 @@
 export const TIMELINE_DEBOUNCE_MS = 150;
 export const TIMELINE_MAX_MINUTE = 90;
 export const TIMELINE_STEP = 5;
+export const TEST_HARNESS_MINUTE_TICKS: readonly number[] = Array.from(
+  { length: Math.floor(TIMELINE_MAX_MINUTE / TIMELINE_STEP) + 1 },
+  (_, index) => index * TIMELINE_STEP
+);
 
 /**
  * Default seed for the "Repetir con seed" button.

@@ -1,0 +1,3495 @@
+    <div class="test-harness-page">
+      <header class="page-header">
+        <h1 class="page-title">Banco de Pruebas</h1>
+        <p class="page-subtitle">
+          Superficie de prueba: cambiar formaci&oacute;n, repetir partidos e inspeccionar el detalle.
+        </p>
+        <a routerLink="/dashboard" class="link link-back" aria-label="Volver al dashboard">
+          &larr; Volver al dashboard
+        </a>
+      </header>
+      <!-- Empty state: no career active -->
+      <div *ngIf="!loading() && !loadError() && !hasCareer()" class="state-container" role="status">
+        <div class="state-icon info-icon" aria-hidden="true">i</div>
+        <h2 class="state-title">Sin carrera activa</h2>
+        <p class="state-text">Necesitas una carrera activa para usar el banco de pruebas.</p>
+        <a routerLink="/career/setup" class="btn btn-primary">Crear carrera</a>
+      </div>
+      <!-- Load error -->
+      <div *ngIf="!loading() && loadError()" class="state-container" role="alert">
+        <div class="state-icon error-icon" aria-hidden="true">!</div>
+        <p class="error-text">{{ loadError() }}</p>
+        <button (click)="reload()" class="btn btn-primary" aria-label="Retry loading">Retry</button>
+      </div>
+      <!-- Loading state -->
+      <div *ngIf="loading()" class="state-container" role="status" aria-live="polite">
+        <div class="state-spinner" aria-hidden="true"></div>
+        <p class="loading-text">Cargando banco de pruebas...</p>
+      </div>
+      <!-- Main grid -->
+      <div *ngIf="!loading() && !loadError() && hasCareer()" class="test-harness-grid">
+        <!-- Panel A: Reused V24 match detail (F2) -->
+        <section class="panel panel-a" aria-labelledby="panel-a-heading">
+          <h2 id="panel-a-heading" class="panel-title">Panel A - Detalle del partido</h2>
+          <p class="panel-hint" *ngIf="!selectedMatchId()">
+            Elegí un partido en el Panel C para ver su detalle.
+          </p>
+          <p class="panel-hint" *ngIf="selectedMatchId() && !selectedMatchHasDetail()">
+            El partido está pendiente: se puede usar para pruebas, pero todavía no tiene detalle ni línea de tiempo.
+          </p>
+          <app-v24-match-detail-page
+            *ngIf="selectedMatchId() && selectedMatchHasDetail() && detailPanelVisible()"
+            [inputCareerId]="careerId()"
+            [inputMatchId]="selectedMatchId()"
+            [inputRefreshToken]="detailRefreshToken()"
+          ></app-v24-match-detail-page>
+        </section>
+        <!-- Panel B: Mutation controls -->
+        <section class="panel panel-b" aria-labelledby="panel-b-heading">
+          <h2 id="panel-b-heading" class="panel-title">Panel B - Cambios</h2>
+          <div
+            class="selected-match-context"
+            data-testid="selected-match-context"
+            aria-live="polite"
+          >
+            <div class="context-chip">
+              <span class="context-label">Partido</span>
+              <strong>{{ selectedMatchLabel() }}</strong>
+            </div>
+            <div class="context-chip">
+              <span class="context-label">Controlando</span>
+              <strong>{{ controlledTeamContextLabel() }}</strong>
+            </div>
+            <div class="context-chip context-chip-wide">
+              <span class="context-label">Lectura</span>
+              <strong>{{ resultPerspectiveLabel() }}</strong>
+            </div>
+          </div>
+          <div
+            *ngIf="dirtyHarnessCaseMessage() as dirtyMessage"
+            class="harness-warning harness-dirty-case"
+            data-testid="dirty-harness-case-warning"
+            role="status"
+          >
+            <strong>WARN Caso sucio</strong>
+            <span>{{ dirtyMessage }}</span>
+            <button
+              type="button"
+              (click)="onResetInjuries()"
+              [disabled]="mutationInFlight()"
+            >
+              Limpiar lesiones
+            </button>
+          </div>
+          <div class="compare-workflow-card" data-testid="compare-workflow-card">
+            <div class="compare-workflow-header">
+              <span class="context-label">Flujo profesional</span>
+              <strong>Modal DT &rarr; Banco &rarr; Motor &rarr; Comparador</strong>
+            </div>
+            <ol class="compare-workflow-steps">
+              <li
+                *ngFor="let step of compareWorkflowSteps()"
+                [class.done]="step.state === 'done'"
+                [class.active]="step.state === 'active'"
+                [class.pending]="step.state === 'pending'"
+              >
+                <span class="workflow-step-status">{{ step.status }}</span>
+                <span>
+                  <strong>{{ step.title }}</strong>
+                  <small>{{ step.body }}</small>
+                </span>
+              </li>
+            </ol>
+          </div>
+          <div class="control-group">
+            <mat-form-field appearance="outline" class="formation-field">
+              <mat-label>Formaci&oacute;n</mat-label>
+              <mat-select
+                [(ngModel)]="selectedFormationModel"
+                (selectionChange)="onFormationChange($event.value)"
+                aria-label="Seleccionar formacion"
+              >
+                <mat-option *ngFor="let code of formationCodes" [value]="code">
+                  {{ code }}
+                </mat-option>
+              </mat-select>
+            </mat-form-field>
+            <div class="button-stack">
+              <button
+                mat-raised-button
+                color="primary"
+                (click)="applyFormation()"
+                [disabled]="mutationInFlight() || !selectedFormationModel"
+                aria-label="Aplicar formaci&oacute;n seleccionada"
+              >
+                Aplicar formaci&oacute;n
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onResetInjuries()"
+                [disabled]="mutationInFlight()"
+                aria-label="Reset all injuries"
+              >
+                Limpiar lesiones
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onReplaceFixtures()"
+                [disabled]="mutationInFlight()"
+                aria-label="Recrear fixture con rival Barcelona"
+              >
+                Recrear fixture
+              </button>
+              <button
+                mat-stroked-button
+                (click)="openSquadEditor()"
+                [disabled]="mutationInFlight()"
+                aria-label="Open visual squad editor"
+              >
+                Abrir editor de equipo
+              </button>
+            </div>
+          </div>
+          <!-- Replay-with-seed and simulate-round block. -->
+          <div class="control-group control-group-replay">
+            <div class="control-group-divider" aria-hidden="true"></div>
+            <mat-form-field appearance="outline" class="seed-field">
+              <mat-label>Seed</mat-label>
+              <input
+                matInput
+                type="number"
+                [(ngModel)]="seedInputModel"
+                (ngModelChange)="onSeedChange($event)"
+                placeholder="12345"
+                aria-label="Replay seed (number, empty for non-reproducible)"
+              />
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="style-field">
+              <mat-label>Focus</mat-label>
+              <mat-select
+                [(ngModel)]="selectedStyleModel"
+                aria-label="Select tactical focus for replay"
+              >
+                <mat-option *ngFor="let option of teamStyleOptions" [value]="option.value">
+                  {{ option.label }}
+                </mat-option>
+              </mat-select>
+              <mat-hint>{{ selectedStyleHint() }}</mat-hint>
+            </mat-form-field>
+            <div class="swap-selector-row" aria-label="Matriz cambio jugador selectors">
+              <mat-form-field appearance="outline" class="swap-field">
+                <mat-label>Slot cambio</mat-label>
+                <mat-select
+                  [(ngModel)]="selectedSwapStarterIdModel"
+                  aria-label="Select starter slot for player swap matrix"
+                >
+                  <mat-option [value]="null">Auto attacker</mat-option>
+                  <mat-option *ngFor="let option of playerSwapSlotOptions(); trackBy: trackBySwapSlotOption" [value]="option.playerId">
+                    {{ option.label }}
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="swap-field">
+                <mat-label>Jugador cambio</mat-label>
+                <mat-select
+                  [(ngModel)]="selectedSwapBenchIdModel"
+                  aria-label="Select bench player for player swap matrix"
+                >
+                  <mat-option [value]="null">Auto bench attacker</mat-option>
+                  <mat-option *ngFor="let option of playerSwapBenchOptions(); trackBy: trackBySwapBenchOption" [value]="option.playerId">
+                    {{ option.label }}
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="swap-seed-count-field">
+                <mat-label>Seeds cambio</mat-label>
+                <input
+                  matInput
+                  type="number"
+                  min="1"
+                  max="50"
+                  [(ngModel)]="playerSwapSeedCountModel"
+                  (ngModelChange)="onPlayerSwapSeedCountChange($event)"
+                  aria-label="Number of seeds for player swap matrix"
+                />
+                <mat-hint>1-50 - Multi-seed usa min 20</mat-hint>
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="swap-field">
+                <mat-label>Minuto cambio</mat-label>
+                <mat-select
+                  [(ngModel)]="substitutionWhatIfMinuteModel"
+                  aria-label="Select minute for substitution what-if"
+                >
+                  <mat-option *ngFor="let minute of substitutionWhatIfMinuteOptions" [value]="minute">
+                    {{ minute }}'
+                  </mat-option>
+                </mat-select>
+                <mat-hint>Para comparar cambio temprano/tardío</mat-hint>
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="swap-field">
+                <mat-label>Precisi&oacute;n bater&iacute;a</mat-label>
+                <mat-select
+                  [(ngModel)]="playerSwapBatteryPrecisionModel"
+                  (ngModelChange)="onPlayerSwapBatteryPrecisionChange($event)"
+                  aria-label="Select player swap battery precision"
+                >
+                  <mat-option value="quick">R&aacute;pida</mat-option>
+                  <mat-option value="balanced">Balanceado</mat-option>
+                  <mat-option value="reliable">Reliable</mat-option>
+                </mat-select>
+                <mat-hint>{{ playerSwapBatteryPrecisionHint() }}</mat-hint>
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="swap-field">
+                <mat-label>Modo bater&iacute;a</mat-label>
+                <mat-select
+                  [(ngModel)]="playerSwapBatteryModeModel"
+                  aria-label="Select player swap battery mode"
+                >
+                  <mat-option value="natural">Solo natural</mat-option>
+                  <mat-option value="mixed">Incluir experimentos</mat-option>
+                  <mat-option value="stress">Prueba de estr&eacute;s</mat-option>
+                </mat-select>
+                <mat-hint>{{ playerSwapBatteryModeHint() }}</mat-hint>
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="swap-field">
+                <mat-label>Controlar</mat-label>
+                <mat-select
+                  [(ngModel)]="controlledTeamSideModel"
+                  (ngModelChange)="onControlledTeamSideChanged($event)"
+                  aria-label="Select controlled team side for scenario smokes"
+                >
+                  <mat-option value="USER" [disabled]="selectedMatchId() !== null && !selectedMatchIncludesUserTeam()">
+                    Mi equipo
+                  </mat-option>
+                  <mat-option value="HOME">Local</mat-option>
+                  <mat-option value="AWAY">Visitante</mat-option>
+                </mat-select>
+                <mat-hint>{{ controlledTeamSideHint() }}</mat-hint>
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="swap-field">
+                <mat-label>Slot prueba</mat-label>
+                <mat-select
+                  [(ngModel)]="roleSlotImpactSlotIdModel"
+                  aria-label="Select tactical slot for role impact lab"
+                >
+                  <mat-option *ngFor="let option of roleSlotImpactAvailableSlotOptions()" [value]="option.slotId">
+                    {{ option.label }}
+                  </mat-option>
+                </mat-select>
+                <mat-hint>{{ roleSlotImpactSlotHint() }}</mat-hint>
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="swap-field">
+                <mat-label>Tablero bater&iacute;a</mat-label>
+                <mat-select
+                  [(ngModel)]="scenarioBatteryGroupModel"
+                  aria-label="Select tactical battery group"
+                >
+                  <mat-option value="OFFENSE">Ataque</mat-option>
+                  <mat-option value="DEFENSE">Defensa</mat-option>
+                  <mat-option value="OPPONENT">Rival</mat-option>
+                  <mat-option value="ALL">Todo</mat-option>
+                </mat-select>
+                <mat-hint>{{ scenarioBatteryGroupHint() }}</mat-hint>
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="swap-field">
+                <mat-label>Alcance batería</mat-label>
+                <mat-select
+                  [(ngModel)]="scenarioBatteryScopeModel"
+                  aria-label="Select tactical battery scope"
+                >
+                  <mat-option value="quick">Rápida</mat-option>
+                  <mat-option value="balanced">Media</mat-option>
+                </mat-select>
+                <mat-hint>{{ scenarioBatteryScopeHint() }}</mat-hint>
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="swap-field">
+                <mat-label>Objetivo DT</mat-label>
+                <mat-select
+                  [(ngModel)]="scenarioBatteryCoachObjectiveModel"
+                  aria-label="Select tactical battery coach objective"
+                >
+                  <mat-option value="AUTO">Auto</mat-option>
+                  <mat-option value="NEUTRAL">Neutral</mat-option>
+                  <mat-option value="NEED_GOAL">Necesito gol</mat-option>
+                  <mat-option value="PROTECT_RESULT">Cuidar resultado</mat-option>
+                </mat-select>
+                <mat-hint>{{ scenarioBatteryCoachObjectiveHint() }}</mat-hint>
+              </mat-form-field>
+            </div>
+            <mat-form-field appearance="outline" class="round-field">
+              <mat-label>Fecha</mat-label>
+              <mat-select
+                [(ngModel)]="selectedRoundModel"
+                (selectionChange)="onRoundSelect($event.value)"
+                aria-label="Seleccionar fecha para simular"
+              >
+                <mat-option *ngFor="let r of rounds()" [value]="r.round">
+                  Fecha {{ r.round }}
+                </mat-option>
+              </mat-select>
+            </mat-form-field>
+            <div class="button-stack">
+              <button
+                mat-raised-button
+                color="primary"
+                (click)="onReplayWithSeed()"
+                [disabled]="mutationInFlight() || !selectedMatchId()"
+                data-testid="replay-with-seed-button"
+                aria-label="Replay selected match with seed"
+              >
+                {{ mutationInFlight() ? 'Repitiendo...' : 'Repetir con seed' }}
+              </button>
+              <p
+                *ngIf="replayStatusMessage()"
+                class="replay-status-card"
+                role="status"
+                aria-live="polite"
+                data-testid="replay-status-card"
+              >
+                {{ replayStatusMessage() }}
+              </p>
+              <a
+                mat-stroked-button
+                color="primary"
+                *ngIf="selectedMatchCompareRoute() as compareRoute"
+                [routerLink]="compareRoute"
+                aria-label="Open professional baseline vs live comparison for the selected match"
+              >
+                Abrir comparador
+              </a>
+              <button
+                mat-stroked-button
+                color="primary"
+                *ngIf="!selectedMatchCompareRoute()"
+                disabled
+                aria-label="Select a match before opening Match Compare"
+              >
+                Abrir comparador
+              </button>
+              <button
+                mat-raised-button
+                color="accent"
+                (click)="onReplayCurrentLineup()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                aria-label="Replay selected match with the current visual lineup and seed"
+              >
+                Repetir XI actual
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRunCurrentLineupMultiSeed()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                aria-label="Replay current visual lineup across multiple seeds"
+              >
+                XI actual multi-seed
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRunModalVsCanonicalMultiSeed()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                aria-label="Compare canonical lineup against modal custom pixels across multiple seeds"
+              >
+                Base vs píxeles del modal
+              </button>
+              <button
+                mat-stroked-button
+                data-testid="lineup-diagnostic-button"
+                (click)="onRunLineupDiagnostic()"
+                [disabled]="mutationInFlight() || !selectedMatchId()"
+                aria-label="Inspect effective starting elevens used by the match engine"
+              >
+                XI efectivo
+              </button>
+              <button
+                mat-stroked-button
+                data-testid="player-swap-matrix-button"
+                (click)="onRunAutoPlayerSwapMatrix()"
+                [disabled]="mutationInFlight() || !selectedMatchId()"
+                aria-label="Compare a starter attacker against a bench attacker across multiple seeds"
+              >
+                Matriz cambio jugador
+              </button>
+              <button
+                mat-stroked-button
+                data-testid="substitution-what-if-button"
+                (click)="onRunSubstitutionWhatIf()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                aria-label="Compare the selected starter and bench player as a live substitution at minute 60"
+              >
+                Simular sustitución
+              </button>
+              <button
+                mat-stroked-button
+                data-testid="modal-recommendation-what-if-button"
+                (click)="onRunModalRecommendationWhatIf()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                aria-label="Run the substitution what-if using the same coach objective recommendation as the live modal"
+              >
+                Probar recomendación modal
+              </button>
+              <button
+                mat-stroked-button
+                data-testid="substitution-timing-matrix-button"
+                (click)="onRunSubstitutionTimingMatrix()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                aria-label="Compare the same substitution at minutes 45, 60, 70 and 80"
+              >
+                Matriz minuto de cambio
+              </button>
+              <button
+                mat-stroked-button
+                data-testid="player-swap-battery-button"
+                (click)="onRunPlayerSwapBattery()"
+                [disabled]="mutationInFlight() || !selectedMatchId()"
+                aria-label="Compare several starter and bench cambios de jugador across multiple seeds"
+              >
+                Batería cambio jugador
+              </button>
+              <button
+                mat-stroked-button
+                data-testid="player-swap-full-smoke-button"
+                (click)="onRunPlayerSwapFullSmoke()"
+                [disabled]="mutationInFlight() || !selectedMatchId()"
+                aria-label="Compare natural and stress player swap batteries together"
+              >
+                Smoke completo de cambios
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRunPlayerSwapPrecisionCompare()"
+                [disabled]="mutationInFlight() || !selectedMatchId()"
+                aria-label="Compare player swap battery reads between quick and balanced precision"
+              >
+                Comparar precisión
+              </button>
+              <button
+                type="button"
+                mat-stroked-button
+                data-testid="position-presets-matrix-button"
+                (click)="onRunPositionPixelMatrix()"
+                [disabled]="mutationInFlight() || !selectedMatchId()"
+                aria-label="Compare multiple pixel movement presets for the selected starter across seeds"
+              >
+                Matriz presets posición
+              </button>
+              <button
+                type="button"
+                mat-stroked-button
+                data-testid="manual-shape-vs-preset-button"
+                (click)="onRunManualShapeVsPresetSmoke()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                aria-label="Compare a manual 4-4-2-like shape against stronger manual shape edits"
+              >
+                Forma manual vs preset
+              </button>
+              <button
+                type="button"
+                mat-stroked-button
+                data-testid="role-slot-impact-button"
+                (click)="onRunRoleSlotImpactSummary()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                aria-label="Compare natural roles in the same tactical slot across seeds"
+              >
+                Impacto rol-slot
+              </button>
+              <button
+                type="button"
+                mat-stroked-button
+                data-testid="all-role-slots-smoke-button"
+                (click)="onRunAllRoleSlotsSmoke()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                aria-label="Run role impact smoke for every real slot in the current starting eleven"
+              >
+                Smoke todos los roles-slot
+              </button>
+              <button
+                type="button"
+                mat-stroked-button
+                data-testid="all-formations-role-slot-smoke-button"
+                (click)="onRunAllFormationsRoleSlotSmoke()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                aria-label="Run role slot smoke across every formation"
+              >
+                Smoke roles-slot por formación
+              </button>
+              <button
+                type="button"
+                mat-stroked-button
+                data-testid="last-modal-move-position-smoke-button"
+                (click)="onRunLastModalMovePositionSmoke()"
+                [disabled]="mutationInFlight() || !selectedMatchId()"
+                aria-label="Replay the last position move made in the formation modal across seeds"
+              >
+                Último movimiento modal
+              </button>
+              <button
+                type="button"
+                mat-stroked-button
+                data-testid="wingback-pixel-lab-button"
+                (click)="onRunWingbackPixelLab()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                aria-label="Run a focused pixel lab for left and right wingbacks"
+              >
+                Lab píxeles carrileros
+              </button>
+              <button
+                type="button"
+                mat-stroked-button
+                (click)="onRunPositionSensitivityCheck()"
+                [disabled]="mutationInFlight() || !selectedMatchId()"
+                aria-label="Run high-seed micro-movement sensitivity check for position pixels"
+              >
+                Chequeo sensibilidad
+              </button>
+              <button
+                type="button"
+                mat-stroked-button
+                data-testid="manual-extremes-position-hunt-button"
+                (click)="onRunManualExtremesPositionHunt()"
+                [disabled]="mutationInFlight() || !selectedMatchId()"
+                aria-label="Run aggressive but football-plausible manual position extremes to hunt visual engine contradictions"
+              >
+                Buscar extremos manuales
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRunPositionCalibrationSweep()"
+                [disabled]="mutationInFlight() || !userTeamName()"
+                aria-label="Run position movement smoke across multiple completed user-team matches"
+              >
+                Smoke posición multi-partido
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRunMidfielderPositionSweep()"
+                [disabled]="mutationInFlight() || !userTeamName()"
+                aria-label="Run midfield-only position movement smoke across multiple completed user-team matches"
+              >
+                Smoke posición MID
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRunLinePositionSweep('DEF')"
+                [disabled]="mutationInFlight() || !userTeamName()"
+                aria-label="Run defensive-line position movement smoke across multiple completed user-team matches"
+              >
+                Smoke posición DEF
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRunLinePositionSweep('ATT')"
+                [disabled]="mutationInFlight() || !userTeamName()"
+                aria-label="Run attacking-line position movement smoke across multiple completed user-team matches"
+              >
+                Smoke posición ATT
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRunFullPositionSmokeBoard()"
+                [disabled]="mutationInFlight() || !userTeamName()"
+                aria-label="Run full position smoke comparison board across completed user-team matches"
+              >
+                Tablero completo posición
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRunCurrentFormationLineAudit()"
+                [disabled]="mutationInFlight() || !canRunUserLineupAudit()"
+                [title]="userLineupAuditDisabledReason()"
+                aria-label="Audit current formation DEF MID ATT candidates before running line smokes"
+              >
+                Auditoría líneas formación
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRunAllFormationsLineAudit()"
+                [disabled]="mutationInFlight() || !canRunUserLineupAudit()"
+                [title]="userLineupAuditDisabledReason()"
+                aria-label="Audit every formation DEF MID ATT candidates before running expensive line smokes"
+              >
+                Auditoría todas las formaciones
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRunFormationMatrix()"
+                [disabled]="mutationInFlight() || !selectedMatchId()"
+                [title]="formationMatrixDisabledReason()"
+                aria-label="Replay selected match with every formation and the same seed"
+              >
+                Matriz formaciones
+              </button>
+              <button
+                mat-stroked-button
+                data-testid="formation-avg-button"
+                (click)="onRunFormationMatrixSummary()"
+                [disabled]="mutationInFlight() || !selectedMatchId()"
+                [title]="formationMatrixDisabledReason()"
+                aria-label="Average every formation across multiple seeds"
+              >
+                Promedio formaciones ({{ scenarioMatrixSummaryEffectiveSeedCount() }} seeds)
+              </button>
+              <button
+                mat-flat-button
+                color="primary"
+                data-testid="professional-smoke-button"
+                (click)="onRunProfessionalSmoke()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !canRunScenarioSummaryForControlledSide()"
+                aria-label="Run professional controlled smoke with formation averages and tactical scenario reads"
+              >
+                Correr smoke profesional
+              </button>
+              <button
+                mat-stroked-button
+                data-testid="professional-smoke-full-button"
+                (click)="onRunProfessionalSmokeFull()"
+                [disabled]="mutationInFlight() || controlledTeamSideModel !== 'USER' || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                aria-label="Run full professional user-team smoke with formations scenarios pixels and swaps"
+              >
+                Correr smoke profesional completo
+              </button>
+              <button
+                mat-stroked-button
+                data-testid="low-block-lab-button"
+                (click)="onRunLowBlockLab()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                aria-label="Compare 5-4-1 low block high base and low second line across seeds"
+              >
+                Lab bloque bajo 5-4-1
+              </button>
+              <button
+                mat-stroked-button
+                data-testid="back-five-transition-lab-button"
+                (click)="onRunBackFiveTransitionLab()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                aria-label="Compare 5-3-2 wingbacks low base and high across seeds"
+              >
+                Lab transicion 5-3-2
+              </button>
+              <button
+                mat-stroked-button
+                data-testid="back-five-family-lab-button"
+                (click)="onRunBackFiveFamilyLab()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                aria-label="Compare 5-4-1 5-3-2 and 3-5-2 back five tactical identities across seeds"
+              >
+                Línea de 5 family lab
+              </button>
+              <button
+                mat-stroked-button
+                data-testid="back-five-any-side-family-lab-button"
+                (click)="onRunBackFiveAnySideFamilyLab()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !canRunScenarioSummaryForControlledSide()"
+                aria-label="Compare back five tactical family for the currently controlled home away or user side"
+              >
+                Línea de 5 any side
+              </button>
+              <button
+                mat-stroked-button
+                data-testid="back-five-context-smoke-button"
+                (click)="onRunBackFiveContextSmoke()"
+                [disabled]="mutationInFlight() || scenarioBatteryCandidateMatches().length === 0"
+                aria-label="Run back five context smoke across completed matches and both sides"
+              >
+                Línea de 5 context smoke
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRunScenarioMatrix()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                aria-label="Run controlled live tactical scenarios for the selected match and seed"
+              >
+                Matriz escenarios
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRunScenarioMatrixSummary()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !canRunScenarioSummaryForControlledSide()"
+                aria-label="Run controlled live tactical scenarios across multiple seeds"
+              >
+                Matriz multi-seed ({{ scenarioMatrixSummaryEffectiveSeedCount() }} seeds)
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRunScenarioMatrixSmoke()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !canRunScenarioSummaryForControlledSide()"
+                aria-label="Run quick controlled live tactical scenario smoke across five seeds"
+              >
+                Smoke escenarios (5 seeds)
+              </button>
+              <button
+                mat-stroked-button
+                data-testid="focused-wide-battery-button"
+                (click)="onRunFocusedWideBattery()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || controlledTeamSideModel !== 'USER' || !selectedMatchIncludesUserTeam()"
+                aria-label="Compare focused wide battery for 4-2-3-1 4-4-2 and 5-4-1 with balanced and wide play"
+              >
+                Batería bandas enfocada
+              </button>
+              <button
+                mat-stroked-button
+                data-testid="focused-pixel-battery-button"
+                (click)="onRunFocusedPixelBattery()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || controlledTeamSideModel !== 'USER' || !selectedMatchIncludesUserTeam()"
+                aria-label="Run focused pixel battery for the selected formation with wide center forward and deeper moves"
+              >
+                Batería píxeles enfocada
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRunScenarioMatrixBlockSmoke('OFFENSE')"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !canRunScenarioSummaryForControlledSide()"
+                aria-label="Run quick offensive scenario smoke across five seeds"
+              >
+                Smoke ataque
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRunScenarioMatrixBlockSmoke('DEFENSE')"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !canRunScenarioSummaryForControlledSide()"
+                aria-label="Run quick defensive scenario smoke across five seeds"
+              >
+                Smoke defensa
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRunScenarioMatrixBlockSmoke('OPPONENT')"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !canRunScenarioSummaryForControlledSide()"
+                aria-label="Run quick opponent channel exposure scenario smoke across five seeds"
+              >
+                Smoke rival
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRunScenarioBatteryBoard()"
+                [disabled]="mutationInFlight() || scenarioBatteryCandidateMatches().length === 0"
+                aria-label="Run quick tactical battery board across several matches and both sides"
+              >
+                Tablero bater&iacute;a
+              </button>
+              <span *ngIf="scenarioBatteryProgress()" class="inline-progress" aria-live="polite">
+                {{ scenarioBatteryProgress() }}
+              </span>
+              <span *ngIf="scenarioBatteryWorkload()" class="inline-progress">
+                {{ scenarioBatteryWorkload() }}
+              </span>
+              <button
+                mat-stroked-button
+                (click)="onPrepareOffensiveUpgradeLab()"
+                [disabled]="mutationInFlight()"
+                aria-label="Prepare controlled offensive substitution upgrade lab"
+              >
+                Preparar lab ofensivo
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRestoreOffensiveUpgradeLab()"
+                [disabled]="mutationInFlight()"
+                aria-label="Restore controlled offensive substitution upgrade lab"
+              >
+                Restaurar lab
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onPrepareDefensiveDowngradeLab()"
+                [disabled]="mutationInFlight()"
+                aria-label="Prepare controlled defensive substitution downgrade lab"
+              >
+                Preparar lab defensivo
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRestoreDefensiveDowngradeLab()"
+                [disabled]="mutationInFlight()"
+                aria-label="Restore controlled defensive substitution downgrade lab"
+              >
+                Restaurar lab defensivo
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onPrepareObjectiveContrastLab()"
+                [disabled]="mutationInFlight()"
+                aria-label="Preparar contraste objetivo lab cambio jugador"
+              >
+                Preparar contraste objetivo
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRestoreObjectiveContrastLab()"
+                [disabled]="mutationInFlight()"
+                aria-label="Restaurar contraste objetivo lab cambio jugador"
+              >
+                Restaurar contraste objetivo
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onPrepareWeakWideDefendersLab()"
+                [disabled]="mutationInFlight()"
+                aria-label="Preparar lab exposicion defensores banda debiles"
+              >
+                Preparar lab DEF bandas debiles
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRestoreWeakWideDefendersLab()"
+                [disabled]="mutationInFlight()"
+                aria-label="Restaurar lab exposicion defensores banda debiles"
+              >
+                Restaurar lab DEF bandas debiles
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onPrepareOpponentWeakWideDefendersLab()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                aria-label="Preparar lab rival defensores banda debiles"
+              >
+                Preparar rival DEF bandas debiles
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRestoreOpponentWeakWideDefendersLab()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                aria-label="Restaurar lab rival defensores banda debiles"
+              >
+                Restaurar rival DEF bandas debiles
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onPrepareOpponentWeakLeftDefenderLab()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                aria-label="Preparar lab rival defensor izquierdo debil"
+              >
+                Preparar rival DEF izquierda debil
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRestoreOpponentWeakLeftDefenderLab()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                aria-label="Restaurar lab rival defensor izquierdo debil"
+              >
+                Restaurar rival DEF izquierda debil
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onPrepareOpponentWeakRightDefenderLab()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                aria-label="Preparar lab rival defensor derecho debil"
+              >
+                Preparar rival DEF derecha debil
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRestoreOpponentWeakRightDefenderLab()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                aria-label="Restaurar lab rival defensor derecho debil"
+              >
+                Restaurar rival DEF derecha debil
+              </button>
+              <button
+                mat-stroked-button
+                color="primary"
+                (click)="onRunSideMirrorSmoke()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                aria-label="Correr smoke espejo bandas"
+              >
+                Smoke espejo bandas
+              </button>
+              <button
+                mat-stroked-button
+                color="primary"
+                (click)="onRunSideMirrorSyntheticLab()"
+                [disabled]="mutationInFlight()"
+                aria-label="Correr lab espejo sintetico"
+              >
+                Lab espejo sintetico
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onPrepareOpponentWeakCenterBacksLab()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                aria-label="Preparar lab rival centrales debiles"
+              >
+                Preparar rival centrales debiles
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRestoreOpponentWeakCenterBacksLab()"
+                [disabled]="mutationInFlight() || !selectedMatchId() || !selectedMatchIncludesUserTeam()"
+                aria-label="Restaurar lab rival centrales debiles"
+              >
+                Restaurar rival centrales debiles
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onPrepareWeakLeftDefenderLab()"
+                [disabled]="mutationInFlight()"
+                aria-label="Prepare weak left defender channel lab"
+              >
+                Preparar DEF izquierda debil
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRestoreWeakLeftDefenderLab()"
+                [disabled]="mutationInFlight()"
+                aria-label="Restore weak left defender channel lab"
+              >
+                Restaurar DEF izquierda debil
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onPrepareWeakRightDefenderLab()"
+                [disabled]="mutationInFlight()"
+                aria-label="Prepare weak right defender channel lab"
+              >
+                Preparar DEF derecha debil
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRestoreWeakRightDefenderLab()"
+                [disabled]="mutationInFlight()"
+                aria-label="Restore weak right defender channel lab"
+              >
+                Restaurar DEF derecha debil
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onPrepareWeakCenterBacksLab()"
+                [disabled]="mutationInFlight()"
+                aria-label="Prepare weak center backs channel lab"
+              >
+                Preparar lab centrales debiles
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRestoreWeakCenterBacksLab()"
+                [disabled]="mutationInFlight()"
+                aria-label="Restore weak center backs channel lab"
+              >
+                Restaurar lab centrales debiles
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onPrepareDefensiveFallbackLineupLab()"
+                [disabled]="mutationInFlight()"
+                aria-label="Prepare defensive fallback lineup lab"
+              >
+                Preparar lab fallback DEF
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onRestoreDefensiveFallbackLineupLab()"
+                [disabled]="mutationInFlight() || !defensiveFallbackRestore"
+                aria-label="Restore defensive fallback lineup lab"
+              >
+                Restaurar lab fallback DEF
+              </button>
+              <button
+                mat-stroked-button
+                (click)="onSimulateRound()"
+                [disabled]="mutationInFlight() || selectedRoundModel === null"
+                aria-label="Simulate selected round"
+              >
+                Simular fecha {{ selectedRoundModel ?? '-' }}
+              </button>
+            </div>
+            <p
+              *ngIf="selectedMatchId() && !selectedMatchIncludesUserTeam()"
+              class="harness-warning"
+              role="status"
+            >
+              {{ selectedMatchScopeWarning() }}
+            </p>
+            <p
+              *ngIf="analysisReadyMessage()"
+              class="analysis-ready-banner"
+              role="status"
+              aria-live="polite"
+            >
+              {{ analysisReadyMessage() }}
+              <button type="button" (click)="scrollToReplayAnalysis()">Ver Panel E</button>
+            </p>
+          </div>
+        </section>
+        <!-- Panel E: replay analysis matrices (full width) -->
+        <section
+          *ngIf="currentLineupReplayResult() || currentLineupMultiSeedSummary() || modalVsCanonicalSummary() || lineupDiagnostic() || playerSwapMatrixSummary() || substitutionWhatIfSummary() || modalRecommendationCandidateAttempts().length > 0 || substitutionTimingMatrixRows().length > 0 || playerSwapBatterySummaries().length > 0 || playerSwapPrecisionComparisonRows().length > 0 || roleSlotImpactRows().length > 0 || roleSlotImpactSmokeRows().length > 0 || allFormationRoleSlotSmokeRows().length > 0 || positionPixelEvidenceNote() || positionPixelMatrixSummary() || positionPixelMatrixRows().length > 0 || formationLineSmokeRows().length > 0 || lineupDebugSnapshot() || formationReplayResults().length > 0 || formationMatrixSummaryResults().length > 0 || focusedWideBatteryRows().length > 0 || professionalSmokeSummary() || lowBlockLabRows().length > 0 || backFiveTransitionLabRows().length > 0 || backFiveFamilyLabRows().length > 0 || backFiveContextSmokeRows().length > 0 || sideMirrorSmokeRows().length > 0 || scenarioMatrixResults().length > 0 || scenarioMatrixSummaryResults().length > 0 || scenarioBatteryRows().length > 0"
+          id="test-harness-replay-analysis"
+          class="panel panel-e"
+          aria-labelledby="panel-e-heading"
+        >
+          <h2 id="panel-e-heading" class="panel-title">Panel E - Análisis de repetición</h2>
+          <p class="panel-hint">
+            Compara el mismo partido y seed con formaciones, tácticas en vivo y sustituciones.
+          </p>
+          <div class="analysis-context-row">
+            <span class="controlled-team-badge">Controlando: {{ controlledTeamDisplayName() }}</span>
+            <span *ngIf="selectedMatch() as panelMatch" class="controlled-team-badge">
+              Partido: {{ panelMatch.homeTeamName }} vs {{ panelMatch.awayTeamName }}
+            </span>
+          </div>
+          <article
+            *ngIf="dirtyHarnessCaseMessage() as dirtyMessage"
+            class="position-read-summary dirty-analysis-warning"
+            data-testid="panel-e-dirty-case-warning"
+          >
+            <strong>WARN Caso sucio antes de comparar</strong>
+            <span>{{ dirtyMessage }}</span>
+            <small>
+              Si corrés matrices con lesionados/sancionados, el motor puede meter auto-sustituciones y contaminar la lectura.
+            </small>
+          </article>
+          <article *ngIf="professionalSmokeSummary() as smoke" class="position-read-summary professional-smoke-summary" data-testid="professional-smoke-summary">
+            <strong>Smoke profesional</strong>
+            <span *ngIf="smoke.verdict" class="qa-verdict-badge" [class]="professionalSmokeVerdictClass(smoke.verdict)">
+              {{ smoke.verdict }}
+            </span>
+            <span>{{ smoke.read }}</span>
+            <small *ngIf="smoke.verdictDetail">
+              Resultado: {{ smoke.verdictDetail }}
+            </small>
+            <small>
+              Incluye: {{ smoke.included.join(' · ') }}
+            </small>
+            <small *ngIf="smoke.skipped.length > 0">
+              Pendiente/omitido: {{ smoke.skipped.join(' · ') }}
+            </small>
+          </article>
+          <div class="formation-matrix analysis-matrix current-lineup-replay">
+            <div class="matrix-header">
+              <div>
+                <strong>Checklist QA profesional</strong>
+                <span>Lectura esperada vs observada para contratos Modal DT → alineación → motor</span>
+              </div>
+              <button
+                type="button"
+                class="qa-run-all-button"
+                (click)="onRunProfessionalQaChecklist()"
+                [disabled]="qaChecklistRunningAll() || mutationInFlight()"
+              >
+                {{ qaChecklistRunningAll() ? 'Checklist corriendo...' : 'Correr todo el checklist' }}
+              </button>
+            </div>
+            <div class="qa-checklist-grid">
+              <article
+                *ngFor="let row of professionalQaChecklistRows(); trackBy: trackByProfessionalQaChecklistRow"
+                class="qa-check-card"
+                [attr.data-testid]="professionalQaChecklistTestId(row.check)"
+              >
+                <div class="qa-check-card-header">
+                  <strong>{{ professionalQaCheckLabel(row.check) }}</strong>
+                  <span class="qa-verdict-badge" [class]="professionalQaVerdictClass(row.verdict)">
+                    {{ professionalQaVerdictLabel(row.verdict) }}
+                  </span>
+                </div>
+                <dl>
+                  <div>
+                    <dt>Esperado</dt>
+                    <dd>{{ professionalQaTextLabel(row.expected) }}</dd>
+                  </div>
+                  <div>
+                    <dt>Observado</dt>
+                    <dd>{{ professionalQaTextLabel(row.observed) }}</dd>
+                  </div>
+                  <div>
+                    <dt>Siguiente</dt>
+                    <dd>{{ professionalQaTextLabel(row.next) }}</dd>
+                  </div>
+                </dl>
+                <button
+                  type="button"
+                  class="qa-action-button"
+                  (click)="onRunProfessionalQaAction(row.check)"
+                  [disabled]="!professionalQaActionEnabled(row.check)"
+                >
+                  {{ professionalQaActionLabel(row.check) }}
+                </button>
+                <span
+                  *ngIf="professionalQaActionStatus(row.check) as status"
+                  class="qa-action-status"
+                  [class]="professionalQaActionStatusClass(status.state)"
+                >
+                  {{ status.message }}
+                </span>
+              </article>
+            </div>
+          </div>
+          <div *ngIf="lineupDiagnostic() as diagnostic" class="formation-matrix analysis-matrix current-lineup-replay">
+            <div class="matrix-header">
+              <strong>XI efectivo del motor</strong>
+              <span>Seed {{ diagnostic.seed }} · titulares, roles, eficacia y promedio colectivo usados para diagnosticar el partido</span>
+            </div>
+            <div class="diagnostic-team-grid">
+              <div class="diagnostic-team-card" *ngFor="let team of lineupDiagnosticTeams(diagnostic); trackBy: trackByLineupDiagnosticTeam">
+                <h3>{{ team.teamName }}</h3>
+                <p>
+                  {{ team.formation }} · {{ team.style }} · {{ team.starters }}/11
+                  · OVR {{ team.avgOverall | number:'1.1-1' }}
+                  · Colectivo {{ team.avgCollective | number:'1.1-1' }}
+                  · Eff {{ team.avgEffectiveness | percent:'1.0-0' }}
+                </p>
+                <div *ngIf="team.width as width" class="width-diagnostic-card">
+                  <div>
+                    <span class="diagnostic-muted">Ancho tactico</span>
+                    <strong [class]="lineupWidthVerdictClass(width.verdict)">{{ width.verdict }}</strong>
+                  </div>
+                  <div class="width-diagnostic-stats">
+                    <span>Izq {{ width.leftCount }}</span>
+                    <span>Centro {{ width.centerCount }}</span>
+                    <span>Der {{ width.rightCount }}</span>
+                    <span>Ancho {{ width.widthScore | number:'1.0-0' }}%</span>
+                    <span>Balance {{ width.sideBalance | number:'1.0-0' }}%</span>
+                  </div>
+                  <p>{{ width.read }}</p>
+                </div>
+                <div class="table-scroll compact-position-table">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Jugador</th>
+                        <th>Nat -> Slot</th>
+                        <th>Rol/Lado</th>
+                        <th>Perfil</th>
+                        <th>Score</th>
+                        <th>Lectura</th>
+                        <th>Slot</th>
+                        <th>XY</th>
+                        <th>Fuente</th>
+                        <th>OVR</th>
+                        <th>ATT</th>
+                        <th>DEF</th>
+                        <th>MEN</th>
+                        <th>Eff</th>
+                        <th>Colectivo</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr *ngFor="let p of team.players; trackBy: trackByLineupDiagnosticPlayer">
+                        <td>{{ p.name }}</td>
+                        <td>{{ p.naturalPosition }} -> {{ p.tacticalPosition }}</td>
+                        <td>{{ p.slotRole || '?' }} / {{ p.slotSide || '?' }}</td>
+                        <td>
+                          <span class="diagnostic-muted">Rol:</span> {{ p.curatedRoles || '-' }}
+                          <br>
+                          <span class="diagnostic-muted">Lado:</span> {{ p.preferredSides || '-' }}
+                        </td>
+                        <td>
+                          {{ p.assignmentScore ?? '-' }}
+                          <br>
+                          <span [class]="lineupAssignmentVerdictClass(p.assignmentVerdict)">
+                            {{ p.assignmentVerdict || 'Aceptable' }}
+                          </span>
+                          <br>
+                          <span class="diagnostic-muted">rol {{ p.roleBonus ?? 0 }} · lado {{ p.sideBonus ?? 0 }}</span>
+                        </td>
+                        <td class="diagnostic-read">{{ p.assignmentRead || '-' }}</td>
+                        <td>{{ p.slotId || 'manual' }}</td>
+                        <td>{{ lineupDiagnosticCoord(p) }}</td>
+                        <td>
+                          <span class="source-pill" [class.source-custom]="p.positionSource === 'modal-custom'">
+                            {{ lineupDiagnosticSource(p) }}
+                          </span>
+                        </td>
+                        <td>{{ p.overall }}</td>
+                        <td>{{ p.attack }}</td>
+                        <td>{{ p.defense }}</td>
+                        <td>{{ p.mentality }}</td>
+                        <td>{{ p.effectiveness | percent:'1.0-0' }}</td>
+                        <td>{{ p.collective | number:'1.1-1' }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div *ngIf="formationLineSmokeRows().length > 0" class="formation-matrix analysis-matrix current-lineup-replay">
+            <div class="matrix-header">
+              <strong>Auditoría líneas formación</strong>
+              <span>DEF/MID/ATT candidates for the current visual formation</span>
+            </div>
+            <div class="table-scroll compact-position-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Formation</th>
+                    <th>Line</th>
+                    <th>Candidates</th>
+                    <th>Expected rows</th>
+                    <th>Players</th>
+                    <th>Slot roles</th>
+                    <th>Verdict</th>
+                    <th>Warnings</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let row of formationLineSmokeRows(); trackBy: trackByFormationLineSmokeRow">
+                    <td>{{ row.formation }}</td>
+                    <td>{{ row.line }}</td>
+                    <td>{{ row.candidates }}</td>
+                    <td>{{ row.expectedRows }}</td>
+                    <td>{{ row.players }}</td>
+                    <td>{{ row.slotRoles }}</td>
+                    <td>{{ row.verdict }}</td>
+                    <td>{{ row.warnings || '-' }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div *ngIf="currentLineupReplayResult() as replay" class="formation-matrix analysis-matrix current-lineup-replay">
+            <div class="matrix-header">
+              <strong>Current lineup replay</strong>
+              <span>
+                {{ replay.label }} · formación {{ replay.formation || '?' }}
+                · seed {{ replay.seed ?? 'auto' }} · {{ selectedStyleLabel() }}
+              </span>
+              <button type="button" class="matrix-export" (click)="copyCurrentLineupReplayJson()">
+                Copiar JSON
+              </button>
+            </div>
+            <div class="current-replay-grid" role="group" aria-label="Current lineup replay summary">
+              <div class="metric-card">
+                <span class="metric-label">Score</span>
+                <span class="metric-value">{{ replay.score }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Possession</span>
+                <span class="metric-value">{{ replay.possession }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Shots</span>
+                <span class="metric-value">{{ replay.shots }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">xG</span>
+                <span class="metric-value">{{ replay.xg }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Zones C/W/L</span>
+                <span class="metric-value">{{ replay.zones }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Starters</span>
+                <span class="metric-value">{{ replay.playerCount }}/11</span>
+              </div>
+            </div>
+            <p class="panel-hint current-replay-starters">
+              {{ replay.starters.join(' · ') }}
+            </p>
+          </div>
+          <div *ngIf="currentLineupMultiSeedSummary() as summary" class="formation-matrix analysis-matrix current-lineup-replay">
+            <div class="matrix-header">
+              <strong>XI actual multi-seed</strong>
+              <span>
+                {{ summary.label }} · formación {{ summary.formation || '?' }}
+                · seeds {{ summary.seedStart }}..{{ summary.seedEnd }} · {{ selectedStyleLabel() }}
+              </span>
+              <button type="button" class="matrix-export" (click)="copyCurrentLineupMultiSeedJson()">
+                Copiar JSON
+              </button>
+            </div>
+            <div
+              class="qa-readable-strip"
+              data-testid="current-lineup-multiseed-readout"
+              aria-label="XI actual multi-seed readable summary"
+            >
+              <span>{{ currentLineupMultiSeedReadable(summary) }}</span>
+              <span [class]="deltaClass(summary.avgXgDiff)">xG {{ fmtDeltaNumber(summary.avgXgDiff) }}</span>
+              <span [class]="deltaClass(summary.avgShotDiff)">Tiros {{ fmtDeltaNumber(summary.avgShotDiff) }}</span>
+              <span>{{ currentLineupMultiSeedSignal(summary) }}</span>
+            </div>
+            <div class="current-replay-grid" role="group" aria-label="XI actual multi-seed summary">
+              <div class="metric-card">
+                <span class="metric-label">Prom. marcador</span>
+                <span class="metric-value">{{ fmtXg(summary.avgGoalsFor) }}-{{ fmtXg(summary.avgGoalsAgainst) }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Prom. dif. gol</span>
+                <span class="metric-value" [class]="deltaClass(summary.avgGoalDiff)">{{ fmtDeltaNumber(summary.avgGoalDiff) }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Prom. posesión</span>
+                <span class="metric-value">{{ fmtPct(summary.avgPossessionFor) }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Prom. tiros</span>
+                <span class="metric-value">
+                  {{ fmtXg(summary.avgShotsFor) }} / {{ fmtXg(summary.avgShotsAgainst) }}
+                  <span [class]="deltaClass(summary.avgShotDiff)">({{ fmtDeltaNumber(summary.avgShotDiff) }})</span>
+                </span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Prom. xG</span>
+                <span class="metric-value">
+                  {{ fmtXg(summary.avgXgFor) }} / {{ fmtXg(summary.avgXgAgainst) }}
+                  <span [class]="deltaClass(summary.avgXgDiff)">({{ fmtDeltaNumber(summary.avgXgDiff) }})</span>
+                </span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Prom. zonas centro/banda/lejos</span>
+                <span class="metric-value">
+                  {{ fmtXg(summary.avgCentralShotsFor) }}/{{ fmtXg(summary.avgWideShotsFor) }}/{{ fmtXg(summary.avgLongShotsFor) }}
+                  /
+                  {{ fmtXg(summary.avgCentralShotsAgainst) }}/{{ fmtXg(summary.avgWideShotsAgainst) }}/{{ fmtXg(summary.avgLongShotsAgainst) }}
+                </span>
+              </div>
+            </div>
+            <p class="panel-hint current-replay-starters">
+              Titulares {{ summary.playerCount }}/11 · {{ summary.starters.join(' · ') }}
+            </p>
+          </div>
+          <div *ngIf="modalVsCanonicalSummary() as summary" class="formation-matrix analysis-matrix current-lineup-replay">
+            <div class="matrix-header">
+              <strong>Base vs píxeles del modal</strong>
+              <span>
+                {{ summary.label }} · formación {{ summary.formation || '?' }}
+                · seeds {{ summary.seedStart }}..{{ summary.seedEnd }} · jugadores movidos {{ summary.customMovableSlotCount }}/{{ summary.customSlotCount }}
+              </span>
+              <button type="button" class="matrix-export" (click)="copyModalVsCanonicalJson()">
+                Copiar JSON
+              </button>
+            </div>
+            <p class="panel-hint">
+              Contrato QA: compara el XI canónico de la formación contra los píxeles guardados por el Modal DT.
+              {{ summary.movedPlayers.length ? 'Movidos: ' + summary.movedPlayers.join(', ') + '.' : 'No hay jugadores de campo movidos.' }}
+              Veredicto motor: {{ summary.engineImpactLabel }} — {{ summary.engineImpactDetail }}
+            </p>
+            <div class="current-replay-grid" role="group" aria-label="Base vs píxeles del modal summary">
+              <div class="metric-card">
+                <span class="metric-label">Lectura DT</span>
+                <span class="metric-value" [class]="summary.coachReadClass">{{ summary.coachRead }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Δ xG a favor</span>
+                <span class="metric-value" [class]="deltaClass(summary.deltaXgFor)">{{ fmtDeltaNumber(summary.deltaXgFor) }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Δ xG en contra</span>
+                <span class="metric-value" [class]="deltaClass(-summary.deltaXgAgainst)">{{ fmtDeltaNumber(summary.deltaXgAgainst) }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Δ tiros</span>
+                <span class="metric-value" [class]="deltaClass(summary.deltaShotDiff)">{{ fmtDeltaNumber(summary.deltaShotDiff) }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Δ posesión</span>
+                <span class="metric-value" [class]="deltaClass(summary.deltaPossessionFor)">{{ fmtDeltaNumber(summary.deltaPossessionFor) }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Δ zonas centro/banda/lejos</span>
+                <span class="metric-value">
+                  {{ fmtDeltaNumber(summary.deltaCentralShotsFor) }}/{{ fmtDeltaNumber(summary.deltaWideShotsFor) }}/{{ fmtDeltaNumber(summary.deltaLongShotsFor) }}
+                </span>
+              </div>
+            </div>
+            <div class="compare-table-wrap">
+              <table class="matrix-table compact-table">
+                <thead>
+                  <tr>
+                    <th>Estado</th>
+                    <th>xG</th>
+                    <th>Tiros</th>
+                    <th>Pos.</th>
+                    <th>Zonas C/W/L</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Base formación</td>
+                    <td>{{ fmtXg(summary.canonical.avgXgFor) }} / {{ fmtXg(summary.canonical.avgXgAgainst) }}</td>
+                    <td>{{ fmtXg(summary.canonical.avgShotsFor) }} / {{ fmtXg(summary.canonical.avgShotsAgainst) }}</td>
+                    <td>{{ fmtPct(summary.canonical.avgPossessionFor) }}</td>
+                    <td>{{ fmtXg(summary.canonical.avgCentralShotsFor) }}/{{ fmtXg(summary.canonical.avgWideShotsFor) }}/{{ fmtXg(summary.canonical.avgLongShotsFor) }}</td>
+                  </tr>
+                  <tr>
+                    <td>Modal custom</td>
+                    <td>{{ fmtXg(summary.modal.avgXgFor) }} / {{ fmtXg(summary.modal.avgXgAgainst) }}</td>
+                    <td>{{ fmtXg(summary.modal.avgShotsFor) }} / {{ fmtXg(summary.modal.avgShotsAgainst) }}</td>
+                    <td>{{ fmtPct(summary.modal.avgPossessionFor) }}</td>
+                    <td>{{ fmtXg(summary.modal.avgCentralShotsFor) }}/{{ fmtXg(summary.modal.avgWideShotsFor) }}/{{ fmtXg(summary.modal.avgLongShotsFor) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div *ngIf="playerSwapMatrixSummary() as swap" class="formation-matrix analysis-matrix current-lineup-replay">
+            <div class="matrix-header">
+              <strong>Matriz cambio jugador</strong>
+              <span>
+                {{ swap.baselinePlayer }} vs {{ swap.swapPlayer }}
+                · slot {{ swap.slotId }} · seeds {{ swap.seedStart }}..{{ swap.seedEnd }}
+              </span>
+              <button type="button" class="matrix-export" (click)="copyPlayerSwapMatrixJson()">
+                Copiar JSON
+              </button>
+              <button type="button" class="matrix-export" (click)="downloadPlayerSwapMatrixCsv()">
+                CSV
+              </button>
+            </div>
+            <div class="current-replay-grid" role="group" aria-label="Matriz cambio jugador summary">
+              <div class="metric-card">
+                <span class="metric-label">Coach read</span>
+                <span class="metric-value" [class]="swap.swapReadClass">{{ swap.swapRead }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Delta GF</span>
+                <span class="metric-value" [class]="deltaClass(swap.deltaGoalsFor)">{{ fmtDeltaNumber(swap.deltaGoalsFor) }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Delta GA</span>
+                <span class="metric-value" [class]="deltaClass(-swap.deltaGoalsAgainst)">{{ fmtDeltaNumber(swap.deltaGoalsAgainst) }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Delta GD</span>
+                <span class="metric-value" [class]="deltaClass(swap.deltaGoalDiff)">{{ fmtDeltaNumber(swap.deltaGoalDiff) }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Delta Shots</span>
+                <span class="metric-value" [class]="deltaClass(swap.deltaShotsFor)">{{ fmtDeltaNumber(swap.deltaShotsFor) }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Delta Poss</span>
+                <span class="metric-value" [class]="deltaClass(swap.deltaPossessionFor)">{{ fmtDeltaNumber(swap.deltaPossessionFor) }}%</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Delta xG For</span>
+                <span class="metric-value" [class]="deltaClass(swap.deltaXgFor)">{{ fmtDeltaNumber(swap.deltaXgFor) }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Delta xG Diff</span>
+                <span class="metric-value" [class]="deltaClass(swap.deltaXgDiff)">{{ fmtDeltaNumber(swap.deltaXgDiff) }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Delta Zones For C/W/L</span>
+                <span class="metric-value" [class]="deltaClass(swap.deltaCentralShotsFor + swap.deltaWideShotsFor + swap.deltaLongShotsFor)">
+                  {{ fmtDeltaNumber(swap.deltaCentralShotsFor) }}/{{ fmtDeltaNumber(swap.deltaWideShotsFor) }}/{{ fmtDeltaNumber(swap.deltaLongShotsFor) }}
+                </span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Delta Zones Ag. C/W/L</span>
+                <span class="metric-value" [class]="deltaClass(-(swap.deltaCentralShotsAgainst + swap.deltaWideShotsAgainst + swap.deltaLongShotsAgainst))">
+                  {{ fmtDeltaNumber(swap.deltaCentralShotsAgainst) }}/{{ fmtDeltaNumber(swap.deltaWideShotsAgainst) }}/{{ fmtDeltaNumber(swap.deltaLongShotsAgainst) }}
+                </span>
+              </div>
+            </div>
+            <p class="panel-hint current-replay-starters" *ngIf="swap.preAutoSubDeltaXgFor !== undefined">
+              Pre-auto-sub 1'-59':
+              Delta Shots {{ fmtDeltaNumber(swap.preAutoSubDeltaShotsFor || 0) }}
+              · Delta Shots Ag. {{ fmtDeltaNumber(swap.preAutoSubDeltaShotsAgainst || 0) }}
+              · Delta xG For {{ fmtDeltaNumber(swap.preAutoSubDeltaXgFor || 0) }}
+              · Delta xG Ag. {{ fmtDeltaNumber(swap.preAutoSubDeltaXgAgainst || 0) }}
+              · Delta xG Diff {{ fmtDeltaNumber(swap.preAutoSubDeltaXgDiff || 0) }}
+            </p>
+            <p class="panel-hint current-replay-starters">
+              Coach read: {{ swap.swapReadDetail }}
+            </p>
+            <p class="panel-hint current-replay-starters">
+              Baseline avg xG {{ fmtXg(swap.baseline.avgXgFor) }} / {{ fmtXg(swap.baseline.avgXgAgainst) }}
+              -> Swapped avg xG {{ fmtXg(swap.swapped.avgXgFor) }} / {{ fmtXg(swap.swapped.avgXgAgainst) }}
+            </p>
+            <p class="panel-hint current-replay-starters">
+              Poss {{ fmtPct(swap.baseline.avgPossessionFor) }} -> {{ fmtPct(swap.swapped.avgPossessionFor) }}
+              · Zonas C/B/L
+              {{ fmtXg(swap.baseline.avgCentralShotsFor) }}/{{ fmtXg(swap.baseline.avgWideShotsFor) }}/{{ fmtXg(swap.baseline.avgLongShotsFor) }}
+              ->
+              {{ fmtXg(swap.swapped.avgCentralShotsFor) }}/{{ fmtXg(swap.swapped.avgWideShotsFor) }}/{{ fmtXg(swap.swapped.avgLongShotsFor) }}
+              · En contra
+              {{ fmtXg(swap.baseline.avgCentralShotsAgainst) }}/{{ fmtXg(swap.baseline.avgWideShotsAgainst) }}/{{ fmtXg(swap.baseline.avgLongShotsAgainst) }}
+              ->
+              {{ fmtXg(swap.swapped.avgCentralShotsAgainst) }}/{{ fmtXg(swap.swapped.avgWideShotsAgainst) }}/{{ fmtXg(swap.swapped.avgLongShotsAgainst) }}
+            </p>
+          </div>
+          <div *ngIf="substitutionWhatIfSummary() as sub" class="formation-matrix analysis-matrix current-lineup-replay">
+            <div class="matrix-header">
+              <strong>Simular sustitución</strong>
+              <span>
+                {{ sub.playerOffName }} -> {{ sub.playerOnName }}
+                · min {{ sub.minute }} · seeds {{ sub.seedStart }}..{{ sub.seedEnd }}
+              </span>
+            </div>
+            <div class="current-replay-grid" role="group" aria-label="Simular sustitución summary">
+              <div class="metric-card">
+                <span class="metric-label">Coach read</span>
+                <span class="metric-value" [class]="sub.readClass">{{ sub.read }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Delta xG For</span>
+                <span class="metric-value" [class]="deltaClass(sub.deltaXgFor)">{{ fmtDeltaNumber(sub.deltaXgFor) }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Delta xG Ag.</span>
+                <span class="metric-value" [class]="deltaClass(-sub.deltaXgAgainst)">{{ fmtDeltaNumber(sub.deltaXgAgainst) }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Delta Shots</span>
+                <span class="metric-value" [class]="deltaClass(sub.deltaShotsFor)">{{ fmtDeltaNumber(sub.deltaShotsFor) }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Delta Poss</span>
+                <span class="metric-value" [class]="deltaClass(sub.deltaPossessionFor)">{{ fmtDeltaNumber(sub.deltaPossessionFor) }}%</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Delta Channels C/W/L</span>
+                <span class="metric-value" [class]="deltaClass(sub.deltaCentralShotsFor + sub.deltaWideShotsFor + sub.deltaLongShotsFor)">
+                  {{ fmtDeltaNumber(sub.deltaCentralShotsFor) }}/{{ fmtDeltaNumber(sub.deltaWideShotsFor) }}/{{ fmtDeltaNumber(sub.deltaLongShotsFor) }}
+                </span>
+              </div>
+            </div>
+            <p class="panel-hint current-replay-starters">
+              Baseline xG {{ fmtXg(sub.baselineAvgXgFor) }} / {{ fmtXg(sub.baselineAvgXgAgainst) }}
+              -> Con cambio {{ fmtXg(sub.substitutedAvgXgFor) }} / {{ fmtXg(sub.substitutedAvgXgAgainst) }}.
+              Esto prueba una sustitución real durante el partido, no solo cambio del XI inicial.
+            </p>
+          </div>
+          <div *ngIf="modalRecommendationCandidateAttempts().length > 0" class="formation-matrix analysis-matrix current-lineup-replay">
+            <div class="matrix-header">
+              <strong>Candidatos probados por Modal DT</strong>
+              <span>
+                {{ modalRecommendationCandidateAttempts().length }} cambios simulados para {{ playerSwapCoachObjectiveRead() }}
+              </span>
+            </div>
+            <div class="matrix-table-wrapper">
+              <table class="matrix-table">
+                <thead>
+                  <tr>
+                    <th>Cambio</th>
+                    <th>Encaje</th>
+                    <th>Delta xG</th>
+                    <th>Delta xGA</th>
+                    <th>Delta tiros ag.</th>
+                    <th>Score cierre</th>
+                    <th>Decision</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let item of modalRecommendationCandidateAttempts(); trackBy: trackByModalRecommendationCandidateAttempt">
+                    <td>
+                      {{ item.candidate.starterName }} ({{ item.candidate.starterPosition }})
+                      ->
+                      {{ item.candidate.benchName }} ({{ item.candidate.benchPosition }})
+                    </td>
+                    <td [class]="playerSwapFitClass(item.candidate)">{{ playerSwapFit(item.candidate) }}</td>
+                    <td [class]="item.row ? deltaClass(item.row.deltaXgDiff) : 'delta-neutral'">
+                      {{ item.row ? fmtDeltaNumber(item.row.deltaXgDiff) : '-' }}
+                    </td>
+                    <td [class]="item.row ? deltaClass(-item.row.deltaXgAgainst) : 'delta-neutral'">
+                      {{ item.row ? fmtDeltaNumber(item.row.deltaXgAgainst) : '-' }}
+                    </td>
+                    <td [class]="item.row ? deltaClass(-item.row.deltaShotsAgainst) : 'delta-neutral'">
+                      {{ item.row ? fmtDeltaNumber(item.row.deltaShotsAgainst) : '-' }}
+                    </td>
+                    <td [class]="deltaClass(item.score)">{{ fmtDeltaNumber(item.score) }}</td>
+                    <td [class]="item.safe ? 'delta-positive' : 'read-check'">
+                      {{ item.status === 'RUNNING' ? 'Probando' : item.status === 'NO_SAMPLE' ? 'Sin muestra' : item.safe ? 'Cierre real' : 'Rechazado' }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p class="panel-hint current-replay-starters">
+              Esta tabla audita el modal: si todos quedan rechazados, el sistema prefiere no recomendar antes que vender un cierre falso.
+            </p>
+          </div>
+          <div *ngIf="substitutionTimingMatrixRows().length > 0" class="formation-matrix analysis-matrix current-lineup-replay">
+            <div class="matrix-header">
+              <strong>Substitution timing matrix</strong>
+              <span>
+                {{ substitutionTimingMatrixRows()[0].playerOffName }} -> {{ substitutionTimingMatrixRows()[0].playerOnName }}
+                · seeds {{ substitutionTimingMatrixRows()[0].seedStart }}..{{ substitutionTimingMatrixRows()[0].seedEnd }}
+              </span>
+            </div>
+            <div class="matrix-table-wrapper">
+              <table class="matrix-table">
+                <thead>
+                  <tr>
+                    <th>Min</th>
+                    <th>Delta xG</th>
+                    <th>Delta xGA</th>
+                    <th>Delta Shots</th>
+                    <th>Delta Poss</th>
+                    <th>Delta C/W/L</th>
+                    <th>Read</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let row of substitutionTimingMatrixRows(); trackBy: trackBySubstitutionTimingRow">
+                    <td>{{ row.minute }}'</td>
+                    <td [class]="deltaClass(row.deltaXgFor)">{{ fmtDeltaNumber(row.deltaXgFor) }}</td>
+                    <td [class]="deltaClass(-row.deltaXgAgainst)">{{ fmtDeltaNumber(row.deltaXgAgainst) }}</td>
+                    <td [class]="deltaClass(row.deltaShotsFor)">{{ fmtDeltaNumber(row.deltaShotsFor) }}</td>
+                    <td [class]="deltaClass(row.deltaPossessionFor)">{{ fmtDeltaNumber(row.deltaPossessionFor) }}%</td>
+                    <td [class]="deltaClass(row.deltaCentralShotsFor + row.deltaWideShotsFor + row.deltaLongShotsFor)">
+                      {{ fmtDeltaNumber(row.deltaCentralShotsFor) }}/{{ fmtDeltaNumber(row.deltaWideShotsFor) }}/{{ fmtDeltaNumber(row.deltaLongShotsFor) }}
+                    </td>
+                    <td [class]="row.readClass">{{ row.timingRead }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p class="panel-hint current-replay-starters">
+              Lectura DT: si el 45' y el 60' muestran más señal que el 80', el timing está pesando. Si todos son iguales, revisar sensibilidad temporal del motor.
+            </p>
+          </div>
+          <div *ngIf="playerSwapBatterySummaries().length > 0" class="formation-matrix analysis-matrix current-lineup-replay">
+            <div class="matrix-header">
+              <strong>Batería cambio jugador</strong>
+              <span>{{ playerSwapBatterySummaries().length }} swaps · seeds {{ playerSwapBatterySummaries()[0].seedStart }}..{{ playerSwapBatterySummaries()[0].seedEnd }}</span>
+              <button type="button" class="matrix-export" (click)="copyPlayerSwapBatteryJson()">
+                Copiar JSON
+              </button>
+              <button type="button" class="matrix-export" (click)="copyPlayerSwapBatteryReport()">
+                Copy report
+              </button>
+              <button type="button" class="matrix-export" (click)="downloadPlayerSwapBatteryCsv()">
+                CSV
+              </button>
+            </div>
+            <div *ngIf="playerSwapBatterySummary() as battery" class="current-replay-grid" role="group" aria-label="Batería cambio jugador summary">
+              <div class="metric-card">
+                <span class="metric-label">Recommendation</span>
+                <span class="metric-value delta-positive">{{ playerSwapBatteryBestWorstText(battery.best) }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Objetivo DT</span>
+                <span class="metric-value">{{ playerSwapCoachObjectiveRead() }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Mejor ataque</span>
+                <span class="metric-value delta-positive">{{ playerSwapObjectiveText(battery.bestAttack, 'NEED_GOAL') }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Mejor cierre</span>
+                <span class="metric-value delta-positive">{{ playerSwapObjectiveText(battery.bestProtect, 'PROTECT_RESULT') }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Contraste DT</span>
+                <span class="metric-value">{{ playerSwapObjectiveContrastText(battery) }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Worst</span>
+                <span class="metric-value delta-negative">{{ playerSwapBatteryBestWorstText(battery.worst) }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Reads</span>
+                <span class="metric-value">{{ playerSwapBatteryCounterText(battery.reads) }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Fit</span>
+                <span class="metric-value">{{ playerSwapBatteryCounterText(battery.fits) }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Mode</span>
+                <span class="metric-value">{{ battery.mode }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Confidence</span>
+                <span class="metric-value">{{ battery.confidence }} · {{ battery.precision }}</span>
+              </div>
+            </div>
+            <div class="table-scroll compact-position-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Caso</th>
+                    <th>Read</th>
+                    <th>Fit</th>
+                    <th>Starter</th>
+                    <th>Bench</th>
+                    <th>OVR</th>
+                    <th>Slot</th>
+                    <th>Shots</th>
+                    <th>Shots Ag.</th>
+                    <th>xG For</th>
+                    <th>xG Ag.</th>
+                    <th>xG Diff</th>
+                    <th>Pre xG Diff</th>
+                    <th>Señal</th>
+                    <th>Ataque</th>
+                    <th>Control</th>
+                    <th>Protección</th>
+                    <th>Canales</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let swap of playerSwapBatterySummaries(); trackBy: trackByPlayerSwapSummary">
+                    <td>{{ swap.testCase }}</td>
+                    <td [class]="swap.swapReadClass">{{ swap.swapRead }}</td>
+                    <td [class]="swap.swapFitClass">{{ swap.swapFit }}</td>
+                    <td>{{ swap.baselinePlayer }}</td>
+                    <td>{{ swap.swapPlayer }}</td>
+                    <td [class]="deltaClass(swap.deltaPlayerOverall || 0)">
+                      {{ playerSwapOverallText(swap) }}
+                    </td>
+                    <td>{{ swap.slotId }}</td>
+                    <td [class]="deltaClass(swap.deltaShotsFor)">{{ fmtDeltaNumber(swap.deltaShotsFor) }}</td>
+                    <td [class]="deltaClass(-swap.deltaShotsAgainst)">{{ fmtDeltaNumber(swap.deltaShotsAgainst) }}</td>
+                    <td [class]="deltaClass(swap.deltaXgFor)">{{ fmtDeltaNumber(swap.deltaXgFor) }}</td>
+                    <td [class]="deltaClass(-swap.deltaXgAgainst)">{{ fmtDeltaNumber(swap.deltaXgAgainst) }}</td>
+                    <td [class]="deltaClass(swap.deltaXgDiff)">{{ fmtDeltaNumber(swap.deltaXgDiff) }}</td>
+                    <td [class]="deltaClass(swap.preAutoSubDeltaXgDiff || 0)">{{ fmtDeltaNumber(swap.preAutoSubDeltaXgDiff || 0) }}</td>
+                    <td [class]="swap.signalClass" [title]="swap.signalDetail">{{ swap.signalRead }}</td>
+                    <td [class]="swap.tacticalAttackClass">{{ swap.tacticalAttackRead }}</td>
+                    <td [class]="swap.tacticalCentralControlClass">{{ swap.tacticalCentralControlRead }}</td>
+                    <td [class]="swap.tacticalProtectionClass">{{ swap.tacticalProtectionRead }}</td>
+                    <td [class]="swap.tacticalChannelsClass" [title]="swap.tacticalBreakdownDetail">{{ swap.tacticalChannelsRead }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div *ngIf="playerSwapPrecisionComparisonRows().length > 0" class="formation-matrix analysis-matrix current-lineup-replay">
+            <div class="matrix-header">
+              <strong>Comparacion precision cambio jugador</strong>
+              <span>Rápido 3 seeds vs Balanceado 10 seeds · {{ playerSwapPrecisionComparisonRows().length }} swaps</span>
+            </div>
+            <div class="table-scroll compact-position-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Stability</th>
+                    <th>Fit</th>
+                    <th>Starter</th>
+                    <th>Bench</th>
+                    <th>Rapido read</th>
+                    <th>Balanceado read</th>
+                    <th>Rapido xG Diff</th>
+                    <th>Balanceado xG Diff</th>
+                    <th>Rapido pre</th>
+                    <th>Balanceado pre</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let row of playerSwapPrecisionComparisonRows(); trackBy: trackByPlayerSwapPrecisionComparison">
+                    <td [class]="row.stabilityClass">{{ row.stability }}</td>
+                    <td>{{ row.fit }}</td>
+                    <td>{{ row.starter }}</td>
+                    <td>{{ row.bench }}</td>
+                    <td [class]="row.quick.swapReadClass">{{ row.quick.swapRead }}</td>
+                    <td [class]="row.balanced.swapReadClass">{{ row.balanced.swapRead }}</td>
+                    <td [class]="deltaClass(row.quick.deltaXgDiff)">{{ fmtDeltaNumber(row.quick.deltaXgDiff) }}</td>
+                    <td [class]="deltaClass(row.balanced.deltaXgDiff)">{{ fmtDeltaNumber(row.balanced.deltaXgDiff) }}</td>
+                    <td [class]="deltaClass(row.quick.preAutoSubDeltaXgDiff || 0)">{{ fmtDeltaNumber(row.quick.preAutoSubDeltaXgDiff || 0) }}</td>
+                    <td [class]="deltaClass(row.balanced.preAutoSubDeltaXgDiff || 0)">{{ fmtDeltaNumber(row.balanced.preAutoSubDeltaXgDiff || 0) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div *ngIf="roleSlotImpactRows().length > 0" class="formation-matrix analysis-matrix current-lineup-replay">
+            <div class="matrix-header">
+              <strong>Impacto rol-slot</strong>
+              <span *ngIf="roleSlotImpactRows()[0] as first">
+                {{ first.baselinePlayerName }} · slot {{ first.slotId }}
+                · XY {{ first.slotXPercent }}/{{ first.slotYPercent }}
+                · seeds {{ first.seedStart }}..{{ first.seedEnd }}
+              </span>
+            </div>
+            <p class="panel-hint current-replay-starters">
+              Prueba aislada: mismo jugador base, mismo slot, mismás seeds. Solo cambia el rol natural en memoria para medir si el modal y el motor hablan el mismo idioma.
+              {{ roleSlotImpactCoachRead() }}
+            </p>
+            <div class="matrix-table-wrap">
+              <table class="matrix-table" aria-label="Impacto rol-slot summary">
+                <thead>
+                  <tr>
+                    <th>Rol probado</th>
+                    <th>Rol motor</th>
+                    <th>Eff</th>
+                    <th>Colectivo</th>
+                    <th>xG</th>
+                    <th>xGA</th>
+                    <th>xGD</th>
+                    <th>Tiros</th>
+                    <th>Banda</th>
+                    <th>Centro</th>
+                    <th>Pos.</th>
+                    <th>Lectura</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let row of roleSlotImpactRows(); trackBy: trackByRoleSlotImpactRow">
+                    <td>{{ row.testedNaturalPosition }}</td>
+                    <td>{{ row.tacticalPosition }}</td>
+                    <td [class]="roleSlotImpactFitClass(row)">{{ fmtPct(row.playerEffectiveness * 100) }}</td>
+                    <td>{{ fmtXg(row.playerCollective) }}</td>
+                    <td>{{ fmtXg(row.avgXgFor) }}</td>
+                    <td>{{ fmtXg(row.avgXgAgainst) }}</td>
+                    <td [class]="deltaClass(row.avgXgDiff)">{{ fmtDeltaNumber(row.avgXgDiff) }}</td>
+                    <td>{{ fmtXg(row.avgShotsFor) }}</td>
+                    <td>{{ fmtXg(row.avgWideShotsFor) }}</td>
+                    <td>{{ fmtXg(row.avgCentralShotsFor) }}</td>
+                    <td>{{ fmtXg(row.avgPossessionFor) }}%</td>
+                    <td [class]="roleSlotImpactFitClass(row)">{{ roleSlotImpactFitRead(row) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div *ngIf="roleSlotImpactSmokeRows().length > 0" class="formation-matrix analysis-matrix current-lineup-replay">
+            <div class="matrix-header">
+              <strong>Smoke todos los roles-slot</strong>
+              <button type="button" class="matrix-export" (click)="copyRoleSlotImpactSmokeJson()">
+                Copiar JSON
+              </button>
+              <button type="button" class="matrix-export" (click)="copyRoleSlotImpactSmokeReport()">
+                Copy MD
+              </button>
+              <span>{{ roleSlotImpactSmokeRows().length }} slots · lectura rápida del XI</span>
+            </div>
+            <p class="panel-hint current-replay-starters">
+              Semáforo: si el mejor rol tiene mucha ventaja contra el peor, el slot está leyendo rol/posición de forma clara.
+            </p>
+            <div class="matrix-table-wrap">
+              <table class="matrix-table" aria-label="Smoke todos los roles-slot">
+                <thead>
+                  <tr>
+                    <th>Slot</th>
+                    <th>Jugador</th>
+                    <th>Mejor rol</th>
+                    <th>Eff</th>
+                    <th>Peor rol</th>
+                    <th>Eff</th>
+                    <th>Gap</th>
+                    <th>Veredicto</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let row of roleSlotImpactSmokeRows(); trackBy: trackByRoleSlotImpactSmokeRow">
+                    <td>{{ row.slotId }}</td>
+                    <td>{{ row.player }}</td>
+                    <td>{{ row.bestRole }}</td>
+                    <td>{{ fmtPct(row.bestEff * 100) }}</td>
+                    <td>{{ row.worstRole }}</td>
+                    <td>{{ fmtPct(row.worstEff * 100) }}</td>
+                    <td [class]="deltaClass(row.gap)">{{ fmtPct(row.gap * 100) }}</td>
+                    <td [class]="row.className">{{ row.verdict }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div *ngIf="allFormationRoleSlotSmokeRows().length > 0" class="formation-matrix analysis-matrix current-lineup-replay">
+            <div class="matrix-header">
+              <strong>Smoke roles-slot por formación</strong>
+              <span>{{ allFormationRoleSlotSmokeRows().length }} formaciones · roles por slot real</span>
+              <button type="button" class="matrix-export" (click)="copyAllFormationsRoleSlotSmokeJson()">
+                Copiar JSON
+              </button>
+              <button type="button" class="matrix-export" (click)="copyAllFormationsRoleSlotSmokeReport()">
+                Copy MD
+              </button>
+            </div>
+            <p class="panel-hint current-replay-starters">
+              Verifica si cada formación auto-seleccionada conserva slots con lectura fuerte de rol natural vs improvisado.
+            </p>
+            <div class="matrix-table-wrap">
+              <table class="matrix-table" aria-label="All formations role slot smoke">
+                <thead>
+                  <tr>
+                    <th>Formacion</th>
+                    <th>Slots</th>
+                    <th>Claro</th>
+                    <th>Visible</th>
+                    <th>Revisar</th>
+                    <th>Min gap</th>
+                    <th>Avg gap</th>
+                    <th>Slot débil</th>
+                    <th>Veredicto</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let row of allFormationRoleSlotSmokeRows(); trackBy: trackByAllFormationRoleSlotSmokeRow">
+                    <td>{{ row.formation }}</td>
+                    <td>{{ row.slots }}</td>
+                    <td>{{ row.clear }}</td>
+                    <td>{{ row.visible }}</td>
+                    <td>{{ row.review }}</td>
+                    <td [class]="deltaClass(row.minGap)">{{ fmtPct(row.minGap * 100) }}</td>
+                    <td [class]="deltaClass(row.avgGap)">{{ fmtPct(row.avgGap * 100) }}</td>
+                    <td>{{ row.weakestSlot }}</td>
+                    <td [class]="row.className">{{ row.verdict }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div *ngIf="positionPixelMatrixSummary() as pixel" class="formation-matrix analysis-matrix current-lineup-replay">
+            <div class="matrix-header">
+              <strong>Position pixel matrix</strong>
+              <span>
+                {{ pixel.playerName }} ({{ pixel.playerPosition }}) · slot {{ pixel.slotId }}
+                · {{ pixel.fromXPercent }}/{{ pixel.fromYPercent }} → {{ pixel.targetXPercent }}/{{ pixel.targetYPercent }}
+                · seeds {{ pixel.seedStart }}..{{ pixel.seedEnd }}
+              </span>
+            </div>
+            <div class="current-replay-grid" role="group" aria-label="Position pixel matrix summary">
+              <div class="metric-card">
+                <span class="metric-label">Delta Shots</span>
+                <span class="metric-value" [class]="deltaClass(pixel.deltaShotsFor)">{{ fmtDeltaNumber(pixel.deltaShotsFor) }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Delta Poss</span>
+                <span class="metric-value" [class]="deltaClass(pixel.deltaPossessionFor)">{{ fmtDeltaNumber(pixel.deltaPossessionFor) }}%</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Delta xG For</span>
+                <span class="metric-value" [class]="deltaClass(pixel.deltaXgFor)">{{ fmtDeltaNumber(pixel.deltaXgFor) }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Delta xG Diff</span>
+                <span class="metric-value" [class]="deltaClass(pixel.deltaXgDiff)">{{ fmtDeltaNumber(pixel.deltaXgDiff) }}</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Delta Zones C/W/L</span>
+                <span class="metric-value" [class]="deltaClass(pixel.deltaCentralShotsFor + pixel.deltaWideShotsFor + pixel.deltaLongShotsFor)">
+                  {{ fmtDeltaNumber(pixel.deltaCentralShotsFor) }}/{{ fmtDeltaNumber(pixel.deltaWideShotsFor) }}/{{ fmtDeltaNumber(pixel.deltaLongShotsFor) }}
+                </span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Delta Zones Ag. C/W/L</span>
+                <span class="metric-value" [class]="deltaClass(-(pixel.deltaCentralShotsAgainst + pixel.deltaWideShotsAgainst + pixel.deltaLongShotsAgainst))">
+                  {{ fmtDeltaNumber(pixel.deltaCentralShotsAgainst) }}/{{ fmtDeltaNumber(pixel.deltaWideShotsAgainst) }}/{{ fmtDeltaNumber(pixel.deltaLongShotsAgainst) }}
+                </span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Delta xG Ag. C/W/L</span>
+                <span class="metric-value" [class]="deltaClass(-(pixel.deltaCentralXgAgainst + pixel.deltaWideXgAgainst + pixel.deltaLongXgAgainst))">
+                  {{ fmtDeltaNumber(pixel.deltaCentralXgAgainst) }}/{{ fmtDeltaNumber(pixel.deltaWideXgAgainst) }}/{{ fmtDeltaNumber(pixel.deltaLongXgAgainst) }}
+                </span>
+              </div>
+            </div>
+            <p class="panel-hint current-replay-starters">
+              xG for {{ fmtXg(pixel.baselineXgFor) }} → {{ fmtXg(pixel.movedXgFor) }}
+              · xG against {{ fmtXg(pixel.baselineXgAgainst) }} → {{ fmtXg(pixel.movedXgAgainst) }}.
+              Movimiento destacado: {{ positionPixelMoveLabel(pixel) }} - Tactical read: {{ positionPixelTacticalRead(pixel) }}.
+            </p>
+            <div class="position-before-after" role="table" aria-label="Position movement before and after">
+              <div class="position-before-after-row position-before-after-head" role="row">
+                <span role="columnheader">Estado</span>
+                <span role="columnheader">XY</span>
+                <span role="columnheader">Linea</span>
+                <span role="columnheader">Canal</span>
+                <span role="columnheader">Rol motor</span>
+                <span role="columnheader">Eff</span>
+                <span role="columnheader">Colectivo</span>
+                <span role="columnheader">xG For</span>
+                <span role="columnheader">xG Ag.</span>
+                <span role="columnheader">Tiros</span>
+                <span role="columnheader">Posesion</span>
+              </div>
+              <div class="position-before-after-row" role="row">
+                <span role="cell">Antes</span>
+                <span role="cell">{{ fmtPctCoord(pixel.fromXPercent) }}/{{ fmtPctCoord(pixel.fromYPercent) }}</span>
+                <span role="cell">{{ positionPixelVisualLineLabel(pixel.fromYPercent) }}</span>
+                <span role="cell">{{ positionPixelVisualChannelLabel(pixel.fromXPercent) }}</span>
+                <span role="cell">{{ pixel.baselineTacticalPosition }}</span>
+                <span role="cell">{{ fmtPct(pixel.baselinePlayerEffectiveness * 100) }}</span>
+                <span role="cell">{{ fmtXg(pixel.baselinePlayerCollective) }}</span>
+                <span role="cell">{{ fmtXg(pixel.baselineXgFor) }}</span>
+                <span role="cell">{{ fmtXg(pixel.baselineXgAgainst) }}</span>
+                <span role="cell">{{ fmtXg(pixel.baselineShotsFor) }}</span>
+                <span role="cell">{{ fmtXg(pixel.baselinePossessionFor) }}%</span>
+              </div>
+              <div class="position-before-after-row" role="row">
+                <span role="cell">Despues</span>
+                <span role="cell">{{ fmtPctCoord(pixel.targetXPercent) }}/{{ fmtPctCoord(pixel.targetYPercent) }}</span>
+                <span role="cell">{{ positionPixelVisualLineLabel(pixel.targetYPercent) }}</span>
+                <span role="cell">{{ positionPixelVisualChannelLabel(pixel.targetXPercent) }}</span>
+                <span role="cell">{{ pixel.movedTacticalPosition }}</span>
+                <span role="cell" [class]="deltaClass(pixel.deltaPlayerEffectiveness)">{{ fmtPct(pixel.movedPlayerEffectiveness * 100) }}</span>
+                <span role="cell" [class]="deltaClass(pixel.deltaPlayerCollective)">{{ fmtXg(pixel.movedPlayerCollective) }}</span>
+                <span role="cell" [class]="deltaClass(pixel.deltaXgFor)">{{ fmtXg(pixel.movedXgFor) }}</span>
+                <span role="cell" [class]="deltaClass(-pixel.deltaXgAgainst)">{{ fmtXg(pixel.movedXgAgainst) }}</span>
+                <span role="cell" [class]="deltaClass(pixel.deltaShotsFor)">{{ fmtXg(pixel.movedShotsFor) }}</span>
+                <span role="cell" [class]="deltaClass(pixel.deltaPossessionFor)">{{ fmtXg(pixel.movedPossessionFor) }}%</span>
+              </div>
+            </div>
+          </div>
+          <div *ngIf="lineupDebugSnapshot() as debug" class="formation-matrix analysis-matrix current-lineup-replay">
+            <div class="matrix-header">
+              <strong>Lectura del XI actual</strong>
+              <span>
+                {{ debug.label }} · {{ lineupDebugScopeLabel(debug) }} · formación {{ debug.formation || '?' }}
+                · seleccionada {{ debug.selectedFormation || '?' }}
+                · jugadores {{ lineupDebugPlayerCountLabel(debug) }}
+                · slots {{ debug.persistedSlotCount }}/{{ debug.effectiveSlotCount }}
+                · candidatos {{ debug.candidatesCount }}
+              </span>
+            </div>
+            <p class="panel-hint current-replay-starters" *ngIf="debug.warnings.length > 0">
+              {{ debug.warnings.join(' · ') }}
+            </p>
+            <div class="table-scroll compact-position-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Player</th>
+                    <th>Role</th>
+                    <th>Slot</th>
+                    <th>X/Y</th>
+                    <th>Visual line</th>
+                    <th>Source</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let row of debug.rows; trackBy: trackByLineupDebugRow">
+                    <td>{{ row.index }}</td>
+                    <td>{{ row.name }}</td>
+                    <td>{{ row.position }}</td>
+                    <td>{{ row.slotId || '-' }}</td>
+                    <td>{{ row.x ?? '?' }}/{{ row.y ?? '?' }}</td>
+                    <td>{{ row.visualLine }}</td>
+                    <td>{{ row.source }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div *ngIf="positionPixelEvidenceNote() as pixelNote" class="formation-matrix analysis-matrix">
+            <div class="matrix-header">
+              <strong>Position movement evidence</strong>
+              <span>Diagnóstico del último check de píxeles</span>
+            </div>
+            <div class="qa-evidence-note">
+              {{ pixelNote }}
+            </div>
+          </div>
+          <div *ngIf="positionPixelMatrixRows().length > 0" class="formation-matrix analysis-matrix">
+            <div class="matrix-header">
+              <strong>Position movement presets</strong>
+              <span>Selected tactical candidates + same seeds, multiple pixel moves</span>
+              <button type="button" class="matrix-export" (click)="copyPositionPixelMatrixJson()">
+                Copy filtered JSON
+              </button>
+              <button type="button" class="matrix-export" (click)="downloadPositionPixelMatrixCsv()">
+                CSV
+              </button>
+            </div>
+            <div class="position-read-summary" aria-label="Position movement read summary">
+              <span
+                *ngFor="let item of positionPixelReadSummary()"
+                class="read-pill"
+                [ngClass]="'read-' + item.level"
+              >
+                {{ item.label }} {{ item.count }}
+              </span>
+              <span *ngIf="positionPixelHasChecks()" class="read-alert">
+                Review Check rows before tuning.
+              </span>
+            </div>
+            <div class="position-read-summary tactical-read-summary" aria-label="Position movement tactical summary">
+              <span
+                *ngFor="let item of positionPixelTacticalReadSummary()"
+                class="read-pill tactical-read-pill"
+                [class]="item.className"
+                [title]="item.hint"
+              >
+                {{ item.label }} {{ item.count }}
+              </span>
+            </div>
+            <div class="position-read-summary tactical-read-summary" aria-label="Position movement visual expectation summary">
+              <span
+                *ngFor="let item of positionPixelVisualExpectationSummary()"
+                class="read-pill tactical-read-pill"
+                [class]="item.className"
+                [title]="item.hint"
+              >
+                {{ item.label }} {{ item.count }}
+              </span>
+            </div>
+            <div class="position-read-summary tactical-read-summary" aria-label="Position movement visual engine summary">
+              <span
+                *ngFor="let item of positionPixelVisualEngineTensionSummary()"
+                class="read-pill tactical-read-pill"
+                [class]="item.className"
+                [title]="item.hint"
+              >
+                {{ item.label }} {{ item.count }}
+              </span>
+            </div>
+            <div *ngIf="positionPixelDiagonalSummary() as diagonal" class="current-replay-grid diagonal-summary" role="group" aria-label="Position diagonal summary">
+              <div>
+                <span>Diagonales</span>
+                <strong>{{ diagonal.total }}</strong>
+                <small>5px o más en X/Y</small>
+              </div>
+              <div>
+                <span>Riesgo</span>
+                <strong [class]="diagonal.risk > 0 ? 'read-check' : 'read-stable'">{{ diagonal.risk }}</strong>
+                <small>Riesgo o xGA sensible</small>
+              </div>
+              <div>
+                <span>Defensa +</span>
+                <strong [class]="diagonal.defenseGain > 0 ? 'delta-positive' : 'delta-neutral'">{{ diagonal.defenseGain }}</strong>
+                <small>Cobertura/defensa mejora</small>
+              </div>
+              <div>
+                <span>Visual review</span>
+                <strong [class]="diagonal.visualMismatch > 0 ? 'read-check' : 'read-stable'">{{ diagonal.visualMismatch }}</strong>
+                <small>Expectativa visual para revisar</small>
+                <button
+                  *ngIf="diagonal.worstVisualMismatch"
+                  type="button"
+                  class="summary-jump-btn"
+                  (click)="jumpToPositionPixelRow(diagonal.worstVisualMismatch, 'diagonal-mismatch')"
+                >
+                  Ver peor
+                </button>
+              </div>
+              <div>
+                <span>Visual micro</span>
+                <strong [class]="diagonal.visualMicro > 0 ? 'read-stable' : 'delta-neutral'">{{ diagonal.visualMicro }}</strong>
+                <small>Ruido visual estable</small>
+              </div>
+              <div>
+                <span>Visual tradeoff</span>
+                <strong [class]="diagonal.visualEngineReview > 0 ? 'read-strong' : 'read-stable'">{{ diagonal.visualEngineReview }}</strong>
+                <small>Mejora visual con costo</small>
+                <button
+                  *ngIf="diagonal.worstVisualReview"
+                  type="button"
+                  class="summary-jump-btn"
+                  (click)="jumpToPositionPixelRow(diagonal.worstVisualReview, 'diagonal-review')"
+                >
+                  Ver peor
+                </button>
+              </div>
+              <div>
+                <span>Mejor diagonal</span>
+                <strong [class]="positionPixelDiagonalSummaryRowClass(diagonal.best, true)">
+                  {{ positionPixelDiagonalSummaryRowText(diagonal.best) }}
+                </strong>
+                <small>{{ diagonal.best ? positionPixelCoachRead(diagonal.best) : 'Sin filas' }}</small>
+                <button
+                  *ngIf="diagonal.best"
+                  type="button"
+                  class="summary-jump-btn"
+                  (click)="jumpToPositionPixelRow(diagonal.best, 'diagonal')"
+                >
+                  Ver fila
+                </button>
+              </div>
+              <div>
+                <span>Peor diagonal</span>
+                <strong [class]="positionPixelDiagonalSummaryRowClass(diagonal.worst, false)">
+                  {{ positionPixelDiagonalSummaryRowText(diagonal.worst) }}
+                </strong>
+                <small>{{ diagonal.worst ? positionPixelCoachRead(diagonal.worst) : 'Sin filas' }}</small>
+                <button
+                  *ngIf="diagonal.worst"
+                  type="button"
+                  class="summary-jump-btn"
+                  (click)="jumpToPositionPixelRow(diagonal.worst, 'diagonal')"
+                >
+                  Ver fila
+                </button>
+              </div>
+            </div>
+            <div *ngIf="positionPixelLineBreakSummary() as lineBreak" class="current-replay-grid diagonal-summary" role="group" aria-label="Position line break summary">
+              <div>
+                <span>Line breaks</span>
+                <strong>{{ lineBreak.total }}</strong>
+                <small>Cruzan ATT/MID/DEF</small>
+              </div>
+              <div>
+                <span>Borde</span>
+                <strong [class]="lineBreak.borderline > 0 ? 'delta-neutral' : 'read-stable'">{{ lineBreak.borderline }}</strong>
+                <small>Distancia <= 6px</small>
+              </div>
+              <div>
+                <span>Grandes</span>
+                <strong [class]="lineBreak.big > 0 ? 'read-visible' : 'read-stable'">{{ lineBreak.big }}</strong>
+                <small>Big zone / más de 6px</small>
+              </div>
+              <div>
+                <span>Strong</span>
+                <strong [class]="lineBreak.strong > 0 ? 'read-strong' : 'read-stable'">{{ lineBreak.strong }}</strong>
+                <small>Impacto alto</small>
+              </div>
+              <div>
+                <span>Bad tradeoff</span>
+                <strong [class]="lineBreak.badTradeoff > 0 ? 'read-check' : 'read-stable'">{{ lineBreak.badTradeoff }}</strong>
+                <small>Riesgo/costo claro</small>
+                <button
+                  *ngIf="lineBreak.worst"
+                  type="button"
+                  class="summary-jump-btn"
+                  (click)="jumpToPositionPixelRow(lineBreak.worst, 'line-break')"
+                >
+                  Ver peor
+                </button>
+              </div>
+              <div>
+                <span>Attack gain</span>
+                <strong [class]="lineBreak.attackGain > 0 ? 'delta-positive' : 'delta-neutral'">{{ lineBreak.attackGain }}</strong>
+                <small>Mejora ofensiva</small>
+                <button
+                  *ngIf="lineBreak.best"
+                  type="button"
+                  class="summary-jump-btn"
+                  (click)="jumpToPositionPixelRow(lineBreak.best, 'line-break')"
+                >
+                  Ver mejor
+                </button>
+              </div>
+            </div>
+            <div *ngIf="positionPixelSmokeRunSummaries().length > 1" class="matrix-scroll position-smoke-summary">
+              <div class="matrix-table position-smoke-table" role="table" aria-label="Position smoke comparison by scope">
+                <div class="matrix-row formation-matrix-row matrix-row-head" role="row">
+                  <span role="columnheader">Scope</span>
+                  <span role="columnheader">Partidos</span>
+                  <span role="columnheader">Players</span>
+                  <span role="columnheader">Rows</span>
+                  <span role="columnheader">Stable</span>
+                  <span role="columnheader">Visible</span>
+                  <span role="columnheader">Strong</span>
+                  <span role="columnheader">Check</span>
+                  <span role="columnheader">5px risk</span>
+                  <span role="columnheader">Big strong</span>
+                  <span role="columnheader">Avg señal</span>
+                  <span role="columnheader">Worst</span>
+                  <span role="columnheader">Worst move</span>
+                  <span role="columnheader">Cause</span>
+                  <span role="columnheader">Verdict</span>
+                </div>
+                <div *ngFor="let item of positionPixelSmokeRunSummaries()" class="matrix-row formation-matrix-row" role="row">
+                  <span role="cell">{{ item.scope }}</span>
+                  <span role="cell">{{ item.matchCount }}</span>
+                  <span role="cell">{{ item.playerCount }}</span>
+                  <span role="cell">{{ item.rows }}</span>
+                  <span role="cell">{{ item.stable }}</span>
+                  <span role="cell">{{ item.visible }}</span>
+                  <span role="cell">{{ item.strong }}</span>
+                  <span role="cell">{{ item.check }}</span>
+                  <span role="cell">{{ item.fivePxRiskRows }}</span>
+                  <span role="cell">{{ item.bigMoveStrongRows }}/{{ item.bigMoveRows }}</span>
+                  <span role="cell">{{ item.avgSignal.toFixed(3) }}</span>
+                  <span role="cell">{{ item.worstSignal.toFixed(3) }}</span>
+                  <span role="cell">{{ item.worstMove }}</span>
+                  <span role="cell" [title]="item.dominantCause">{{ item.dominantCause }}</span>
+                  <span role="cell" [class]="item.verdictClass">{{ item.verdict }}</span>
+                </div>
+              </div>
+            </div>
+            <div *ngIf="positionPixelMatchSmokeSummary().length > 1" class="matrix-scroll position-smoke-summary">
+              <div class="matrix-table position-smoke-table" role="table" aria-label="Smoke posición multi-partido summary">
+                <div class="matrix-row formation-matrix-row matrix-row-head" role="row">
+                  <span role="columnheader">Match</span>
+                  <span role="columnheader">Rows</span>
+                  <span role="columnheader">Stable</span>
+                  <span role="columnheader">Visible</span>
+                  <span role="columnheader">Strong</span>
+                  <span role="columnheader">Check</span>
+                  <span role="columnheader">Micro</span>
+                  <span role="columnheader">Visible risk</span>
+                  <span role="columnheader">Att loss</span>
+                  <span role="columnheader">Big bad</span>
+                  <span role="columnheader">5px risk</span>
+                  <span role="columnheader">5px cost</span>
+                  <span role="columnheader">Big strong</span>
+                  <span role="columnheader">Avg señal</span>
+                  <span role="columnheader">Worst</span>
+                  <span role="columnheader">Worst move</span>
+                  <span role="columnheader">Cause</span>
+                  <span role="columnheader">A/C/C trend</span>
+                  <span role="columnheader">Verdict</span>
+                </div>
+                <div *ngFor="let item of positionPixelMatchSmokeSummary()" class="matrix-row formation-matrix-row" role="row">
+                  <span role="cell">{{ item.matchLabel }}</span>
+                  <span role="cell">{{ item.rows }}</span>
+                  <span role="cell">{{ item.stable }}</span>
+                  <span role="cell">{{ item.visible }}</span>
+                  <span role="cell">{{ item.strong }}</span>
+                  <span role="cell">{{ item.check }}</span>
+                  <span role="cell">{{ item.microReview }}</span>
+                  <span role="cell">{{ item.visibleRisk }}</span>
+                  <span role="cell">{{ item.visibleAttackLoss }}</span>
+                  <span role="cell">{{ item.bigBadTradeoff }}</span>
+                  <span role="cell">{{ item.fivePxRiskRows }}</span>
+                  <span role="cell">{{ item.fivePxCostRows }}</span>
+                  <span role="cell">{{ item.bigMoveStrongRows }}/{{ item.bigMoveRows }}</span>
+                  <span role="cell">{{ item.avgSignal.toFixed(3) }}</span>
+                  <span role="cell" [title]="item.worstMove">{{ item.worstSignal.toFixed(3) }}</span>
+                  <span role="cell" [title]="item.worstTacticalRead">{{ item.worstMove }}</span>
+                  <span role="cell" [title]="item.dominantCause">{{ item.dominantCause }}</span>
+                  <span role="cell" [class]="item.verdictClass">{{ item.verdict }}</span>
+                </div>
+              </div>
+            </div>
+            <div *ngIf="positionPixelPlayerSmokeSummary().length > 0" class="matrix-scroll position-smoke-summary">
+              <div class="matrix-table position-smoke-table" role="table" aria-label="Position smoke summary by player">
+                <div class="matrix-row formation-matrix-row matrix-row-head" role="row">
+                  <span role="columnheader">Player</span>
+                  <span role="columnheader">Pos</span>
+                  <span role="columnheader">Rows</span>
+                  <span role="columnheader">5px risk</span>
+                  <span role="columnheader">5px cost</span>
+                  <span role="columnheader">Big strong</span>
+                  <span role="columnheader">Avg señal</span>
+                  <span role="columnheader">Worst</span>
+                  <span role="columnheader">Worst move</span>
+                  <span role="columnheader">Cause</span>
+                  <span role="columnheader">A/C/C trend</span>
+                  <span role="columnheader">Verdict</span>
+                </div>
+                <div *ngFor="let item of positionPixelPlayerSmokeSummary()" class="matrix-row formation-matrix-row" role="row">
+                  <span role="cell">{{ item.playerName }}</span>
+                  <span role="cell">{{ item.playerPosition }}</span>
+                  <span role="cell">{{ item.rows }}</span>
+                  <span role="cell">{{ item.fivePxRiskRows }}</span>
+                  <span role="cell">{{ item.fivePxCostRows }}</span>
+                  <span role="cell">{{ item.bigMoveStrongRows }}/{{ item.bigMoveRows }}</span>
+                  <span role="cell">{{ item.avgSignal.toFixed(3) }}</span>
+                  <span role="cell">{{ item.worstSignal.toFixed(3) }}</span>
+                  <span role="cell">{{ item.worstMove }}</span>
+                  <span role="cell" [title]="item.dominantCause">{{ item.dominantCause }}</span>
+                  <span role="cell" [title]="item.channelBreakdownTrend">{{ item.channelBreakdownTrend }}</span>
+                  <span role="cell" [class]="item.verdictClass">{{ item.verdict }}</span>
+                </div>
+              </div>
+            </div>
+            <div class="position-read-controls" aria-label="Position movement table controls">
+              <label>
+                Read
+                <select [ngModel]="positionPixelReadFilter()" (ngModelChange)="setPositionPixelReadFilter($event)">
+                  <option value="all">All</option>
+                  <option value="diagonal">Diagonals</option>
+                  <option value="diagonal-mismatch">Diagonal mismatch</option>
+                  <option value="diagonal-micro">Diagonal micro</option>
+                  <option value="diagonal-review">Diagonal tradeoff</option>
+                  <option value="visual-mismatch">Visual review</option>
+                  <option value="visual-micro">Visual micro</option>
+                  <option value="visual-review">Visual tradeoff</option>
+                  <option value="big-move">Big moves</option>
+                  <option value="line-break">Line breaks</option>
+                  <option value="check">Check</option>
+                  <option value="strong">Strong</option>
+                  <option value="visible">Visible</option>
+                  <option value="stable">Stable</option>
+                </select>
+              </label>
+              <label>
+                Sort
+                <select [ngModel]="positionPixelSortMode()" (ngModelChange)="setPositionPixelSortMode($event)">
+                  <option value="default">Orden de ejecución</option>
+                  <option value="read-desc">Read priority</option>
+                  <option value="impact-desc">Impact</option>
+                  <option value="distance-desc">Movement distance</option>
+                </select>
+              </label>
+              <span class="position-read-count">
+                Showing {{ displayedPositionPixelMatrixRows().length }} / {{ positionPixelMatrixRows().length }}
+              </span>
+            </div>
+            <div class="matrix-scroll">
+              <div class="matrix-scroll-hint" aria-hidden="true">Scroll horizontal para ver lectura ofensiva/defensiva completa →</div>
+              <div class="matrix-table position-movement-table" role="table" aria-label="Position movement preset comparison">
+                <div class="matrix-row formation-matrix-row matrix-row-head" role="row">
+                  <span role="columnheader">Player</span>
+                  <span role="columnheader">Move</span>
+                  <span role="columnheader">Coord.</span>
+                  <span role="columnheader">Delta xG</span>
+                  <span role="columnheader">Delta xG Ag.</span>
+                  <span role="columnheader">Delta shots</span>
+                  <span role="columnheader">Shots Ag.</span>
+                  <span role="columnheader">Delta poss</span>
+                  <span role="columnheader">Delta zones C/W/L</span>
+                  <span role="columnheader">Zones Ag. C/W/L</span>
+                  <span role="columnheader">xG zones C/W/L</span>
+                  <span role="columnheader">xG Ag. C/W/L</span>
+                  <span role="columnheader">Wide L/R</span>
+                  <span role="columnheader">Wide Ag. L/R</span>
+                  <span role="columnheader">Señal</span>
+                  <span role="columnheader">Shape move</span>
+                <span role="columnheader">Canal A/C/C</span>
+                <span role="columnheader">Visual expect</span>
+                <span role="columnheader">Visual vs engine</span>
+                <span role="columnheader">Tactical read</span>
+                <span role="columnheader">Read</span>
+                </div>
+                <div
+                  *ngFor="let row of displayedPositionPixelMatrixRows(); trackBy: trackByPositionPixelRow"
+                  class="matrix-row formation-matrix-row"
+                  [class.position-row-highlight]="selectedPositionPixelRowKey() === positionPixelRowKey(row)"
+                  [attr.data-position-row-key]="positionPixelRowKey(row)"
+                  role="row"
+                >
+                  <span role="cell">{{ row.playerName }} ({{ row.playerPosition }})</span>
+                  <span role="cell">{{ row.label }}</span>
+                  <span role="cell">{{ row.fromXPercent }}/{{ row.fromYPercent }} -> {{ row.targetXPercent }}/{{ row.targetYPercent }}</span>
+                  <span role="cell" [class]="deltaClass(row.deltaXgFor)">{{ fmtDeltaMicro(row.deltaXgFor) }}</span>
+                  <span role="cell" [class]="deltaClass(-row.deltaXgAgainst)">{{ fmtDeltaMicro(row.deltaXgAgainst) }}</span>
+                  <span role="cell" [class]="deltaClass(row.deltaShotsFor)">{{ fmtDeltaNumber(row.deltaShotsFor) }}</span>
+                  <span role="cell" [class]="deltaClass(-row.deltaShotsAgainst)">{{ fmtDeltaNumber(row.deltaShotsAgainst) }}</span>
+                  <span role="cell" [class]="deltaClass(row.deltaPossessionFor)">{{ fmtDeltaNumber(row.deltaPossessionFor) }}%</span>
+                  <span role="cell" [class]="deltaClass(row.deltaCentralShotsFor + row.deltaWideShotsFor + row.deltaLongShotsFor)">
+                    {{ fmtDeltaNumber(row.deltaCentralShotsFor) }}/{{ fmtDeltaNumber(row.deltaWideShotsFor) }}/{{ fmtDeltaNumber(row.deltaLongShotsFor) }}
+                  </span>
+                  <span role="cell" [class]="deltaClass(-(row.deltaCentralShotsAgainst + row.deltaWideShotsAgainst + row.deltaLongShotsAgainst))">
+                    {{ fmtDeltaNumber(row.deltaCentralShotsAgainst) }}/{{ fmtDeltaNumber(row.deltaWideShotsAgainst) }}/{{ fmtDeltaNumber(row.deltaLongShotsAgainst) }}
+                  </span>
+                  <span role="cell" [class]="deltaClass(row.deltaCentralXgFor + row.deltaWideXgFor + row.deltaLongXgFor)">
+                    {{ fmtDeltaMicro(row.deltaCentralXgFor) }}/{{ fmtDeltaMicro(row.deltaWideXgFor) }}/{{ fmtDeltaMicro(row.deltaLongXgFor) }}
+                  </span>
+                  <span role="cell" [class]="deltaClass(-(row.deltaCentralXgAgainst + row.deltaWideXgAgainst + row.deltaLongXgAgainst))">
+                    {{ fmtDeltaMicro(row.deltaCentralXgAgainst) }}/{{ fmtDeltaMicro(row.deltaWideXgAgainst) }}/{{ fmtDeltaMicro(row.deltaLongXgAgainst) }}
+                  </span>
+                  <span role="cell" [class]="deltaClass(row.deltaLeftWideXgFor + row.deltaRightWideXgFor)" [title]="'shots L/R ' + fmtDeltaNumber(row.deltaLeftWideShotsFor) + '/' + fmtDeltaNumber(row.deltaRightWideShotsFor)">
+                    xG {{ fmtDeltaMicro(row.deltaLeftWideXgFor) }}/{{ fmtDeltaMicro(row.deltaRightWideXgFor) }}
+                  </span>
+                  <span role="cell" [class]="deltaClass(-(row.deltaLeftWideXgAgainst + row.deltaRightWideXgAgainst))" [title]="'shots ag. L/R ' + fmtDeltaNumber(row.deltaLeftWideShotsAgainst) + '/' + fmtDeltaNumber(row.deltaRightWideShotsAgainst)">
+                    xG {{ fmtDeltaMicro(row.deltaLeftWideXgAgainst) }}/{{ fmtDeltaMicro(row.deltaRightWideXgAgainst) }}
+                  </span>
+                  <span role="cell" [class]="row.signalClass" [title]="row.signalDetail">{{ row.signalRead }}</span>
+                  <span role="cell" class="shape-move-read" [title]="positionPixelShapeMoveDetail(row)">
+                    {{ positionPixelShapeMove(row) }}
+                  </span>
+                  <span role="cell" [class]="positionPixelChannelBreakdownClass(row)" [title]="positionPixelChannelBreakdownDetail(row)">
+                    {{ positionPixelChannelBreakdownRead(row) }}
+                  </span>
+                  <span role="cell" [class]="positionPixelVisualExpectationClass(row)" [title]="positionPixelVisualExpectationDetail(row)">
+                    {{ positionPixelVisualExpectationRead(row) }}
+                  </span>
+                  <span role="cell" [class]="positionPixelVisualEngineTensionClass(row)" [title]="positionPixelVisualEngineTensionDetail(row)">
+                    {{ positionPixelVisualEngineTensionRead(row) }}
+                  </span>
+                  <span role="cell" [class]="positionPixelTacticalReadClass(row)" [title]="positionPixelTacticalReadReason(row)">
+                    {{ positionPixelTacticalRead(row) }}
+                    <small class="tactical-read-coach-note">{{ positionPixelCoachRead(row) }}</small>
+                  </span>
+                  <span role="cell" [class]="positionPixelReadClass(row)">{{ positionPixelRead(row) }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div *ngIf="formationReplayResults().length > 0" class="formation-matrix analysis-matrix">
+            <div class="matrix-header">
+              <strong>Matriz formaciones</strong>
+              <span>Mismo partido + seed {{ seedInputModel ?? 'auto' }} + {{ selectedStyleLabel() }}</span>
+              <button type="button" class="matrix-export" (click)="copyFormationMatrixJson()">
+                Copiar JSON
+              </button>
+              <button type="button" class="matrix-export" (click)="downloadFormationMatrixCsv()">
+                CSV
+              </button>
+            </div>
+            <div class="matrix-scroll">
+              <div class="matrix-table formation-matrix-table" role="table" aria-label="Comparación de formaciones">
+                <div class="matrix-row formation-matrix-row matrix-row-head" role="row">
+                  <span role="columnheader">Form.</span>
+                  <span role="columnheader">Marcador favor/contra</span>
+                  <span role="columnheader">Δ marcador</span>
+                  <span role="columnheader">Posesión favor/contra</span>
+                  <span role="columnheader">Δ posesión</span>
+                  <span role="columnheader">Tiros favor/contra</span>
+                  <span role="columnheader">Δ tiros</span>
+                  <span role="columnheader">xG favor/contra</span>
+                  <span role="columnheader">Δ xG</span>
+                  <span role="columnheader">Zonas favor C/B/L</span>
+                  <span role="columnheader">Δ zonas</span>
+                </div>
+                <div
+                  *ngFor="let row of formationReplayResults(); trackBy: trackByFormationReplay"
+                  class="matrix-row formation-matrix-row"
+                  role="row"
+                >
+                  <span role="cell">{{ row.formation }}</span>
+                  <span role="cell">{{ row.homeGoals ?? '?' }}-{{ row.awayGoals ?? '?' }}</span>
+                  <span role="cell">{{ fmtPct(row.homePossession) }} / {{ fmtPct(row.awayPossession) }}</span>
+                  <span role="cell">{{ row.homeShots ?? '-' }} / {{ row.awayShots ?? '-' }}</span>
+                  <span role="cell">{{ fmtXg(row.homeXg) }} / {{ fmtXg(row.awayXg) }}</span>
+                  <span role="cell">
+                    {{ row.homeCentralShots }}/{{ row.homeWideShots }}/{{ row.homeLongShots }}
+                    /
+                    {{ row.awayCentralShots }}/{{ row.awayWideShots }}/{{ row.awayLongShots }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div *ngIf="formationMatrixSummaryResults().length > 0" class="formation-matrix analysis-matrix">
+            <div class="matrix-header">
+              <strong>Formation averages</strong>
+              <span>
+                Seeds {{ formationMatrixSummaryResults()[0].seedStart }}-{{ formationMatrixSummaryResults()[0].seedEnd }}
+                · {{ formationMatrixSummaryResults()[0].seedCount }} corridas por formación
+              </span>
+            </div>
+            <div *ngIf="formationCoachSummary() as coach" class="current-replay-grid" role="group" aria-label="Formation coach recommendations">
+              <div>
+                <span>{{ coach.bestBalance.label }}</span>
+                <strong>{{ coach.bestBalance.formation }}</strong>
+                <small>{{ coach.bestBalance.identity }}</small>
+                <small [class]="coach.bestBalance.cssClass">{{ coach.bestBalance.read }} · {{ coach.bestBalance.detail }}</small>
+              </div>
+              <div>
+                <span>{{ coach.bestAttack.label }}</span>
+                <strong>{{ coach.bestAttack.formation }}</strong>
+                <small>{{ coach.bestAttack.identity }}</small>
+                <small [class]="coach.bestAttack.cssClass">{{ coach.bestAttack.read }} · {{ coach.bestAttack.detail }}</small>
+              </div>
+              <div>
+                <span>{{ coach.safest.label }}</span>
+                <strong>{{ coach.safest.formation }}</strong>
+                <small>{{ coach.safest.identity }}</small>
+                <small [class]="coach.safest.cssClass">{{ coach.safest.read }} · {{ coach.safest.detail }}</small>
+              </div>
+              <div>
+                <span>{{ coach.avoid.label }}</span>
+                <strong>{{ coach.avoid.formation }}</strong>
+                <small>{{ coach.avoid.identity }}</small>
+                <small [class]="coach.avoid.cssClass">{{ coach.avoid.read }} · {{ coach.avoid.detail }}</small>
+              </div>
+            </div>
+            <div class="matrix-scroll">
+              <div class="matrix-table formation-matrix-table" role="table" aria-label="Formation average comparison">
+                <div class="matrix-row formation-matrix-row matrix-row-head" role="row">
+                  <span role="columnheader">Form.</span>
+                  <span role="columnheader">Read</span>
+                  <span role="columnheader">Goals F/Ag.</span>
+                  <span role="columnheader">Goal diff</span>
+                  <span role="columnheader">Poss For</span>
+                  <span role="columnheader">Shots F/Ag.</span>
+                  <span role="columnheader">Shot diff</span>
+                  <span role="columnheader">xG F/Ag.</span>
+                  <span role="columnheader">xG diff</span>
+                  <span role="columnheader">Zones F C/W/L</span>
+                  <span role="columnheader">Zones Ag C/W/L</span>
+                  <span role="columnheader">Wide F L/R xG</span>
+                  <span role="columnheader">Wide Ag L/R xG</span>
+                  <span role="columnheader">Shape P/A/D</span>
+                  <span role="columnheader">Atk L/C/R</span>
+                  <span role="columnheader">Def L/C/R</span>
+                </div>
+                <div
+                  *ngFor="let row of formationMatrixSummaryResults(); trackBy: trackByFormationSummary"
+                  class="matrix-row formation-matrix-row"
+                  role="row"
+                >
+                  <span role="cell">{{ row.formation }}</span>
+                  <span role="cell" class="shape-move-read" [class]="formationSummaryReadClass(row)" [title]="formationSummaryReadDetail(row)">
+                    {{ formationSummaryRead(row) }}
+                  </span>
+                  <span role="cell">{{ fmtXg(row.avgGoalsFor) }} / {{ fmtXg(row.avgGoalsAgainst) }}</span>
+                  <span role="cell">{{ fmtDeltaNumber(row.avgGoalDiff) }}</span>
+                  <span role="cell">{{ fmtPct(row.avgPossessionFor) }}</span>
+                  <span role="cell">{{ fmtXg(row.avgShotsFor) }} / {{ fmtXg(row.avgShotsAgainst) }}</span>
+                  <span role="cell">{{ fmtDeltaNumber(row.avgShotDiff) }}</span>
+                  <span role="cell">{{ fmtXg(row.avgXgFor) }} / {{ fmtXg(row.avgXgAgainst) }}</span>
+                  <span role="cell">{{ fmtDeltaNumber(row.avgXgDiff) }}</span>
+                  <span role="cell">
+                    {{ fmtXg(row.avgCentralShotsFor) }}/{{ fmtXg(row.avgWideShotsFor) }}/{{ fmtXg(row.avgLongShotsFor) }}
+                  </span>
+                  <span role="cell">
+                    {{ fmtXg(row.avgCentralShotsAgainst) }}/{{ fmtXg(row.avgWideShotsAgainst) }}/{{ fmtXg(row.avgLongShotsAgainst) }}
+                  </span>
+                  <span role="cell">
+                    {{ fmtXg(row.avgLeftWideXgFor ?? 0) }}/{{ fmtXg(row.avgRightWideXgFor ?? 0) }}
+                  </span>
+                  <span role="cell">
+                    {{ fmtXg(row.avgLeftWideXgAgainst ?? 0) }}/{{ fmtXg(row.avgRightWideXgAgainst ?? 0) }}
+                  </span>
+                  <span role="cell">
+                    {{ fmtXg(row.avgShapePossessionMultiplier) }}/{{ fmtXg(row.avgShapeAttackVolumeMultiplier) }}/{{ fmtXg(row.avgShapeDefensiveResistanceMultiplier) }}
+                  </span>
+                  <span role="cell">
+                    {{ fmtXg(row.avgShapeAttackLeft) }}/{{ fmtXg(row.avgShapeAttackCenter) }}/{{ fmtXg(row.avgShapeAttackRight) }}
+                  </span>
+                  <span role="cell">
+                    {{ fmtXg(row.avgShapeDefenseLeft) }}/{{ fmtXg(row.avgShapeDefenseCenter) }}/{{ fmtXg(row.avgShapeDefenseRight) }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div *ngIf="focusedWideBatteryRows().length > 0" class="formation-matrix analysis-matrix">
+            <div class="matrix-header">
+              <strong>Batería bandas enfocada</strong>
+              <span>
+                4-2-3-1 / 4-4-2 / 5-4-1 · Balanceado vs Bandas ·
+                {{ focusedWideBatteryRows()[0].seedCount }} seeds
+              </span>
+            </div>
+            <div class="matrix-scroll">
+              <div class="matrix-table formation-matrix-table" role="table" aria-label="Batería bandas enfocada results">
+                <div class="matrix-row formation-matrix-row matrix-row-head" role="row">
+                  <span role="columnheader">Form.</span>
+                  <span role="columnheader">Estilo</span>
+                  <span role="columnheader">xG F/Ag.</span>
+                  <span role="columnheader">xG diff</span>
+                  <span role="columnheader">Shots F/Ag.</span>
+                  <span role="columnheader">Wide/Central</span>
+                  <span role="columnheader">Wide share</span>
+                  <span role="columnheader">Δ vs Balanceado</span>
+                  <span role="columnheader">Lectura DT</span>
+                </div>
+                <div
+                  *ngFor="let row of focusedWideBatteryRows(); trackBy: trackByFocusedWideBatteryRow"
+                  class="matrix-row formation-matrix-row"
+                  role="row"
+                >
+                  <span role="cell">{{ row.formation }}</span>
+                  <span role="cell">{{ row.styleLabel }}</span>
+                  <span role="cell">{{ fmtXg(row.avgXgFor) }} / {{ fmtXg(row.avgXgAgainst) }}</span>
+                  <span role="cell">{{ fmtDeltaNumber(row.avgXgDiff) }}</span>
+                  <span role="cell">{{ fmtXg(row.avgShotsFor) }} / {{ fmtXg(row.avgShotsAgainst) }}</span>
+                  <span role="cell">{{ fmtXg(row.avgWideShotsFor) }} / {{ fmtXg(row.avgCentralShotsFor) }}</span>
+                  <span role="cell">{{ fmtPct(row.wideShare * 100) }}</span>
+                  <span role="cell">
+                    xG {{ fmtDeltaNumber(row.deltaXgFor) }} · wide {{ fmtDeltaNumber(row.deltaWideShotsFor) }} · share {{ fmtDeltaNumber(row.deltaWideShare * 100) }}%
+                  </span>
+                  <span role="cell" class="shape-move-read" [class]="row.className">{{ row.read }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div *ngIf="lowBlockLabRows().length > 0" class="formation-matrix analysis-matrix">
+            <div class="matrix-header">
+              <strong>Lab bloque bajo 5-4-1</strong>
+              <span>
+                Segunda línea alta / base / baja · {{ lowBlockLabRows()[0].seedCount }} seeds
+              </span>
+            </div>
+            <p class="panel-hint">
+              Compara el mismo partido y los mismos jugadores: solo cambia la altura visual de la segunda línea del 5-4-1.
+              La base es el punto cero; las otras filas muestran cuánto cambia el motor.
+            </p>
+            <div class="matrix-scroll">
+              <div class="matrix-table formation-matrix-table" role="table" aria-label="5-4-1 low block visual lab">
+                <div class="matrix-row formation-matrix-row matrix-row-head" role="row">
+                  <span role="columnheader">Variante</span>
+                  <span role="columnheader">Lectura</span>
+                  <span role="columnheader">xG</span>
+                  <span role="columnheader">xGA</span>
+                  <span role="columnheader">Dif xG</span>
+                  <span role="columnheader">Shots contra</span>
+                  <span role="columnheader">Pos.</span>
+                  <span role="columnheader">Contra centro/bandas</span>
+                </div>
+                <div
+                  *ngFor="let row of lowBlockLabRows(); trackBy: trackByLowBlockLabRow"
+                  class="matrix-row formation-matrix-row"
+                  role="row"
+                >
+                  <span role="cell">
+                    <strong>{{ row.label }}</strong>
+                    <small>y{{ row.secondLineY }}</small>
+                  </span>
+                  <span role="cell" [class]="row.className">{{ row.read }}</span>
+                  <span role="cell">
+                    {{ row.avgXgFor | number:'1.2-2' }}
+                    <small>{{ signed(row.deltaXgFor) }}</small>
+                  </span>
+                  <span role="cell">
+                    {{ row.avgXgAgainst | number:'1.2-2' }}
+                    <small>{{ signed(row.deltaXgAgainst) }}</small>
+                  </span>
+                  <span role="cell">{{ signed(row.deltaXgDiff) }}</span>
+                  <span role="cell">
+                    {{ row.avgShotsAgainst | number:'1.1-1' }}
+                    <small>{{ signed(row.deltaShotsAgainst) }}</small>
+                  </span>
+                  <span role="cell">
+                    {{ row.avgPossessionFor | number:'1.1-1' }}%
+                    <small>{{ signed(row.deltaPossessionFor) }}</small>
+                  </span>
+                  <span role="cell">
+                    C {{ row.avgCentralShotsAgainst | number:'1.1-1' }} · B {{ row.avgWideShotsAgainst | number:'1.1-1' }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div *ngIf="backFiveTransitionLabRows().length > 0" class="formation-matrix analysis-matrix">
+            <div class="matrix-header">
+              <strong>Lab transicion 5-3-2</strong>
+              <span>Carrileros bajos / base / altos · {{ backFiveTransitionLabRows()[0].seedCount }} seeds</span>
+            </div>
+            <p class="panel-hint">
+              Compara el mismo partido y los mismos jugadores: solo cambia la altura visual de los carrileros del 5-3-2.
+            </p>
+            <div class="matrix-scroll">
+              <div class="matrix-table formation-matrix-table" role="table" aria-label="Lab transicion 5-3-2">
+                <div class="matrix-row formation-matrix-row matrix-row-head" role="row">
+                  <span role="columnheader">Variante</span>
+                  <span role="columnheader">Lectura</span>
+                  <span role="columnheader">xG</span>
+                  <span role="columnheader">xGA</span>
+                  <span role="columnheader">Dif xG</span>
+                  <span role="columnheader">Bandas propias</span>
+                  <span role="columnheader">Bandas contra</span>
+                  <span role="columnheader">Shots contra</span>
+                </div>
+                <div
+                  *ngFor="let row of backFiveTransitionLabRows(); trackBy: trackByBackFiveTransitionLabRow"
+                  class="matrix-row formation-matrix-row"
+                  role="row"
+                >
+                  <span role="cell">
+                    <strong>{{ row.label }}</strong>
+                    <small>y{{ row.wingbackY }}</small>
+                  </span>
+                  <span role="cell" [class]="row.className">{{ row.read }}</span>
+                  <span role="cell">{{ row.avgXgFor | number:'1.2-2' }} <small>{{ signed(row.deltaXgFor) }}</small></span>
+                  <span role="cell">{{ row.avgXgAgainst | number:'1.2-2' }} <small>{{ signed(row.deltaXgAgainst) }}</small></span>
+                  <span role="cell">{{ signed(row.deltaXgDiff) }}</span>
+                  <span role="cell">{{ row.avgWideShotsFor | number:'1.1-1' }} <small>{{ signed(row.deltaWideShotsFor) }}</small></span>
+                  <span role="cell">{{ row.avgWideShotsAgainst | number:'1.1-1' }} <small>{{ signed(row.deltaWideShotsAgainst) }}</small></span>
+                  <span role="cell">{{ row.avgShotsAgainst | number:'1.1-1' }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div *ngIf="backFiveFamilyLabRows().length > 0" class="formation-matrix analysis-matrix">
+            <div class="matrix-header">
+              <strong>Línea de 5 family lab</strong>
+              <span>
+                5-4-1 / 5-3-2 / 3-5-2 · {{ backFiveFamilyLabRows()[0].seedCount }} seeds
+                <ng-container *ngIf="backFiveFamilyLabScope() as scope"> · {{ scope }}</ng-container>
+              </span>
+            </div>
+            <p class="panel-hint">
+              Compara tres identidades de línea de 5 en el mismo partido: bloque bajo, transición y control por carrileros.
+              La referencia es 5-3-2; las diferencias muestran qu? gana y qu? pierde cada plan.
+            </p>
+            <div class="matrix-scroll">
+              <div class="matrix-table formation-matrix-table" role="table" aria-label="Lab familia linea de 5">
+                <div class="matrix-row formation-matrix-row matrix-row-head" role="row">
+                  <span role="columnheader">Plan</span>
+                  <span role="columnheader">Lectura</span>
+                  <span role="columnheader">xG</span>
+                  <span role="columnheader">xGA</span>
+                  <span role="columnheader">Dif xG</span>
+                  <span role="columnheader">Bandas propias</span>
+                  <span role="columnheader">Bandas contra</span>
+                  <span role="columnheader">Pos.</span>
+                  <span role="columnheader">Shots contra</span>
+                </div>
+                <div
+                  *ngFor="let row of backFiveFamilyLabRows(); trackBy: trackByBackFiveFamilyLabRow"
+                  class="matrix-row formation-matrix-row"
+                  role="row"
+                >
+                  <span role="cell">
+                    <strong>{{ row.label }}</strong>
+                    <small>{{ row.formation }} · {{ row.visualPlan }}</small>
+                  </span>
+                  <span role="cell" [class]="row.className">{{ row.read }}</span>
+                  <span role="cell">{{ row.avgXgFor | number:'1.2-2' }} <small>{{ signed(row.deltaXgFor) }}</small></span>
+                  <span role="cell">{{ row.avgXgAgainst | number:'1.2-2' }} <small>{{ signed(row.deltaXgAgainst) }}</small></span>
+                  <span role="cell">{{ signed(row.deltaXgDiff) }}</span>
+                  <span role="cell">{{ row.avgWideShotsFor | number:'1.1-1' }} <small>{{ signed(row.deltaWideShotsFor) }}</small></span>
+                  <span role="cell">{{ row.avgWideShotsAgainst | number:'1.1-1' }} <small>{{ signed(row.deltaWideShotsAgainst) }}</small></span>
+                  <span role="cell">{{ row.avgPossessionFor | number:'1.1-1' }}%</span>
+                  <span role="cell">{{ row.avgShotsAgainst | number:'1.1-1' }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div *ngIf="backFiveContextSmokeRows().length > 0" class="formation-matrix analysis-matrix">
+            <div class="matrix-header">
+              <strong>Línea de 5 context smoke</strong>
+              <span>
+                {{ backFiveContextSmokeRows().length }} lecturas ?
+                {{ backFiveContextSmokeRows()[0].seedCount }} seeds · local/visitante
+              </span>
+            </div>
+            <p class="panel-hint">
+              Recorre varios partidos completados y ambos lados. Resume qu? plan de línea de 5 gana diferencial,
+              cuál protege mejor y cuál genera más xG.
+            </p>
+            <div *ngIf="backFiveContextSmokeSummary() as summary" class="coach-pick-grid">
+              <article class="coach-pick-card">
+                <span class="coach-pick-label">Gana diferencial</span>
+                <div class="context-summary-counts">
+                  <span><strong>5-4-1</strong> {{ summary.best541 }}</span>
+                  <span><strong>5-3-2</strong> {{ summary.best532 }}</span>
+                  <span><strong>3-5-2</strong> {{ summary.best352 }}</span>
+                </div>
+                <small>{{ summary.total }} contextos evaluados</small>
+                <span class="shape-move-read" [class]="summary.className">{{ summary.read }}</span>
+              </article>
+              <article class="coach-pick-card">
+                <span class="coach-pick-label">Más seguro</span>
+                <div class="context-summary-counts">
+                  <span><strong>5-4-1</strong> {{ summary.safest541 }}</span>
+                  <span><strong>5-3-2</strong> {{ summary.safest532 }}</span>
+                  <span><strong>3-5-2</strong> {{ summary.safest352 }}</span>
+                </div>
+                <small>Cuenta el menor xGA por contexto.</small>
+              </article>
+              <article class="coach-pick-card">
+                <span class="coach-pick-label">Más ofensivo</span>
+                <div class="context-summary-counts">
+                  <span><strong>5-4-1</strong> {{ summary.offensive541 }}</span>
+                  <span><strong>5-3-2</strong> {{ summary.offensive532 }}</span>
+                  <span><strong>3-5-2</strong> {{ summary.offensive352 }}</span>
+                </div>
+                <small>Cuenta el mayor xG por contexto.</small>
+              </article>
+              <article class="coach-pick-card context-review-card">
+                <span class="coach-pick-label">Revisar</span>
+                <strong>{{ summary.review }} casos</strong>
+                <div *ngIf="summary.reviewDetails.length > 0" class="context-review-details">
+                  <small *ngFor="let detail of summary.reviewDetails">&bull; {{ detail }}</small>
+                </div>
+                <small>Casos donde el mejor plan sigue negativo o la lectura queda frágil.</small>
+              </article>
+            </div>
+            <div class="matrix-scroll">
+              <div class="matrix-table formation-matrix-table" role="table" aria-label="Smoke contexto linea de 5">
+                <div class="matrix-row formation-matrix-row matrix-row-head" role="row">
+                  <span role="columnheader">Contexto</span>
+                  <span role="columnheader">Lectura</span>
+                  <span role="columnheader">Mejor plan</span>
+                  <span role="columnheader">Más seguro</span>
+                  <span role="columnheader">Más ofensivo</span>
+                  <span role="columnheader">5-4-1</span>
+                  <span role="columnheader">5-3-2</span>
+                  <span role="columnheader">3-5-2</span>
+                </div>
+                <div
+                  *ngFor="let row of backFiveContextSmokeRows(); trackBy: trackByBackFiveContextSmokeRow"
+                  class="matrix-row formation-matrix-row"
+                  role="row"
+                >
+                  <span role="cell">
+                    <strong>{{ row.controlledTeamName }}</strong>
+                    <small>{{ row.controlledSide === 'HOME' ? 'local' : 'visitante' }} · {{ row.matchLabel }}</small>
+                  </span>
+                  <span role="cell" [class]="row.className">{{ row.read }}</span>
+                  <span role="cell">{{ row.bestPlan }} <small>{{ signed(row.bestXgDiff) }}</small></span>
+                  <span role="cell">{{ row.safestPlan }} <small>xGA {{ row.safestXga | number:'1.2-2' }}</small></span>
+                  <span role="cell">{{ row.mostOffensivePlan }} <small>xG {{ row.mostOffensiveXg | number:'1.2-2' }}</small></span>
+                  <span role="cell">{{ row.lowBlockDiff === null ? '-' : signed(row.lowBlockDiff) }}</span>
+                  <span role="cell">{{ row.transitionDiff === null ? '-' : signed(row.transitionDiff) }}</span>
+                  <span role="cell">{{ row.wingbackDiff === null ? '-' : signed(row.wingbackDiff) }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div *ngIf="sideMirrorSmokeRows().length > 0" class="formation-matrix analysis-matrix">
+            <div class="matrix-header">
+              <strong>{{ sideMirrorSmokeMode() === 'synthetic' ? 'Lab espejo sintetico' : 'Smoke espejo bandas' }}</strong>
+              <span>
+                {{ sideMirrorSmokeMode() === 'synthetic' ? 'Equipos espejados, solo cambia lateral débil' : 'Rival izquierda/derecha debil' }}
+                · Seeds {{ sideMirrorSmokeRows()[0].seedStart }}-{{ sideMirrorSmokeRows()[0].seedEnd }}
+                · {{ sideMirrorSmokeRows()[0].seedCount }} runs per formación
+              </span>
+            </div>
+            <div *ngIf="sideMirrorSmokeSummary() as summary" class="coach-pick-grid">
+              <article class="coach-pick-card">
+                <span class="coach-pick-label">Resumen espejo</span>
+                <strong>{{ summary.ok }}/{{ summary.total }} OK · {{ summary.partial }} parciales · {{ summary.review }} revisar</strong>
+                <small>
+                  Edge promedio esperado:
+                  weak-left -> derecha {{ fmtDeltaNumber(summary.avgWeakLeftExpectedEdge) }}
+                  · weak-right -> izquierda {{ fmtDeltaNumber(summary.avgWeakRightExpectedEdge) }}
+                </small>
+                <span class="shape-move-read" [class]="summary.className">
+                  Gap espejo {{ fmtDeltaNumber(summary.mirrorGap) }} · {{ summary.read }}
+                </span>
+                <small *ngIf="summary.reviewFormations">
+                  Revisar: {{ summary.reviewFormations }}
+                </small>
+                <small *ngIf="summary.partialFormations">
+                  Parciales: {{ summary.partialFormations }}
+                </small>
+                <span class="shape-move-read" [class]="summary.className">
+                  {{ summary.nextAction }}
+                </span>
+              </article>
+            </div>
+            <div class="matrix-scroll">
+              <div class="matrix-table formation-matrix-table" role="table" aria-label="Smoke espejo bandas comparison">
+                <div class="matrix-row formation-matrix-row matrix-row-head" role="row">
+                  <span role="columnheader">Form.</span>
+                  <span role="columnheader">Verdict</span>
+                  <span role="columnheader">Weak left rival -> F L/R xG</span>
+                  <span role="columnheader">Weak right rival -> F L/R xG</span>
+                  <span role="columnheader">Shots L/R weak left</span>
+                  <span role="columnheader">Shots L/R weak right</span>
+                  <span role="columnheader">Edges expected</span>
+                  <span role="columnheader">Ancho</span>
+                  <span role="columnheader">Carrileros</span>
+                  <span role="columnheader">Read</span>
+                </div>
+                <div
+                  *ngFor="let row of sideMirrorSmokeRows(); trackBy: trackBySideMirrorSmokeRow"
+                  class="matrix-row formation-matrix-row"
+                  role="row"
+                >
+                  <span role="cell">{{ row.formation }}</span>
+                  <span role="cell" class="shape-move-read" [class]="sideMirrorVerdictClass(row)">
+                    {{ row.verdict }}
+                  </span>
+                  <span role="cell">{{ fmtXg(row.weakLeftWideXgL) }} / {{ fmtXg(row.weakLeftWideXgR) }}</span>
+                  <span role="cell">{{ fmtXg(row.weakRightWideXgL) }} / {{ fmtXg(row.weakRightWideXgR) }}</span>
+                  <span role="cell">{{ fmtXg(row.weakLeftWideShotsL) }} / {{ fmtXg(row.weakLeftWideShotsR) }}</span>
+                  <span role="cell">{{ fmtXg(row.weakRightWideShotsL) }} / {{ fmtXg(row.weakRightWideShotsR) }}</span>
+                  <span role="cell">
+                    R-vs-L {{ fmtDeltaNumber(row.weakLeftRightEdge) }} · L-vs-R {{ fmtDeltaNumber(row.weakRightLeftEdge) }}
+                  </span>
+                  <span role="cell" class="shape-move-read" [class]="row.widthClass">{{ row.widthRead }}</span>
+                  <span role="cell" class="shape-move-read" [class]="row.wingbackClass">{{ row.wingbackRead }}</span>
+                  <span role="cell">{{ row.read }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div *ngIf="wingbackLabRows().length > 0" class="formation-matrix analysis-matrix">
+            <div class="matrix-header">
+              <strong>Carrileros lab</strong>
+              <span>Lectura fina de LWB/RWB usando el mismo Smoke espejo bandas</span>
+            </div>
+            <div class="matrix-scroll">
+              <div class="matrix-table formation-matrix-table" role="table" aria-label="Wingback lab comparison">
+                <div class="matrix-row formation-matrix-row matrix-row-head" role="row">
+                  <span role="columnheader">Form.</span>
+                  <span role="columnheader">Carrileros</span>
+                  <span role="columnheader">Verdict</span>
+                  <span role="columnheader">Edge prom.</span>
+                  <span role="columnheader">Edge min.</span>
+                  <span role="columnheader">Gap lado</span>
+                  <span role="columnheader">Ataque</span>
+                  <span role="columnheader">Diagnóstico</span>
+                </div>
+                <div
+                  *ngFor="let row of wingbackLabRows(); trackBy: trackByWingbackLabRow"
+                  class="matrix-row formation-matrix-row"
+                  role="row"
+                >
+                  <span role="cell">{{ row.formation }}</span>
+                  <span role="cell" class="shape-move-read" [class]="row.wingbackClass">{{ row.wingbackRead }}</span>
+                  <span role="cell" class="shape-move-read" [class]="sideMirrorVerdictLabelClass(row.verdict)">
+                    {{ row.verdict }}
+                  </span>
+                  <span role="cell">{{ fmtDeltaNumber(row.expectedEdgeAvg) }}</span>
+                  <span role="cell">{{ fmtDeltaNumber(row.expectedEdgeMin) }}</span>
+                  <span role="cell">{{ fmtXg(row.sideGap) }}</span>
+                  <span role="cell">{{ row.attackRead }}</span>
+                  <span role="cell" class="shape-move-read" [class]="row.className">{{ row.diagnosis }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div *ngIf="sideMirrorDecisionRows().length > 0" class="formation-matrix analysis-matrix">
+            <div class="matrix-header">
+              <strong>Mirror decision: sintético vs real</strong>
+              <span>Control sano contra partido real · decide si tocar motor o revisar DT/plantel</span>
+            </div>
+            <div *ngIf="sideMirrorDecisionSummary() as summary" class="coach-pick-grid">
+              <article class="coach-pick-card">
+                <span class="coach-pick-label">Diagnóstico de decisión</span>
+                <strong>
+                  {{ summary.fullyHealthy }}/{{ summary.total }} sanas ?
+                  {{ summary.engineHealthyRealBiased }} plantel/roles ?
+                  {{ summary.engineReview }} control sintético
+                </strong>
+                <span class="shape-move-read" [class]="summary.className">{{ summary.read }}</span>
+                <small>Foco: {{ summary.focus }}</small>
+              </article>
+            </div>
+            <div class="matrix-scroll">
+              <div class="matrix-table formation-matrix-table" role="table" aria-label="Synthetic vs real side mirror decision">
+                <div class="matrix-row formation-matrix-row matrix-row-head" role="row">
+                  <span role="columnheader">Form.</span>
+                  <span role="columnheader">Sintético</span>
+                  <span role="columnheader">Real</span>
+                  <span role="columnheader">Edges sintético</span>
+                  <span role="columnheader">Edges real</span>
+                  <span role="columnheader">Ancho</span>
+                  <span role="columnheader">Decisión</span>
+                </div>
+                <div
+                  *ngFor="let row of sideMirrorDecisionRows(); trackBy: trackBySideMirrorDecisionRow"
+                  class="matrix-row formation-matrix-row"
+                  role="row"
+                >
+                  <span role="cell">{{ row.formation }}</span>
+                  <span role="cell" class="shape-move-read" [class]="sideMirrorVerdictLabelClass(row.syntheticVerdict)">
+                    {{ row.syntheticVerdict }}
+                  </span>
+                  <span role="cell" class="shape-move-read" [class]="sideMirrorVerdictLabelClass(row.realVerdict)">
+                    {{ row.realVerdict }}
+                  </span>
+                  <span role="cell">{{ row.syntheticEdges }}</span>
+                  <span role="cell">{{ row.realEdges }}</span>
+                  <span role="cell" class="shape-move-read" [class]="row.widthClass">{{ row.widthRead }}</span>
+                  <span role="cell" class="shape-move-read" [class]="row.className">{{ row.decision }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div *ngIf="scenarioMatrixResults().length > 0" class="formation-matrix analysis-matrix scenario-matrix">
+            <div class="matrix-header">
+              <strong>Matriz escenarios</strong>
+              <span>Mismo partido + seed {{ seedInputModel ?? 'auto' }} · cambios tácticos en vivo</span>
+              <button type="button" class="matrix-export" (click)="copyScenarioMatrixJson()">
+                Copiar JSON
+              </button>
+            </div>
+            <div class="matrix-scroll">
+              <div class="matrix-table scenario-matrix-table" role="table" aria-label="Live tactical scenario comparison">
+                <div class="matrix-row scenario-matrix-row matrix-row-head" role="row">
+                  <span role="columnheader">Scenario</span>
+                  <span role="columnheader">Minute</span>
+                  <span role="columnheader">Action</span>
+                  <span role="columnheader">Score For/Ag.</span>
+                  <span role="columnheader">Delta Score</span>
+                  <span role="columnheader">Poss For/Ag.</span>
+                  <span role="columnheader">Delta Poss</span>
+                  <span role="columnheader">Shots For/Ag.</span>
+                  <span role="columnheader">Delta Shots</span>
+                  <span role="columnheader">xG For/Ag.</span>
+                  <span role="columnheader">Delta xG</span>
+                  <span role="columnheader">Zones For C/W/L</span>
+                  <span role="columnheader">Delta Zones</span>
+                </div>
+                <div
+                  *ngFor="let row of scenarioMatrixResults(); trackBy: trackByScenarioMatrix"
+                  class="matrix-row scenario-matrix-row"
+                  role="row"
+                >
+                  <span role="cell" [title]="row.description">{{ row.scenario }}</span>
+                  <span role="cell">{{ row.changeMinute ?? 'Base' }}</span>
+                  <span role="cell" [title]="row.actionDetail">{{ actionLabel(row) }}</span>
+                  <span role="cell">{{ scenarioGoalsFor(row) }}-{{ scenarioGoalsAgainst(row) }}</span>
+                  <span role="cell" [class]="deltaClass(scenarioGoalDiff(row))">
+                    {{ fmtDeltaInt(scenarioGoalDiff(row)) }}
+                  </span>
+                  <span role="cell">{{ fmtPct(scenarioPossessionFor(row)) }} / {{ fmtPct(scenarioPossessionAgainst(row)) }}</span>
+                  <span role="cell" [class]="deltaClass(scenarioPossessionDiff(row))">
+                    {{ fmtDeltaInt(scenarioPossessionDiff(row)) }}pp
+                  </span>
+                  <span role="cell">{{ scenarioShotsFor(row) }} / {{ scenarioShotsAgainst(row) }}</span>
+                  <span role="cell" [class]="deltaClass(scenarioShotDiff(row))">
+                    {{ fmtDeltaInt(scenarioShotDiff(row)) }}
+                  </span>
+                  <span role="cell">{{ fmtXg(scenarioXgFor(row)) }} / {{ fmtXg(scenarioXgAgainst(row)) }}</span>
+                  <span role="cell" [class]="deltaClass(scenarioXgDiff(row))">
+                    {{ fmtDeltaNumber(scenarioXgDiff(row)) }}
+                  </span>
+                  <span role="cell">
+                    {{ scenarioZonesFor(row).central }}/{{ scenarioZonesFor(row).wide }}/{{ scenarioZonesFor(row).long }}
+                  </span>
+                  <span role="cell" [class]="deltaClass(scenarioZoneDiff(row).central + scenarioZoneDiff(row).wide + scenarioZoneDiff(row).long)">
+                    C {{ fmtDeltaInt(scenarioZoneDiff(row).central) }}
+                    / W {{ fmtDeltaInt(scenarioZoneDiff(row).wide) }}
+                    / L {{ fmtDeltaInt(scenarioZoneDiff(row).long) }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div *ngIf="scenarioMatrixSummaryResults().length > 0" class="formation-matrix analysis-matrix scenario-matrix">
+            <div class="matrix-header">
+              <strong>Multi-seed scenario summary</strong>
+              <span>
+                Mismo partido - seeds {{ summarySeedStart() }}..{{ summarySeedEnd() }}
+                - averages vs minute baselines
+              </span>
+              <span *ngIf="scenarioSummaryBaseFormation()" class="controlled-team-badge">
+                Base formation: {{ scenarioSummaryBaseFormation() }}
+              </span>
+              <span class="controlled-team-badge">
+                Controlando: {{ controlledTeamDisplayName() }}
+              </span>
+              <button type="button" class="matrix-export" (click)="copyScenarioMatrixSummaryJson()">
+                Copy filtered JSON
+              </button>
+              <button type="button" class="matrix-export" (click)="downloadScenarioMatrixSummaryCsv()">
+                CSV
+              </button>
+            </div>
+            <div class="position-read-summary tactical-read-summary" aria-label="Equipo controlado">
+              <span class="read-pill tactical-read-pill read-visible">
+                Controlando: {{ controlledTeamDisplayName() }}
+              </span>
+            </div>
+            <div
+              *ngIf="scenarioScoutingNotes().length > 0"
+              class="position-read-summary tactical-read-summary"
+              aria-label="Scouting rapido"
+            >
+              <span
+                *ngFor="let note of scenarioScoutingNotes()"
+                class="read-pill tactical-read-pill"
+                [class]="note.className"
+                [title]="note.body"
+              >
+                {{ note.title }}: {{ note.body }}
+              </span>
+            </div>
+            <div
+              *ngIf="scenarioDecisionCards().length > 0"
+              class="scenario-decision-grid"
+              aria-label="Decision tactica rapida"
+            >
+              <article
+                *ngFor="let card of scenarioDecisionCards()"
+                class="scenario-decision-card"
+                [class]="card.className"
+                [title]="card.detail"
+              >
+                <span class="decision-title">{{ card.title }}</span>
+                <strong>{{ card.label }}</strong>
+                <span class="decision-metrics">{{ card.metrics }}</span>
+                <small>{{ card.detail }}</small>
+              </article>
+            </div>
+            <div class="position-read-controls" aria-label="Scenario summary table controls">
+              <label>
+                Read
+                <select [ngModel]="scenarioSummaryReadFilter()" (ngModelChange)="setScenarioSummaryReadFilter($event)">
+                  <option value="all">All</option>
+                  <option value="actionable">Actionable</option>
+                  <option value="review">Review</option>
+                  <option value="strong">Strong</option>
+                  <option value="visible">Visible</option>
+                  <option value="small">Small signal</option>
+                  <option value="noise">Noise</option>
+                </select>
+              </label>
+              <label>
+                Sort
+                <select [ngModel]="scenarioSummarySortMode()" (ngModelChange)="setScenarioSummarySortMode($event)">
+                  <option value="read-desc">Read priority</option>
+                  <option value="impact-desc">Impact</option>
+                  <option value="xg-desc">xG movement</option>
+                  <option value="default">Orden de ejecución</option>
+                </select>
+              </label>
+              <span class="position-read-count">
+                Showing {{ displayedScenarioMatrixSummaryRows().length }} / {{ scenarioMatrixSummaryResults().length }}
+              </span>
+            </div>
+            <div class="position-read-summary tactical-read-summary" aria-label="Scenario summary outcome summary">
+              <span
+                *ngFor="let item of scenarioSummaryOutcomeSummary()"
+                class="read-pill tactical-read-pill"
+                [class]="item.className"
+                [title]="item.hint"
+              >
+                {{ item.label }} {{ item.count }}
+              </span>
+            </div>
+            <div class="matrix-scroll">
+              <div class="matrix-table scenario-matrix-table" role="table" aria-label="Multi-seed tactical scenario summary">
+                <div class="matrix-row scenario-matrix-summary-row matrix-row-head" role="row">
+                  <span role="columnheader">Scenario</span>
+                  <span role="columnheader">Baseline</span>
+                  <span role="columnheader">Action</span>
+                  <span role="columnheader">Formation</span>
+                  <span role="columnheader">Coach read</span>
+                  <span role="columnheader">DT tip</span>
+                  <span role="columnheader">Read</span>
+                  <span role="columnheader">Outcome</span>
+                  <span role="columnheader">Seeds</span>
+                  <span role="columnheader">Delta xG For avg</span>
+                  <span role="columnheader">Delta xG For min/max</span>
+                  <span role="columnheader">Delta xG Ag.</span>
+                  <span role="columnheader">Delta Shots For/Ag.</span>
+                  <span role="columnheader">Delta Poss</span>
+                  <span role="columnheader">Delta Zones C/W</span>
+                  <span role="columnheader">Delta Opp zones C/W</span>
+                  <span role="columnheader">Delta Opp xG C/W</span>
+                  <span role="columnheader">Delta Opp wide L/R xG</span>
+                </div>
+                <div
+                  *ngFor="let row of displayedScenarioMatrixSummaryRows(); trackBy: trackByScenarioMatrixSummary"
+                  class="matrix-row scenario-matrix-summary-row"
+                  role="row"
+                >
+                  <span role="cell">{{ row.scenario }}</span>
+                  <span role="cell">{{ row.baselineScenario }}</span>
+                  <span role="cell" [title]="row.actionDetail">{{ summaryActionLabel(row) }}</span>
+                  <span role="cell" [title]="scenarioSummaryFormationHint(row)">
+                    {{ scenarioSummaryFormationLabel(row) }}
+                  </span>
+                  <span role="cell" class="shape-move-read" [title]="scenarioSummaryCoachReadDetail(row)">
+                    {{ scenarioSummaryCoachRead(row) }}
+                  </span>
+                  <span role="cell" class="shape-move-read" [class]="scenarioSummaryRecommendationClass(row)" [title]="scenarioSummaryRecommendationDetail(row)">
+                    {{ scenarioSummaryRecommendation(row) }}
+                  </span>
+                  <span
+                    role="cell"
+                    [class]="scenarioSummaryReadClass(row)"
+                    [title]="scenarioSummaryReadReason(row)"
+                  >
+                    {{ scenarioSummaryRead(row) }}
+                  </span>
+                  <span
+                    role="cell"
+                    [class]="scenarioSummaryOutcomeClass(row)"
+                    [title]="scenarioSummaryOutcomeReason(row)"
+                  >
+                    {{ scenarioSummaryOutcome(row) }}
+                  </span>
+                  <span role="cell">{{ row.seedCount }}</span>
+                  <span role="cell" [class]="deltaClass(row.avgUserXgDelta)">
+                    {{ fmtDeltaNumber(row.avgUserXgDelta) }}
+                  </span>
+                  <span role="cell">
+                    {{ fmtDeltaNumber(row.minUserXgDelta) }} / {{ fmtDeltaNumber(row.maxUserXgDelta) }}
+                  </span>
+                  <span role="cell" [class]="deltaClass(-row.avgOpponentXgDelta)">
+                    {{ fmtDeltaNumber(row.avgOpponentXgDelta) }}
+                  </span>
+                  <span role="cell">
+                    <span [class]="deltaClass(row.avgUserShotsDelta)">
+                      F {{ fmtDeltaNumber(row.avgUserShotsDelta) }}
+                    </span>
+                    vs
+                    <span [class]="deltaClass(-row.avgOpponentShotsDelta)">
+                      Ag {{ fmtDeltaNumber(row.avgOpponentShotsDelta) }}
+                    </span>
+                  </span>
+                  <span role="cell" [class]="deltaClass(row.avgUserPossessionDelta)">
+                    {{ fmtDeltaNumber(row.avgUserPossessionDelta) }}pp
+                  </span>
+                  <span role="cell">
+                    C {{ fmtDeltaNumber(row.avgUserCentralDelta) }}
+                    | W {{ fmtDeltaNumber(row.avgUserWideDelta) }}
+                  </span>
+                  <span role="cell">
+                    C {{ fmtDeltaNumber(row.avgOpponentCentralDelta) }}
+                    | W {{ fmtDeltaNumber(row.avgOpponentWideDelta) }}
+                  </span>
+                  <span role="cell">
+                    C {{ fmtDeltaNumber(row.avgOpponentCentralXgDelta) }}
+                    | W {{ fmtDeltaNumber(row.avgOpponentWideXgDelta) }}
+                  </span>
+                  <span role="cell">
+                    L {{ fmtDeltaNumber(row.avgOpponentLeftWideXgDelta) }}
+                    | R {{ fmtDeltaNumber(row.avgOpponentRightWideXgDelta) }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div *ngIf="scenarioBatteryRows().length > 0" class="formation-matrix analysis-matrix scenario-battery">
+            <div class="matrix-header">
+              <strong>Tablero bater&iacute;a tactico</strong>
+              <span>
+                {{ scenarioBatteryRows().length }} lecturas - seeds {{ summarySeedStart() }}..{{ summarySeedStart() + scenarioMatrixSmokeSeedCount() - 1 }}
+                - {{ scenarioBatteryGroupLabel(scenarioBatteryRows()[0]?.scenarioGroup || scenarioBatteryGroupModel) }}
+                - {{ scenarioBatteryCandidateMatches().length }}/{{ scenarioBatteryMatchLimit() }} partidos disponibles
+              </span>
+              <button type="button" class="matrix-export" (click)="copyScenarioBatteryJson()">
+                Copiar JSON
+              </button>
+              <button type="button" class="matrix-export" (click)="downloadScenarioBatteryCsv()">
+                CSV
+              </button>
+            </div>
+            <div class="position-read-summary tactical-read-summary" aria-label="Scenario battery notes">
+              <span class="read-pill tactical-read-pill read-visible">
+                {{ scenarioBatteryScopeHint() }}
+              </span>
+              <span class="read-pill tactical-read-pill read-stable">
+                {{ scenarioBatteryGroupHint() }}
+              </span>
+              <span class="read-pill tactical-read-pill read-noise">
+                {{ scenarioBatteryCoverageHint() }}
+              </span>
+              <span class="read-pill tactical-read-pill" [class.read-visible]="scenarioBatteryReviewCount() === 0" [class.read-noise]="scenarioBatteryReviewCount() > 0">
+                {{ scenarioBatteryReviewHint() }}
+              </span>
+            </div>
+            <div *ngIf="scenarioBatteryReviewItems().length > 0" class="position-read-summary tactical-read-summary" aria-label="Scenario battery review items">
+              <span
+                *ngFor="let item of scenarioBatteryReviewItems(); trackBy: trackByScenarioBatteryReviewItem"
+                class="read-pill tactical-read-pill read-noise"
+                [title]="item.detail"
+              >
+                {{ item.summary }}
+              </span>
+            </div>
+            <div class="matrix-scroll">
+              <div class="matrix-table scenario-battery-table" role="table" aria-label="Tactical battery board">
+                <div class="matrix-row scenario-battery-row matrix-row-head" role="row">
+                  <span role="columnheader">Partido</span>
+                  <span role="columnheader">Controlando</span>
+                  <span role="columnheader">Grupo</span>
+                  <span role="columnheader">Objetivo</span>
+                  <span role="columnheader">Contexto</span>
+                  <span role="columnheader">Decision</span>
+                  <span role="columnheader">Revisión</span>
+                  <span role="columnheader">Plan</span>
+                  <span role="columnheader">Doble</span>
+                  <span role="columnheader">Atacar</span>
+                  <span role="columnheader">Forma</span>
+                  <span role="columnheader">Cuidar</span>
+                  <span role="columnheader">Riesgo</span>
+                  <span role="columnheader">Amenaza rival</span>
+                  <span role="columnheader">Escenarios</span>
+                </div>
+                <div
+                  *ngFor="let row of scenarioBatteryRows(); trackBy: trackByScenarioBattery"
+                  class="matrix-row scenario-battery-row"
+                  role="row"
+                >
+                  <span role="cell">{{ row.matchLabel }}</span>
+                  <span role="cell">{{ row.controlledTeam }} ({{ row.controlledSide === 'HOME' ? 'local' : 'visitante' }})</span>
+                  <span role="cell">{{ scenarioBatteryGroupLabel(row.scenarioGroup) }}</span>
+                  <span role="cell">{{ scenarioBatteryCoachObjectiveLabel(row.coachObjective) }}</span>
+                  <span role="cell" [title]="row.coachContextDetail">{{ row.coachContext }}</span>
+                  <span role="cell" [title]="row.decisionDetail">{{ row.decision }}</span>
+                  <span role="cell" [title]="row.reviewDetail">{{ row.review }}</span>
+                  <span role="cell" [title]="scenarioBatteryCardDetail(row, 'Plan actual')">
+                    {{ scenarioBatteryCardSummary(row, 'Plan actual') }}
+                  </span>
+                  <span role="cell" [title]="scenarioBatteryCardDetail(row, 'Doble ganancia')">
+                    {{ scenarioBatteryCardSummary(row, 'Doble ganancia') }}
+                  </span>
+                  <span role="cell" [title]="scenarioBatteryCardDetail(row, 'Atacar')">
+                    {{ scenarioBatteryCardSummary(row, 'Atacar') }}
+                  </span>
+                  <span role="cell" [title]="scenarioBatteryCardDetail(row, 'Forma')">
+                    {{ scenarioBatteryCardSummary(row, 'Forma') }}
+                  </span>
+                  <span role="cell" [title]="scenarioBatteryCardDetail(row, 'Cuidar')">
+                    {{ scenarioBatteryCardSummary(row, 'Cuidar') }}
+                  </span>
+                  <span role="cell" [title]="scenarioBatteryRiskCardDetail(row)">
+                    {{ scenarioBatteryRiskCardSummary(row) }}
+                  </span>
+                  <span role="cell" [title]="scenarioBatteryCardDetail(row, 'Amenaza rival')">
+                    {{ scenarioBatteryCardSummary(row, 'Amenaza rival') }}
+                  </span>
+                  <span role="cell">{{ row.scenarioCount }} x {{ row.seedCount }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+        <!-- Panel C: Match list (full width) -->
+        <section class="panel panel-c" aria-labelledby="panel-c-heading">
+          <h2 id="panel-c-heading" class="panel-title">Panel C - Partidos</h2>
+          <p class="panel-hint">Elegí un partido para cargar el detalle en Panel A y la línea de tiempo en Panel D.</p>
+          <div *ngIf="rounds().length === 0" class="empty-rounds">
+            <p>No hay partidos en la carrera activa.</p>
+          </div>
+          <ul class="rounds-list" *ngIf="rounds().length > 0">
+            <li *ngFor="let r of rounds(); trackBy: trackByRound" class="round-block">
+              <div class="round-header">
+                <span class="round-label">Fecha {{ r.round }}</span>
+                <span *ngIf="r.byeTeam" class="round-bye">BYE: {{ r.byeTeam }}</span>
+              </div>
+              <ul class="match-list">
+                <li
+                  *ngFor="let m of r.matches; trackBy: trackByMatchId"
+                  class="match-row"
+                  data-testid="match-row"
+                  [attr.data-match-id]="m.matchId"
+                  [class.match-row-selected]="m.matchId === selectedMatchId()"
+                  (click)="selectMatch(m)"
+                  (keyup.enter)="selectMatch(m)"
+                  (keyup.space)="selectMatch(m)"
+                  tabindex="0"
+                  role="button"
+                  [attr.aria-pressed]="m.matchId === selectedMatchId()"
+                  [attr.aria-label]="'Partido ' + m.homeTeamName + ' vs ' + m.awayTeamName + ', estado ' + m.status"
+                >
+                  <span class="match-teams">
+                    <span class="team-home">{{ m.homeTeamName }}</span>
+                    <span class="team-sep">vs</span>
+                    <span class="team-away">{{ m.awayTeamName }}</span>
+                  </span>
+                  <span class="match-score">
+                    <ng-container *ngIf="m.homeGoals !== null && m.awayGoals !== null; else pendingScore">
+                      {{ m.homeGoals }} - {{ m.awayGoals }}
+                    </ng-container>
+                    <ng-template #pendingScore>vs</ng-template>
+                  </span>
+                  <span class="match-status" [attr.data-status]="m.status">{{ matchStatusLabel(m.status) }}</span>
+                </li>
+              </ul>
+            </li>
+          </ul>
+        </section>
+        <!-- Panel D: Timeline scrubber (F3) -->
+        <section class="panel panel-d" aria-labelledby="panel-d-heading">
+          <h2 id="panel-d-heading" class="panel-title">Panel D - Línea de tiempo</h2>
+          <p class="panel-hint" *ngIf="!selectedMatchId()">
+            Elegí un partido en el Panel C para usar la línea de tiempo.
+          </p>
+          <p class="panel-hint" *ngIf="selectedMatchId() && !selectedMatchHasDetail()">
+            La linea de tiempo aparece cuando el partido ya fue simulado.
+          </p>
+          <div *ngIf="selectedMatchId() && selectedMatchHasDetail()" class="scrubber-content">
+            <div class="scrubber-header">
+              <span class="minute-label">Minuto {{ selectedMinute() }}</span>
+              <span *ngIf="timelineSnapshot() as snap" class="match-context">
+                de {{ snap.events.length }} eventos
+              </span>
+            </div>
+            <input
+              type="range"
+              class="minute-slider"
+              min="0"
+              [max]="TIMELINE_MAX_MINUTE"
+              [step]="TIMELINE_STEP"
+              [value]="selectedMinute()"
+              (input)="onSliderInput($event)"
+              [attr.aria-label]="'Minuto del partido, actualmente ' + selectedMinute()"
+              [attr.aria-valuemin]="0"
+              [attr.aria-valuemax]="TIMELINE_MAX_MINUTE"
+              [attr.aria-valuenow]="selectedMinute()"
+              [disabled]="timelineLoading()"
+            />
+            <div class="minute-ticks" aria-hidden="true">
+              <span *ngFor="let m of minuteTicks" class="tick" [class.tick-active]="m === selectedMinute()">
+                {{ m }}
+              </span>
+            </div>
+            <!-- Loading skeleton -->
+            <div *ngIf="timelineLoading()" class="scrubber-skeleton" aria-live="polite">
+              <div class="skeleton-row skeleton-score"></div>
+              <div class="skeleton-grid">
+                <div class="skeleton-card"></div>
+                <div class="skeleton-card"></div>
+                <div class="skeleton-card"></div>
+                <div class="skeleton-card"></div>
+              </div>
+            </div>
+            <!-- Snapshot content -->
+            <ng-container *ngIf="!timelineLoading() && timelineSnapshot() as snap">
+              <div class="scrubber-score" role="status" aria-live="polite">
+                <span class="score-home">{{ snap.homeGoals }}</span>
+                <span class="score-sep">-</span>
+                <span class="score-away">{{ snap.awayGoals }}</span>
+              </div>
+              <div class="metric-grid">
+                <div class="metric-card">
+                  <span class="metric-label">xG local</span>
+                  <span class="metric-value">{{ snap.homeXg | number:'1.2-2' }}</span>
+                </div>
+                <div class="metric-card">
+                  <span class="metric-label">xG visitante</span>
+                  <span class="metric-value">{{ snap.awayXg | number:'1.2-2' }}</span>
+                </div>
+                <div class="metric-card">
+                  <span class="metric-label">Tiros local</span>
+                  <span class="metric-value">{{ snap.homeShots }}</span>
+                </div>
+                <div class="metric-card">
+                  <span class="metric-label">Tiros visitante</span>
+                  <span class="metric-value">{{ snap.awayShots }}</span>
+                </div>
+              </div>
+            </ng-container>
+            <!-- Empty / error state -->
+            <div *ngIf="!timelineLoading() && !timelineSnapshot() && !timelineError()" class="empty-snapshot">
+              <p>La línea de tiempo no está disponible para este partido.</p>
+            </div>
+            <div *ngIf="!timelineLoading() && timelineError()" class="error-snapshot" role="alert">
+              <p>{{ timelineError() }}</p>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  
