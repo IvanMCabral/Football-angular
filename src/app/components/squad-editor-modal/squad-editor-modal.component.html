@@ -54,7 +54,7 @@
 
           <div class="formation-effectiveness-row" *ngIf="formationEffectiveness$ | async as fe">
             <span class="fe-label">Formación inferida:</span>
-            <span class="fe-formation">{{ fe.inferredFormation }}</span>
+            <span class="fe-formation">{{ getDisplayedFormationLabel(fe) }}</span>
             <span class="fe-sep">·</span>
             <span class="fe-label">Eff. team:</span>
             <span class="fe-team-avg"

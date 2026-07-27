@@ -1710,6 +1710,13 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     return fe?.inferredFormation ?? null;
   }
 
+  getDisplayedFormationLabel(fe: { inferredFormation?: string } | null | undefined): string {
+    if (!this.isCustomLineup() && this.selectedFormation !== this.userFormationLabel) {
+      return this.selectedFormation;
+    }
+    return fe?.inferredFormation || this.selectedFormation;
+  }
+
   onFormationChange(newFormation?: string): void {
     // Bloquear si hay un cambio en progreso
     if (this.isFormationChanging) {

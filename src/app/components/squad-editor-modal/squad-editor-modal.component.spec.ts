@@ -3263,6 +3263,24 @@ describe('SquadEditorModalComponent free-formation cross-role drag/drop', () => 
 
   // ---- formation detection ----
 
+  it('shows the manager-selected preset in the header when the lineup is not custom', () => {
+    component.selectedFormation = '4-3-3';
+    spyOn(component as any, 'isCustomLineup').and.returnValue(false);
+
+    const label = component.getDisplayedFormationLabel({ inferredFormation: '4-4-2' });
+
+    expect(label).toBe('4-3-3');
+  });
+
+  it('shows the inferred formation in the header when the manager shape is custom', () => {
+    component.selectedFormation = '4-3-3';
+    spyOn(component as any, 'isCustomLineup').and.returnValue(true);
+
+    const label = component.getDisplayedFormationLabel({ inferredFormation: '4-4-2' });
+
+    expect(label).toBe('4-4-2');
+  });
+
   it('detectFormation returns the user-formation label for an incomplete lineup', (done) => {
     // Incomplete lineups are treated as a custom manager shape, not as a
     // silent canonical formation match.
