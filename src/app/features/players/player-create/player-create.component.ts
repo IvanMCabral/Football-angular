@@ -8,6 +8,7 @@ import { HttpClient } from '@angular/common/http';
 import { ToastService } from '../../../core/services/toast.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { environment } from '../../../environments/environment';
+import { readableErrorMessage } from '../../../shared/utils/error-message';
 
 interface CreatedPlayerResponse {
   name: string;
@@ -74,7 +75,7 @@ export class PlayerCreateComponent {
       map((player) => {
         const duration = performance.now() - start;
         this.loading = false;
-        this.toastService.success(`Player \"${player.name}\" created successfully! (tardó ${duration.toFixed(0)} ms)`);
+        this.toastService.success(`Jugador "${player.name}" creado correctamente (${duration.toFixed(0)} ms).`);
         this.playerForm.reset({
           position: 'MID',
           age: 25,
@@ -88,7 +89,7 @@ export class PlayerCreateComponent {
         return player;
       }),
       catchError((err: unknown) => {
-        this.errorMessage = this.readErrorMessage(err, 'Error creating player');
+        this.errorMessage = readableErrorMessage(err, 'No se pudo crear el jugador.');
         this.loading = false;
         this.toastService.error(this.errorMessage);
         return of(null);
@@ -103,11 +104,11 @@ export class PlayerCreateComponent {
         this.http.post<CreatedPlayerResponse>(`${this.apiUrl}/world/create-random-player`, { userId: userInfo.id })
       ),
       map((player) => {
-        this.toastService.success(`Player \"${player.name}\" created successfully!`);
+        this.toastService.success(`Jugador "${player.name}" creado correctamente.`);
         return { count: 1 };
       }),
       catchError((err: unknown) => {
-        this.errorMessage = this.readErrorMessage(err, 'Error generating random player');
+        this.errorMessage = readableErrorMessage(err, 'No se pudo generar el jugador aleatorio.');
         this.toastService.error(this.errorMessage);
         return of(null);
       })
@@ -116,7 +117,7 @@ export class PlayerCreateComponent {
 
   createRandomBatch(): void {
     if (this.randomCount < 1 || this.randomCount > this.MAX_RANDOM_PLAYERS) {
-      this.toastService.error(`Amount must be between 1 and ${this.MAX_RANDOM_PLAYERS}`);
+      this.toastService.error(`La cantidad debe estar entre 1 y ${this.MAX_RANDOM_PLAYERS}.`);
       return;
     }
     this.errorMessage = '';
@@ -128,25 +129,14 @@ export class PlayerCreateComponent {
         })
       ),
       map((res) => {
-        this.toastService.success(`${res?.count ?? this.randomCount} players generated successfully!`);
+        this.toastService.success(`${res?.count ?? this.randomCount} jugadores generados correctamente.`);
         return res;
       }),
       catchError((err: unknown) => {
-        const backendMessage = this.readErrorMessage(err, 'Server error');
-        this.errorMessage = `Error: ${backendMessage}`;
+        this.errorMessage = readableErrorMessage(err, 'No se pudieron generar los jugadores.');
         this.toastService.error(this.errorMessage);
         return of(null);
       })
     );
-  }
-
-  private readErrorMessage(err: unknown, fallback: string): string {
-    if (typeof err !== 'object' || err === null) return fallback;
-    const maybeMessage = 'message' in err ? (err as { message?: unknown }).message : null;
-    if (typeof maybeMessage === 'string' && maybeMessage.trim()) return maybeMessage;
-    const errorBody = 'error' in err ? (err as { error?: unknown }).error : null;
-    if (typeof errorBody !== 'object' || errorBody === null || !('message' in errorBody)) return fallback;
-    const backendMessage = (errorBody as { message?: unknown }).message;
-    return typeof backendMessage === 'string' && backendMessage.trim() ? backendMessage : fallback;
   }
 }

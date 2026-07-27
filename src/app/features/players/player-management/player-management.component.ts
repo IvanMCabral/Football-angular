@@ -6,6 +6,7 @@ import { ToastService } from '../../../core/services/toast.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { AppLoggerService } from '../../../core/services/app-logger.service';
 import { environment } from '../../../environments/environment';
+import { readableErrorMessage } from '../../../shared/utils/error-message';
 import { Observable, of, BehaviorSubject, Subject, merge } from 'rxjs';
 import { switchMap, catchError, startWith, map } from 'rxjs/operators';
 
@@ -157,7 +158,7 @@ export class PlayerManagementComponent {
       };
       this.http.post(`${this.apiUrl}/world/assign-player`, payload).subscribe({
         next: () => {
-          this.toastService.success('Player assigned to team in WorldSnapshot');
+          this.toastService.success('Jugador asignado al equipo.');
           // Trigger reload
           this.teamId$.next(this.selectedTeamId);
           this.reloadAvailablePlayers$.next();
@@ -165,7 +166,7 @@ export class PlayerManagementComponent {
         },
         error: (err: unknown) => {
           this.logger.error('Failed to assign player:', err);
-          this.toastService.error(`Failed to assign player: ${this.readErrorMessage(err)}`);
+          this.toastService.error(readableErrorMessage(err, 'No se pudo asignar el jugador.'));
         }
       });
     });
@@ -181,7 +182,7 @@ export class PlayerManagementComponent {
       };
       this.http.post(`${this.apiUrl}/world/remove-player`, payload).subscribe({
         next: () => {
-          this.toastService.success('Player removed from team in WorldSnapshot');
+          this.toastService.success('Jugador quitado del equipo.');
           // Trigger reload
           this.teamId$.next(this.selectedTeamId);
           this.reloadAvailablePlayers$.next();
@@ -189,26 +190,10 @@ export class PlayerManagementComponent {
         },
         error: (err: unknown) => {
           this.logger.error('Failed to remove player:', err);
-          this.toastService.error(`Failed to remove player: ${this.readErrorMessage(err)}`);
+          this.toastService.error(readableErrorMessage(err, 'No se pudo quitar el jugador.'));
         }
       });
     });
-  }
-
-  private readErrorMessage(err: unknown): string {
-    if (typeof err !== 'object' || err === null) {
-      return 'Unknown error';
-    }
-
-    const maybeError = err as { message?: unknown; error?: { message?: unknown } };
-    if (typeof maybeError.error?.message === 'string') {
-      return maybeError.error.message;
-    }
-    if (typeof maybeError.message === 'string') {
-      return maybeError.message;
-    }
-
-    return 'Unknown error';
   }
 }
 

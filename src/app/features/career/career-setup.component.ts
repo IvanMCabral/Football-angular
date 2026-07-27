@@ -6,6 +6,7 @@ import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../core/services/auth.service';
 import { AppLoggerService } from '../../core/services/app-logger.service';
 import { environment } from '../../environments/environment';
+import { readableErrorMessage } from '../../shared/utils/error-message';
 import { Observable, BehaviorSubject, combineLatest, firstValueFrom, concat } from 'rxjs';
 import { map, switchMap, catchError, take, tap, startWith, distinctUntilChanged, shareReplay } from 'rxjs/operators';
 import { of } from 'rxjs';
@@ -236,7 +237,7 @@ export class CareerSetupComponent implements OnInit {
           },
           error: (err) => {
             this.seedingWorld = false;
-            const msg = err?.error?.message || err?.statusText || 'Error al inicializar el mundo';
+            const msg = readableErrorMessage(err, 'Error al inicializar el mundo.');
             this.error$.next(`Error al inicializar el mundo: ${msg}`);
             this.logger.error('[CAREER-SETUP] seed error:', err);
           }
@@ -280,22 +281,8 @@ export class CareerSetupComponent implements OnInit {
       await this.router.navigate(['/squad']);
     } catch (err: unknown) {
       this.logger.error('[CAREER-SETUP] Error starting career:', err);
-      this.error$.next(this.readErrorMessage(err, 'Error al iniciar carrera'));
+      this.error$.next(readableErrorMessage(err, 'Error al iniciar carrera.'));
       this.creating = false;
     }
-  }
-
-  private readErrorMessage(err: unknown, fallback: string): string {
-    if (typeof err !== 'object' || err === null) {
-      return fallback;
-    }
-    const errorBody = 'error' in err ? (err as { error?: unknown }).error : null;
-    if (typeof errorBody === 'object' && errorBody !== null && 'message' in errorBody) {
-      const message = (errorBody as { message?: unknown }).message;
-      if (typeof message === 'string' && message.trim().length > 0) {
-        return message;
-      }
-    }
-    return fallback;
   }
 }

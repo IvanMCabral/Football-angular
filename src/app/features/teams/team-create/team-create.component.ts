@@ -8,6 +8,7 @@ import { TeamService } from '../services/team.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { RandomTeamsResponse, SessionTeam } from '../../../shared/models/team.model';
+import { readableErrorMessage } from '../../../shared/utils/error-message';
 
 interface Country {
   code: string;
@@ -91,11 +92,11 @@ export class TeamCreateComponent {
     this.randomTeam$ = this.authService.getUserInfo().pipe(
       switchMap(userInfo => this.teamService.createRandomSessionTeam(userInfo.id)),
       map((team: SessionTeam) => {
-        this.toastService.success(`Team \"${team.name}\" created successfully!`);
+        this.toastService.success(`Equipo "${team.name}" creado correctamente.`);
         return team;
       }),
       catchError((err: unknown) => {
-        this.errorMessage = this.readErrorMessage(err, 'Failed to generate random team');
+        this.errorMessage = readableErrorMessage(err, 'No se pudo generar el equipo aleatorio.');
         this.toastService.error(this.errorMessage);
         return of(null);
       })
@@ -107,11 +108,11 @@ export class TeamCreateComponent {
     this.randomTeam$ = this.authService.getUserInfo().pipe(
       switchMap(userInfo => this.teamService.createRandomSessionTeams(userInfo.id, count)),
       map((response: RandomTeamsResponse) => {
-        this.toastService.success(`${response.count} teams created successfully!`);
+        this.toastService.success(`${response.count} equipos creados correctamente.`);
         return response;
       }),
       catchError((err: unknown) => {
-        this.errorMessage = this.readErrorMessage(err, 'Failed to generate random teams');
+        this.errorMessage = readableErrorMessage(err, 'No se pudieron generar los equipos aleatorios.');
         this.toastService.error(this.errorMessage);
         return of(null);
       })
@@ -143,25 +144,17 @@ export class TeamCreateComponent {
       map((team: SessionTeam) => {
         const duration = performance.now() - start;
         this.loading = false;
-        this.toastService.success(`Team \"${team.name}\" created successfully! (tardó ${duration.toFixed(0)} ms)`);
+        this.toastService.success(`Equipo "${team.name}" creado correctamente (${duration.toFixed(0)} ms).`);
         this.teamForm.reset({ budget: 100, formation: '4-3-3' });
         this.availableCities = [];
         return team;
       }),
       catchError((err: unknown) => {
-        this.errorMessage = this.readErrorMessage(err, 'Failed to create club');
+        this.errorMessage = readableErrorMessage(err, 'No se pudo crear el club.');
         this.loading = false;
         this.toastService.error(this.errorMessage);
         return of(null);
       })
     ).subscribe();
-  }
-
-  private readErrorMessage(err: unknown, fallback: string): string {
-    if (typeof err !== 'object' || err === null) return fallback;
-    const errorBody = 'error' in err ? (err as { error?: unknown }).error : null;
-    if (typeof errorBody !== 'object' || errorBody === null || !('message' in errorBody)) return fallback;
-    const message = (errorBody as { message?: unknown }).message;
-    return typeof message === 'string' && message.trim() ? message : fallback;
   }
 }

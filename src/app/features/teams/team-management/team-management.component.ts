@@ -7,6 +7,7 @@ import { ToastService } from '../../../core/services/toast.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { AppLoggerService } from '../../../core/services/app-logger.service';
 import { environment } from '../../../environments/environment';
+import { readableErrorMessage } from '../../../shared/utils/error-message';
 import { Observable, of, BehaviorSubject, Subject, merge, combineLatest } from 'rxjs';
 import { switchMap, catchError, startWith, map, shareReplay, tap } from 'rxjs/operators';
 
@@ -69,7 +70,7 @@ export class TeamManagementComponent {
       this.http.get<League[]>(`${this.apiUrl}/world/leagues?userId=${userInfo.id}`).pipe(
         catchError(err => {
           this.logger.error('Failed to load leagues:', err);
-          this.toastService.error('Failed to load leagues');
+          this.toastService.error(readableErrorMessage(err, 'No se pudieron cargar las ligas.'));
           return of([]);
         })
       )
@@ -149,7 +150,7 @@ export class TeamManagementComponent {
       return this.http.get<Player[]>(`${this.apiUrl}/teams/${team.id}/roster`).pipe(
         catchError(err => {
           this.logger.error('Failed to load roster:', err);
-          this.toastService.error('Failed to load roster');
+          this.toastService.error(readableErrorMessage(err, 'No se pudo cargar el plantel.'));
           return of([]);
         })
       );
@@ -176,12 +177,12 @@ export class TeamManagementComponent {
       )
     ).subscribe({
       next: () => {
-        this.toastService.success('Team added to league');
+        this.toastService.success('Equipo agregado a la liga.');
         this.reloadTeams$.next();
       },
       error: (err) => {
         this.logger.error('Failed to add team:', err);
-        this.toastService.error('Failed to add team');
+        this.toastService.error(readableErrorMessage(err, 'No se pudo agregar el equipo.'));
       }
     });
   }
@@ -196,12 +197,12 @@ export class TeamManagementComponent {
       )
     ).subscribe({
       next: () => {
-        this.toastService.success('Team removed from league');
+        this.toastService.success('Equipo quitado de la liga.');
         this.reloadTeams$.next();
       },
       error: (err) => {
         this.logger.error('Failed to remove team:', err);
-        this.toastService.error('Failed to remove team');
+        this.toastService.error(readableErrorMessage(err, 'No se pudo quitar el equipo.'));
       }
     });
   }
@@ -220,13 +221,13 @@ export class TeamManagementComponent {
 
     this.http.delete(`${this.apiUrl}/teams/${team.id}/remove-player/${player.id}`).subscribe({
       next: () => {
-        this.toastService.success(`${player.name} removed from roster!`);
+        this.toastService.success(`${player.name} fue quitado del plantel.`);
         // Reload roster by re-emitting the same team
         this.selectedTeamForRoster$.next(team);
       },
       error: (err) => {
         this.logger.error('Failed to remove player:', err);
-        this.toastService.error('Failed to remove player from roster');
+        this.toastService.error(readableErrorMessage(err, 'No se pudo quitar el jugador del plantel.'));
       }
     });
   }
