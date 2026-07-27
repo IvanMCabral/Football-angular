@@ -42,9 +42,13 @@
       padding: 4px 10px;
       border-radius: 999px;
       border: 1px solid rgba(255, 255, 255, 0.4);
-      color: #fff;
+      color: #fff !important;
       background: rgba(245, 158, 11, 0.18);
       transition: background 0.15s ease;
+    }
+    .reset-positions-btn .mdc-button__label {
+      color: #fff !important;
+      font-weight: 800;
     }
     .reset-positions-btn:hover {
       background: rgba(245, 158, 11, 0.32);

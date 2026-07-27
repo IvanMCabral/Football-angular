@@ -297,7 +297,7 @@ export function runTestHarnessRoleSlotOptionsFromLineup(ctx: any, lineup: any): 
       const player = playerById.get(slot.playerId);
       return {
         slotId: slot.subdivisionId,
-        label: `${slot.subdivisionId} · ${player?.name ?? slot.playerId} (${player?.position ?? '?'})`,
+        label: `${slot.subdivisionId} - ${player?.name ?? slot.playerId} (${player?.position ?? '?'})`,
       };
     });
   
