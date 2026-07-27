@@ -1847,7 +1847,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       'homeCentralShots', 'homeWideShots', 'homeLongShots',
       'awayCentralShots', 'awayWideShots', 'awayLongShots',
     ];
-    const lines = this.csvLines(header, rows as unknown as Record<string, unknown>[]);
+    const lines = this.csvLines(header, rows);
     this.downloadCsv(lines, `formation-matrix-${this.seedInputModel ?? 'auto'}.csv`);
     this.snackBar.open(`Matriz formaciones CSV exported (${rows.length} rows).`, 'OK', { duration: 2500 });
   }
@@ -1875,7 +1875,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       'swappedAvgXgFor', 'swappedAvgXgAgainst', 'swappedAvgXgDiff',
       'timestamp',
     ];
-    const lines = this.csvLines(header, [exportRow as Record<string, unknown>]);
+    const lines = this.csvLines(header, [exportRow]);
     this.downloadCsv(lines, `player-swap-${row.formation}-${row.slotId}-${row.seedStart}-${row.seedEnd}.csv`);
     this.snackBar.open('Matriz cambio jugador CSV exported.', 'OK', { duration: 2500 });
   }
@@ -1921,7 +1921,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       'deltaCentralXgAgainst', 'deltaWideXgAgainst', 'deltaLongXgAgainst',
       'baselineXgFor', 'baselineXgAgainst', 'movedXgFor', 'movedXgAgainst', 'timestamp',
     ];
-    const lines = this.csvLines(header, rows as unknown as Record<string, unknown>[]);
+    const lines = this.csvLines(header, rows);
     this.downloadCsv(lines, `position-movement-${this.positionPixelReadFilter()}-${this.positionPixelSortMode()}-${this.seedInputModel ?? 'auto'}.csv`);
     this.snackBar.open(`Position movement CSV exported (${rows.length} rows).`, 'OK', { duration: 2500 });
   }
@@ -1966,7 +1966,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   private csvCell(value: unknown): string {
     return formatCsvCell(value);
   }
-  private csvLines(header: string[], rows: Record<string, unknown>[]): string[] {
+  private csvLines(header: string[], rows: readonly object[]): string[] {
     return buildCsvLines(header, rows);
   }
   private downloadCsv(lines: string[], filename: string): void {

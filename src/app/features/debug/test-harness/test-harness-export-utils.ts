@@ -4,10 +4,13 @@ export function csvCell(value: unknown): string {
   return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
-export function csvLines(header: string[], rows: Record<string, unknown>[]): string[] {
+export function csvLines(header: string[], rows: readonly object[]): string[] {
   return [
     header.join(','),
-    ...rows.map((row) => header.map((key) => csvCell(row[key])).join(',')),
+    ...rows.map((row) => {
+      const cells = row as Record<string, unknown>;
+      return header.map((key) => csvCell(cells[key])).join(',');
+    }),
   ];
 }
 
