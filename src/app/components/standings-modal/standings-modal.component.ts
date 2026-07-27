@@ -7,17 +7,7 @@ import { MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { CareerService } from 'app/core/services/career.service';
 import { DivisionStandings } from 'app/core/services/career.model';
-
-function errorMessage(error: unknown): string {
-  if (typeof error === 'object' && error !== null && 'error' in error) {
-    const nested = (error as { error?: { message?: string } }).error;
-    if (nested?.message) { return nested.message; }
-  }
-  if (typeof error === 'object' && error !== null && 'message' in error) {
-    return String((error as { message?: unknown }).message ?? error);
-  }
-  return error instanceof Error ? error.message : String(error);
-}
+import { readableErrorMessage } from 'app/shared/utils/error-message';
 
 @Component({
   selector: 'app-standings-modal',
@@ -70,7 +60,7 @@ export class StandingsModalComponent implements OnInit {
         this.divisions$ = new BehaviorSubject(divisions).asObservable();
       },
       error: (err: unknown) => {
-        this.error$.next('Error al cargar tablas de posiciones: ' + errorMessage(err));
+        this.error$.next('Error al cargar tablas de posiciones: ' + readableErrorMessage(err));
         this.loading$.next(false);
         this.divisions$ = new BehaviorSubject<DivisionStandings[]>([]).asObservable();
       }

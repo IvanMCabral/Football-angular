@@ -6,17 +6,7 @@ import { HttpClient } from '@angular/common/http';
 import { MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { environment } from '../../environments/environment';
 import { BehaviorSubject, Observable, of } from 'rxjs';
-
-function errorMessage(error: unknown): string {
-  if (typeof error === 'object' && error !== null && 'error' in error) {
-    const nested = (error as { error?: { message?: string } }).error;
-    if (nested?.message) { return nested.message; }
-  }
-  if (typeof error === 'object' && error !== null && 'message' in error) {
-    return String((error as { message?: unknown }).message ?? error);
-  }
-  return error instanceof Error ? error.message : String(error);
-}
+import { readableErrorMessage } from 'app/shared/utils/error-message';
 
 interface CompleteFixture {
   careerId: string;
@@ -102,7 +92,7 @@ export class FixtureModalComponent implements OnInit {
         this.divisions$ = of(data.divisions);
       },
       error: (err: unknown) => {
-        this.error$.next('Error al cargar fixtures: ' + errorMessage(err));
+        this.error$.next('Error al cargar fixtures: ' + readableErrorMessage(err));
         this.loading$.next(false);
         this.divisions$ = of([]);
       }
