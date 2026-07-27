@@ -36,6 +36,7 @@ import {
   tacticalChannelFromX,
   tacticalLineFromY
 } from '../../shared/utils/tactical-shape-utils';
+import { computeSquadEditorAvgAttribute } from './squad-editor-modal-ratings.utils';
 
 @Component({
   selector: 'app-squad-editor-modal',
@@ -126,21 +127,6 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     return this.homePlayers.filter(p => !!p.injured).length;
   }
 
-  private computeAvgAttribute(players: PlayerOnFieldDto[], attr: 'attack' | 'defense' | 'technique' | 'speed' | 'mentality'): number {
-    if (players.length === 0) { return 0; }
-    let sum = 0;
-    let count = 0;
-    for (const p of players) {
-      const v = (p as any)[attr];
-      const rating = typeof v === 'number' && isFinite(v)
-        ? v
-        : (typeof p.overall === 'number' ? p.overall : 70);
-      sum += rating;
-      count++;
-    }
-    return count === 0 ? 0 : Math.round(sum / count);
-  }
-
   get attackRating(): number {
     return this.liveRatings?.attackRating
       ?? this.formationEffectiveness$.value?.attackRating
@@ -158,13 +144,13 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   }
 
   get paceRating(): number {
-    return this.computeAvgAttribute(this.homePlayers, 'speed');
+    return computeSquadEditorAvgAttribute(this.homePlayers, 'speed');
   }
   get techniqueRating(): number {
-    return this.computeAvgAttribute(this.homePlayers, 'technique');
+    return computeSquadEditorAvgAttribute(this.homePlayers, 'technique');
   }
   get mentalityRating(): number {
-    return this.computeAvgAttribute(this.homePlayers, 'mentality');
+    return computeSquadEditorAvgAttribute(this.homePlayers, 'mentality');
   }
 
   private liveRatings: { attackRating: number; midfieldRating: number; defenseRating: number } | null = null;
