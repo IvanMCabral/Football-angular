@@ -22,8 +22,26 @@ import { LineupDTO, PlayerLineupDTO, ChemistryBreakdownDTO } from 'app/shared/mo
 import { FormationDTO } from 'app/shared/models/lineup/formation.dto';
 import { LineupSlotDTO } from 'app/shared/models/lineup/lineup-slot.dto';
 import { LineupWarningDTO } from 'app/shared/models/lineup/lineup-warning.dto';
-import { ALL_FORMATIONS } from 'app/shared/constants/formations';
+import { ALL_FORMATIONS, FormationCode } from 'app/shared/constants/formations';
 import { SquadEditorModalComponent } from 'app/components/squad-editor-modal/squad-editor-modal.component';
+
+interface AdvanceRoundResponse {
+  success: boolean;
+  message?: string;
+  currentRound?: number;
+  careerPhase?: string | null;
+  tournamentFinished?: boolean;
+  userPosition?: number;
+}
+
+interface ContinueCareerResponse {
+  success: boolean;
+  message?: string;
+}
+
+function isFormationCode(value: string): value is FormationCode {
+  return (ALL_FORMATIONS as readonly string[]).includes(value);
+}
 
 interface SessionPlayer {
   sessionPlayerId: string;
@@ -171,7 +189,7 @@ private applyLineup(lineup: LineupDTO | null): void {
   this.lineupWarning$.next(this.pickLineupWarning(lineup?.warnings));
 
   // Keep the visible formation selector in sync with the persisted lineup.
-  if (lineup?.formation && ALL_FORMATIONS.includes(lineup.formation as any)) {
+  if (lineup?.formation && isFormationCode(lineup.formation)) {
     this.selectedFormation$.next(lineup.formation);
   }
 }
@@ -613,7 +631,7 @@ this.http.post(`${environment.apiUrl}/career/lineup/confirm`, {}).subscribe({
             this.resetLineupWarning();
             this.refreshSquad();
             if (careerStatus.careerPhase === 'WAITING_USER') {
-             this.http.post<any>(`${environment.apiUrl}/career/${careerStatus.careerId}/next-round`, {}).subscribe({
+             this.http.post<AdvanceRoundResponse>(`${environment.apiUrl}/career/${careerStatus.careerId}/next-round`, {}).subscribe({
                next: (response) => {
                  this.lineupLoading$.next(false);
 
@@ -667,7 +685,7 @@ this.http.post(`${environment.apiUrl}/career/lineup/confirm`, {}).subscribe({
     }
 
     continueToNewSeason(): void {
-      this.http.post<any>(`${environment.apiUrl}/career/continue`, {}).subscribe({
+      this.http.post<ContinueCareerResponse>(`${environment.apiUrl}/career/continue`, {}).subscribe({
         next: (response) => {
           if (response.success) {
             this.refreshCareerStatus();

@@ -19,6 +19,21 @@ import { LiveTimelineComponent } from './components/live-timeline/live-timeline.
 import { LiveMatchModalsService } from '../../core/services/live-match-modals.service';
 import { ConfirmActionDialogComponent } from '../../shared/components/confirm-action-dialog/confirm-action-dialog.component';
 
+type ConfirmDialogData = {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  cancelLabel: string;
+  tone: 'warning';
+};
+
+function valueIdToString(value: unknown): string {
+  if (typeof value === 'object' && value !== null && 'value' in value) {
+    return String((value as { value?: unknown }).value ?? '');
+  }
+  return String(value ?? '');
+}
+
 /**
  * Live match view.
  *
@@ -89,10 +104,7 @@ export class MatchLiveComponent implements OnInit, OnDestroy {
             next: (teams) => {
               const map: { [id: string]: string } = {};
               teams.forEach(team => {
-                const teamId = team.sessionTeamId
-                  || (typeof team.id === 'object' && 'value' in team.id
-                      ? (team.id as any).value
-                      : String(team.id));
+                const teamId = team.sessionTeamId || valueIdToString(team.id);
                 map[teamId] = team.name;
               });
               this.teamNameMapSubject.next(map);
@@ -182,7 +194,7 @@ export class MatchLiveComponent implements OnInit, OnDestroy {
   }
 
   stopMatch() {
-    const ref = this.dialog.open<ConfirmActionDialogComponent, any, boolean>(ConfirmActionDialogComponent, {
+    const ref = this.dialog.open<ConfirmActionDialogComponent, ConfirmDialogData, boolean>(ConfirmActionDialogComponent, {
       data: {
         title: 'Cancelar partido',
         message: 'El partido se detendrá ahora. Usalo sólo si querés cortar esta simulación.',

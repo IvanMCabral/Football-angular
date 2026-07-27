@@ -42,6 +42,22 @@ interface CareerStatus {
   promotionsAvailable?: boolean;
 }
 
+interface AdvanceRoundResponse {
+  success: boolean;
+  message?: string;
+  currentRound?: number;
+  careerPhase?: string | null;
+  tournamentFinished?: boolean;
+}
+
+type ConfirmDialogData = {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  cancelLabel: string;
+  tone: 'danger' | 'warning';
+};
+
 interface RecentActivity {
   message: string;
   timestamp: Date;
@@ -116,7 +132,7 @@ export class DashboardComponent implements OnInit {
   }
 
   private loadCareerStatus(): void {
-    this.http.get<any>(`${environment.apiUrl}/career/status`).pipe(
+    this.http.get<CareerStatus>(`${environment.apiUrl}/career/status`).pipe(
       map(status => {
         if (status && status.careerId) {
           return {
@@ -318,7 +334,7 @@ export class DashboardComponent implements OnInit {
         return;
       }
 
-      this.http.post<any>(`${environment.apiUrl}/career/${status.careerId}/next-round`, {}).subscribe({
+      this.http.post<AdvanceRoundResponse>(`${environment.apiUrl}/career/${status.careerId}/next-round`, {}).subscribe({
         next: (response) => {
           this.loading = false;
 
@@ -359,7 +375,7 @@ export class DashboardComponent implements OnInit {
   }
 
   onDeleteCareer(): void {
-    const ref = this.dialog.open<ConfirmActionDialogComponent, any, boolean>(ConfirmActionDialogComponent, {
+    const ref = this.dialog.open<ConfirmActionDialogComponent, ConfirmDialogData, boolean>(ConfirmActionDialogComponent, {
       data: {
         title: 'Borrar carrera',
         message: 'Esta acción borra tu carrera actual y no se puede deshacer.',
