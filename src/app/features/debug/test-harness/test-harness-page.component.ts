@@ -287,6 +287,14 @@ import {
   playerSwapTacticalLabel as getPlayerSwapTacticalLabel,
 } from './player-swap-analysis';
 import {
+  playerSwapFitClass as getPlayerSwapFitClass,
+  playerSwapFitDetail as getPlayerSwapFitDetail,
+  playerSwapFitLevel as getPlayerSwapFitLevel,
+  playerSwapFitText as getPlayerSwapFitText,
+  playerSwapProfile as getPlayerSwapProfile,
+  playerSwapRoleRisk as getPlayerSwapRoleRisk,
+} from './player-swap-fit-utils';
+import {
   positionPixelAttackGainScore as getPositionPixelAttackGainScore,
   positionPixelAttackLossScore as getPositionPixelAttackLossScore,
   positionPixelChannelBreakdown as getPositionPixelChannelBreakdown,
@@ -342,6 +350,14 @@ import {
   subdivisionXPercent,
   subdivisionYPercent,
 } from './position-pixel-analysis';
+import {
+  manualExtremeMovementPresets as buildManualExtremeMovementPresets,
+  manualShapeVsPresetPresets as buildManualShapeVsPresetPresets,
+  positionMicroMovementPresets as buildPositionMicroMovementPresets,
+  positionMovementPresets as buildPositionMovementPresets,
+  wingbackMovementPresets as buildWingbackMovementPresets,
+  wingbackSlotSide as getWingbackSlotSide,
+} from './position-movement-presets';
 /**
  * Debug page for replaying and comparing match-engine scenarios.
  */
@@ -2788,44 +2804,13 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return getPlayerSwapTacticalBreakdown(row, this.playerSwapRoleRisk(candidate), (value) => this.fmtDeltaNumber(value));
   }
   private playerSwapRoleRisk(candidate: PlayerSwapCandidate | null): { attack: number; control: number; protection: number; detail: string } {
-    if (!candidate || this.playerSwapFitLevel(candidate) !== 'out') {
-      return { attack: 0, control: 0, protection: 0, detail: '' };
-    }
-    const starter = this.positionPixelLine(candidate.starterPosition);
-    const bench = this.positionPixelLine(candidate.benchPosition);
-    if (starter === 'MID' && bench === 'ATT') {
-      return {
-        attack: 0.020,
-        control: -0.055,
-        protection: -0.045,
-        detail: 'Alerta de rol: reemplaza un mediocampista por atacante/banda en zona de control',
-      };
-    }
-    if (starter === 'MID' && bench === 'DEF') {
-      return {
-        attack: -0.010,
-        control: -0.040,
-        protection: -0.010,
-        detail: 'Alerta de rol: gana marca potencial, pero pierde gestion de pelota en el medio',
-      };
-    }
-    if (starter === 'DEF' && bench === 'ATT') {
-      return {
-        attack: 0.025,
-        control: -0.015,
-        protection: -0.055,
-        detail: 'Alerta de rol: cambia defensa por atacante/banda y expone protección',
-      };
-    }
-    if (starter === 'ATT' && (bench === 'DEF' || bench === 'MID')) {
-      return {
-        attack: -0.055,
-        control: bench === 'MID' ? 0.020 : -0.010,
-        protection: bench === 'DEF' ? 0.025 : 0.010,
-        detail: 'Alerta de rol: cambia amenaza ofensiva por perfil mas conservador',
-      };
-    }
-    return { attack: 0, control: 0, protection: 0, detail: '' };
+    const roleRisk = getPlayerSwapRoleRisk(candidate, (position) => this.positionPixelLine(position));
+    return {
+      attack: roleRisk.attack,
+      control: roleRisk.control,
+      protection: roleRisk.protection,
+      detail: roleRisk.detail ?? '',
+    };
   }
   private playerSwapTacticalLabel(score: number, dimension: string): { label: string; cssClass: string } {
     return getPlayerSwapTacticalLabel(score, dimension);
@@ -2858,157 +2843,48 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return getPlayerSwapIsActionableRecommendation(row);
   }
   playerSwapFit(candidate: PlayerSwapCandidate | null): string {
-    const level = this.playerSwapFitLevel(candidate);
-    if (level === 'profile') return 'Same profile';
-    if (level === 'line') return 'Same line';
-    return 'Out of role';
+    return getPlayerSwapFitText(this.playerSwapFitLevel(candidate));
   }
   playerSwapFitClass(candidate: PlayerSwapCandidate | null): string {
-    const level = this.playerSwapFitLevel(candidate);
-    if (level === 'profile') return 'delta-positive';
-    if (level === 'line') return 'read-stable';
-    return 'read-check';
+    return getPlayerSwapFitClass(this.playerSwapFitLevel(candidate));
   }
   private playerSwapFitDetail(candidate: PlayerSwapCandidate | null): string {
-    if (!candidate) return 'No candidate metadata available.';
-    const starterProfile = this.playerSwapProfile(candidate.starterPosition);
-    const benchProfile = this.playerSwapProfile(candidate.benchPosition);
-    const starterLine = this.positionPixelLine(candidate.starterPosition) ?? 'NONE';
-    const benchLine = this.positionPixelLine(candidate.benchPosition) ?? 'NONE';
-    const fit = this.playerSwapFit(candidate);
-    return `${fit}: ${candidate.starterPosition}/${starterProfile}/${starterLine} -> ${candidate.benchPosition}/${benchProfile}/${benchLine}.`;
+    return getPlayerSwapFitDetail(candidate, (position) => this.positionPixelLine(position));
   }
   private playerSwapFitLevel(candidate: PlayerSwapCandidate | null): 'profile' | 'line' | 'out' {
-    if (!candidate) return 'out';
-    if (this.playerSwapProfile(candidate.starterPosition) === this.playerSwapProfile(candidate.benchPosition)) return 'profile';
-    if (this.positionPixelLine(candidate.starterPosition) === this.positionPixelLine(candidate.benchPosition)) return 'line';
-    return 'out';
+    return getPlayerSwapFitLevel(candidate, (position) => this.positionPixelLine(position));
   }
   private positionMovementPresets(fromX: number, fromY: number): Array<{ label: string; x: number; y: number; dx: number; dy: number }> {
-    const clamp = clampFieldPercent;
-    const wideDelta = fromX <= 50 ? -5 : 5;
-    const centerDelta = fromX <= 50 ? 5 : -5;
-    const crossDelta = fromY <= 50 ? 18 : -18;
-    return [
-      { label: '1px forward', x: clamp(fromX), y: clamp(fromY - 1), dx: 0, dy: -1 },
-      { label: '5px forward', x: clamp(fromX), y: clamp(fromY - 5), dx: 0, dy: -5 },
-      { label: '5px deeper', x: clamp(fromX), y: clamp(fromY + 5), dx: 0, dy: 5 },
-      { label: '5px wide', x: clamp(fromX + wideDelta), y: clamp(fromY), dx: wideDelta, dy: 0 },
-      { label: '5px center', x: clamp(fromX + centerDelta), y: clamp(fromY), dx: centerDelta, dy: 0 },
-      { label: '5px wide forward', x: clamp(fromX + wideDelta), y: clamp(fromY - 5), dx: wideDelta, dy: -5 },
-      { label: '5px wide deeper', x: clamp(fromX + wideDelta), y: clamp(fromY + 5), dx: wideDelta, dy: 5 },
-      { label: '5px center forward', x: clamp(fromX + centerDelta), y: clamp(fromY - 5), dx: centerDelta, dy: -5 },
-      { label: '5px center deeper', x: clamp(fromX + centerDelta), y: clamp(fromY + 5), dx: centerDelta, dy: 5 },
-      { label: 'big zone cross', x: clamp(50), y: clamp(fromY + crossDelta), dx: clamp(50) - clamp(fromX), dy: crossDelta },
-    ];
+    return buildPositionMovementPresets(fromX, fromY);
   }
   private manualShapeVsPresetPresets(
     fromX: number,
     fromY: number,
     candidate: PositionPixelCandidate
   ): Array<{ label: string; x: number; y: number; dx: number; dy: number }> {
-    const clamp = clampFieldPercent;
-    const line = this.positionPixelVisualLine(fromY);
-    const toCenter = clamp(50) - clamp(fromX);
-    const smallCenterStep = Math.max(-5, Math.min(5, toCenter));
-    if (line === 'DEF') {
-      return [
-        { label: 'manual 4-4-2 same spot', x: clamp(fromX), y: clamp(fromY), dx: 0, dy: 0 },
-        { label: 'manual DEF 5px step', x: clamp(fromX), y: clamp(fromY - 5), dx: 0, dy: -5 },
-        { label: 'manual DEF 10px step', x: clamp(fromX), y: clamp(fromY - 10), dx: 0, dy: -10 },
-        { label: 'manual DEF tuck center', x: clamp(fromX + smallCenterStep), y: clamp(fromY), dx: smallCenterStep, dy: 0 },
-        { label: 'manual DEF line break', x: clamp(fromX + smallCenterStep), y: clamp(58), dx: smallCenterStep, dy: clamp(58) - clamp(fromY) },
-      ];
-    }
-    if (line === 'ATT') {
-      return [
-        { label: 'manual 4-4-2 same spot', x: clamp(fromX), y: clamp(fromY), dx: 0, dy: 0 },
-        { label: 'manual ATT 5px higher', x: clamp(fromX), y: clamp(fromY - 5), dx: 0, dy: -5 },
-        { label: 'manual ATT 10px higher', x: clamp(fromX), y: clamp(fromY - 10), dx: 0, dy: -10 },
-        { label: 'manual ATT half-space', x: clamp(fromX + smallCenterStep), y: clamp(fromY + 2), dx: smallCenterStep, dy: 2 },
-        { label: 'manual ATT drop to 4-2-3-1', x: clamp(fromX + smallCenterStep), y: clamp(38), dx: smallCenterStep, dy: clamp(38) - clamp(fromY) },
-      ];
-    }
-    const wideDelta = fromX <= 50 ? -6 : 6;
-    return [
-      { label: 'manual 4-4-2 same spot', x: clamp(fromX), y: clamp(fromY), dx: 0, dy: 0 },
-      { label: 'manual MID 5px higher', x: clamp(fromX), y: clamp(fromY - 5), dx: 0, dy: -5 },
-      { label: 'manual MID 10px higher', x: clamp(fromX), y: clamp(fromY - 10), dx: 0, dy: -10 },
-      { label: 'manual MID tuck center', x: clamp(fromX + smallCenterStep), y: clamp(fromY), dx: smallCenterStep, dy: 0 },
-      { label: 'manual MID wide to 4-3-3', x: clamp(fromX + wideDelta), y: clamp(25), dx: wideDelta, dy: clamp(25) - clamp(fromY) },
-    ];
+    void candidate;
+    return buildManualShapeVsPresetPresets(fromX, fromY, this.positionPixelVisualLine(fromY));
   }
   private wingbackMovementPresets(
     fromX: number,
     fromY: number,
     candidate: PositionPixelCandidate
   ): Array<{ label: string; x: number; y: number; dx: number; dy: number }> {
-    const clamp = clampFieldPercent;
-    const slotSide = this.wingbackSlotSide(candidate.slotId);
-    const wideDelta = slotSide === 'left' ? -4 : slotSide === 'right' ? 4 : fromX <= 50 ? -4 : 4;
-    const centerDelta = -wideDelta;
-    return [
-      { label: 'WB 5px forward', x: clamp(fromX), y: clamp(fromY - 5), dx: 0, dy: -5 },
-      { label: 'WB 5px deeper', x: clamp(fromX), y: clamp(fromY + 5), dx: 0, dy: 5 },
-      { label: 'WB hug touchline', x: clamp(fromX + wideDelta), y: clamp(fromY), dx: wideDelta, dy: 0 },
-      { label: 'WB tuck inside', x: clamp(fromX + centerDelta), y: clamp(fromY), dx: centerDelta, dy: 0 },
-    ];
+    return buildWingbackMovementPresets(fromX, fromY, candidate);
   }
   private wingbackSlotSide(slotId: string | null | undefined): 'left' | 'right' | null {
-    const parsed = parseFieldSubdivision(slotId);
-    if (!parsed) return null;
-    const [, subIndex] = parsed;
-    if (subIndex === 1) return 'left';
-    if (subIndex === 3) return 'right';
-    return null;
+    return getWingbackSlotSide(slotId);
   }
   private manualExtremeMovementPresets(
     fromX: number,
     fromY: number,
     candidate: PositionPixelCandidate
   ): Array<{ label: string; x: number; y: number; dx: number; dy: number }> {
-    const clamp = clampFieldPercent;
     const line = this.strictPositionPixelLine(candidate.starterPosition) ?? this.positionPixelVisualLine(fromY);
-    const sideX = fromX <= 50 ? 18 : 82;
-    const halfSpaceX = fromX <= 50 ? 38 : 62;
-    const overlapX = fromX <= 50 ? 12 : 88;
-    const presets = line === 'ATT'
-      ? [
-          { label: 'ATT wide channel', x: sideX, y: 18 },
-          { label: 'ATT half-space', x: halfSpaceX, y: 24 },
-          { label: 'ATT drop link', x: 50, y: 42 },
-        ]
-      : line === 'MID'
-        ? [
-            { label: 'MID late run', x: clamp(fromX), y: 26 },
-            { label: 'MID wide overload', x: sideX, y: 38 },
-            { label: 'MID anchor drop', x: 50, y: 70 },
-          ]
-        : [
-            { label: 'DEF step midfield', x: clamp(fromX), y: 58 },
-            { label: 'DEF overlap lane', x: overlapX, y: 48 },
-            { label: 'DEF cover depth', x: clamp(fromX), y: 90 },
-          ];
-    return presets
-      .map((preset) => ({
-        label: preset.label,
-        x: clamp(preset.x),
-        y: clamp(preset.y),
-        dx: clamp(preset.x) - clamp(fromX),
-        dy: clamp(preset.y) - clamp(fromY),
-      }))
-      .filter((preset) => Math.abs(preset.dx) + Math.abs(preset.dy) >= 6);
+    return buildManualExtremeMovementPresets(fromX, fromY, candidate, line);
   }
   private positionMicroMovementPresets(fromX: number, fromY: number): Array<{ label: string; x: number; y: number; dx: number; dy: number }> {
-    const clamp = clampFieldPercent;
-    const wideDelta = fromX <= 50 ? -1 : 1;
-    const centerDelta = fromX <= 50 ? 1 : -1;
-    return [
-      { label: '1px forward', x: clamp(fromX), y: clamp(fromY - 1), dx: 0, dy: -1 },
-      { label: '1px deeper', x: clamp(fromX), y: clamp(fromY + 1), dx: 0, dy: 1 },
-      { label: '1px wide', x: clamp(fromX + wideDelta), y: clamp(fromY), dx: wideDelta, dy: 0 },
-      { label: '1px center', x: clamp(fromX + centerDelta), y: clamp(fromY), dx: centerDelta, dy: 0 },
-    ];
+    return buildPositionMicroMovementPresets(fromX, fromY);
   }
   private fallbackYForPosition(position: string | null | undefined): number {
     const p = String(position ?? '').toUpperCase();
@@ -4224,15 +4100,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
       ?? null;
   }
   private playerSwapProfile(position: string | null | undefined): string {
-    const p = String(position ?? '').toUpperCase();
-    if (['ST', 'CF', 'ATT'].includes(p)) return 'ST';
-    if (['LW', 'RW', 'LM', 'RM', 'WINGER'].includes(p)) return 'WIDE';
-    if (['CAM', 'AM'].includes(p)) return 'AM';
-    if (['CDM', 'DM'].includes(p)) return 'DM';
-    if (['CM', 'MID'].includes(p)) return 'CM';
-    if (['LB', 'RB', 'LWB', 'RWB'].includes(p)) return 'FB';
-    if (['CB', 'DEF'].includes(p)) return 'CB';
-    return this.positionPixelLine(p) ?? 'MID';
+    return getPlayerSwapProfile(position, (value) => this.positionPixelLine(value));
   }
   private playerSwapBenchScore(player: SessionPlayer): number {
     return player.attack + player.defense + player.technique + player.speed + player.stamina + player.mentality;
