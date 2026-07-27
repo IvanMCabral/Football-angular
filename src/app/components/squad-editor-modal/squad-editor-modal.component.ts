@@ -38,6 +38,12 @@ import {
 } from '../../shared/utils/tactical-shape-utils';
 import { computeSquadEditorAvgAttribute } from './squad-editor-modal-ratings.utils';
 import {
+  SQUAD_EDITOR_GOALKEEPER_SLOT_ID,
+  canSquadEditorPlayerUseSlot,
+  isInsideSquadEditorGoalkeeperProtectedArea,
+  isSquadEditorGoalkeeperSlot,
+} from './squad-editor-modal-goalkeeper.utils';
+import {
   buildSquadEditorCoachChannelDeltas,
   buildSquadEditorVisualChannelDeltas,
   buildSquadEditorVisualEngineTension,
@@ -955,32 +961,22 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   }
 
   private isGoalkeeperSlot(slotId: string | null | undefined): boolean {
-    return slotId === 'GK-1';
+    return isSquadEditorGoalkeeperSlot(slotId);
   }
 
   private canPlayerUseSlot(player: PlayerOnFieldDto, slotId: string | null | undefined): boolean {
-    if (!slotId) { return false; }
-    const gkPlayer = this.isGoalkeeperPlayer(player);
-    const gkSlot = this.isGoalkeeperSlot(slotId);
-    return gkPlayer === gkSlot;
+    return canSquadEditorPlayerUseSlot(this.getRoleFamily(player?.role ?? ''), slotId);
   }
 
   private lockGoalkeeperToGoalArea(player: PlayerOnFieldDto): void {
-    player.slotId = 'GK-1';
+    player.slotId = SQUAD_EDITOR_GOALKEEPER_SLOT_ID;
     delete player.xPercent;
     delete player.yPercent;
-    this.slotPlayerMap['GK-1'] = player;
+    this.slotPlayerMap[SQUAD_EDITOR_GOALKEEPER_SLOT_ID] = player;
   }
 
   private isInsideGoalkeeperProtectedArea(xPct: number, yPct: number): boolean {
-    const gkSlot = this.subdivisions.find(s => s.subdivisionId === 'GK-1');
-    if (gkSlot) {
-      return xPct >= gkSlot.left
-        && xPct <= gkSlot.left + gkSlot.width
-        && yPct >= gkSlot.top
-        && yPct <= gkSlot.top + gkSlot.height;
-    }
-    return false;
+    return isInsideSquadEditorGoalkeeperProtectedArea(xPct, yPct, this.subdivisions);
   }
 
   getMarkerRoleLabel(player: PlayerOnFieldDto): string {
