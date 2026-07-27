@@ -1,24 +1,9 @@
 import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Match } from '../../../shared/models/match.model';
+import { MatchEvent, MatchState } from '../../../core/services/match-engine.model';
 
-export interface MatchCardState {
-  status: string;
-  currentMinute: number;
-  score: { home: number; away: number };
-  homeTactic?: string;
-  awayTactic?: string;
-  /** Possession percentages (0-100) per team. */
-  homePossession?: number;
-  awayPossession?: number;
-  /** Current style per team. */
-  homeStyle?: string;
-  awayStyle?: string;
-  /** Current formation per team. */
-  homeFormation?: string;
-  awayFormation?: string;
-  events?: any[];
-}
+export type MatchCardState = MatchState;
 
 @Component({
   selector: 'app-match-card',
@@ -70,15 +55,15 @@ export class MatchCardComponent {
 
   getEventIcon(eventType: string): string {
     const iconMap: { [key: string]: string } = {
-      'GOAL': '⚽',
-      'CARD': '🟨',
-      'INJURY': '🚑',
-      'SUBSTITUTION': '🔄'
+      GOAL: '⚽',
+      CARD: '🟨',
+      INJURY: '🚑',
+      SUBSTITUTION: '🔄'
     };
     return iconMap[eventType] || '📋';
   }
 
-  getLastEvents(events: any[] | undefined, count: number): any[] {
+  getLastEvents(events: MatchEvent[] | undefined, count: number): MatchEvent[] {
     return (events || []).slice(-count).reverse();
   }
 

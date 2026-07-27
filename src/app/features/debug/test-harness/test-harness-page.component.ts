@@ -1232,7 +1232,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     if ((health.redCardsCount ?? 0) > 0) {
       parts.push(`${health.redCardsCount} roja(s)`);
     }
-    return `Caso sucio para comparar: ${parts.join(' ? ')}. Us? Reset Injuries antes de correr matrices si querés una lectura limpia del DT.`;
+    return `Caso sucio para comparar: ${parts.join(' · ')}. Usá Reset Injuries antes de correr matrices si querés una lectura limpia del DT.`;
   });
   /** True if there is an active career. */
   readonly hasCareer = computed(() => this.careerId() !== null);
@@ -5559,7 +5559,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   onRunLastModalMovePositionSmoke(): void {
     const modalMove = this.readLastModalPositionMoveCase();
     if (!modalMove) {
-      this.snackBar.open('No hay ultimo movimiento del modal guardado. Mov? un jugador en Editar Formación Visual primero.', 'OK', { duration: 5000 });
+      this.snackBar.open('No hay último movimiento del modal guardado. Mové un jugador en Editar Formación Visual primero.', 'OK', { duration: 5000 });
       return;
     }
     const matchId = this.selectedMatchId();
@@ -8834,7 +8834,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
   }
   onRunProfessionalSmokeFull(): void {
     if (this.controlledTeamSideModel !== 'USER' || !this.selectedMatchIncludesUserTeam()) {
-      this.snackBar.open('El smoke full usa píxeles y swaps del lineup editable; pon? Controlar en Mi equipo.', 'OK', { duration: 4500 });
+      this.snackBar.open('El smoke full usa píxeles y swaps del lineup editable; poné Controlar en Mi equipo.', 'OK', { duration: 4500 });
       return;
     }
     if (!this.selectedMatchId()) {
@@ -9494,7 +9494,7 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
         if (rows.length > 0) {
           this.markReplayAnalysisReady(`Línea de 5 any side listo para ${scope} (${rows.length} planes).`);
         } else {
-          this.analysisReadyMessage.set('Línea de 5 any side no devolvi? filas para 5-4-1 / 5-3-2 / 3-5-2.');
+          this.analysisReadyMessage.set('Línea de 5 any side no devolvió filas para 5-4-1 / 5-3-2 / 3-5-2.');
         }
       },
       error: (err) => {
@@ -10866,3 +10866,4 @@ export class TestHarnessPageComponent implements OnInit, OnDestroy {
     return err?.error?.message ?? err?.message ?? fallback;
   }
 }
+
