@@ -393,7 +393,7 @@ export class PartidoModalComponent {
     }
     const coords = this.freeSlotCoords.get(this.selectedNudgeSlotIdx);
     if (!coords) {
-      return 'En posiciÃ³n base de la formaciÃ³n.';
+      return 'En posición base de la formación.';
     }
     return `X ${coords.x.toFixed(1)}% Â· Y ${coords.y.toFixed(1)}%`;
   }

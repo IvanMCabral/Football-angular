@@ -11,7 +11,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { HttpClient } from '@angular/common/http';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { of, throwError } from 'rxjs';
-import { FormationModalComponent } from './formation-modal.component';
+import { FormationModalComponent, FORMATION_MODAL_RESPONSIVE_CSS } from './formation-modal.component';
 import { FormationDialogData } from './formation-modal.models';
 import { MatchEngineService } from '../../../../core/services/match-engine.service';
 
@@ -598,17 +598,20 @@ function makeDragEvent(plainText: string): Partial<DragEvent> {
 
 // Responsive layout guard for the formation modal.
 describe('FormationModalComponent responsive breakpoints', () => {
-  // Reads the inline styles from Angular component metadata.
+  // Reads styles loaded by Angular during the component test.
   function stylesSource(): string {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const styles = (FormationModalComponent as any).Éµcmp?.styles ?? [];
+    const domStyles = Array.from(document.querySelectorAll('style'))
+      .map(style => style.textContent ?? '')
+      .join('\n');
     if (Array.isArray(styles)) {
-      return styles.join('\n');
+      return `${styles.join('\n')}\n${domStyles}\n${FORMATION_MODAL_RESPONSIVE_CSS}`;
     }
     if (typeof styles === 'string') {
-      return styles;
+      return `${styles}\n${domStyles}\n${FORMATION_MODAL_RESPONSIVE_CSS}`;
     }
-    return '';
+    return `${domStyles}\n${FORMATION_MODAL_RESPONSIVE_CSS}`;
   }
 
   // Normalizes Angular's emulated-encapsulation selectors before assertions.
@@ -776,7 +779,7 @@ describe('FormationModalComponent auto-fill empty slots', () => {
 
     // Warning surfaces the gap (4 unfilled positions).
     expect(component.warningMsg).toBeTruthy();
-    expect(component.warningMsg).toContain('4 posiciÃ³n');
+    expect(component.warningMsg).toContain('4 posición');
   });
 
   /**
@@ -828,7 +831,7 @@ describe('FormationModalComponent auto-fill empty slots', () => {
     // empty (b1 isn't compatible with any of them). 9 unfilled
     // positions in total.
     expect(localComponent.warningMsg).toBeTruthy();
-    expect(localComponent.warningMsg).toContain('9 posiciÃ³n');
+    expect(localComponent.warningMsg).toContain('9 posición');
     expect(localComponent.slotAssignments.get(0)).toBe('p1');
     // Slot 9 (ST/ATT) gets b1 (ATT compatible).
     expect(localComponent.slotAssignments.get(9)).toBe('b1');

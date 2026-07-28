@@ -360,7 +360,7 @@ describe('SubstitutionModalComponent', () => {
     expect(rec?.kind).toBe('medical');
     expect(rec?.playerOff.sessionPlayerId).toBe('p4');
     expect(rec?.playerOn.position).toBe('ATT');
-    expect(component.recommendedSubstitutionText).toContain('Prioridad mÃ©dica');
+    expect(component.recommendedSubstitutionText).toContain('Prioridad médica');
     expect(alt).not.toBeNull();
     expect(alt?.kind).toBe('tactical');
     expect(alt?.playerOff.sessionPlayerId).not.toBe('p4');
@@ -465,7 +465,7 @@ describe('SubstitutionModalComponent', () => {
     };
 
     expect(component.recommendedSubstitution).toBeNull();
-    expect(component.recommendedSubstitutionText).toContain('Sin recomendaciÃ³n clara');
+    expect(component.recommendedSubstitutionText).toContain('Sin recomendación clara');
   });
 
   it('applyRecommendedSubstitution selects the suggested off and on players', () => {
@@ -892,7 +892,7 @@ describe('Substitution modal visual pitch, stats chips, and remaining substituti
     const reasonBadge = f.nativeElement.querySelector('.reason-badge') as HTMLElement;
     expect(reasonBadge).not.toBeNull();
     expect(reasonBadge.getAttribute('data-reason')).toBe('injury');
-    expect(reasonBadge.textContent).toContain('SustituciÃ³n por lesiÃ³n');
+    expect(reasonBadge.textContent).toContain('Sustitución por lesión');
   });
 
   it('reason=undefined (manual open) does NOT render the reason badge', () => {
@@ -924,9 +924,9 @@ describe('Substitution modal visual pitch, stats chips, and remaining substituti
 
     const guide = f.nativeElement.querySelector('[data-testid="sub-flow-guide"]') as HTMLElement;
     expect(guide).not.toBeNull();
-    expect(guide.textContent).toContain('1. ElegÃ­ quiÃ©n sale');
-    expect(guide.textContent).toContain('2. ElegÃ­ quiÃ©n entra');
-    expect(guide.textContent).toContain('3. ConfirmÃ¡ el cambio');
+    expect(guide.textContent).toContain('1. Elegí quién sale');
+    expect(guide.textContent).toContain('2. Elegí quién entra');
+    expect(guide.textContent).toContain('3. Confirmá el cambio');
 
     const context = f.nativeElement.querySelector('[data-testid="injury-context"]') as HTMLElement;
     expect(context).not.toBeNull();

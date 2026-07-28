@@ -203,7 +203,7 @@ export class V24MatchDetailPageComponent implements OnInit, OnChanges {
       row('Goles', this.detail.homeGoals, this.detail.awayGoals, n => String(Math.round(n))),
       row('xG', this.detail.homeXg, this.detail.awayXg, n => n.toFixed(2)),
       row('Tiros', this.detail.homeShots, this.detail.awayShots, n => String(Math.round(n))),
-      row('PosesiÃ³n', this.detail.homePossession, this.detail.awayPossession, n => `${Math.round(n)}%`)
+      row('Posesión', this.detail.homePossession, this.detail.awayPossession, n => `${Math.round(n)}%`)
     ];
   }
 
@@ -384,7 +384,7 @@ export class V24MatchDetailPageComponent implements OnInit, OnChanges {
         : '';
     const message = `${httpErr.message ?? ''} ${raw}`.trim();
     if (httpErr.status === 422 && /No active match session/i.test(message)) {
-      return 'Este partido no tiene una sesiÃ³n viva activa. Para probar sustituciones reales hay que iniciar el partido en modo live o usar el harness de replay/what-if.';
+      return 'Este partido no tiene una sesión viva activa. Para probar sustituciones reales hay que iniciar el partido en modo live o usar el harness de replay/what-if.';
     }
     return httpErr.message || raw || String(err);
   }

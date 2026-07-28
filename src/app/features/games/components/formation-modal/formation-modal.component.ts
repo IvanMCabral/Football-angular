@@ -28,6 +28,30 @@ import {
 } from './formation-modal-slot-geometry.utils';
 
 const FORMATIONS = ALL_FORMATIONS;
+export const FORMATION_MODAL_RESPONSIVE_CSS = `
+  @media (max-width: 600px) {
+    .player-dot {
+      min-width: 12px;
+      max-width: 22px;
+    }
+
+    .dot-label {
+      text-overflow: ellipsis;
+    }
+  }
+
+  @media (min-width: 601px) and (max-width: 1024px) {
+    .player-dot {
+      width: 24px;
+    }
+  }
+
+  @media (min-width: 1600px) {
+    .player-dot {
+      width: 36px;
+    }
+  }
+`;
 export const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
 
   '4-4-2': [
@@ -128,6 +152,7 @@ export const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
   templateUrl: './formation-modal.component.html',
 
   styleUrl: './formation-modal.component.css',
+  styles: [FORMATION_MODAL_RESPONSIVE_CSS],
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class FormationModalComponent {
@@ -315,7 +340,7 @@ export class FormationModalComponent {
       }
     }
     if (unfilled > 0) {
-      this.warningMsg = `${unfilled} posiciÃ³n(es) no se pudieron completar â€” no hay suficientes jugadores en el banquillo con posiciÃ³n compatible.`;
+      this.warningMsg = `${unfilled} posición(es) no se pudieron completar — no hay suficientes jugadores en el banquillo con posición compatible.`;
     }
 
     this.selectedFormation.set(this.selectedFormation());
@@ -393,7 +418,7 @@ export class FormationModalComponent {
     }
     const player = this.playerAtSlot(this.selectedSlotIdx);
     const role = this.roleForSlot(this.selectedSlotIdx);
-    return `${player?.name ?? role} Â· ${role} Â· ${this.slotCoordLabel(this.selectedSlotIdx)}`;
+    return `${player?.name ?? role} · ${role} · ${this.slotCoordLabel(this.selectedSlotIdx)}`;
   }
 
   isSelectedSlotLocked(): boolean {
@@ -478,7 +503,7 @@ export class FormationModalComponent {
     const openedWithFullXi = (this.data.currentSlots?.length ?? 0) >= 10;
     if (openedWithFullXi && slots.some(slot => !slot.sessionPlayerId)) {
       this.isSubmitting = false;
-      this.errorMsg = 'No se puede confirmar: todos los slots visibles deben tener un jugador real. CerrÃ¡ y reabrÃ­ el modal si ves sÃ³lo roles.';
+      this.errorMsg = 'No se puede confirmar: todos los slots visibles deben tener un jugador real. Cerrá y reabrí el modal si ves sólo roles.';
       return;
     }
     this.engineService.changeFormation(this.data.matchId, slots, this.selectedFormation())
@@ -488,18 +513,18 @@ export class FormationModalComponent {
           this.isSubmitting = false;
           if (result.success) {
             this.snackBar.open(
-              `FormaciÃ³n cambiada a ${this.selectedFormation()}`,
+              `Formación cambiada a ${this.selectedFormation()}`,
               'OK',
               { duration: 3000, panelClass: 'success-toast' }
             );
             this.dialogRef.close({ success: true, result, formation: this.selectedFormation() });
           } else {
-            this.errorMsg = result.error || 'Cambio de formaciÃ³n rechazado por el servidor';
+            this.errorMsg = result.error || 'Cambio de formación rechazado por el servidor';
           }
         },
         error: () => {
           this.isSubmitting = false;
-          this.errorMsg = 'Error de red al intentar cambiar la formaciÃ³n';
+          this.errorMsg = 'Error de red al intentar cambiar la formación';
         }
       });
   }

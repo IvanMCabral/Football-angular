@@ -187,11 +187,11 @@ export class SubstitutionModalComponent {
     const rec = this.recommendedSubstitution;
     if (!rec) {
       if (this.coachObjective === 'PROTECT_RESULT') {
-        return 'Sin recomendaciÃ³n clara para cerrar: no hay un cambio automÃ¡tico suficientemente seguro. MantenÃ© estructura o elegÃ­ manualmente.';
+        return 'Sin recomendación clara para cerrar: no hay un cambio automático suficientemente seguro. Mantené estructura o elegí manualmente.';
       }
-      return 'Sin recomendaciÃ³n clara: faltan suplentes vÃ¡lidos o no quedan cambios.';
+      return 'Sin recomendación clara: faltan suplentes válidos o no quedan cambios.';
     }
-    return `${rec.playerOff.displayName} â†’ ${rec.playerOn.displayName}. ${rec.reason}`;
+    return `${rec.playerOff.displayName} → ${rec.playerOn.displayName}. ${rec.reason}`;
   }
   applyRecommendedSubstitution(): void {
     const rec = this.recommendedSubstitution;
@@ -305,13 +305,13 @@ export class SubstitutionModalComponent {
       return 'SeleccionÃ¡ un jugador de cancha para ajustar pÃ­xeles.';
     }
     if (this.isGoalkeeper(player)) {
-      return 'El arquero queda fijo en el Ã¡rea chica.';
+      return 'El arquero queda fijo en el área chica.';
     }
     const tweak = this.positionTweaks.get(player.sessionPlayerId);
     if (!tweak) {
-      return `${player.displayName}: posiciÃ³n base`;
+      return `${player.displayName}: posición base`;
     }
-    return `${player.displayName}: X ${tweak.x}px Â· Y ${tweak.y}px`;
+    return `${player.displayName}: X ${tweak.x}px · Y ${tweak.y}px`;
   }
   confirm(): void {
     if (!this.canConfirm) {
@@ -379,13 +379,13 @@ export class SubstitutionModalComponent {
               playerOnId: firstChange.playerOnId
             });
           } else {
-            this.errorMsg = failed.error || 'SustituciÃ³n rechazada por el servidor';
+            this.errorMsg = failed.error || 'Sustitución rechazada por el servidor';
             this.cdr.markForCheck();
           }
         },
         error: (err) => {
           this.errorMsg = formationSaveAttempted
-            ? 'La sustituciÃ³n se aplicÃ³, pero fallÃ³ el guardado del ajuste de posiciÃ³n. PodÃ©s cerrar y reabrir Partido/FormaciÃ³n para revisar la tÃ¡ctica.'
+            ? 'La sustitución se aplicó, pero falló el guardado del ajuste de posición. Podés cerrar y reabrir Partido/Formación para revisar la táctica.'
             : this.formatSubstitutionError(err);
           this.cdr.markForCheck();
         }
