@@ -84,7 +84,7 @@ export class TestHarnessService {
   /**
    * Persist a lineup through the real lineup endpoint.
    *
-   * Used by the Formation matrix when we want the V24 engine to receive a real
+   * Used by the Formation matrix when we want the motor detallado to receive a real
    * tactical shape, not only a formation label. Passing no slots lets the backend
    * rebuild canonical slots for the requested formation while preserving the
    * same player IDs. Passing slots restores the exact original manual/custom

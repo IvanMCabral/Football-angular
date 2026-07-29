@@ -15,7 +15,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { Subject, from, of, takeUntil } from 'rxjs';
 import { concatMap, finalize, switchMap, timeout, toArray } from 'rxjs/operators';
 import { MatchEngineService } from '../../../../core/services/match-engine.service';
-import { SubModalPlayer, SubstitutionResult, V24LivePlayerRating } from '../../../../core/services/match-engine.model';
+import { SubModalPlayer, SubstitutionResult, LivePlayerRating } from '../../../../core/services/match-engine.model';
 import { clampFieldPixelTweak } from '../../../../shared/utils/field-percent.utils';
 import { buildSubstitutionPitchLines, SubstitutionPitchLine } from './substitution-modal-pitch.utils';
 import {
@@ -482,7 +482,7 @@ export class SubstitutionModalComponent {
   dotClass(lineCategory: SubstitutionPitchLine['category']): string {
     return `is-${lineCategory.toLowerCase()}`;
   }
-  getRating(playerId: string): V24LivePlayerRating | null {
+  getRating(playerId: string): LivePlayerRating | null {
     return findSubstitutionPlayerRating(this.data.playerRatings, playerId);
   }
   hasAnyChip(playerId: string): boolean {

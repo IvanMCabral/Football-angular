@@ -28,7 +28,7 @@
       </div>
       <!-- Main grid -->
       <div *ngIf="!loading() && !loadError() && hasCareer()" class="test-harness-grid">
-        <!-- Panel A: Reused V24 match detail (F2) -->
+        <!-- Panel A: Reused detailed match page (F2) -->
         <section class="panel panel-a" aria-labelledby="panel-a-heading">
           <h2 id="panel-a-heading" class="panel-title">Panel A - Detalle del partido</h2>
           <p class="panel-hint" *ngIf="!selectedMatchId()">
@@ -37,12 +37,12 @@
           <p class="panel-hint" *ngIf="selectedMatchId() && !selectedMatchHasDetail()">
             El partido está pendiente: se puede usar para pruebas, pero todavía no tiene detalle ni línea de tiempo.
           </p>
-          <app-v24-match-detail-page
+          <app-detailed-match-page
             *ngIf="selectedMatchId() && selectedMatchHasDetail() && detailPanelVisible()"
             [inputCareerId]="careerId()"
             [inputMatchId]="selectedMatchId()"
             [inputRefreshToken]="detailRefreshToken()"
-          ></app-v24-match-detail-page>
+          ></app-detailed-match-page>
         </section>
         <!-- Panel B: Mutation controls -->
         <section class="panel panel-b" aria-labelledby="panel-b-heading">

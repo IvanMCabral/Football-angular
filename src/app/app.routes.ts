@@ -101,8 +101,8 @@ export const routes: Routes = [
   },
   {
     path: 'careers/:careerId/matches/:matchId/detail',
-    loadComponent: () => import('./features/match-detail/pages/v24-match-detail-page.component')
-      .then((m) => m.V24MatchDetailPageComponent),
+    loadComponent: () => import('./features/match-detail/pages/detailed-match-page.component')
+      .then((m) => m.DetailedMatchPageComponent),
     canActivate: guarded,
   },
   {

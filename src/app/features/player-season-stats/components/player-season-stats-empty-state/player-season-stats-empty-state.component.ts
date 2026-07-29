@@ -31,9 +31,9 @@ export class PlayerSeasonStatsEmptyStateComponent {
   get message(): string {
     switch (this.reason) {
       case 'feature-disabled':
-        return 'Play matches with V24 detail enabled to start collecting data.';
+        return 'Play matches with detalle de partido habilitado to start collecting data.';
       case 'no-data':
-        return 'Play matches with V24 detail recording enabled to generate stats.';
+        return 'Play matches with guardado de detalle de partido habilitado to generate stats.';
       case 'player-not-found':
         return 'This player has no recorded stats for this season.';
       case 'api-error':

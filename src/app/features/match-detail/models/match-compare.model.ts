@@ -38,7 +38,7 @@ export interface MatchComparisonDiff {
  * Top-level response from GET /careers/{careerId}/matches/{matchId}/compare.
  * - `baseline` is the match replayed with the same initial context + subs[]
  *   applied (what would have happened with the manager's interventions).
- * - `live` is what actually happened (the V24 detail persisted on match finish).
+ * - `live` is what actually happened (the detailed match persisted on finish).
  * - `diff` is signed `live - baseline` for every metric.
  */
 export interface MatchComparison {

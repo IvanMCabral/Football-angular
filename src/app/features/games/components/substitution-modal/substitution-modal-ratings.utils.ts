@@ -1,16 +1,16 @@
-import { V24LivePlayerRating } from '../../../../core/services/match-engine.model';
+import { LivePlayerRating } from '../../../../core/services/match-engine.model';
 
 export function findSubstitutionPlayerRating(
-  ratings: V24LivePlayerRating[] | undefined,
+  ratings: LivePlayerRating[] | undefined,
   playerId: string
-): V24LivePlayerRating | null {
+): LivePlayerRating | null {
   if (!ratings) {
     return null;
   }
   return ratings.find(rating => rating.playerId === playerId) ?? null;
 }
 
-export function hasSubstitutionRatingChip(rating: V24LivePlayerRating | null): boolean {
+export function hasSubstitutionRatingChip(rating: LivePlayerRating | null): boolean {
   if (!rating) {
     return false;
   }
@@ -22,7 +22,7 @@ export function hasSubstitutionRatingChip(rating: V24LivePlayerRating | null): b
 }
 
 export function isInjuredFromSubstitutionRatings(
-  ratings: V24LivePlayerRating[] | undefined,
+  ratings: LivePlayerRating[] | undefined,
   playerId: string
 ): boolean {
   return (findSubstitutionPlayerRating(ratings, playerId)?.injuries ?? 0) > 0;

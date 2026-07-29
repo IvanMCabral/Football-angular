@@ -10,6 +10,7 @@ import { of, throwError } from 'rxjs';
 import { MatchComparePageComponent } from './match-compare-page.component';
 import { MatchCompareApiService } from '../services/match-compare-api.service';
 import { MatchComparison } from '../models/match-compare.model';
+import { DETAILED_MATCH_ENGINE_VERSION } from '../models/detailed-match-compatibility.model';
 
 describe('MatchComparePageComponent', () => {
   let component: MatchComparePageComponent;
@@ -90,7 +91,7 @@ function sampleComparison(): MatchComparison {
       homeShots: 8, awayShots: 5,
       homePossession: 50, awayPossession: 50,
       timeline: [], playerRatings: [],
-      schemaVersion: '1', engineVersion: 'V24',
+      schemaVersion: '1', engineVersion: DETAILED_MATCH_ENGINE_VERSION,
       createdAt: new Date().toISOString(),
     },
     live: {
@@ -102,7 +103,7 @@ function sampleComparison(): MatchComparison {
       homeShots: 12, awayShots: 8,
       homePossession: 55, awayPossession: 45,
       timeline: [], playerRatings: [],
-      schemaVersion: '1', engineVersion: 'V24',
+      schemaVersion: '1', engineVersion: DETAILED_MATCH_ENGINE_VERSION,
       createdAt: new Date().toISOString(),
     },
     diff: {

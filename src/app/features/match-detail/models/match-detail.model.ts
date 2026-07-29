@@ -135,7 +135,7 @@ export interface MatchDetail {
 /**
  * Match detail snapshot filtered up to and including a specific minute.
  *
- * Aggregation rules (see backend V24TimelineSnapshot):
+ * Aggregation rules mirror the backend detailed timeline snapshot:
  * - homeGoals / awayGoals: count of GOAL events per team
  * - homeShots / awayShots: count of SHOT events per team (SHOT_ON_TARGET
  *   is NOT a separate shot; it is the same attempt with an on-target flag)

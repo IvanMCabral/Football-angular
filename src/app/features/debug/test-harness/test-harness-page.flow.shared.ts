@@ -25,7 +25,7 @@ export { Fixture } from '../../../core/services/career.model';
 export { environment } from '../../../environments/environment';
 export { MatchDetailApiService } from '../../match-detail/services/match-detail-api.service';
 export { MatchDetail, MatchEvent, TimelineSnapshot } from '../../match-detail/models/match-detail.model';
-export { V24MatchDetailPageComponent } from '../../match-detail/pages/v24-match-detail-page.component';
+export { DetailedMatchPageComponent } from '../../match-detail/pages/detailed-match-page.component';
 export { SquadEditorModalComponent } from '../../../components/squad-editor-modal/squad-editor-modal.component';
 export { SessionPlayer } from '../../../shared/models/player.model';
 export { LineupDTO } from '../../../shared/models/lineup/lineup.dto';

@@ -3,9 +3,9 @@ import {
   hasSubstitutionRatingChip,
   isInjuredFromSubstitutionRatings
 } from './substitution-modal-ratings.utils';
-import { V24LivePlayerRating } from '../../../../core/services/match-engine.model';
+import { LivePlayerRating } from '../../../../core/services/match-engine.model';
 
-const rating = (playerId: string, overrides: Partial<V24LivePlayerRating> = {}): V24LivePlayerRating => ({
+const rating = (playerId: string, overrides: Partial<LivePlayerRating> = {}): LivePlayerRating => ({
   playerId,
   playerName: playerId,
   teamId: 'team',

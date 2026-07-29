@@ -19,13 +19,13 @@ import {
  * Match detail page with score, timeline, player ratings and post-match data.
  */
 @Component({
-  selector: 'app-v24-match-detail-page',
+  selector: 'app-detailed-match-page',
   standalone: true,
   imports: [CommonModule, RouterLink, MatDialogModule, MatButtonModule, MatchShotMapComponent],
-  templateUrl: './v24-match-detail-page.component.html',
-  styleUrls: ['./v24-match-detail-page.component.scss']
+  templateUrl: './detailed-match-page.component.html',
+  styleUrls: ['./detailed-match-page.component.scss']
 })
-export class V24MatchDetailPageComponent implements OnInit, OnChanges {
+export class DetailedMatchPageComponent implements OnInit, OnChanges {
   private api = inject(MatchDetailApiService);
   private route = inject(ActivatedRoute);
   private cdr = inject(ChangeDetectorRef);

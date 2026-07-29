@@ -287,7 +287,7 @@ describe('RoundLiveComponent live round behavior', () => {
           playerName: 'Gerard Piqué',
           playerId: 'p-rival-1',
           teamId: SAMPLE_AWAY_TEAM_ID,
-          description: 'InJURED_V23_LEGACY'
+          description: 'LEGACY_INJURY_EVENT'
         }
       ]
     })]));
@@ -315,7 +315,7 @@ describe('RoundLiveComponent live round behavior', () => {
           playerName: 'Sergio Ramos',
           playerId: 'p-user-1',
           teamId: SAMPLE_HOME_TEAM_ID,
-          description: 'InJURED_V23_LEGACY'
+          description: 'LEGACY_INJURY_EVENT'
         }
       ]
     })]));
@@ -372,7 +372,7 @@ describe('RoundLiveComponent live round behavior', () => {
           playerName: 'Diego Godín',
           playerId: 'p-rival-2',
           teamId: SAMPLE_AWAY_TEAM_ID,
-          description: 'InJURED_V23_LEGACY'
+          description: 'LEGACY_INJURY_EVENT'
         }
       ]
     })]));
@@ -393,7 +393,7 @@ describe('RoundLiveComponent live round behavior', () => {
       playerName: 'Pepe',
       playerId: 'p-rival-pepe',
       teamId: SAMPLE_AWAY_TEAM_ID,
-      description: 'InJURED_V23_LEGACY'
+      description: 'LEGACY_INJURY_EVENT'
     };
 
     // First SSE: red card arrives → modal opens.
@@ -451,7 +451,7 @@ describe('RoundLiveComponent live round behavior', () => {
           playerName: 'Diego Godín',
           playerId: 'p-rival-3',
           teamId: SAMPLE_AWAY_TEAM_ID,
-          description: 'InJURED_V23_LEGACY'
+          description: 'LEGACY_INJURY_EVENT'
         }
       ]
     })]));
@@ -467,7 +467,7 @@ describe('RoundLiveComponent live round behavior', () => {
           playerName: 'Diego Godín',
           playerId: 'p-rival-3',
           teamId: SAMPLE_AWAY_TEAM_ID,
-          description: 'InJURED_V23_LEGACY'
+          description: 'LEGACY_INJURY_EVENT'
         },
         {
           eventType: 'RED_CARD',
@@ -475,7 +475,7 @@ describe('RoundLiveComponent live round behavior', () => {
           playerName: 'Pepe',
           playerId: 'p-rival-pepe2',
           teamId: SAMPLE_AWAY_TEAM_ID,
-          description: 'InJURED_V23_LEGACY'
+          description: 'LEGACY_INJURY_EVENT'
         }
       ]
     })]));

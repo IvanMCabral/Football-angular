@@ -13,7 +13,7 @@ import { MatchDetail, TimelineSnapshot } from '../models/match-detail.model';
  * - 500 or other non-404 errors: propagate to caller
  *
  * The /detail endpoint returns 404 when:
- * - app.simulation.v24.expose-detail-api=false (flag disabled)
+ * - the detailed-match API feature flag is disabled
  * - match was simulated before detail persistence was enabled
  * - detail was not persisted for this match
  *

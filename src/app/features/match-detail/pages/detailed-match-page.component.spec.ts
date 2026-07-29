@@ -8,13 +8,14 @@ import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { of, throwError } from 'rxjs';
 
-import { V24MatchDetailPageComponent } from './v24-match-detail-page.component';
+import { DetailedMatchPageComponent } from './detailed-match-page.component';
 import { MatchDetailApiService } from '../services/match-detail-api.service';
 import { MatchDetail } from '../models/match-detail.model';
+import { DETAILED_MATCH_ENGINE_VERSION } from '../models/detailed-match-compatibility.model';
 
-describe('V24MatchDetailPageComponent input path', () => {
-  let component: V24MatchDetailPageComponent;
-  let fixture: ComponentFixture<V24MatchDetailPageComponent>;
+describe('DetailedMatchPageComponent input path', () => {
+  let component: DetailedMatchPageComponent;
+  let fixture: ComponentFixture<DetailedMatchPageComponent>;
   let api: MatchDetailApiService;
   let snackBarSpy: jasmine.SpyObj<MatSnackBar>;
 
@@ -25,7 +26,7 @@ describe('V24MatchDetailPageComponent input path', () => {
     };
 
     await TestBed.configureTestingModule({
-      imports: [V24MatchDetailPageComponent, NoopAnimationsModule],
+      imports: [DetailedMatchPageComponent, NoopAnimationsModule],
       providers: [
         provideRouter([]),
         provideHttpClient(),
@@ -36,7 +37,7 @@ describe('V24MatchDetailPageComponent input path', () => {
       ],
     }).compileComponents();
 
-    fixture = TestBed.createComponent(V24MatchDetailPageComponent);
+    fixture = TestBed.createComponent(DetailedMatchPageComponent);
     component = fixture.componentInstance;
     api = TestBed.inject(MatchDetailApiService);
   });
@@ -97,7 +98,7 @@ describe('V24MatchDetailPageComponent input path', () => {
     };
     TestBed.resetTestingModule();
     await TestBed.configureTestingModule({
-      imports: [V24MatchDetailPageComponent, NoopAnimationsModule],
+      imports: [DetailedMatchPageComponent, NoopAnimationsModule],
       providers: [
         provideRouter([]),
         provideHttpClient(),
@@ -107,7 +108,7 @@ describe('V24MatchDetailPageComponent input path', () => {
         { provide: ActivatedRoute, useValue: routeStubWithParams },
       ],
     }).compileComponents();
-    fixture = TestBed.createComponent(V24MatchDetailPageComponent);
+    fixture = TestBed.createComponent(DetailedMatchPageComponent);
     component = fixture.componentInstance;
     api = TestBed.inject(MatchDetailApiService);
     spyOn(api, 'getMatchDetail').and.returnValue(of(detail));
@@ -176,7 +177,7 @@ describe('V24MatchDetailPageComponent input path', () => {
     };
     TestBed.resetTestingModule();
     await TestBed.configureTestingModule({
-      imports: [V24MatchDetailPageComponent, NoopAnimationsModule],
+      imports: [DetailedMatchPageComponent, NoopAnimationsModule],
       providers: [
         provideRouter([]),
         provideHttpClient(),
@@ -186,7 +187,7 @@ describe('V24MatchDetailPageComponent input path', () => {
         { provide: ActivatedRoute, useValue: routeStubEmpty },
       ],
     }).compileComponents();
-    fixture = TestBed.createComponent(V24MatchDetailPageComponent);
+    fixture = TestBed.createComponent(DetailedMatchPageComponent);
     component = fixture.componentInstance;
     api = TestBed.inject(MatchDetailApiService);
     spyOn(api, 'getMatchDetail');
@@ -283,7 +284,7 @@ function makeDetail(matchId: string, careerId: string, homeGoals: number, awayGo
     awayStartingPlayers: [],
     awayBenchPlayers: [],
     schemaVersion: '1',
-    engineVersion: 'V24',
+    engineVersion: DETAILED_MATCH_ENGINE_VERSION,
     createdAt: new Date().toISOString(),
   };
 }

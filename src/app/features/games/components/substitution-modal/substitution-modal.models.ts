@@ -1,4 +1,4 @@
-import { SubModalPlayer, V24LivePlayerRating } from '../../../../core/services/match-engine.model';
+import { SubModalPlayer, LivePlayerRating } from '../../../../core/services/match-engine.model';
 import {
   SubstitutionPendingChange,
   SubstitutionPositionTweak,
@@ -16,7 +16,7 @@ export interface SubstitutionDialogData {
   substitutionsRemaining: number;
   effectivenessMap?: Record<string, number>;
   formation?: string;
-  playerRatings?: V24LivePlayerRating[];
+  playerRatings?: LivePlayerRating[];
   managerSide?: 'HOME' | 'AWAY';
   preSelectedPlayerId?: string;
   reason?: 'INJURY_FORCED_SUBSTITUTION' | 'MANUAL';

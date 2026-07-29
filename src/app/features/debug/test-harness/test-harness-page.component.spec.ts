@@ -1,7 +1,7 @@
 ﻿// Tests for TestHarnessPageComponent.
 //
 // These tests focus on the state-management contract (signals, handlers).
-// The full template rendering (Material modules, V24MatchDetailPageComponent
+// The full template rendering (Material modules, DetailedMatchPageComponent
 // re-mount, etc.) is exercised by the visual smoke tests because Angular Material
 // component specs would need NoopAnimations + providers for every nested
 // component, which is high-cost relative to value for a debug-only page.

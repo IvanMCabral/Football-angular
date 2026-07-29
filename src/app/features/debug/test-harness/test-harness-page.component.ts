@@ -25,7 +25,7 @@ import { Fixture } from '../../../core/services/career.model';
 import { environment } from '../../../environments/environment';
 import { MatchDetailApiService } from '../../match-detail/services/match-detail-api.service';
 import { MatchDetail, MatchEvent, TimelineSnapshot } from '../../match-detail/models/match-detail.model';
-import { V24MatchDetailPageComponent } from '../../match-detail/pages/v24-match-detail-page.component';
+import { DetailedMatchPageComponent } from '../../match-detail/pages/detailed-match-page.component';
 import { SquadEditorModalComponent } from '../../../components/squad-editor-modal/squad-editor-modal.component';
 import { SessionPlayer } from '../../../shared/models/player.model';
 import { LineupDTO } from '../../../shared/models/lineup/lineup.dto';
@@ -396,7 +396,7 @@ import * as Flow from './test-harness-page.flow';
     MatInputModule,
     MatSelectModule,
     MatDialogModule,
-    V24MatchDetailPageComponent,
+    DetailedMatchPageComponent,
   ],
   templateUrl: './test-harness-page.component.html',
   styleUrl: './test-harness-page.component.css',

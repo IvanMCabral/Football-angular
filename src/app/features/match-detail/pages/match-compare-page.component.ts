@@ -353,7 +353,7 @@ export class MatchComparePageComponent implements OnInit {
         this.loading = false;
         if (!data) {
           this.error = 'Comparación no disponible para este partido. '
-            + 'El baseline puede haber expirado (TTL 7d) o el partido no se jugó por la ruta V24.';
+            + 'El baseline puede haber expirado (TTL 7d) o el partido no se jugó por la ruta de detalle actual.';
           this.snackBar.open(this.error, 'Cerrar', { duration: 5000 });
         }
         this.cdr.markForCheck();

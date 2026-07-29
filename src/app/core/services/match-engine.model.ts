@@ -1,7 +1,7 @@
 /**
  * Per-player live stats sent by the match engine for visual pitch cards.
  */
-export interface V24LivePlayerRating {
+export interface LivePlayerRating {
   playerId: string;
   playerName: string;
   teamId: string;
@@ -58,9 +58,9 @@ export interface MatchState {
   substitutions: unknown[];
   players: unknown[];
   /** Per-player live stats for the home team. */
-  homePlayerRatings?: V24LivePlayerRating[];
+  homePlayerRatings?: LivePlayerRating[];
   /** Per-player live stats for the away team. */
-  awayPlayerRatings?: V24LivePlayerRating[];
+  awayPlayerRatings?: LivePlayerRating[];
   /** Remaining manager substitutions, computed by the backend. */
   substitutionsRemaining?: number;
 }

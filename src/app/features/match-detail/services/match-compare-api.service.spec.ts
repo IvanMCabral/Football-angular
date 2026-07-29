@@ -5,6 +5,7 @@ import { TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
 import { MatchCompareApiService } from './match-compare-api.service';
 import { MatchComparison } from '../models/match-compare.model';
+import { DETAILED_MATCH_ENGINE_VERSION } from '../models/detailed-match-compatibility.model';
 
 describe('MatchCompareApiService', () => {
   let service: MatchCompareApiService;
@@ -65,7 +66,7 @@ function makeMatchDetail(matchId: string, homeGoals: number, awayGoals: number) 
     homeShots: 10, awayShots: 6,
     homePossession: 55, awayPossession: 45,
     timeline: [], playerRatings: [],
-    schemaVersion: '1', engineVersion: 'V24',
+    schemaVersion: '1', engineVersion: DETAILED_MATCH_ENGINE_VERSION,
     createdAt: new Date().toISOString(),
   };
 }
