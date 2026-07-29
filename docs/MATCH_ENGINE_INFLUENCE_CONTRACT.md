@@ -13,7 +13,7 @@ flowchart LR
   A["Movimiento / decisión del DT"] --> B["Lineup slots + customX/customY"]
   B --> C["Perfil táctico continuo"]
   C --> D["Ratings ATT/MID/DEF + química"]
-  D --> E["Motor V24 por minuto"]
+  D --> E["Motor Detailed por minuto"]
   E --> F["Posesión, tiros, xG, zonas, eventos, resultado"]
 ```
 
@@ -41,7 +41,7 @@ flowchart LR
 | Persistencia de slots con píxeles | Parcial/OK | `LineupSlotDTO` soporta `customXPercent/customYPercent`. |
 | Preview de ratings | OK | `FormationEffectiveness` y `TeamRatingsCalculator` usan coordenadas. |
 | Química táctica | OK inicial | `TacticalChemistryCalculator` usa distancia y canales. |
-| Posesión y volumen de chances | OK inicial | `V24DetailedMatchEngine` usa `V24TacticalShapeProfile`. |
+| Posesión y volumen de chances | OK inicial | `DetailedSprintetailedMatchEngine` usa `DetailedTacticalShapeProfile`. |
 | Zonas de tiro | OK inicial | `selectShotLocation` usa shape/canales. |
 | xG por calidad ATT/DEF | Mejorado en V25D99.22 | Ahora `aggregateAttackerStat` y `aggregateDefenderStat` usan coordenadas continuas vía `SubdivisionEffectivenessCalculator`. |
 | Sustituciones | Parcial | Cambian jugador/atributos, pero falta medir impacto promedio. |
@@ -57,8 +57,8 @@ Problema detectado:
 
 Cambio:
 
-- `V24DetailedMatchEngine.aggregateAttackerStat(...)` ahora recibe `slotsByPlayerId`.
-- `V24DetailedMatchEngine.aggregateDefenderStat(...)` ahora recibe `slotsByPlayerId`.
+- `DetailedSprintetailedMatchEngine.aggregateAttackerStat(...)` ahora recibe `slotsByPlayerId`.
+- `DetailedSprintetailedMatchEngine.aggregateDefenderStat(...)` ahora recibe `slotsByPlayerId`.
 - Ambos usan `SubdivisionEffectivenessCalculator.effectiveness(naturalPosition, x, y, tacticalPosition)`.
 - Si no hay slot/píxeles, cae al comportamiento anterior por compatibilidad.
 
@@ -78,7 +78,7 @@ Problema detectado:
 
 Cambio:
 
-- `V24DetailedMatchEngine.aggregateAttackerStat(...)` ahora también aplica un `forwardIntentMultiplier` cuando existe `customYPercent` real.
+- `DetailedSprintetailedMatchEngine.aggregateAttackerStat(...)` ahora también aplica un `forwardIntentMultiplier` cuando existe `customYPercent` real.
 - El bonus es suave y sólo para no-delanteros:
   - `y=60`: sin bonus.
   - `y=40`: bonus ofensivo moderado.
@@ -89,7 +89,7 @@ Contrato verificado:
 
 | Prueba | Resultado |
 |---|---|
-| `mvn -q -Dtest=V24DetailedMatchEngineFormationTest test` | OK |
+| `mvn -q -Dtest=DetailedSprintetailedMatchEngineFormationTest test` | OK |
 | MID con misma etiqueta táctica movido de `y=60` a `y=40` | sube el input ofensivo del motor |
 | Lineup sin coordenadas custom | conserva el comportamiento legacy |
 | `mvn -q -DskipTests package` | OK |
@@ -104,7 +104,7 @@ Problema detectado:
 
 Cambio:
 
-- `V24DetailedMatchEngine.tacticalShapeProfile(...)` ahora calcula DEF/MID/ATT como pesos suaves según `customYPercent`.
+- `DetailedSprintetailedMatchEngine.tacticalShapeProfile(...)` ahora calcula DEF/MID/ATT como pesos suaves según `customYPercent`.
 - Usa la misma lógica conceptual que `TeamRatingsCalculator.softShapeFromCoords(...)`:
   - más arriba → más peso ATT;
   - zona media → más peso MID;
@@ -117,7 +117,7 @@ Contrato verificado:
 |---|---|
 | MID movido de `y=60` a `y=40` | sube `attackVolumeMultiplier` |
 | MID movido de `y=40` a `y=39` | cambio pequeño, sin salto brusco |
-| `mvn -q -Dtest=V24DetailedMatchEngineFormationTest test` | OK |
+| `mvn -q -Dtest=DetailedSprintetailedMatchEngineFormationTest test` | OK |
 
 ## Reglas de diseño para píxeles
 
@@ -549,10 +549,10 @@ Nuevo contrato:
 
 Implementación:
 
-- `V24ShotCoordinateGenerator.generateWideFlank(left, random)` fuerza coordenadas:
+- `DetailedShotCoordinateGenerator.generateWideFlank(left, random)` fuerza coordenadas:
   - izquierda: `y 18..42`
   - derecha: `y 58..82`
-- `V24DetailedMatchEngine.defenderChannelWeight(...)` distingue:
+- `DetailedSprintetailedMatchEngine.defenderChannelWeight(...)` distingue:
   - defensor del mismo lado del tiro: peso alto
   - defensor del lado opuesto: peso bajo
   - central: peso residual
@@ -564,7 +564,7 @@ Tests:
 
 Validación:
 
-- `mvn -q -Dtest=V24DetailedMatchEngineFormationTest test` OK.
+- `mvn -q -Dtest=DetailedSprintetailedMatchEngineFormationTest test` OK.
 
 Criterio profesional:
 
@@ -595,7 +595,7 @@ Test:
 
 Validación:
 
-- `mvn -q -Dtest=V24DetailedMatchEngineFormationTest test` OK.
+- `mvn -q -Dtest=DetailedSprintetailedMatchEngineFormationTest test` OK.
 - `mvn -q -DskipTests compile` OK.
 
 Criterio profesional:
@@ -608,7 +608,7 @@ Criterio profesional:
 
 Nuevo contrato:
 
-- Un partido puede no tener detalle V24 persistido.
+- Un partido puede no tener detalle Detailed persistido.
 - Eso no debe verse como fallo rojo si el endpoint responde `404`.
 - Debe verse como estado vacío: detalle no disponible.
 

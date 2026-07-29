@@ -10,9 +10,9 @@ Goal: prove the formation editor is not cosmetic. Manual player moves and positi
 flowchart LR
   A["Modal drag/change"] --> B["manual-select payload"]
   B --> C["CareerSave.teamStarting11SubdivisionSlots"]
-  C --> D["V24MatchContextFactory"]
-  D --> E["V24MatchContext home/awaySlotsByPlayerId"]
-  E --> F["V24DetailedMatchEngine"]
+  C --> D["DetailedMatchContextFactory"]
+  D --> E["DetailedMatchContext home/awaySlotsByPlayerId"]
+  E --> F["DetailedSprintetailedMatchEngine"]
   F --> G["xG, shots, zones, possession, result"]
 ```
 
@@ -22,15 +22,15 @@ flowchart LR
 |---|---|---|
 | Front sends `customXPercent/customYPercent` | `squad-editor-modal.component.ts` and V25D99.20 specs | OK |
 | Backend persists those coordinates | `LineupCommandUseCaseImplSubdivisionTest` | OK |
-| V24 context receives coordinates by player id | `V24MatchContextFactoryTest.carriesPersistedCustomSlotCoordinatesIntoMatchContextByPlayerId` | OK |
-| Engine consumes coordinates | `V24DetailedMatchEngineFormationTest` | OK |
+| Detailed context receives coordinates by player id | `DetailedMatchContextFactoryTest.carriesPersistedCustomSlotCoordinatesIntoMatchContextByPlayerId` | OK |
+| Engine consumes coordinates | `DetailedSprintetailedMatchEngineFormationTest` | OK |
 
 ## Tests run
 
 | Command | Result |
 |---|---|
-| `mvn -q -Dtest=V24MatchContextFactoryTest test` | OK |
-| `mvn -q -Dtest=V24DetailedMatchEngineFormationTest test` | OK |
+| `mvn -q -Dtest=DetailedMatchContextFactoryTest test` | OK |
+| `mvn -q -Dtest=DetailedSprintetailedMatchEngineFormationTest test` | OK |
 | `npm test -- --watch=false --include src/app/components/squad-editor-modal/squad-editor-modal.component.spec.ts` | OK, 121 success |
 
 ## Professional rule
@@ -206,7 +206,7 @@ Reading:
 
 Fix added during QA:
 
-- Panel A could show the previous detailed timeline while the replay card already showed the new replay. Added `inputRefreshToken` to `V24MatchDetailPageComponent` and increment it after replay mutations so the detail view refreshes even when `matchId` stays the same.
+- Panel A could show the previous detailed timeline while the replay card already showed the new replay. Added `inputRefreshToken` to `DetailedMatchDetailPageComponent` and increment it after replay mutations so the detail view refreshes even when `matchId` stays the same.
 
 ## Player replacement multi-seed comparison - 2026-07-12
 
@@ -236,7 +236,7 @@ What it does:
 1. Reads the currently persisted visual lineup.
 2. Applies the selected tactical style.
 3. Replays the selected match across consecutive deterministic seeds.
-4. Fetches V24 detail after each replay.
+4. Fetches Detailed detail after each replay.
 5. Shows a user-team summary card with:
    - average goals for/against;
    - average goal difference;
@@ -387,7 +387,7 @@ Request:
 
 Behavior:
 
-- Builds the baseline V24 context from the current persisted modal/lineup state.
+- Builds the baseline Detailed context from the current persisted modal/lineup state.
 - Builds a second in-memory context where the bench player replaces the starter
   in the same tactical slot.
 - Transfers the starter's persisted `LineupSlotDTO` to the bench player so the
@@ -469,7 +469,7 @@ Request:
 
 Behavior:
 
-- Builds the baseline V24 context from the persisted visual lineup.
+- Builds the baseline Detailed context from the persisted visual lineup.
 - Builds a moved in-memory context where only that player's `LineupSlotDTO`
   coordinates change.
 - Does not persist lineup, fixture, detail or career state.
@@ -1018,11 +1018,11 @@ Validation:
 
 - Backend compile: OK.
 - Focused backend tests:
-  `V24DetailedMatchEngineFormationTest,V24MatchContextFactoryTest` OK.
+  `DetailedSprintetailedMatchEngineFormationTest,DetailedMatchContextFactoryTest` OK.
 
 Known debt:
 
-- `V24ModelTuningDiagnosticTest.measureGoalDistribution_lambdaInReasonableBand`
+- `DetailedModelTuningDiagnosticTest.measureGoalDistribution_lambdaInReasonableBand`
   still reports low lambda around `0.2865` vs the minimum `0.3`.
 - This is a global scoring/conversion tuning issue, not a modal wiring issue.
 - Defensive swaps now move in the right direction, but should probably become
@@ -1075,7 +1075,7 @@ Reading:
 Validation:
 
 - Focused backend tests:
-  `V24DetailedMatchEngineFormationTest,V24MatchContextFactoryTest` OK.
+  `DetailedSprintetailedMatchEngineFormationTest,DetailedMatchContextFactoryTest` OK.
 
 ## Position pixel defensive-channel visibility - 2026-07-13
 
@@ -1230,7 +1230,7 @@ Environment notes:
 
 - Redis must be running with auth: `--requirepass MgrRedis2026!Rotate#Secure`.
 - Backend must inherit `DB_PASSWORD` and `REDIS_PASSWORD`.
-- Stable backend launch used `SPRING_PROFILES_ACTIVE=local,v24-mutations`.
+- Stable backend launch used `SPRING_PROFILES_ACTIVE=local,detailed-mutations`.
 - A stale browser session produced `/career/status` 500 once. A fresh smoke user
   worked correctly, so stale career/session recovery remains a separate cleanup
   candidate.
@@ -1252,7 +1252,7 @@ Automated validation:
 
 - Backend compile: `mvn -q -DskipTests compile` OK.
 - Backend focused tests:
-  `mvn -q "-Dtest=V24DetailedMatchEngineFormationTest,V24MatchContextFactoryTest" test` OK.
+  `mvn -q "-Dtest=DetailedSprintetailedMatchEngineFormationTest,DetailedMatchContextFactoryTest" test` OK.
 - Frontend build: `npm run build` OK.
 - Frontend focused specs:
   `test-harness-page`, `squad-editor-modal`, `match-detail-api-service` OK
@@ -1440,7 +1440,7 @@ Contract:
 
 Implementation:
 
-- `V24DetailedMatchEngine.tacticalShapeProfile(...)` now weights structural
+- `DetailedSprintetailedMatchEngine.tacticalShapeProfile(...)` now weights structural
   contributions by `tacticalEffectiveness(...)`.
 - MID structural contribution uses a stronger curve for role mismatch, so
   out-of-role players no longer preserve full midfield control only because
@@ -1450,7 +1450,7 @@ Implementation:
 
 Regression coverage:
 
-- `V24DetailedMatchEngineFormationTest.outOfRoleMidfieldSlotLowersPossessionAndProtectionShape`
+- `DetailedSprintetailedMatchEngineFormationTest.outOfRoleMidfieldSlotLowersPossessionAndProtectionShape`
 - Same visual MID point, same team shape:
   - natural `MID` in slot;
   - natural `ATT` forced into same slot.
@@ -1460,7 +1460,7 @@ Regression coverage:
 
 Validation:
 
-- `mvn -Dtest=V24DetailedMatchEngineFormationTest test`: OK, `25` tests.
+- `mvn -Dtest=DetailedSprintetailedMatchEngineFormationTest test`: OK, `25` tests.
 - Visual harness:
   - `/debug/test-harness`;
   - `Real Betis vs Real Madrid`;
@@ -2267,7 +2267,7 @@ Fecha: 2026-07-13
 
 Bug corregido en motor:
 
-- La forma táctica (`V24TacticalShapeProfile`) y posesión viva se calculaban antes del loop de partido y no se recalculaban después de sustituciones.
+- La forma táctica (`DetailedTacticalShapeProfile`) y posesión viva se calculaban antes del loop de partido y no se recalculaban después de sustituciones.
 - La primera aplicación de una sustitución programada llamaba `manualSubstitute`, que cambiaba `onPitch`, pero no movía al suplente desde bench a la lista activa usada por shooter/assist/shape.
 - Un suplente sin slot visual persistido caía a coordenadas genéricas, en vez de ocupar el slot del jugador reemplazado.
 
@@ -2285,7 +2285,7 @@ Contrato nuevo:
 
 Validación:
 
-- Tests backend focalizados: `V24DetailedMatchEngineFormationTest`, `V24DetailedMatchEngineTeamIdTest`, `V24SubstitutionEngineTest` OK.
+- Tests backend focalizados: `DetailedSprintetailedMatchEngineFormationTest`, `DetailedSprintetailedMatchEngineTeamIdTest`, `DetailedSubstitutionEngineTest` OK.
 - Harness visual Valencia vs Sevilla:
   - downgrade defensivo m30 `Gaya -> Yarek Gasiorowski [-32]` ahora aumenta xGA y tiros recibidos en la dirección esperada.
 
@@ -2991,17 +2991,17 @@ Conclusión:
 - Próximo paso recomendado:
   - crear un smoke automático multi-equipo/multi-carrera;
   - o profundizar en personalidad de formaciones parecidas (`4-4-2` vs `4-2-2-2`, `4-3-3` vs `4-1-2-3`).
-## V25D99.58 - Formation geometry contract into V24 engine
+## V25D99.58 - Formation geometry contract into Detailed engine
 
 Problem found:
 
 - The visual modal/backend `FormationService` can assign different x/y coordinates to the same `subdivisionId` depending on formation.
-- The V24 engine was falling back from `subdivisionId` to a generic 3x9 grid when `customX/Y` was null.
+- The Detailed engine was falling back from `subdivisionId` to a generic 3x9 grid when `customX/Y` was null.
 - This made tactical variants such as `4-1-2-3` behave like `4-3-3` in the match even when the formation drawing had a real pivot/interior triangle.
 
 Fix:
 
-- `V24MatchContextFactory` now enriches persisted canonical slots with selected-formation coordinates from `FormationService`.
+- `DetailedMatchContextFactory` now enriches persisted canonical slots with selected-formation coordinates from `FormationService`.
 - Manual custom coordinates still win:
   - if `customX/Y` exists, preserve it;
   - otherwise inject the formation-specific canonical x/y into the slot DTO before the engine reads it.
@@ -3011,7 +3011,7 @@ Additional calibration:
 - `4-2-2-2` is now a narrower central box rather than a flat `4-4-2` clone.
 - `4-1-2-3` has a deeper pivot and two interiors.
 - `3-5-2-CDM` has a clearer holder/wingback identity.
-- `V24DetailedMatchEngine` has small named-formation identity nudges for:
+- `DetailedSprintetailedMatchEngine` has small named-formation identity nudges for:
   - `4-1-2-3`
   - `4-2-2-2`
   - `3-5-2-CDM`
@@ -3019,10 +3019,10 @@ Additional calibration:
 Validation:
 
 - Passed:
-  - `V24MatchContextFactoryTest`
-  - `V24MatchContextFactoryFormationTest`
-  - `V24DetailedMatchEngineFormationTest`
-  - `V24DetailedMatchEngineTeamIdTest`
+  - `DetailedMatchContextFactoryTest`
+  - `DetailedMatchContextFactoryFormationTest`
+  - `DetailedSprintetailedMatchEngineFormationTest`
+  - `DetailedSprintetailedMatchEngineTeamIdTest`
 
 Final visual validation:
 
@@ -3066,7 +3066,7 @@ Contract:
 - For each formation it applies both:
   - the formation label;
   - the canonical visual slots and x/y coordinates from `FormationService`.
-- It does not persist V24 detail to Redis per row.
+- It does not persist Detailed detail to Redis per row.
 - It is intended for smoke/comparison speed, not for inspecting a persisted timeline.
 
 Visual validation:
@@ -3082,10 +3082,10 @@ Visual validation:
 Verification:
 
 - Backend focused tests passed:
-  - `V24MatchContextFactoryFormationTest`
-  - `V24DetailedMatchEngineFormationTest`
-  - `V24DetailedMatchEngineTeamIdTest`
-  - `V24LiveSessionTest`
+  - `DetailedMatchContextFactoryFormationTest`
+  - `DetailedSprintetailedMatchEngineFormationTest`
+  - `DetailedSprintetailedMatchEngineTeamIdTest`
+  - `DetailedLiveSessionTest`
 - Front harness spec passed:
   - `test-harness-page.component.spec.ts` - 47 tests.
 
@@ -3124,17 +3124,17 @@ Visual validation:
 
 Startup note:
 
-- For local visual QA, backend must run with `local,v24-mutations`.
+- For local visual QA, backend must run with `local,detailed-mutations`.
 - The reliable Windows launch shape is:
   - set `DB_PASSWORD`, `DB_USER`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `JWT_SECRET`, `REDIS_PASSWORD` in the parent PowerShell process;
-  - then run `Start-Process mvn.cmd -ArgumentList "spring-boot:run","-Dspring-boot.run.profiles=local,v24-mutations"`.
+  - then run `Start-Process mvn.cmd -ArgumentList "spring-boot:run","-Dspring-boot.run.profiles=local,detailed-mutations"`.
 - Launching `mvn spring-boot:run "-Dspring-boot.run.profiles=..."` inside a nested PowerShell string can split the `-D` parameter incorrectly.
 
 Verification:
 
 - Backend focused tests passed:
   - `TestHarnessFormationMatrixSlotAssignmentTest`
-  - `V24DetailedMatchEngineFormationTest`
+  - `DetailedSprintetailedMatchEngineFormationTest`
   - `TestHarnessControllerE2ETest`
 - Front harness spec passed:
   - `test-harness-page.component.spec.ts` - 48 tests.
@@ -3223,7 +3223,7 @@ Technical verification:
 
 - Backend:
   - `TestHarnessFormationMatrixSlotAssignmentTest` OK.
-  - `V24DetailedMatchEngineFormationTest` OK.
+  - `DetailedSprintetailedMatchEngineFormationTest` OK.
 - Frontend:
   - `test-harness-page.component.spec.ts` OK, 47/47.
   - development build OK.
@@ -3274,7 +3274,7 @@ Verification:
 
 - Backend:
   - `TestHarnessFormationMatrixSlotAssignmentTest` OK.
-  - `V24DetailedMatchEngineFormationTest` OK.
+  - `DetailedSprintetailedMatchEngineFormationTest` OK.
   - `TestHarnessControllerE2ETest` OK.
 - Frontend:
   - `test-harness-page.component.spec.ts` OK, 47/47.
@@ -3331,7 +3331,7 @@ Important interpretation:
 Verification:
 
 - Backend focused test passed:
-  - `mvn -q -Dtest=V24DetailedMatchEngineFormationTest test`
+  - `mvn -q -Dtest=DetailedSprintetailedMatchEngineFormationTest test`
 - Front harness spec passed:
   - `npm test -- --watch=false --include='src/app/features/debug/test-harness/test-harness-page.component.spec.ts' --progress=false`
   - `47 SUCCESS`
@@ -3455,7 +3455,7 @@ Purpose:
   1. visual modal stores free-position coordinates on the player;
   2. `saveLineup()` sends those coordinates to `/career/lineup/manual-select`;
   3. backend persists them;
-  4. `V24MatchContextFactory` reads them into match context.
+  4. `DetailedMatchContextFactory` reads them into match context.
 
 New front test:
 
@@ -3496,11 +3496,11 @@ Verification:
 - Front harness spec:
   - `test-harness-page.component.spec.ts`: 47 passing.
 - Backend engine context:
-  - `V24MatchContextFactoryTest`: passing.
+  - `DetailedMatchContextFactoryTest`: passing.
 
 Known unrelated test debt:
 
-- Running `LineupCommandUseCaseImplSubdivisionTest,V24MatchContextFactoryTest` currently fails in `LineupCommandUseCaseImplSubdivisionTest` with older slot-map expectations:
+- Running `LineupCommandUseCaseImplSubdivisionTest,DetailedMatchContextFactoryTest` currently fails in `LineupCommandUseCaseImplSubdivisionTest` with older slot-map expectations:
   - expected `S22-1` mappings missing;
   - expected 11 entries but observed 12/18 in some cases.
 - This was not introduced by the new modal save test, but should be cleaned before treating the subdivision suite as a reliable regression gate.
@@ -3589,10 +3589,10 @@ Contract interpretation:
 Verification:
 
 - Backend focused tests passed:
-  - `V24MatchContextFactoryFormationTest`
-  - `V24DetailedMatchEngineFormationTest`
-  - `V24DetailedMatchEngineTeamIdTest`
-  - `V24LiveSessionTest`
+  - `DetailedMatchContextFactoryFormationTest`
+  - `DetailedSprintetailedMatchEngineFormationTest`
+  - `DetailedSprintetailedMatchEngineTeamIdTest`
+  - `DetailedLiveSessionTest`
 - Front harness spec passed:
   - `test-harness-page.component.spec.ts` - 47 tests.
 
@@ -3667,10 +3667,10 @@ Interpretation:
 Verification:
 
 - Backend focused tests passed:
-  - `V24MatchContextFactoryFormationTest`
-  - `V24DetailedMatchEngineFormationTest`
-  - `V24DetailedMatchEngineTeamIdTest`
-  - `V24LiveSessionTest`
+  - `DetailedMatchContextFactoryFormationTest`
+  - `DetailedSprintetailedMatchEngineFormationTest`
+  - `DetailedSprintetailedMatchEngineTeamIdTest`
+  - `DetailedLiveSessionTest`
 - Front harness spec passed:
   - `test-harness-page.component.spec.ts` - 47 tests.
 
@@ -3845,10 +3845,10 @@ Additional calibration:
 Verification:
 
 - Backend focused tests passed:
-  - `V24MatchContextFactoryFormationTest`
-  - `V24DetailedMatchEngineFormationTest`
-  - `V24DetailedMatchEngineTeamIdTest`
-  - `V24LiveSessionTest`
+  - `DetailedMatchContextFactoryFormationTest`
+  - `DetailedSprintetailedMatchEngineFormationTest`
+  - `DetailedSprintetailedMatchEngineTeamIdTest`
+  - `DetailedLiveSessionTest`
 - Front harness spec passed:
   - `test-harness-page.component.spec.ts` - 47 tests.
 
@@ -3920,9 +3920,9 @@ Next required diagnostic:
 Verification:
 
 - Backend focused tests passed:
-  - `V24MatchContextFactoryFormationTest`
-  - `V24DetailedMatchEngineFormationTest`
-  - `V24DetailedMatchEngineTeamIdTest`
-  - `V24LiveSessionTest`
+  - `DetailedMatchContextFactoryFormationTest`
+  - `DetailedSprintetailedMatchEngineFormationTest`
+  - `DetailedSprintetailedMatchEngineTeamIdTest`
+  - `DetailedLiveSessionTest`
 - Front harness spec passed:
   - `test-harness-page.component.spec.ts` - 47 tests.

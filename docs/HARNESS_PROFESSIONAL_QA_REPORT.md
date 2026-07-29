@@ -1,7 +1,7 @@
 # Test Harness QA — comportamiento profesional del motor
 
 Fecha: 2026-07-12  
-Stack usado: backend local `8080`, frontend local `4200`, perfil `local,v24-mutations`  
+Stack usado: backend local `8080`, frontend local `4200`, perfil `local,detailed-mutations`
 Career smoke: `Vigo City 1`, división `UNDECIMA`, temporada 1, ronda 1  
 Seed principal: `12345` / seed de formación real: `223344`
 
@@ -436,7 +436,7 @@ Pendiente motor:
 ## V25D99.22.11 - Ajuste motor: defensa afecta volumen de chances
 
 Fecha: 2026-07-12  
-Cambio: `V24DetailedMatchEngine` ahora usa `defenderRosterChanceVolumeMultiplier(...)` en `chanceProbability`.
+Cambio: `DetailedSprintetailedMatchEngine` ahora usa `defenderRosterChanceVolumeMultiplier(...)` en `chanceProbability`.
 
 Antes del ajuste, `aggregateDefenderStat` afectaba sobre todo calidad/xG del tiro dentro de `attemptShot`, pero casi no afectaba volumen. Ahora la calidad real de DEF/GK tambien mueve un poco la probabilidad de crear chances:
 
@@ -564,7 +564,7 @@ Bug menor UI corregido:
 ## V25D99.22.14 - Defensa sensible por canal en xG
 
 Fecha: 2026-07-12  
-Cambio: `V24DetailedMatchEngine` ahora calcula la calidad defensiva tambien segun la zona del tiro.
+Cambio: `DetailedSprintetailedMatchEngine` ahora calcula la calidad defensiva tambien segun la zona del tiro.
 
 Antes:
 
@@ -708,7 +708,7 @@ Conclusion:
 ## V25D99.22.18 - QA multi-seed amplia del harness
 
 Fecha: 2026-07-12  
-Backend: `local,v24-mutations`  
+Backend: `local,detailed-mutations`
 Smoke user recreado desde cero:
 
 - `POST /api/v1/world/seed-la-liga`
@@ -725,7 +725,7 @@ Partido usado:
 
 Validaciones previas:
 
-- Backend targeted test: `mvn -q -Dtest=V24DetailedMatchEngineFormationTest test` OK.
+- Backend targeted test: `mvn -q -Dtest=DetailedSprintetailedMatchEngineFormationTest test` OK.
 - Frontend build: `npm run build` OK.
 
 Tabla principal:
@@ -814,7 +814,7 @@ Smoke real:
 Validacion:
 
 - `mvn -q -DskipTests compile` OK.
-- `mvn -q -Dtest=V24DetailedMatchEngineFormationTest test` OK.
+- `mvn -q -Dtest=DetailedSprintetailedMatchEngineFormationTest test` OK.
 - `npm run build` OK.
 
 Lectura:
@@ -873,7 +873,7 @@ Smoke real:
 Validacion:
 
 - `mvn -q -DskipTests compile` OK.
-- `mvn -q -Dtest=V24DetailedMatchEngineFormationTest test` OK.
+- `mvn -q -Dtest=DetailedSprintetailedMatchEngineFormationTest test` OK.
 - `npm run build` OK.
 
 Lectura:
@@ -922,7 +922,7 @@ Lectura:
 
 - El JSON ya trae metricas L/R y compila.
 - Pero el scenario `m45-opponent-wide` todavia no fuerza un lado: solo aumenta probabilidad de tiros wide.
-- La coordenada exacta izquierda/derecha sigue saliendo por distribucion aleatoria del `V24ShotCoordinateGenerator`.
+- La coordenada exacta izquierda/derecha sigue saliendo por distribucion aleatoria del `DetailedShotCoordinateGenerator`.
 - Por eso `weak-left-defender` y `weak-right-defender` todavia no se separan con claridad.
 
 Siguiente mejora real:
@@ -989,7 +989,7 @@ Validacion:
 
 - Backend compile OK.
 - Frontend build OK.
-- `mvn -q -Dtest=V24DetailedMatchEngineFormationTest test` OK.
+- `mvn -q -Dtest=DetailedSprintetailedMatchEngineFormationTest test` OK.
 
 Siguiente mejora:
 

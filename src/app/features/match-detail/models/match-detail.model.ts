@@ -128,7 +128,7 @@ export interface MatchDetail {
   awayStartingPlayers?: MatchLineupPlayer[];
   awayBenchPlayers?: MatchLineupPlayer[];
   schemaVersion: string;
-  engineVersion: string;
+  engineType: string;
   createdAt: string;
 }
 

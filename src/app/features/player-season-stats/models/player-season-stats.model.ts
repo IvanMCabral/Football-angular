@@ -1,4 +1,4 @@
-import { PLAYER_STATS_DETAILED_DATA_SOURCE } from '../../match-detail/models/detailed-match-compatibility.model';
+import { DETAILED_PLAYER_STATS_DATA_SOURCE } from '../../match-detail/models/detailed-match-discriminators.model';
 
 /**
  * Player season stats type definitions.
@@ -95,7 +95,7 @@ export interface PlayerSeasonStatsMetadata {
   returnedPlayers: number;
   totalMatchesProcessed: number;
   lastUpdatedRound: number;
-  dataSource: typeof PLAYER_STATS_DETAILED_DATA_SOURCE;
+  dataSource: typeof DETAILED_PLAYER_STATS_DATA_SOURCE;
   dataCompleteness: DataCompleteness;
   generatedAt: string; // ISO-8601 timestamp
   versionHash: string;

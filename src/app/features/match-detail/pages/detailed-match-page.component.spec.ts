@@ -11,7 +11,7 @@ import { of, throwError } from 'rxjs';
 import { DetailedMatchPageComponent } from './detailed-match-page.component';
 import { MatchDetailApiService } from '../services/match-detail-api.service';
 import { MatchDetail } from '../models/match-detail.model';
-import { DETAILED_MATCH_ENGINE_VERSION } from '../models/detailed-match-compatibility.model';
+import { DETAILED_MATCH_ENGINE_TYPE } from '../models/detailed-match-discriminators.model';
 
 describe('DetailedMatchPageComponent input path', () => {
   let component: DetailedMatchPageComponent;
@@ -284,7 +284,7 @@ function makeDetail(matchId: string, careerId: string, homeGoals: number, awayGo
     awayStartingPlayers: [],
     awayBenchPlayers: [],
     schemaVersion: '1',
-    engineVersion: DETAILED_MATCH_ENGINE_VERSION,
+    engineType: DETAILED_MATCH_ENGINE_TYPE,
     createdAt: new Date().toISOString(),
   };
 }

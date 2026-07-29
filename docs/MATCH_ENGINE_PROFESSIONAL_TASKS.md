@@ -136,7 +136,7 @@ Contrato:
 
 Validación:
 
-- `mvn -q -Dtest=V24DetailedMatchEngineFormationTest test` OK.
+- `mvn -q -Dtest=DetailedSprintetailedMatchEngineFormationTest test` OK.
 - `mvn -q -DskipTests compile` OK.
 
 QA visual pendiente:
@@ -152,7 +152,7 @@ Fecha: 2026-07-12
 
 Problema detectado:
 
-- Al seleccionar un partido `PENDING` o sin detalle V24 persistido, Panel A mostraba:
+- Al seleccionar un partido `PENDING` o sin detalle Detailed persistido, Panel A mostraba:
   - `Failed to load match detail.`
 - El contrato del servicio decía que `404` debía tratarse como `null`, pero Angular entrega un `HttpErrorResponse` y no entra al `map`.
 
@@ -220,7 +220,7 @@ Contrato:
 Validación técnica:
 
 - `mvn -q -DskipTests compile` OK.
-- `mvn -q -Dtest=V24DetailedMatchEngineFormationTest test` OK.
+- `mvn -q -Dtest=DetailedSprintetailedMatchEngineFormationTest test` OK.
 
 Próximo paso:
 

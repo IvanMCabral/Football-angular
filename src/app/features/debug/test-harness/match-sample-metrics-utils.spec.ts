@@ -44,7 +44,7 @@ const detail = (timeline: MatchEvent[]): MatchDetail => ({
   timeline,
   playerRatings: [],
   schemaVersion: 'test',
-  engineVersion: 'test',
+  engineType: 'test',
   createdAt: '2026-07-27T00:00:00.000Z',
 });
 

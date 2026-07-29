@@ -5,7 +5,7 @@ import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 import { MatchDetailApiService } from './match-detail-api.service';
 import { MatchDetail, TimelineSnapshot } from '../models/match-detail.model';
-import { DETAILED_MATCH_ENGINE_VERSION } from '../models/detailed-match-compatibility.model';
+import { DETAILED_MATCH_ENGINE_TYPE } from '../models/detailed-match-discriminators.model';
 
 describe('MatchDetailApiService', () => {
   let service: MatchDetailApiService;
@@ -173,7 +173,7 @@ function makeMatchDetail(matchId: string): MatchDetail {
     timeline: [],
     playerRatings: [],
     schemaVersion: '1',
-    engineVersion: DETAILED_MATCH_ENGINE_VERSION,
+    engineType: DETAILED_MATCH_ENGINE_TYPE,
     createdAt: new Date().toISOString(),
   };
 }

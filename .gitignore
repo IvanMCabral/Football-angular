@@ -6,7 +6,7 @@ node_modules
 *.err
 *.err.log
 
-# V24D14: src/assets/ contiene ~200 archivos de una exploracion de sprites
+# src/assets/ contiene ~200 archivos de una exploracion de sprites
 # (sprites PNG, mockup-pitch.html, scripts Python de generacion) que NUNCA
 # se integraron al build (angular.json tiene "assets": [] con el builder
 # application de Angular 17+) ni son referenciados por ningun componente
