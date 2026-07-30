@@ -100,6 +100,8 @@ describe('PlayerCardComponent injury availability details', () => {
 
     const chips: HTMLElement[] = Array.from(fixture.nativeElement.querySelectorAll('.trait-chip'));
     expect(chips.map(chip => chip.textContent?.trim())).toEqual(['One-on-one keeper', 'Sweeper keeper']);
+    expect(fixture.nativeElement.textContent).not.toContain('one_on_one_keeper');
+    expect(fixture.nativeElement.textContent).not.toContain('sweeper_keeper');
   });
 
   it('keeps the UI stable when an invalid payload contains more than two traits', () => {
