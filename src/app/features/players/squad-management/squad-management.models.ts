@@ -34,6 +34,13 @@ export interface SessionPlayer {
   redCards?: number;
   suspended?: boolean;
   suspensionRemainingMatches?: number;
+  specialTraits?: PlayerSpecialTrait[];
+}
+
+export interface PlayerSpecialTrait {
+  code: string;
+  name: string;
+  description?: string | null;
 }
 
 export interface Team {

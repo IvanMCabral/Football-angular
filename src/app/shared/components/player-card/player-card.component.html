@@ -28,6 +28,14 @@
       Energía: {{energyPercent()}}% · {{energyLabel()}}
     </span>
   </div>
+  <div class="player-traits" *ngIf="hasSpecialTraits()">
+    <span
+      class="trait-chip"
+      *ngFor="let trait of player.specialTraits"
+      [title]="trait.description || trait.name">
+      {{trait.name}}
+    </span>
+  </div>
   <div class="player-suspended" *ngIf="isSuspended()">
     <span class="suspended-badge" [title]="suspendedTooltip()">⛔ {{suspendedLabel()}}</span>
     <span class="suspended-detail">{{suspendedDetail()}}</span>

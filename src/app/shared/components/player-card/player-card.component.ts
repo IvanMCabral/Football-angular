@@ -114,6 +114,10 @@ export class PlayerCardComponent {
     return this.clampEnergy(this.player.energy ?? 100);
   }
 
+  hasSpecialTraits(): boolean {
+    return (this.player.specialTraits?.length ?? 0) > 0;
+  }
+
   private clampEnergy(value: number | undefined | null): number {
     if (value === null || value === undefined) { return 100; }
     return Math.max(0, Math.min(100, Math.round(value)));
