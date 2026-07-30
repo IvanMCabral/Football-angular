@@ -32,7 +32,8 @@
     <span
       class="trait-chip"
       *ngFor="let trait of displayedSpecialTraits()"
-      [title]="trait.description || trait.name">
+      [title]="trait.description || trait.name"
+      [attr.aria-label]="trait.description ? trait.name + ': ' + trait.description : trait.name">
       {{trait.name}}
     </span>
   </div>

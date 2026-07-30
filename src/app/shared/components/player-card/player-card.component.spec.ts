@@ -84,6 +84,7 @@ describe('PlayerCardComponent injury availability details', () => {
     expect(chips.length).toBe(1);
     expect(chips[0].textContent?.trim()).toBe('Leader');
     expect(chips[0].getAttribute('title')).toBe('Collective mentality stabilizer.');
+    expect(chips[0].getAttribute('aria-label')).toBe('Leader: Collective mentality stabilizer.');
   });
 
   it('renders exactly two special trait chips in backend order', () => {
@@ -142,5 +143,6 @@ describe('PlayerCardComponent injury availability details', () => {
     const chips: HTMLElement[] = Array.from(fixture.nativeElement.querySelectorAll('.trait-chip'));
     expect(chips.map(chip => chip.textContent?.trim())).toEqual(['Arquero uno contra uno', 'Líbero del área']);
     expect(chips[1].getAttribute('title')).toBe('Cubre pelotas profundas detrás de la defensa.');
+    expect(chips[1].getAttribute('aria-label')).toBe('Líbero del área: Cubre pelotas profundas detrás de la defensa.');
   });
 });
