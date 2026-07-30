@@ -1,6 +1,6 @@
 import { Component, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { PlayerCardData } from './player-card.model';
+import { PlayerCardData, PlayerSpecialTrait } from './player-card.model';
 
 @Component({
   selector: 'app-player-card',
@@ -115,7 +115,11 @@ export class PlayerCardComponent {
   }
 
   hasSpecialTraits(): boolean {
-    return (this.player.specialTraits?.length ?? 0) > 0;
+    return this.displayedSpecialTraits().length > 0;
+  }
+
+  displayedSpecialTraits(): PlayerSpecialTrait[] {
+    return (this.player.specialTraits ?? []).slice(0, 2);
   }
 
   private clampEnergy(value: number | undefined | null): number {

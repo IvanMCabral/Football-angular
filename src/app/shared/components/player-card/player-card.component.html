@@ -31,7 +31,7 @@
   <div class="player-traits" *ngIf="hasSpecialTraits()">
     <span
       class="trait-chip"
-      *ngFor="let trait of player.specialTraits"
+      *ngFor="let trait of displayedSpecialTraits()"
       [title]="trait.description || trait.name">
       {{trait.name}}
     </span>

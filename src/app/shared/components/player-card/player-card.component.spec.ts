@@ -59,4 +59,88 @@ describe('PlayerCardComponent injury availability details', () => {
     component.player.injuryRemainingMatches = 2;
     expect(component.injuryDetail()).toBe('');
   });
+
+  it('does not render trait chips when specialTraits is missing or empty', () => {
+    component.player = { ...basePlayer, specialTraits: undefined };
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelectorAll('.trait-chip').length).toBe(0);
+
+    component.player = { ...basePlayer, specialTraits: [] };
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelectorAll('.trait-chip').length).toBe(0);
+  });
+
+  it('renders one special trait chip with name and description tooltip', () => {
+    component.player = {
+      ...basePlayer,
+      specialTraits: [
+        { code: 'leader', name: 'Leader', description: 'Collective mentality stabilizer.' }
+      ]
+    };
+
+    fixture.detectChanges();
+
+    const chips: HTMLElement[] = Array.from(fixture.nativeElement.querySelectorAll('.trait-chip'));
+    expect(chips.length).toBe(1);
+    expect(chips[0].textContent?.trim()).toBe('Leader');
+    expect(chips[0].getAttribute('title')).toBe('Collective mentality stabilizer.');
+  });
+
+  it('renders exactly two special trait chips in backend order', () => {
+    component.player = {
+      ...basePlayer,
+      specialTraits: [
+        { code: 'one_on_one_keeper', name: 'One-on-one keeper', description: 'Stops clear chances.' },
+        { code: 'sweeper_keeper', name: 'Sweeper keeper', description: 'Protects space behind the line.' }
+      ]
+    };
+
+    fixture.detectChanges();
+
+    const chips: HTMLElement[] = Array.from(fixture.nativeElement.querySelectorAll('.trait-chip'));
+    expect(chips.map(chip => chip.textContent?.trim())).toEqual(['One-on-one keeper', 'Sweeper keeper']);
+  });
+
+  it('keeps the UI stable when an invalid payload contains more than two traits', () => {
+    component.player = {
+      ...basePlayer,
+      specialTraits: [
+        { code: 'leader', name: 'Leader', description: 'Mental boost.' },
+        { code: 'workhorse', name: 'Workhorse', description: 'High effort.' },
+        { code: 'speedster', name: 'Speedster', description: 'Fast runner.' }
+      ]
+    };
+
+    fixture.detectChanges();
+
+    const chips: HTMLElement[] = Array.from(fixture.nativeElement.querySelectorAll('.trait-chip'));
+    expect(chips.length).toBe(2);
+    expect(chips.map(chip => chip.textContent?.trim())).toEqual(['Leader', 'Workhorse']);
+  });
+
+  it('renders UTF-8 trait names from a real backend-style payload', () => {
+    component.player = {
+      ...basePlayer,
+      name: 'João Pedro',
+      position: 'GK',
+      specialTraits: [
+        {
+          code: 'one_on_one_keeper',
+          name: 'Arquero uno contra uno',
+          description: 'Rinde mejor en mano a mano y presión alta.'
+        },
+        {
+          code: 'sweeper_keeper',
+          name: 'Líbero del área',
+          description: 'Cubre pelotas profundas detrás de la defensa.'
+        }
+      ]
+    };
+
+    fixture.detectChanges();
+
+    const chips: HTMLElement[] = Array.from(fixture.nativeElement.querySelectorAll('.trait-chip'));
+    expect(chips.map(chip => chip.textContent?.trim())).toEqual(['Arquero uno contra uno', 'Líbero del área']);
+    expect(chips[1].getAttribute('title')).toBe('Cubre pelotas profundas detrás de la defensa.');
+  });
 });
