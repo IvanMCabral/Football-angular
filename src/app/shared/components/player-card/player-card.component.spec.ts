@@ -145,4 +145,35 @@ describe('PlayerCardComponent injury availability details', () => {
     expect(chips[1].getAttribute('title')).toBe('Cubre pelotas profundas detrás de la defensa.');
     expect(chips[1].getAttribute('aria-label')).toBe('Líbero del área: Cubre pelotas profundas detrás de la defensa.');
   });
+
+  it('renders representative Spanish and Portuguese names without mojibake', () => {
+    component.player = {
+      ...basePlayer,
+      name: 'Aitor Fernández / Antonio Rüdiger / João Cancelo',
+      position: 'CB',
+      specialTraits: [
+        {
+          code: 'coverage_leader',
+          name: 'Cobertura aérea',
+          description: 'Ordena la línea, corrige desmarques y sostiene presión.'
+        },
+        {
+          code: 'technical_marker',
+          name: 'Marcador técnico',
+          description: 'Usa intuición, precisión y fuerza sin perder posición.'
+        }
+      ]
+    };
+
+    fixture.detectChanges();
+
+    const visibleText = fixture.nativeElement.textContent ?? '';
+    const chips: HTMLElement[] = Array.from(fixture.nativeElement.querySelectorAll('.trait-chip'));
+    expect(visibleText).toContain('Aitor Fernández / Antonio Rüdiger / João Cancelo');
+    expect(chips.map(chip => chip.textContent?.trim())).toEqual(['Cobertura aérea', 'Marcador técnico']);
+    expect(chips[0].getAttribute('aria-label')).toBe('Cobertura aérea: Ordena la línea, corrige desmarques y sostiene presión.');
+    expect(chips[1].getAttribute('aria-label')).toBe('Marcador técnico: Usa intuición, precisión y fuerza sin perder posición.');
+    expect(visibleText).toMatch(/[ñáéíóúüçã]/);
+    expect(visibleText).not.toMatch(/Ã|Â|â|ð|ï¿½|�/);
+  });
 });

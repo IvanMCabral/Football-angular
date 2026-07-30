@@ -5,6 +5,7 @@
     "ng": "ng",
     "start": "ng serve",
     "build": "ng build",
+    "pretest": "node tools/check-visible-text-encoding.mjs",
     "test": "ng test"
   },
   "dependencies": {

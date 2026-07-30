@@ -139,7 +139,7 @@
         </div>
 
         <div *ngIf="(squad$ | async)?.length === 0" class="empty-state">
-          Tu plantilla est? vac?a. Ve a "Gestionar" para agregar jugadores.
+          Tu plantilla está vacía. Ve a "Gestionar" para agregar jugadores.
         </div>
 
         <div class="players-grid">
@@ -220,7 +220,7 @@
                       [class.chemistry-high]="lineup.chemistryScore >= 80"
                       [class.chemistry-mid]="lineup.chemistryScore >= 60 && lineup.chemistryScore < 80"
                       [class.chemistry-low]="lineup.chemistryScore < 60"
-                      title="Qu?mica: promedio de nivel, habilidades y cobertura del equipo.">
+                      title="Química: promedio de nivel, habilidades y cobertura del equipo.">
                   ⚗ {{lineup.chemistryScore}}/99
                 </span>
                 <span class="lineup-count"
