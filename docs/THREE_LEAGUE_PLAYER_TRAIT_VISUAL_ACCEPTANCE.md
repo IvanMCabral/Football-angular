@@ -39,7 +39,7 @@ Career API checks with real authenticated users:
 
 ## Encoding guard
 
-`src/app` was scanned for mojibake markers `Ã`, `Â`, `â`, `ð` and Unicode replacement characters after remediation: zero matching files.
+`src/app` was scanned for known mojibake marker families and Unicode replacement characters after remediation: zero matching files.
 
 ## Verdict
 

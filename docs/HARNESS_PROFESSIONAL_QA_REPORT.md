@@ -994,7 +994,7 @@ Validacion:
 Siguiente mejora:
 
 - Agregar columna visual en la tabla Multi-seed para `ΔOpp wide L/R xG`.
-- Limpiar mojibake viejo del template (`Î”`, `Â·`) antes de seguir agregando columnas.
+- Limpiar mojibake viejo del template antes de seguir agregando columnas.
 - Después decidir si `LEFT_FLANK` / `RIGHT_FLANK` se vuelven tácticas reales visibles para el DT.
 
 ## V25D99.22.23 - Columna visual ΔOpp wide L/R xG
@@ -1015,7 +1015,7 @@ UI:
 Encoding:
 
 - El template está en UTF-8 correcto.
-- La consola PowerShell puede mostrar mojibake (`Î”`, `Â·`) por codepage, pero el archivo contiene:
+- La consola PowerShell puede mostrar mojibake por codepage, pero el archivo contiene:
   - `Δ` (`\u0394`)
   - `·`
 
