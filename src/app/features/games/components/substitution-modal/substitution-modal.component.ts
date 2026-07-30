@@ -204,7 +204,7 @@ export class SubstitutionModalComponent {
   selectOff(p: SubModalPlayer): void {
     if (this.isOutOfSubs) { return; }
     if (this.pendingChanges.some(change => change.playerOffId === p.sessionPlayerId)) {
-      this.errorMsg = 'Ese jugador ya estÃ¡ preparado para salir en otro cambio.';
+      this.errorMsg = 'Ese jugador ya est? preparado para salir en otro cambio.';
       return;
     }
     this.playerOffId = p.sessionPlayerId;
@@ -213,7 +213,7 @@ export class SubstitutionModalComponent {
   }
   selectOn(p: SubModalPlayer): void {
     if (this.pendingChanges.some(change => change.playerOnId === p.sessionPlayerId)) {
-      this.errorMsg = 'Ese suplente ya estÃ¡ preparado para entrar en otro cambio.';
+      this.errorMsg = 'Ese suplente ya est? preparado para entrar en otro cambio.';
       return;
     }
     this.playerOnId = p.sessionPlayerId;
@@ -302,7 +302,7 @@ export class SubstitutionModalComponent {
     const player = this.effectiveStartingXi.find(p => p.sessionPlayerId === this.selectedFineTunePlayerId)
       ?? this.data.startingXi.find(p => p.sessionPlayerId === this.selectedFineTunePlayerId);
     if (!player) {
-      return 'SeleccionÃ¡ un jugador de cancha para ajustar pÃ­xeles.';
+      return 'Seleccion? un jugador de cancha para ajustar p?xeles.';
     }
     if (this.isGoalkeeper(player)) {
       return 'El arquero queda fijo en el área chica.';
@@ -363,7 +363,7 @@ export class SubstitutionModalComponent {
             this.snackBar.open(
               changes.length > 1
                 ? `Sustituciones realizadas (${changes.length})`
-                : `SustituciÃ³n realizada (minuto ${results[0]?.minuteApplied ?? this.data.currentMinute})`,
+                : `Sustituci?n realizada (minuto ${results[0]?.minuteApplied ?? this.data.currentMinute})`,
               'OK',
               { duration: 3000, panelClass: 'success-toast' }
             );

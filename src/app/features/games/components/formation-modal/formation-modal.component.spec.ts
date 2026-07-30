@@ -81,7 +81,7 @@ describe('FormationModalComponent', () => {
     fixture.detectChanges();
   });
 
-  it('initial state â€” formation is 4-4-2 (current)', () => {
+  it('initial state ? formation is 4-4-2 (current)', () => {
     expect(component.selectedFormation()).toBe('4-4-2');
   });
 
@@ -89,7 +89,7 @@ describe('FormationModalComponent', () => {
     const unknownData = { ...SAMPLE_DATA, currentFormation: 'banana' };
     (component as any).data = unknownData;
     // Trigger the normalizeFormation via the selectedFormation signal
-    // by calling onFormationChange â€” which calls normalizeFormation.
+    // by calling onFormationChange ? which calls normalizeFormation.
     component.onFormationChange('4-3-3');
     // The signal was updated; verify it's a valid formation.
     expect(ALL_FORMATIONS).toContain(component.selectedFormation());
@@ -240,7 +240,7 @@ describe('FormationModalComponent', () => {
     expect(gk?.customXPercent).toBe(50);
   });
 
-  it('confirm success â†’ snackbar + dialog close with success=true', () => {
+  it('confirm success ? snackbar + dialog close with success=true', () => {
     engineServiceSpy.changeFormation.and.returnValue(of({ success: true, minuteApplied: 35 }));
     component.onFormationChange('4-3-3');
     component.confirm();
@@ -360,8 +360,8 @@ describe('FormationModalComponent', () => {
 
   it('3-5-2-CDM applies is-mid to every midfield line', () => {
     // 3-5-2-CDM shape: GK(1) + 3CB(3) + CDM(1) + 2CM(2) + 2WB(2) + 2ST(2) = 11
-    // Cumulative offsets: line 0 â†’ dots[0], line 1 â†’ dots[1..3], line 2 â†’
-    // dots[4], line 3 â†’ dots[5..6], line 4 â†’ dots[7..8], line 5 â†’ dots[9..10].
+    // Cumulative offsets: line 0 ? dots[0], line 1 ? dots[1..3], line 2 ?
+    // dots[4], line 3 ? dots[5..6], line 4 ? dots[7..8], line 5 ? dots[9..10].
     component.onFormationChange('3-5-2-CDM');
     fixture.componentRef.changeDetectorRef.markForCheck();
     fixture.detectChanges();
@@ -369,17 +369,17 @@ describe('FormationModalComponent', () => {
 
     const dots = renderedDots();
     expect(dots.length).toBe(11);
-    // Line 0 (i=0): GK â†’ is-gk
+    // Line 0 (i=0): GK ? is-gk
     expect(dots[0].classList.contains('is-gk')).toBeTrue();
-    // Line 1 (i=1): 3 DEF â†’ is-def (dots 1..3)
+    // Line 1 (i=1): 3 DEF ? is-def (dots 1..3)
     for (let i = 1; i <= 3; i++) {
       expect(dots[i].classList.contains('is-def')).toBeTrue();
     }
-    // Lines 2-4 (i=2,3,4): CDM + 2CM + 2WB â†’ is-mid (dots 4..8, 6 dots)
+    // Lines 2-4 (i=2,3,4): CDM + 2CM + 2WB ? is-mid (dots 4..8, 6 dots)
     for (let i = 4; i <= 8; i++) {
       expect(dots[i].classList.contains('is-mid')).toBeTrue();
     }
-    // Line 5 (i=5): 2 ATT â†’ is-att (dots 9, 10)
+    // Line 5 (i=5): 2 ATT ? is-att (dots 9, 10)
     expect(dots[9].classList.contains('is-att')).toBeTrue();
     expect(dots[10].classList.contains('is-att')).toBeTrue();
   });
@@ -510,7 +510,7 @@ describe('FormationModalComponent', () => {
     expect(component.slotAssignments.get(10)).toBeNull(); // new empty
   });
 
-  it('onFormationChange preserves all 11 assignments when formations have the same slot count (4-4-2 â†’ 4-3-3 â†’ 4-2-3-1 all have 11 slots)', () => {
+  it('onFormationChange preserves all 11 assignments when formations have the same slot count (4-4-2 ? 4-3-3 ? 4-2-3-1 all have 11 slots)', () => {
     // All 12 formations in the dropdown have exactly 11 slots
     // (1 GK + 10 outfield). So in practice, a manager re-arranging
     // formations never LOSES assignments via trim. This test pins
@@ -743,7 +743,7 @@ describe('FormationModalComponent auto-fill empty slots', () => {
    * (indices 4..10) get processed: slots 4 (DEF), 5 (MID) and 9
    * (ATT) get filled from the bench (b1, b2, b3 in matching
    * groups). The remaining 4 slots stay empty because the 3 bench
-   * players are exhausted â€” the warning banner surfaces that gap.
+   * players are exhausted ? the warning banner surfaces that gap.
    */
   it('autoFillEmptySlots fills compatible slots and warns on the rest', () => {
     // Sanity: 7 slots empty before.
@@ -761,16 +761,16 @@ describe('FormationModalComponent auto-fill empty slots', () => {
     expect(component.slotAssignments.get(2)).toBe('p3');
     expect(component.slotAssignments.get(3)).toBe('p4');
 
-    // Slot 4 (RB/DEF) â†’ b1 (DEF) âœ“
+    // Slot 4 (RB/DEF) ? b1 (DEF) ?
     expect(component.slotAssignments.get(4)).toBe('b1');
-    // Slot 5 (LM/MID) â†’ b2 (MID) âœ“
+    // Slot 5 (LM/MID) ? b2 (MID) ?
     expect(component.slotAssignments.get(5)).toBe('b2');
-    // Slot 9 (ST/ATT) â†’ b3 (ATT) âœ“
+    // Slot 9 (ST/ATT) ? b3 (ATT) ?
     expect(component.slotAssignments.get(9)).toBe('b3');
 
-    // Slots 6, 7, 8 (MID) and 10 (ATT) â€” bench exhausted, stay empty.
+    // Slots 6, 7, 8 (MID) and 10 (ATT) ? bench exhausted, stay empty.
     // (toBeFalsy covers both null and undefined since the Map doesn't
-    // pre-seed empty slot indices â€” get() returns undefined for
+    // pre-seed empty slot indices ? get() returns undefined for
     // never-set keys.)
     expect(component.slotAssignments.get(6)).toBeFalsy();
     expect(component.slotAssignments.get(7)).toBeFalsy();
@@ -784,7 +784,7 @@ describe('FormationModalComponent auto-fill empty slots', () => {
 
   /**
    * No compatible bench. A squad with only one GK and
-   * no DEF bench player cannot fill the 4 DEF slots â€” the
+   * no DEF bench player cannot fill the 4 DEF slots ? the
    * auto-fill pass sets warningMsg instead of throwing or silently
    * dropping the request. The last-resort fallback (any bench
    * player) is intentionally NOT engaged in this case (no bench
@@ -792,7 +792,7 @@ describe('FormationModalComponent auto-fill empty slots', () => {
    */
   it('no compatible bench triggers warningMsg', async () => {
     // Reconfigure the dialog data with a tiny squad: 1 GK (assigned)
-    // and 1 ATT on the bench. No DEF bench â†’ 4 DEF slots stay empty.
+    // and 1 ATT on the bench. No DEF bench ? 4 DEF slots stay empty.
     await TestBed.resetTestingModule();
     const tinyData = makeAutoFillData({
       squad: [
@@ -879,7 +879,7 @@ describe('FormationModalComponent auto-fill empty slots', () => {
     component.autoFillEmptySlots();
 
     // Slots 4, 5, 9 got auto-filled (b1, b2, b3). The marker must
-    // be exactly on those slots â€” not on the unfilled ones.
+    // be exactly on those slots ? not on the unfilled ones.
     expect(component.isAutoFilledSlot(4)).toBe(true);
     expect(component.isAutoFilledSlot(5)).toBe(true);
     expect(component.isAutoFilledSlot(9)).toBe(true);
@@ -922,7 +922,7 @@ describe('FormationModalComponent auto-fill empty slots', () => {
     expect(slots.length).toBe(11);
 
     // The slot list must include the auto-fill picks (3 of them in
-    // our seed data â€” b1/b2/b3 get into a DEF/MID/ATT slot).
+    // our seed data ? b1/b2/b3 get into a DEF/MID/ATT slot).
     const playerIds = slots.map(s => s.sessionPlayerId);
     expect(playerIds).not.toContain('b1');
     expect(playerIds).not.toContain('b2');

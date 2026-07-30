@@ -306,7 +306,7 @@ this.squad$ = combineLatest([
             .subscribe();
         },
         error: (err) => {
-          const userMsg = readableErrorMessage(err, 'Error actualizando formaciÃ³n');
+          const userMsg = readableErrorMessage(err, 'Error actualizando formaci?n');
           this.lineupError$.next(userMsg);
         }
       });
@@ -394,7 +394,7 @@ openVisualEditor(): void {
           this.lineupLoading$.next(false);
         },
         error: (err) => {
-          const userMsg = readableErrorMessage(err, 'Error seleccionando alineaciÃ³n');
+          const userMsg = readableErrorMessage(err, 'Error seleccionando alineaci?n');
           this.lineupError$.next(userMsg);
 
           if (err.error?.code) {
@@ -415,8 +415,8 @@ openVisualEditor(): void {
       if (playerCount < 7 || playerCount > 11) {
         this.lineupError$.next(
           playerCount < 7
-            ? 'MÃ­nimo 7 jugadores para confirmar'
-            : 'MÃ¡ximo 11 jugadores'
+            ? 'M?nimo 7 jugadores para confirmar'
+            : 'M?ximo 11 jugadores'
         );
         return;
       }
@@ -447,7 +447,7 @@ this.http.post(`${environment.apiUrl}/career/lineup/confirm`, {}).subscribe({
                   this.lineupLoading$.next(false);
                   if (response.success) {
                     if (response.tournamentFinished) {
-                      this.lineupError$.next('Temporada completada. PosiciÃ³n final: ' + response.userPosition + 'Â°');
+                      this.lineupError$.next('Temporada completada. Posici?n final: ' + response.userPosition + '?');
                       this.refreshCareerStatus();
                     } else {
                       this.router.navigate([`/games/${careerStatus.careerId}/round/${response.currentRound}/live`]);
@@ -474,7 +474,7 @@ this.http.post(`${environment.apiUrl}/career/lineup/confirm`, {}).subscribe({
           error: (err) => {
             this.logDevError('[SQUAD] Error confirmando lineup:', err);
             this.lineupLoading$.next(false);
-            this.lineupError$.next(readableErrorMessage(err, 'Error al confirmar alineaciÃ³n'));
+            this.lineupError$.next(readableErrorMessage(err, 'Error al confirmar alineaci?n'));
             this.resetLineupWarning();
           }
         });
@@ -525,7 +525,7 @@ this.http.post(`${environment.apiUrl}/career/lineup/confirm`, {}).subscribe({
         },
         error: (err) => {
           this.logDevError('[PALMARES-FRONT] Error obteniendo datos:', err);
-          this.lineupError$.next('Error al obtener datos del palmarÃ©s');
+          this.lineupError$.next('Error al obtener datos del palmar?s');
         }
       });
     }

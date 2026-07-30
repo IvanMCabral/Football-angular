@@ -158,10 +158,10 @@ export class DetailedMatchPageComponent implements OnInit, OnChanges {
     FOUL: 'Falta',
     YELLOW_CARD: 'Amarilla',
     RED_CARD: 'Roja',
-    INJURY: 'LesiÃ³n',
+    INJURY: 'Lesi?n',
     SUBSTITUTION: 'Cambio',
     OFFSIDE: 'Offside',
-    CORNER: 'CÃ³rner',
+    CORNER: 'C?rner',
     CHANCE_CREATED: 'Chance creada'
   };
 
@@ -176,11 +176,11 @@ export class DetailedMatchPageComponent implements OnInit, OnChanges {
       .replace(/^Shot saved$/i, 'Tiro atajado')
       .replace(/^Shot missed$/i, 'Tiro desviado')
       .replace(/^Offside$/i, 'Offside')
-      .replace(/^(.+) committed a foul$/i, '$1 cometiÃ³ una falta')
-      .replace(/^(.+) received a yellow card$/i, '$1 recibiÃ³ amarilla')
-      .replace(/^(.+) received a red card$/i, '$1 recibiÃ³ roja')
+      .replace(/^(.+) committed a foul$/i, '$1 cometi? una falta')
+      .replace(/^(.+) received a yellow card$/i, '$1 recibi? amarilla')
+      .replace(/^(.+) received a red card$/i, '$1 recibi? roja')
       .replace(/^(.+) scored$/i, 'Gol de $1')
-      .replace(/^(.+) was injured$/i, '$1 se lesionÃ³')
+      .replace(/^(.+) was injured$/i, '$1 se lesion?')
       .replace(/^Substitution: (.+)$/i, 'Cambio: $1');
   }
 
@@ -253,7 +253,7 @@ export class DetailedMatchPageComponent implements OnInit, OnChanges {
 
   postMatchConditionLabel(): string {
     if (this.hasInjuryEvents()) {
-      return `ðŸ¤• ${this.injuryEventsCount()} evento${this.injuryEventsCount() > 1 ? 's' : ''} de lesiÃ³n`;
+      return `?? ${this.injuryEventsCount()} evento${this.injuryEventsCount() > 1 ? 's' : ''} de lesi?n`;
     }
     return 'No se registraron lesiones en este partido.';
   }
@@ -293,7 +293,7 @@ export class DetailedMatchPageComponent implements OnInit, OnChanges {
     const data = this.buildRealSubstitutionDialogData();
     if (!data) {
       this.snackBar.open(
-        'Sustituciones reales bloqueadas: el detalle del partido todavÃ­a no expone titulares y suplentes reales. Hay que extender el DTO antes de habilitar este modal.',
+        'Sustituciones reales bloqueadas: el detalle del partido todav?a no expone titulares y suplentes reales. Hay que extender el DTO antes de habilitar este modal.',
         'Cerrar',
         {
           duration: 7000,
@@ -321,8 +321,8 @@ export class DetailedMatchPageComponent implements OnInit, OnChanges {
       ).subscribe({
         next: (subResult: { success: boolean; minuteApplied: number; substitutionsRemaining: number; error?: string }) => {
           const msg = subResult.success
-            ? `SustituciÃ³n registrada (minuto ${subResult.minuteApplied || result.minute}). Te quedan ${subResult.substitutionsRemaining ?? '?'}.`
-            : `Error: ${subResult.error || 'sustituciÃ³n no aplicada'}`;
+            ? `Sustituci?n registrada (minuto ${subResult.minuteApplied || result.minute}). Te quedan ${subResult.substitutionsRemaining ?? '?'}.`
+            : `Error: ${subResult.error || 'sustituci?n no aplicada'}`;
           this.snackBar.open(msg, 'Cerrar', {
             duration: 5000,
             panelClass: subResult.success ? 'snack-success' : 'snack-error',

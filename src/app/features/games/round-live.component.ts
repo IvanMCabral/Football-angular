@@ -209,7 +209,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
       this.pendingLiveModalNotice = result.reason;
       return;
     }
-    this.pendingLiveModalNotice = 'LesiÃ³n de prueba creada. AbrÃ­ Partido para validar AUTO + cambio manual.';
+    this.pendingLiveModalNotice = 'Lesi?n de prueba creada. Abr? Partido para validar AUTO + cambio manual.';
   }
 
   private startRoundEngine(gameId: string, matches: RoundMatchVM[]): any { return roundLiveStartRoundEngine(this, gameId, matches); }

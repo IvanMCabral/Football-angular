@@ -100,7 +100,7 @@ export class LiveMatchModalsService {
     options?: LiveMatchModalsService['openSubstitutionOptions']
   ): Observable<unknown> {
     if (state.status === 'FINISHED' || state.status === 'CANCELLED') {
-      this.snackBar.open('El partido ya terminÃ³, no se puede sustituir', 'OK', { duration: 3000 });
+      this.snackBar.open('El partido ya termin?, no se puede sustituir', 'OK', { duration: 3000 });
       return new Observable(sub => sub.complete());
     }
     const careerId = this.getCurrentCareerId();
@@ -109,7 +109,7 @@ export class LiveMatchModalsService {
       switchMap(status => {
         const userTeamId = status.userSessionTeamId;
         if (!userTeamId) {
-          this.snackBar.open('No se encontrÃ³ el equipo del manager', 'OK', { duration: 3000 });
+          this.snackBar.open('No se encontr? el equipo del manager', 'OK', { duration: 3000 });
           return [];
         }
         return forkJoin({
