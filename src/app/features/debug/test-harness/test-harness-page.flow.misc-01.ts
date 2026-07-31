@@ -357,7 +357,7 @@ export function runTestHarnessLineupDiagnosticTeams(ctx: any, diagnostic: any): 
 }
 
 export function runTestHarnessLoadFormationCoordinateCache(ctx: any): any {
-    (ctx.http as HttpClient).get<FormationDTO[]>(`${environment.apiUrl}/editor/formations`)
+    (ctx.http as HttpClient).get<FormationDTO[]>(`${environment.apiUrl}/lineup-editor/formations`)
       .pipe(catchError(() => of([] as FormationDTO[])))
       .subscribe((formations: any) => {
         const next: Record<string, FormationDTO['positions']> = {};

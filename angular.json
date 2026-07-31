@@ -20,6 +20,12 @@
             "production": {
               "aot": true,
               "extractLicenses": true,
+              "fileReplacements": [
+                {
+                  "replace": "src/app/app.debug-routes.ts",
+                  "with": "src/app/app.debug-routes.prod.ts"
+                }
+              ],
               "namedChunks": false,
               "optimization": true,
               "outputHashing": "all",
@@ -35,7 +41,8 @@
             "scripts": [],
             "styles": ["src/global_styles.css"],
             "tsConfig": "tsconfig.app.json"
-          }
+          },
+          "defaultConfiguration": "production"
         },
         "serve": {
           "builder": "@angular-devkit/build-angular:dev-server",

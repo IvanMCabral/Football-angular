@@ -321,8 +321,8 @@ export function runSquadEditorKeepPlayerAtFreeDropPosition(ctx: any, player: any
 
 export function runSquadEditorLoadSubdivisions(ctx: any): any {
     forkJoin({
-      subs: (ctx.http as HttpClient).get<FieldSubdivisionDTO[]>(`${environment.apiUrl}/editor/subdivisions`),
-      formations: (ctx.http as HttpClient).get<FormationDTO[]>(`${environment.apiUrl}/editor/formations`).pipe(
+      subs: (ctx.http as HttpClient).get<FieldSubdivisionDTO[]>(`${environment.apiUrl}/lineup-editor/subdivisions`),
+      formations: (ctx.http as HttpClient).get<FormationDTO[]>(`${environment.apiUrl}/lineup-editor/formations`).pipe(
         catchError(() => of([] as FormationDTO[]))
       )
     }).subscribe({

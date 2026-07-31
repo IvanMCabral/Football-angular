@@ -55,12 +55,12 @@ describe('SquadEditorModalComponent basic flow', () => {
     httpClientSpy = jasmine.createSpyObj('HttpClient', ['get', 'post']);
     dialogRefSpy = jasmine.createSpyObj('MatDialogRef', ['close']);
 
-    // Mock the 3 GETs ngOnInit fires: /editor/subdivisions, /editor/formations, /career/lineup/current
+    // Mock the 3 GETs ngOnInit fires: /lineup-editor/subdivisions, /lineup-editor/formations, /career/lineup/current
     httpClientSpy.get.and.callFake(((url: string) => {
-      if (url.includes('/editor/subdivisions')) {
+      if (url.includes('/lineup-editor/subdivisions')) {
         return of(SUBDIVISIONS_RESPONSE);
       }
-      if (url.includes('/editor/formations')) {
+      if (url.includes('/lineup-editor/formations')) {
         return of(FORMATIONS_RESPONSE);
       }
       if (url.includes('/career/lineup/current')) {
@@ -91,12 +91,12 @@ describe('SquadEditorModalComponent basic flow', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should call /editor/subdivisions on init', () => {
+  it('should call /lineup-editor/subdivisions on init', () => {
     fixture.detectChanges(); // triggers ngOnInit
     const subdivisionsCall = httpClientSpy.get.calls.allArgs()
-      .find(args => String(args[0]).includes('/editor/subdivisions'));
+      .find(args => String(args[0]).includes('/lineup-editor/subdivisions'));
     expect(subdivisionsCall).toBeTruthy(
-      'ngOnInit should GET /api/v1/editor/subdivisions');
+      'ngOnInit should GET /api/v1/lineup-editor/subdivisions');
   });
 
   it('saveLineup sends free-position customX/customY to manual-select', () => {
@@ -122,15 +122,15 @@ describe('SquadEditorModalComponent basic flow', () => {
     expect(movedSlot.customYPercent).toBe(56.0);
   });
 
-  it('should call /editor/formations on init', (done) => {
+  it('should call /lineup-editor/formations on init', (done) => {
     fixture.detectChanges();
     // loadSubdivisions uses setTimeout(0) before chaining formations load.
     // Use a small async wait to allow the chain to complete.
     setTimeout(() => {
       const formationsCall = httpClientSpy.get.calls.allArgs()
-        .find(args => String(args[0]).includes('/editor/formations'));
+        .find(args => String(args[0]).includes('/lineup-editor/formations'));
       expect(formationsCall).toBeTruthy(
-        'ngOnInit should GET /api/v1/editor/formations');
+        'ngOnInit should GET /api/v1/lineup-editor/formations');
       done();
     }, 20);
   });
@@ -206,10 +206,10 @@ describe('SquadEditorModalComponent backend formation loading', () => {
 
     // Defaults for subdivisions + formations. /current gets overridden per test.
     httpClientSpy.get.and.callFake(((url: string) => {
-      if (url.includes('/editor/subdivisions')) {
+      if (url.includes('/lineup-editor/subdivisions')) {
         return of(SUBDIVISIONS_RESPONSE);
       }
-      if (url.includes('/editor/formations')) {
+      if (url.includes('/lineup-editor/formations')) {
         return of(FORMATIONS_RESPONSE);
       }
       return of(null);
@@ -237,8 +237,8 @@ describe('SquadEditorModalComponent backend formation loading', () => {
   it('loadSquadFromBackend sets selectedFormation from the response before role matching', (done) => {
     // El back retorna formation 4-3-3 (no la default 4-4-2)
     httpClientSpy.get.and.callFake(((url: string) => {
-      if (url.includes('/editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
-      if (url.includes('/editor/formations')) return of(FORMATIONS_RESPONSE);
+      if (url.includes('/lineup-editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
+      if (url.includes('/lineup-editor/formations')) return of(FORMATIONS_RESPONSE);
       if (url.includes('/career/lineup/current')) {
         return of({
           formation: '4-3-3',
@@ -262,8 +262,8 @@ describe('SquadEditorModalComponent backend formation loading', () => {
   it('F3 - loadSquadFromBackend con formation null usa default 4-4-2', (done) => {
     // El back NO retorna formation (legacy save)
     httpClientSpy.get.and.callFake(((url: string) => {
-      if (url.includes('/editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
-      if (url.includes('/editor/formations')) return of(FORMATIONS_RESPONSE);
+      if (url.includes('/lineup-editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
+      if (url.includes('/lineup-editor/formations')) return of(FORMATIONS_RESPONSE);
       if (url.includes('/career/lineup/current')) {
         return of({
           formation: null,
@@ -305,8 +305,8 @@ describe('SquadEditorModalComponent backend formation loading', () => {
     ];
 
     httpClientSpy.get.and.callFake(((url: string) => {
-      if (url.includes('/editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
-      if (url.includes('/editor/formations')) return of(FORMATIONS_RESPONSE);
+      if (url.includes('/lineup-editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
+      if (url.includes('/lineup-editor/formations')) return of(FORMATIONS_RESPONSE);
       if (url.includes('/career/lineup/current')) {
         return of({
           formation: '4-4-2',
@@ -445,10 +445,10 @@ describe('SquadEditorModalComponent chemistry preview', () => {
     dialogRefSpy = jasmine.createSpyObj('MatDialogRef', ['close']);
 
     httpClientSpy.get.and.callFake(((url: string) => {
-      if (url.includes('/editor/subdivisions')) {
+      if (url.includes('/lineup-editor/subdivisions')) {
         return of(SUBDIVISIONS_RESPONSE);
       }
-      if (url.includes('/editor/formations')) {
+      if (url.includes('/lineup-editor/formations')) {
         return of(FORMATIONS_RESPONSE);
       }
       if (url.includes('/career/lineup/current')) {
@@ -661,8 +661,8 @@ describe('SquadEditorModalComponent drag-drop and effectiveness', () => {
     dialogRefSpy = jasmine.createSpyObj('MatDialogRef', ['close']);
 
     httpClientSpy.get.and.callFake(((url: string) => {
-      if (url.includes('/editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
-      if (url.includes('/editor/formations'))  return of(FORMATIONS_RESPONSE);
+      if (url.includes('/lineup-editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
+      if (url.includes('/lineup-editor/formations'))  return of(FORMATIONS_RESPONSE);
       if (url.includes('/career/lineup/current')) {
         // Default: formationEffectiveness present, baseline chemistry 85.
         return of(buildCurrentLineup(
@@ -722,8 +722,8 @@ describe('SquadEditorModalComponent drag-drop and effectiveness', () => {
   it('should NOT render the formation-effectiveness row when formationEffectiveness is null', (done) => {
     // Legacy responses without formationEffectiveness must hide the row.
     httpClientSpy.get.and.callFake(((url: string) => {
-      if (url.includes('/editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
-      if (url.includes('/editor/formations'))  return of(FORMATIONS_RESPONSE);
+      if (url.includes('/lineup-editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
+      if (url.includes('/lineup-editor/formations'))  return of(FORMATIONS_RESPONSE);
       if (url.includes('/career/lineup/current')) {
         return of(buildCurrentLineup(null, 85));
       }
@@ -914,8 +914,8 @@ describe('SquadEditorModalComponent drag-drop and effectiveness', () => {
     // When formationEffectiveness is missing, the chemistry preview
     // shows the raw score unchanged.
     httpClientSpy.get.and.callFake(((url: string) => {
-      if (url.includes('/editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
-      if (url.includes('/editor/formations'))  return of(FORMATIONS_RESPONSE);
+      if (url.includes('/lineup-editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
+      if (url.includes('/lineup-editor/formations'))  return of(FORMATIONS_RESPONSE);
       if (url.includes('/career/lineup/current')) {
         return of(buildCurrentLineup(null, 85));  // formationEffectiveness = null
       }
@@ -1024,8 +1024,8 @@ describe('SquadEditorModalComponent effectiveness feedback', () => {
     dialogRefSpy = jasmine.createSpyObj('MatDialogRef', ['close']);
 
     httpClientSpy.get.and.callFake(((url: string) => {
-      if (url.includes('/editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
-      if (url.includes('/editor/formations'))  return of(FORMATIONS_RESPONSE);
+      if (url.includes('/lineup-editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
+      if (url.includes('/lineup-editor/formations'))  return of(FORMATIONS_RESPONSE);
       if (url.includes('/career/lineup/current')) {
         // Default: full effectiveness coverage. Distribution per slot:
         //   GK-1=1.0  -> eff-good  (perfect GK)
@@ -1168,8 +1168,8 @@ describe('SquadEditorModalComponent effectiveness feedback', () => {
     // Legacy lineups without formationEffectiveness must not show
     // marker-level chemistry feedback.
     httpClientSpy.get.and.callFake(((url: string) => {
-      if (url.includes('/editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
-      if (url.includes('/editor/formations'))  return of(FORMATIONS_RESPONSE);
+      if (url.includes('/lineup-editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
+      if (url.includes('/lineup-editor/formations'))  return of(FORMATIONS_RESPONSE);
       if (url.includes('/career/lineup/current')) {
         return of(buildCurrentLineup(null, null, 85));  // formationEffectiveness=null
       }
@@ -1550,8 +1550,8 @@ describe('SquadEditorModalComponent green marker effectiveness', () => {
     dialogRefSpy = jasmine.createSpyObj('MatDialogRef', ['close']);
 
     httpClientSpy.get.and.callFake(((url: string) => {
-      if (url.includes('/editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
-      if (url.includes('/editor/formations'))  return of(FORMATIONS_RESPONSE);
+      if (url.includes('/lineup-editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
+      if (url.includes('/lineup-editor/formations'))  return of(FORMATIONS_RESPONSE);
       if (url.includes('/career/lineup/current')) {
         return of({
           formation: '4-4-2',
@@ -1639,7 +1639,7 @@ describe('SquadEditorModalComponent bench display', () => {
 
   /**
    * 4-4-2 formation: 1 GK + 2 CB + 1 LB + 1 RB + 2 CM + 2 ST = 10 outfield + 1 GK = 11.
-   * Positions come from /editor/formations.
+   * Positions come from /lineup-editor/formations.
    */
   const FORMATIONS_RESPONSE = [
     {
@@ -1733,13 +1733,13 @@ describe('SquadEditorModalComponent bench display', () => {
     dialogRefSpy = jasmine.createSpyObj('MatDialogRef', ['close']);
 
     httpClientSpy.get.and.callFake(((url: string) => {
-      if (url.includes('/editor/subdivisions')) {
+      if (url.includes('/lineup-editor/subdivisions')) {
         return of([{
           subdivisionId: 'GK-1', isGoalkeeper: true, sector: 26, subIndex: 1,
           left: 35, top: 88, width: 30, height: 10, zone: 'GK'
         }]);
       }
-      if (url.includes('/editor/formations')) {
+      if (url.includes('/lineup-editor/formations')) {
         return of(FORMATIONS_RESPONSE);
       }
       return of(null);
@@ -1765,13 +1765,13 @@ describe('SquadEditorModalComponent bench display', () => {
   it('with squad=22 and lineup=11, benchPlayers.length === 11', (done) => {
     // Mock /career/lineup/current with 11 persisted players and slots.
     httpClientSpy.get.and.callFake(((url: string) => {
-      if (url.includes('/editor/subdivisions')) {
+      if (url.includes('/lineup-editor/subdivisions')) {
         return of([{
           subdivisionId: 'GK-1', isGoalkeeper: true, sector: 26, subIndex: 1,
           left: 35, top: 88, width: 30, height: 10, zone: 'GK'
         }]);
       }
-      if (url.includes('/editor/formations')) {
+      if (url.includes('/lineup-editor/formations')) {
         return of(FORMATIONS_RESPONSE);
       }
       if (url.includes('/career/lineup/current')) {
@@ -1822,13 +1822,13 @@ describe('SquadEditorModalComponent bench display', () => {
 
     // Mock lineup with the same seven short-squad players.
     httpClientSpy.get.and.callFake(((url: string) => {
-      if (url.includes('/editor/subdivisions')) {
+      if (url.includes('/lineup-editor/subdivisions')) {
         return of([{
           subdivisionId: 'GK-1', isGoalkeeper: true, sector: 26, subIndex: 1,
           left: 35, top: 88, width: 30, height: 10, zone: 'GK'
         }]);
       }
-      if (url.includes('/editor/formations')) {
+      if (url.includes('/lineup-editor/formations')) {
         return of(FORMATIONS_RESPONSE);
       }
       if (url.includes('/career/lineup/current')) {
@@ -1882,13 +1882,13 @@ describe('SquadEditorModalComponent bench display', () => {
     }).compileComponents();
 
     httpClientSpy.get.and.callFake(((url: string) => {
-      if (url.includes('/editor/subdivisions')) {
+      if (url.includes('/lineup-editor/subdivisions')) {
         return of([{
           subdivisionId: 'GK-1', isGoalkeeper: true, sector: 26, subIndex: 1,
           left: 35, top: 88, width: 30, height: 10, zone: 'GK'
         }]);
       }
-      if (url.includes('/editor/formations')) {
+      if (url.includes('/lineup-editor/formations')) {
         return of(FORMATIONS_RESPONSE);
       }
       if (url.includes('/career/lineup/current')) {
@@ -1924,13 +1924,13 @@ describe('SquadEditorModalComponent bench display', () => {
     }).compileComponents();
 
     httpClientSpy.get.and.callFake(((url: string) => {
-      if (url.includes('/editor/subdivisions')) {
+      if (url.includes('/lineup-editor/subdivisions')) {
         return of([{
           subdivisionId: 'GK-1', isGoalkeeper: true, sector: 26, subIndex: 1,
           left: 35, top: 88, width: 30, height: 10, zone: 'GK'
         }]);
       }
-      if (url.includes('/editor/formations')) {
+      if (url.includes('/lineup-editor/formations')) {
         return of(FORMATIONS_RESPONSE);
       }
       if (url.includes('/career/lineup/current')) {
@@ -2036,8 +2036,8 @@ describe('SquadEditorModalComponent marker cards', () => {
     dialogRefSpy = jasmine.createSpyObj('MatDialogRef', ['close']);
 
     httpClientSpy.get.and.callFake(((url: string) => {
-      if (url.includes('/editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
-      if (url.includes('/editor/formations'))  return of([
+      if (url.includes('/lineup-editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
+      if (url.includes('/lineup-editor/formations'))  return of([
         {
           name: '4-4-2', description: '4-4-2',
           defenders: 1, midfielders: 1, attackers: 2, outfieldPlayers: 4,
@@ -2242,8 +2242,8 @@ describe('SquadEditorModalComponent role-match by family', () => {
     dialogRefSpy = jasmine.createSpyObj('MatDialogRef', ['close']);
 
     httpClientSpy.get.and.callFake(((url: string) => {
-      if (url.includes('/editor/subdivisions')) return of([]);
-      if (url.includes('/editor/formations')) return of([]);
+      if (url.includes('/lineup-editor/subdivisions')) return of([]);
+      if (url.includes('/lineup-editor/formations')) return of([]);
       if (url.includes('/career/lineup/current')) return of(null);
       return of(null);
     }) as any);
@@ -2429,8 +2429,8 @@ describe('SquadEditorModalComponent formation change updates header and markers'
     dialogRefSpy = jasmine.createSpyObj('MatDialogRef', ['close']);
 
     httpClientSpy.get.and.callFake(((url: string) => {
-      if (url.includes('/editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
-      if (url.includes('/editor/formations')) return of(FORMATIONS_RESPONSE);
+      if (url.includes('/lineup-editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
+      if (url.includes('/lineup-editor/formations')) return of(FORMATIONS_RESPONSE);
       if (url.includes('/career/lineup/current')) {
         return of({
           formation: '4-4-2',
@@ -2919,8 +2919,8 @@ describe('SquadEditorModalComponent ghost slots and drag-drop overlap', () => {
     dialogRefSpy = jasmine.createSpyObj('MatDialogRef', ['close']);
 
     httpClientSpy.get.and.callFake(((url: string) => {
-      if (url.includes('/editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
-      if (url.includes('/editor/formations'))  return of(FORMATIONS_RESPONSE);
+      if (url.includes('/lineup-editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
+      if (url.includes('/lineup-editor/formations'))  return of(FORMATIONS_RESPONSE);
       if (url.includes('/career/lineup/current')) {
         // Default: 3 players (p-gk, p-def, p-mid) so that loadSquadFromBackend
         // populates slotPlayerMap with GK-1, S22-1, S13-2 for the drag-drop
@@ -3019,8 +3019,8 @@ describe('SquadEditorModalComponent ghost slots and drag-drop overlap', () => {
     // they do not belong to the active formation. Use WINGER here so
     // role-match cannot reassign the player into the three-slot mock.
     httpClientSpy.get.and.callFake(((url: string) => {
-      if (url.includes('/editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
-      if (url.includes('/editor/formations'))  return of(FORMATIONS_RESPONSE);
+      if (url.includes('/lineup-editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
+      if (url.includes('/lineup-editor/formations'))  return of(FORMATIONS_RESPONSE);
       if (url.includes('/career/lineup/current')) {
         return of(buildCurrentLineupWithPersistedSlots(
           [{ playerId: 'p-ghost', subdivisionId: 'S99-OUTSIDE' }],   // ghost: not in 4-4-2
@@ -3053,8 +3053,8 @@ describe('SquadEditorModalComponent ghost slots and drag-drop overlap', () => {
     // first keeps the slot. The second goes to the bench so markers do
     // not stack visually.
     httpClientSpy.get.and.callFake(((url: string) => {
-      if (url.includes('/editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
-      if (url.includes('/editor/formations'))  return of(FORMATIONS_RESPONSE);
+      if (url.includes('/lineup-editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
+      if (url.includes('/lineup-editor/formations'))  return of(FORMATIONS_RESPONSE);
       if (url.includes('/career/lineup/current')) {
         return of(buildCurrentLineupWithPersistedSlots(
           [
@@ -3196,8 +3196,8 @@ describe('SquadEditorModalComponent free-formation cross-role drag/drop', () => 
     dialogRefSpy = jasmine.createSpyObj('MatDialogRef', ['close']);
 
     httpClientSpy.get.and.callFake(((url: string) => {
-      if (url.includes('/editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
-      if (url.includes('/editor/formations'))  return of(FORMATIONS_RESPONSE);
+      if (url.includes('/lineup-editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
+      if (url.includes('/lineup-editor/formations'))  return of(FORMATIONS_RESPONSE);
       if (url.includes('/career/lineup/current')) {
         return of(buildCurrentLineup(85));
       }
@@ -3542,8 +3542,8 @@ describe('SquadEditorModalComponent free positioning on field drop', () => {
     dialogRefSpy = jasmine.createSpyObj('MatDialogRef', ['close']);
 
     httpClientSpy.get.and.callFake(((url: string) => {
-      if (url.includes('/editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
-      if (url.includes('/editor/formations'))  return of(FORMATIONS_RESPONSE);
+      if (url.includes('/lineup-editor/subdivisions')) return of(SUBDIVISIONS_RESPONSE);
+      if (url.includes('/lineup-editor/formations'))  return of(FORMATIONS_RESPONSE);
       if (url.includes('/career/lineup/current')) return of(buildCurrentLineup(85));
       return of([]);
     }) as any);

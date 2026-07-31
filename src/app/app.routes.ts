@@ -1,22 +1,10 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
 import { environment } from './environments/environment';
+import { buildDebugRoutes } from './app.debug-routes';
 
 const guarded = [authGuard];
-export const buildDebugRoutes = (enableDebugRoutes: boolean): Routes => (
-  enableDebugRoutes
-    ? [
-        {
-          path: 'debug/test-harness',
-          loadComponent: () => import('./features/debug/test-harness/test-harness-page.component')
-            .then((m) => m.TestHarnessPageComponent),
-          canActivate: guarded,
-        },
-      ]
-    : []
-);
-
-const debugRoutes: Routes = buildDebugRoutes(environment.enableDebugRoutes);
+const debugRoutes: Routes = buildDebugRoutes(environment.enableDebugRoutes, guarded);
 
 export const routes: Routes = [
   { path: '', redirectTo: '/dashboard', pathMatch: 'full' },

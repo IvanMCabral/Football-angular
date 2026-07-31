@@ -282,7 +282,7 @@ this.squad$ = combineLatest([
         customXPercent: s.customXPercent,
         customYPercent: s.customYPercent,
       }));
-      const slots$ = this.http.get<FormationDTO[]>(`${environment.apiUrl}/editor/formations`).pipe(
+      const slots$ = this.http.get<FormationDTO[]>(`${environment.apiUrl}/lineup-editor/formations`).pipe(
         map(formations => this.reflowCurrentPlayersIntoFormation(formation, current, formations) ?? fallbackSlots),
         catchError(() => of(fallbackSlots))
       );

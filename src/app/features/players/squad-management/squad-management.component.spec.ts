@@ -1064,7 +1064,7 @@ describe('SquadManagementComponent', () => {
         return of(null);
       }) as any);
       httpSpy.get.and.callFake(((url: string) => {
-        if (String(url).includes('/editor/formations')) {
+        if (String(url).includes('/lineup-editor/formations')) {
           return of([
             {
               name: '3-5-2',
