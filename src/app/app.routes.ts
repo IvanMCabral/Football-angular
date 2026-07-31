@@ -1,7 +1,22 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
+import { environment } from './environments/environment';
 
 const guarded = [authGuard];
+export const buildDebugRoutes = (enableDebugRoutes: boolean): Routes => (
+  enableDebugRoutes
+    ? [
+        {
+          path: 'debug/test-harness',
+          loadComponent: () => import('./features/debug/test-harness/test-harness-page.component')
+            .then((m) => m.TestHarnessPageComponent),
+          canActivate: guarded,
+        },
+      ]
+    : []
+);
+
+const debugRoutes: Routes = buildDebugRoutes(environment.enableDebugRoutes);
 
 export const routes: Routes = [
   { path: '', redirectTo: '/dashboard', pathMatch: 'full' },
@@ -111,12 +126,7 @@ export const routes: Routes = [
       .then((m) => m.MatchComparePageComponent),
     canActivate: guarded,
   },
-  {
-    path: 'debug/test-harness',
-    loadComponent: () => import('./features/debug/test-harness/test-harness-page.component')
-      .then((m) => m.TestHarnessPageComponent),
-    canActivate: guarded,
-  },
+  ...debugRoutes,
   {
     path: 'games/:id',
     loadComponent: () => import('./features/games/game-detail.component')
