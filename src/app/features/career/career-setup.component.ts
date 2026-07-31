@@ -266,12 +266,11 @@ export class CareerSetupComponent implements OnInit {
         leagueId: this.selectedLeagueId,
         teamId: this.selectedTeamId,
         difficulty: this.selectedDifficulty,
-        gameSpeed: this.selectedGameSpeed
+        gameSpeed: this.selectedGameSpeed,
+        teamsPerDivision: this.selectedTeamsPerDivision && this.selectedTeamsPerDivision < totalTeams
+          ? this.selectedTeamsPerDivision
+          : totalTeams
       };
-
-      if (this.selectedTeamsPerDivision && this.selectedTeamsPerDivision < totalTeams) {
-        payload.teamsPerDivision = this.selectedTeamsPerDivision;
-      }
 
       await this.http.post<{ careerId: string }>(
         `${environment.apiUrl}/career/start`, 

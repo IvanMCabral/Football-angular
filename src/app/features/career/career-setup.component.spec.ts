@@ -129,6 +129,30 @@ describe('CareerSetupComponent — setup flow', () => {
     });
   });
 
+  it('starts a single-division career by sending every league team in teamsPerDivision', async () => {
+    component.selectedLeagueId = LA_LIGA.realLeagueId;
+    component.selectedTeamId = 'athletic-club';
+    component.selectedDifficulty = 'MEDIUM';
+    component.selectedGameSpeed = 'NORMAL';
+    component.selectedTeamsPerDivision = null;
+    component.totalTeamsInLeague$ = of(20);
+
+    httpSpy.post.and.returnValue(of({ careerId: 'career-1' }));
+
+    await component.startCareer();
+
+    expect(httpSpy.post).toHaveBeenCalledWith(
+      jasmine.stringMatching(/\/career\/start$/),
+      jasmine.objectContaining({
+        leagueId: LA_LIGA.realLeagueId,
+        teamId: 'athletic-club',
+        difficulty: 'MEDIUM',
+        gameSpeed: 'NORMAL',
+        teamsPerDivision: 20
+      })
+    );
+  });
+
   it('stores a clear error message when world initialization fails', (done: DoneFn) => {
     // Setup: empty leagues, seed POST fails
     httpSpy.get.and.returnValue(of([]));
