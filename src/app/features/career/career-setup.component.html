@@ -51,8 +51,8 @@
       <div class="form-group" *ngIf="selectedLeagueId && (availableTeamsPerDivision$ | async)?.length">
         <label>📊 Tamaño de cada división</label>
         <select [(ngModel)]="selectedTeamsPerDivision" (change)="onTeamsPerDivisionChange()" class="form-select">
-          <option [value]="null">Una sola división (todos los equipos)</option>
-          <option *ngFor="let opt of (availableTeamsPerDivision$ | async)" [value]="opt">
+          <option [ngValue]="null">Una sola división (todos los equipos)</option>
+          <option *ngFor="let opt of (availableTeamsPerDivision$ | async)" [ngValue]="opt">
             {{ opt }} equipos por división
           </option>
         </select>

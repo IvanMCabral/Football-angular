@@ -153,6 +153,64 @@ describe('CareerSetupComponent — setup flow', () => {
     );
   });
 
+  it('starts a subdivided career by sending the selected numeric teamsPerDivision', async () => {
+    component.selectedLeagueId = LA_LIGA.realLeagueId;
+    component.selectedTeamId = 'real-sociedad';
+    component.selectedDifficulty = 'MEDIUM';
+    component.selectedGameSpeed = 'FAST';
+    component.selectedTeamsPerDivision = 4;
+    component.totalTeamsInLeague$ = of(20);
+
+    httpSpy.post.and.returnValue(of({ careerId: 'career-4-team' }));
+
+    await component.startCareer();
+
+    expect(httpSpy.post).toHaveBeenCalledWith(
+      jasmine.stringMatching(/\/career\/start$/),
+      jasmine.objectContaining({
+        leagueId: LA_LIGA.realLeagueId,
+        teamId: 'real-sociedad',
+        difficulty: 'MEDIUM',
+        gameSpeed: 'FAST',
+        teamsPerDivision: 4
+      })
+    );
+  });
+
+  it('waits for a real team count before starting a subdivided career', async () => {
+    component.selectedLeagueId = LA_LIGA.realLeagueId;
+    component.selectedTeamId = 'real-sociedad';
+    component.selectedDifficulty = 'MEDIUM';
+    component.selectedGameSpeed = 'FAST';
+    component.selectedTeamsPerDivision = 4;
+    component.totalTeamsInLeague$ = of(0, 20);
+
+    httpSpy.post.and.returnValue(of({ careerId: 'career-after-loading' }));
+
+    await component.startCareer();
+
+    expect(httpSpy.post).toHaveBeenCalledWith(
+      jasmine.stringMatching(/\/career\/start$/),
+      jasmine.objectContaining({
+        teamsPerDivision: 4
+      })
+    );
+  });
+
+  it('keeps visible Spanish labels encoded as clean UTF-8', () => {
+    expect(component.difficulties.map(option => option.label)).toEqual([
+      'Fácil',
+      'Normal',
+      'Difícil'
+    ]);
+    expect(component.gameSpeeds.map(option => option.label)).toEqual([
+      'Lenta',
+      'Normal',
+      'Rápida'
+    ]);
+    expect(component.getDivisionName(4)).toBe('4ª');
+  });
+
   it('stores a clear error message when world initialization fails', (done: DoneFn) => {
     // Setup: empty leagues, seed POST fails
     httpSpy.get.and.returnValue(of([]));

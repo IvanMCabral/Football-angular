@@ -8,7 +8,7 @@ import { AppLoggerService } from '../../core/services/app-logger.service';
 import { environment } from '../../environments/environment';
 import { readableErrorMessage } from '../../shared/utils/error-message';
 import { Observable, BehaviorSubject, combineLatest, firstValueFrom, concat } from 'rxjs';
-import { map, switchMap, catchError, take, startWith, distinctUntilChanged, shareReplay } from 'rxjs/operators';
+import { map, switchMap, catchError, take, startWith, distinctUntilChanged, shareReplay, filter } from 'rxjs/operators';
 import { of } from 'rxjs';
 
 interface League {
@@ -260,7 +260,10 @@ export class CareerSetupComponent implements OnInit {
       this.creating = true;
       this.error$.next(null);
 
-      const totalTeams = await firstValueFrom(this.totalTeamsInLeague$);
+      const totalTeams = await firstValueFrom(this.totalTeamsInLeague$.pipe(
+        filter(total => total > 0),
+        take(1)
+      ));
 
       const payload: StartCareerPayload = {
         leagueId: this.selectedLeagueId,
