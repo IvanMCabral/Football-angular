@@ -1,7 +1,7 @@
 import { Injectable, inject, NgZone } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { BehaviorSubject, Observable, Subject } from 'rxjs';
-import { map, switchMap } from 'rxjs/operators';
+import { BehaviorSubject, Observable, ReplaySubject } from 'rxjs';
+import { map, share, switchMap } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 import { AuthService } from './auth.service';
 import { AppLoggerService } from './app-logger.service';
@@ -41,6 +41,8 @@ export class MatchEngineService {
   private authService = inject(AuthService);
   private logger = inject(AppLoggerService);
   private apiUrl = `${environment.apiUrl}/match-engine`;
+  /** One transport per URL prevents duplicate SSE connections on route re-entry. */
+  private readonly sharedStreams = new Map<string, Observable<unknown>>();
 
   // Starts the engine for one match.
   startEngine(matchId: string, homeTeamId: string, awayTeamId: string): Observable<MatchState> {
@@ -180,7 +182,12 @@ export class MatchEngineService {
     label: string,
     isComplete: (payload: T) => boolean
   ): Observable<T> {
-    return new Observable<T>(observer => {
+    const existing = this.sharedStreams.get(url);
+    if (existing) {
+      return existing as Observable<T>;
+    }
+
+    const source = new Observable<T>(observer => {
       let attempt = 0;
       let backoffTimer: ReturnType<typeof setTimeout> | null = null;
       let lastEventAt = 0;
@@ -221,8 +228,7 @@ export class MatchEngineService {
         // (re)connect so token refresh / logout are picked up.
         const token = this.authService.getToken();
         const headers: Record<string, string> = {
-          'Accept': 'text/event-stream',
-          'Cache-Control': 'no-cache'
+          'Accept': 'text/event-stream'
         };
         if (token) {
           headers['Authorization'] = `Bearer ${token}`;
@@ -238,6 +244,15 @@ export class MatchEngineService {
           });
 
           if (!response.ok || !response.body) {
+            // Authentication, ownership and missing-round responses are
+            // terminal for this subscription. Retrying them creates a noisy
+            // loop and cannot repair the underlying condition.
+            if ([400, 401, 403, 404, 409].includes(response.status)) {
+              connected = false;
+              setHealth('CLOSED');
+              observer.complete();
+              return;
+            }
             throw new Error(`SSE HTTP ${response.status}`);
           }
 
@@ -316,6 +331,15 @@ export class MatchEngineService {
           }
           this.logger.warn(`[SSE-${label}] fetch error:`, err);
           connected = false;
+          // Browser CORS failures surface as TypeError/"Failed to fetch".
+          // Retrying that configuration error only produces a retry storm;
+          // the manager must re-enter the view after configuration is fixed.
+          if (err instanceof TypeError
+              || (err instanceof Error && /failed to fetch|networkerror|cors/i.test(err.message))) {
+            setHealth('CLOSED');
+            observer.complete();
+            return;
+          }
           scheduleReconnect();
         }
       };
@@ -367,6 +391,17 @@ export class MatchEngineService {
         }
       };
     });
+
+    const shared = source.pipe(
+      share({
+        connector: () => new ReplaySubject<T>(1),
+        resetOnError: true,
+        resetOnComplete: true,
+        resetOnRefCountZero: true
+      })
+    );
+    this.sharedStreams.set(url, shared);
+    return shared;
   }
 
   // Most recent stream health across active SSE connections.

@@ -542,9 +542,9 @@ describe('DashboardComponent — season-aware play-next labels', () => {
     component = Object.create(DashboardComponent.prototype);
   });
 
-  it('returns next-round label during the season', () => {
+  it('uses the canonical pending round during the season', () => {
     const status = { currentRound: 3, totalRounds: 10, season: 1 } as any;
-    expect(component.playNextRoundLabel(status)).toBe('Jugar Fecha 4');
+    expect(component.playNextRoundLabel(status)).toBe('Jugar Fecha 3');
     expect(component.playNextRoundSubtitle(status)).toBe('Confirmar para iniciar');
   });
 
@@ -558,7 +558,13 @@ describe('DashboardComponent — season-aware play-next labels', () => {
 
   it('returns next-round label after a new season has started', () => {
     const status = { currentRound: 1, totalRounds: 10, season: 2 } as any;
-    expect(component.playNextRoundLabel(status)).toBe('Jugar Fecha 2');
+    expect(component.playNextRoundLabel(status)).toBe('Jugar Fecha 1');
+  });
+
+  it('does not add a second round while a match is live', () => {
+    const status = { currentRound: 2, totalRounds: 10, season: 1, careerPhase: 'LIVE' } as any;
+    expect(component.playNextRoundLabel(status)).toBe('Continuar Fecha 2');
+    expect(component.playNextRoundSubtitle(status)).toBe('Partido en curso');
   });
 
   it('returns safe fallback label without career status', () => {

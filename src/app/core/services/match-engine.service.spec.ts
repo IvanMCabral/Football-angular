@@ -344,6 +344,7 @@ describe('MatchEngineService - streaming, auth and reconnect behavior', () => {
     expect(inst.url).toContain('/rounds/r1/stream');
     expect(inst.headers['Authorization']).toBe('Bearer test-jwt-token');
     expect(inst.headers['Accept']).toBe('text/event-stream');
+    expect(inst.headers['Cache-Control']).toBeUndefined();
     // Simulate completion so the backoff timer doesn't leak.
     inst.respondHttpError(500);
     await flushMicrotasks();
@@ -356,6 +357,7 @@ describe('MatchEngineService - streaming, auth and reconnect behavior', () => {
     const inst = MockFetchSse.instances[0];
     expect(inst.headers['Authorization']).toBeUndefined();
     expect(inst.headers['Accept']).toBe('text/event-stream');
+    expect(inst.headers['Cache-Control']).toBeUndefined();
     inst.respondHttpError(500);
     await flushMicrotasks();
   });
@@ -431,13 +433,15 @@ describe('MatchEngineService - streaming, auth and reconnect behavior', () => {
     expect(inst.signal.aborted).toBe(true);
   });
 
-  it('triggers RECONNECTING when fetch returns non-2xx (e.g. 401)', async () => {
+  it('does not retry non-transient HTTP errors such as 401', async () => {
     jasmine.clock().install();
     service.streamRoundState('r6').subscribe();
     await flushMicrotasks();
     MockFetchSse.instances[0].respondHttpError(401);
     await flushMicrotasks();
-    expect(service.streamHealth$.value).toBe('RECONNECTING');
+    expect(service.streamHealth$.value).toBe('CLOSED');
+    expect(MockFetchSse.instances.length).toBe(1);
+    jasmine.clock().uninstall();
   });
 });
 

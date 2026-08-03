@@ -108,21 +108,36 @@ export class DashboardComponent implements OnInit {
 
   playNextRoundLabel(status: CareerStatus | null | undefined): string {
     if (!status) return 'Jugar Próxima Fecha';
-    const nextRound = (status.currentRound ?? 0) + 1;
+    // currentRound is the canonical pending round. The backend advances it
+    // exactly once after a finished match-day, so adding one here displayed
+    // Fecha 4 immediately after Fecha 2 had completed.
+    const currentRound = status.currentRound ?? 1;
     const totalRounds = status.totalRounds ?? 0;
-    if (nextRound > totalRounds) {
+    const seasonComplete = currentRound > totalRounds
+      || (currentRound === totalRounds
+        && (!status.careerPhase || status.careerPhase === 'WAITING_USER'));
+    if (seasonComplete) {
       const nextSeason = (status.season ?? 1) + 1;
       return `Continuar Temporada ${nextSeason}`;
     }
-    return `Jugar Fecha ${nextRound}`;
+    if (status.careerPhase === 'LIVE' || status.careerPhase === 'IN_MATCH') {
+      return `Continuar Fecha ${currentRound}`;
+    }
+    return `Jugar Fecha ${currentRound}`;
   }
 
   playNextRoundSubtitle(status: CareerStatus | null | undefined): string {
     if (!status) return 'Confirmar para iniciar';
-    const nextRound = (status.currentRound ?? 0) + 1;
+    const currentRound = status.currentRound ?? 1;
     const totalRounds = status.totalRounds ?? 0;
-    if (nextRound > totalRounds) {
+    const seasonComplete = currentRound > totalRounds
+      || (currentRound === totalRounds
+        && (!status.careerPhase || status.careerPhase === 'WAITING_USER'));
+    if (seasonComplete) {
       return 'Temporada finalizada, ver resultados';
+    }
+    if (status.careerPhase === 'LIVE' || status.careerPhase === 'IN_MATCH') {
+      return 'Partido en curso';
     }
     return 'Confirmar para iniciar';
   }
