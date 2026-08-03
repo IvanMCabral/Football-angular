@@ -1,10 +1,19 @@
-import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ReactiveFormsModule } from '@angular/forms';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { RouterLink } from '@angular/router';
-import { Router } from '@angular/router';
+import { HttpErrorResponse } from '@angular/common/http';
+import { Component, InjectionToken, inject } from '@angular/core';
+import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { Router, RouterLink } from '@angular/router';
+import { TimeoutError, finalize, timeout } from 'rxjs';
 import { AuthService } from '../../../core/services/auth.service';
+
+export const REGISTRATION_REQUEST_TIMEOUT_MS = new InjectionToken<number>(
+  'REGISTRATION_REQUEST_TIMEOUT_MS',
+  { providedIn: 'root', factory: () => 120_000 }
+);
+export const SLOW_SERVER_NOTICE_DELAY_MS = new InjectionToken<number>(
+  'SLOW_SERVER_NOTICE_DELAY_MS',
+  { providedIn: 'root', factory: () => 5_000 }
+);
 
 @Component({
   selector: 'app-register',
@@ -17,11 +26,16 @@ export class RegisterComponent {
   private fb = inject(FormBuilder);
   private authService = inject(AuthService);
   private router = inject(Router);
+  private requestTimeoutMs = inject(REGISTRATION_REQUEST_TIMEOUT_MS);
+  private slowServerNoticeDelayMs = inject(SLOW_SERVER_NOTICE_DELAY_MS);
 
   registerForm: FormGroup;
   loading = false;
   errorMessage = '';
   successMessage = '';
+  serverStartingMessage = false;
+
+  private slowServerNoticeTimer: ReturnType<typeof setTimeout> | undefined;
 
   constructor() {
     this.registerForm = this.fb.group({
@@ -42,28 +56,58 @@ export class RegisterComponent {
     this.loading = true;
     this.errorMessage = '';
     this.successMessage = '';
+    this.serverStartingMessage = false;
+    this.clearSlowServerNoticeTimer();
+    this.slowServerNoticeTimer = setTimeout(() => {
+      if (this.loading) this.serverStartingMessage = true;
+    }, this.slowServerNoticeDelayMs);
 
     const { email, username, password } = this.registerForm.value;
-    this.authService.register(email, username, password).subscribe({
-      next: () => {
+    this.authService.register(email, username, password).pipe(
+      timeout({ first: this.requestTimeoutMs }),
+      finalize(() => {
         this.loading = false;
-        this.router.navigate(['/dashboard']);
-      },
-      error: (err: unknown) => {
-        if (this.isConflictError(err)) {
-          this.errorMessage = 'El usuario ya existe. Usa otro email o inicia sesión.';
-        } else {
-          this.errorMessage = 'Error al registrar usuario';
-        }
-        this.loading = false;
+        this.serverStartingMessage = false;
+        this.clearSlowServerNoticeTimer();
+      })
+    ).subscribe({
+      next: () => this.router.navigate(['/dashboard']),
+      error: (error: unknown) => {
+        this.errorMessage = this.registrationErrorMessage(error);
       }
     });
   }
 
-  private isConflictError(err: unknown): boolean {
-    return typeof err === 'object'
-      && err !== null
-      && 'status' in err
-      && (err as { status?: unknown }).status === 409;
+  private registrationErrorMessage(error: unknown): string {
+    if (error instanceof TimeoutError) {
+      return 'El servidor gratuito no respondió a tiempo. La cuenta podría haberse creado; intentá iniciar sesión antes de volver a registrarte.';
+    }
+    if (this.isConflictError(error)) {
+      return 'El usuario ya existe. Usa otro email o inicia sesión.';
+    }
+    if (error instanceof HttpErrorResponse && error.status === 422) {
+      return 'Revisá los datos ingresados e intentá nuevamente.';
+    }
+    if (error instanceof HttpErrorResponse && error.status === 0) {
+      return 'No se pudo conectar con el servidor. Revisá tu conexión e intentá nuevamente.';
+    }
+    if (error instanceof HttpErrorResponse && error.status >= 500) {
+      return 'El servidor no pudo completar el registro. Intentá nuevamente en unos instantes.';
+    }
+    return 'No se pudo completar el registro. Intentá nuevamente.';
+  }
+
+  private isConflictError(error: unknown): boolean {
+    return typeof error === 'object'
+      && error !== null
+      && 'status' in error
+      && (error as { status?: unknown }).status === 409;
+  }
+
+  private clearSlowServerNoticeTimer(): void {
+    if (this.slowServerNoticeTimer !== undefined) {
+      clearTimeout(this.slowServerNoticeTimer);
+      this.slowServerNoticeTimer = undefined;
+    }
   }
 }

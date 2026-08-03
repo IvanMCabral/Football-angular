@@ -18,8 +18,11 @@
       <span *ngIf="loading">Registrando...</span>
     </button>
   </form>
+  <div *ngIf="serverStartingMessage" class="server-starting-message" role="status">
+    El servidor gratuito se está iniciando. Esto puede tardar hasta dos minutos.
+  </div>
   <div *ngIf="successMessage" class="success-message">{{ successMessage }}</div>
-  <div *ngIf="errorMessage" class="error-message">{{ errorMessage }}</div>
+  <div *ngIf="errorMessage" class="error-message" role="alert">{{ errorMessage }}</div>
   <div style="margin-top:1rem;">
     <a routerLink="/login">¿Ya tienes cuenta? Inicia sesión</a>
   </div>

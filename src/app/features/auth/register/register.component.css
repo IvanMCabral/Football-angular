@@ -52,3 +52,13 @@ button {
   margin-top: 1rem;
   font-size: 1rem;
 }
+
+.server-starting-message {
+  color: #0d47a1;
+  background: #e3f2fd;
+  border: 1px solid #1976d2;
+  border-radius: 4px;
+  padding: 0.75rem;
+  margin-top: 1rem;
+  font-size: 0.95rem;
+}
