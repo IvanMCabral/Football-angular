@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, InjectionToken, inject } from '@angular/core';
+import { ChangeDetectorRef, Component, InjectionToken, inject } from '@angular/core';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { TimeoutError, finalize, timeout } from 'rxjs';
@@ -26,6 +26,7 @@ export class RegisterComponent {
   private fb = inject(FormBuilder);
   private authService = inject(AuthService);
   private router = inject(Router);
+  private changeDetector = inject(ChangeDetectorRef);
   private requestTimeoutMs = inject(REGISTRATION_REQUEST_TIMEOUT_MS);
   private slowServerNoticeDelayMs = inject(SLOW_SERVER_NOTICE_DELAY_MS);
 
@@ -59,7 +60,10 @@ export class RegisterComponent {
     this.serverStartingMessage = false;
     this.clearSlowServerNoticeTimer();
     this.slowServerNoticeTimer = setTimeout(() => {
-      if (this.loading) this.serverStartingMessage = true;
+      if (this.loading) {
+        this.serverStartingMessage = true;
+        this.changeDetector.detectChanges();
+      }
     }, this.slowServerNoticeDelayMs);
 
     const { email, username, password } = this.registerForm.value;
@@ -69,11 +73,13 @@ export class RegisterComponent {
         this.loading = false;
         this.serverStartingMessage = false;
         this.clearSlowServerNoticeTimer();
+        this.changeDetector.detectChanges();
       })
     ).subscribe({
       next: () => this.router.navigate(['/dashboard']),
       error: (error: unknown) => {
         this.errorMessage = this.registrationErrorMessage(error);
+        this.changeDetector.detectChanges();
       }
     });
   }
