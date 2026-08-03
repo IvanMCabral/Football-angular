@@ -22,6 +22,28 @@
               "extractLicenses": true,
               "fileReplacements": [
                 {
+                  "replace": "src/app/environments/environment.ts",
+                  "with": "src/app/environments/environment.prod.ts"
+                },
+                {
+                  "replace": "src/app/app.debug-routes.ts",
+                  "with": "src/app/app.debug-routes.prod.ts"
+                }
+              ],
+              "namedChunks": false,
+              "optimization": true,
+              "outputHashing": "all",
+              "sourceMap": false
+            },
+            "staging": {
+              "aot": true,
+              "extractLicenses": true,
+              "fileReplacements": [
+                {
+                  "replace": "src/app/environments/environment.ts",
+                  "with": "src/app/environments/environment.staging.ts"
+                },
+                {
                   "replace": "src/app/app.debug-routes.ts",
                   "with": "src/app/app.debug-routes.prod.ts"
                 }
