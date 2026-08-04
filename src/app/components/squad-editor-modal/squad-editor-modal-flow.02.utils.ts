@@ -413,8 +413,11 @@ export function runSquadEditorOnMarkerDragStarted(ctx: any, event: any): any {
       return;
     }
     ctx.markerPickupOffset.set(data.playerId, {
-      x: dragRef._pickupPositionInElement?.x ?? 35,
-      y: dragRef._pickupPositionInElement?.y ?? 24,
+      // CdkDrag does not expose the pointer offset as public API.  Use the
+      // marker centre consistently instead of reaching into its private
+      // DragRef implementation.
+      x: 35,
+      y: 24,
     });
   
 }
