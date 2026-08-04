@@ -137,6 +137,9 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
   pendingLiveModalNotice: string | null = null;
 
   private autoStartTriggered = false;
+  /** Prevents a second start POST while the first round is being prepared. */
+  startingRound = false;
+  startPhase = 'Preparando fecha';
 
   private resolvedRoundId$ = new BehaviorSubject<string | null>(null);
 

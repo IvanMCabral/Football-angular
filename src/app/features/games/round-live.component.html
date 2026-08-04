@@ -5,6 +5,10 @@
     <p>Cargando fecha...</p>
   </div>
 
+  <div *ngIf="startingRound" class="banner banner-starting" role="status" aria-live="polite" data-testid="round-live-starting">
+    {{ startPhase }}…
+  </div>
+
   <div class="header">
     <h2>Fecha {{ vm.roundNumber }} - En Vivo</h2>
     <span *ngIf="vm.byeTeam" class="bye-badge">Descansa: {{ vm.byeTeam }}</span>
@@ -14,6 +18,7 @@
         *ngIf="!vm.allFinished && !vm.isRoundPaused && !vm.anyStarted"
         (click)="iniciarTodos()"
         class="btn btn-start"
+        [disabled]="startingRound"
         data-testid="iniciar-todos-button"
       >
         ▶️ Iniciar todos

@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../core/services/auth.service';
+import { WorldCatalogService } from '../../core/services/world-catalog.service';
 import { AppLoggerService } from '../../core/services/app-logger.service';
 import { environment } from '../../environments/environment';
 import { readableErrorMessage } from '../../shared/utils/error-message';
@@ -100,17 +101,11 @@ export class CareerSetupComponent implements OnInit {
     private http: HttpClient,
     private router: Router,
     private authService: AuthService,
+    private catalogService: WorldCatalogService,
     private logger: AppLoggerService
   ) {
-    this.leagues$ = combineLatest([
-      this.authService.getUserInfo(),
-      this.refreshLeaguesTrigger
-    ]).pipe(
-        switchMap(([userInfo]) =>
-        this.http.get<League[]>(`${environment.apiUrl}/world/leagues?userId=${userInfo.id}`, {
-          timeout: this.worldRequestTimeoutMs
-        })
-      ),
+    this.leagues$ = combineLatest([this.refreshLeaguesTrigger]).pipe(
+      switchMap(() => this.catalogService.leagues()),
       catchError(err => {
         this.error$.next('No se pudo cargar el mundo. Revisá tu conexión y reintentá.');
         return of([]);
@@ -119,6 +114,7 @@ export class CareerSetupComponent implements OnInit {
     );
 
     this.teamsWithOVR$ = this.leagueChangeSubject.pipe(
+      distinctUntilChanged(),
       switchMap(leagueId => {
         if (!leagueId) {
           return of([]);
@@ -127,40 +123,39 @@ export class CareerSetupComponent implements OnInit {
         return concat(
           of([] as TeamWithOVR[]),
           this.authService.getUserInfo().pipe(
-            switchMap(userInfo =>
-              this.http.get<TeamWithOVR[]>(`${environment.apiUrl}/world/leagues/${leagueId}/teams-with-ovr?userId=${userInfo.id}`, {
-                timeout: this.worldRequestTimeoutMs
-              })
-            ),
+            switchMap(() => this.catalogService.teamsForLeague(leagueId, this.worldRequestTimeoutMs)),
             catchError(err => {
               this.error$.next('Error al cargar equipos');
               return of([] as TeamWithOVR[]);
             })
           )
         );
-      })
+      }),
+      // The template consumes this stream through several independent
+      // projections. Keep one authenticated catalog request per selection.
+      shareReplay({ bufferSize: 1, refCount: false })
     );
 
     this.divisionPreviews$ = combineLatest([
       this.divisionChangeSubject,
       this.leagueChangeSubject
     ]).pipe(
+      distinctUntilChanged(([previousTeams, previousLeague], [teams, league]) =>
+        previousTeams === teams && previousLeague === league),
       switchMap(([teamsPerDivision, leagueId]) => {
         if (!teamsPerDivision || !leagueId) {
           return of<DivisionPreview[]>([]);
         }
-        return this.authService.getUserInfo().pipe(
-          switchMap(userInfo => 
-            this.http.get<DivisionPreview[]>(
-              `${environment.apiUrl}/world/leagues/${leagueId}/division-preview?teamsPerDivision=${teamsPerDivision}&userId=${userInfo.id}`
-            )
-          ),
+        return this.catalogService.divisionPreview(leagueId, teamsPerDivision).pipe(
           catchError(err => {
             this.error$.next('Error al calcular preview de divisiones');
             return of<DivisionPreview[]>([]);
           })
         );
-      })
+      }),
+      // Division previews are derived from the same selection state and must
+      // not rebuild the world snapshot once per async pipe subscriber.
+      shareReplay({ bufferSize: 1, refCount: false })
     );
 
     this.availableTeamsPerDivision$ = this.teamsWithOVR$.pipe(
@@ -202,6 +197,7 @@ export class CareerSetupComponent implements OnInit {
 
   retryWorldLoad(): void {
     this.error$.next(null);
+    this.catalogService.invalidate();
     this.refreshLeaguesTrigger.next();
   }
 
@@ -243,6 +239,7 @@ export class CareerSetupComponent implements OnInit {
         ).subscribe({
           next: () => {
             this.seedingWorld = false;
+            this.catalogService.invalidate();
             this.refreshLeaguesTrigger.next();
           },
           error: (err) => {

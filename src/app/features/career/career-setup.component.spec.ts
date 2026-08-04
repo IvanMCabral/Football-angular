@@ -430,6 +430,54 @@ describe('CareerSetupComponent — setup flow', () => {
         done();
       });
     });
+
+    it('multiple subscribers to teamsWithOVR$ only fire one HTTP request per selection', (done: DoneFn) => {
+      let teamsCallCount = 0;
+      httpSpy.get.and.callFake(((url: string) => {
+        if (url.includes('/teams-with-ovr')) {
+          teamsCallCount++;
+          return of([{ worldTeamId: 'team-1', name: 'Team 1', country: 'ES', formation: '4-4-2', ovr: 75, playerCount: 25 }]);
+        }
+        return of([LA_LIGA]);
+      }) as any);
+
+      const sub1 = component.teamsWithOVR$.subscribe();
+      const sub2 = component.teamsWithOVR$.subscribe();
+      component.selectedLeagueId = LA_LIGA.realLeagueId;
+      component.onLeagueChange();
+
+      fixture.whenStable().then(() => {
+        expect(teamsCallCount).toBe(1);
+        sub1.unsubscribe();
+        sub2.unsubscribe();
+        done();
+      });
+    });
+
+    it('multiple subscribers to divisionPreviews$ only fire one HTTP request per selection', (done: DoneFn) => {
+      let previewCallCount = 0;
+      httpSpy.get.and.callFake(((url: string) => {
+        if (url.includes('/division-preview')) {
+          previewCallCount++;
+          return of([]);
+        }
+        return of([LA_LIGA]);
+      }) as any);
+
+      const sub1 = component.divisionPreviews$.subscribe();
+      const sub2 = component.divisionPreviews$.subscribe();
+      component.selectedLeagueId = LA_LIGA.realLeagueId;
+      component.onLeagueChange();
+      component.selectedTeamsPerDivision = 4;
+      component.onTeamsPerDivisionChange();
+
+      fixture.whenStable().then(() => {
+        expect(previewCallCount).toBe(1);
+        sub1.unsubscribe();
+        sub2.unsubscribe();
+        done();
+      });
+    });
   });
   describe('division tier badges', () => {
     const TEAMS_WITH_OVR = [

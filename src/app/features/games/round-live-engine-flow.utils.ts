@@ -20,13 +20,15 @@ export function roundLiveStartRoundEngine(ctx: any, gameId: string, matches: Rou
 
     const startRound$: Observable<RoundState | null> = ctx.autoStartTriggered
       ? of(null)
-      : ctx.engineService.startRound(requestRoundId, matchData).pipe(
+      : (ctx.startingRound = true, ctx.startPhase = 'Iniciando partido', ctx.engineService.startRound(requestRoundId, matchData).pipe(
           tap((state: RoundState) => {
+            ctx.startingRound = false;
             if (state && state.roundId) {
               ctx.resolvedRoundId$.next(state.roundId);
             }
-          })
-        );
+          }),
+          tap({ error: () => { ctx.startingRound = false; } })
+        ));
 
     const sseStream$: Observable<RoundState> = ctx.resolvedRoundId$.pipe(
       filter((id): id is string => !!id),
@@ -129,6 +131,9 @@ export function roundLiveResumeAll(ctx: any): any {
 }
 
 export function roundLiveIniciarTodos(ctx: any): void {
+    if (ctx.startingRound) {
+      return;
+    }
     const vm = ctx.vmSubject.value;
     const pending = buildPendingRoundStartMatches(vm.matches);
 
@@ -137,13 +142,17 @@ export function roundLiveIniciarTodos(ctx: any): void {
     }
 
     const roundId = vm.gameId;
+    ctx.startingRound = true;
+    ctx.startPhase = 'Iniciando partido';
     ctx.engineService.startRound(roundId, pending).subscribe({
       next: (state: RoundState) => {
+        ctx.startingRound = false;
         if (state && state.roundId) {
           ctx.resolvedRoundId$.next(state.roundId);
         }
       },
       error: (err: unknown) => {
+        ctx.startingRound = false;
         ctx.logDevError('[ROUND-LIVE] Iniciar Todos failed', err);
       }
     });
@@ -151,7 +160,7 @@ export function roundLiveIniciarTodos(ctx: any): void {
 }
 
 export function roundLiveTryAutoStartRound(ctx: any, vm: RoundLiveViewModel): void {
-    if (ctx.autoStartTriggered) {
+    if (ctx.autoStartTriggered || ctx.startingRound) {
       return;
     }
     ctx.autoStartTriggered = true;
@@ -166,13 +175,17 @@ export function roundLiveTryAutoStartRound(ctx: any, vm: RoundLiveViewModel): vo
       return;
     }
 
+    ctx.startingRound = true;
+    ctx.startPhase = 'Iniciando partido';
     ctx.engineService.startRound(vm.gameId, pending).subscribe({
       next: (state: RoundState) => {
+        ctx.startingRound = false;
         if (state && state.roundId) {
           ctx.resolvedRoundId$.next(state.roundId);
         }
       },
       error: (err: unknown) => {
+        ctx.startingRound = false;
         ctx.logDevError('[ROUND-LIVE] Auto-start failed; user can retry with Iniciar Todos', err);
       }
     });
