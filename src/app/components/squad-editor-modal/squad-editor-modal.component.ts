@@ -232,6 +232,8 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   loadingFormation$ = new BehaviorSubject<boolean>(false);
   private isInitializing = true;
   isFormationChanging = false;
+  isSavingDraft = false;
+  private confirmedDraftSignature = '';
   private previewTrigger$ = new Subject<{
     ids: string[];
     formation: string;
@@ -265,6 +267,32 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
     this.destroy$.next();
     this.destroy$.complete();
     this.previewTrigger$.complete();
+  }
+  private draftSignature(): string {
+    const players = [...this.homePlayers$.value, ...this.benchPlayers$.value]
+      .map(player => ({
+        id: player.playerId,
+        slot: player.slotId || '',
+        x: typeof player.xPercent === 'number' ? Number(player.xPercent.toFixed(3)) : null,
+        y: typeof player.yPercent === 'number' ? Number(player.yPercent.toFixed(3)) : null,
+      }))
+      .sort((a, b) => a.id.localeCompare(b.id));
+    return JSON.stringify({ formation: this.selectedFormation, players });
+  }
+  markConfirmedDraft(): void {
+    this.confirmedDraftSignature = this.draftSignature();
+  }
+  get hasDraftChanges(): boolean {
+    return !!this.confirmedDraftSignature && this.confirmedDraftSignature !== this.draftSignature();
+  }
+  confirmDraft(): void {
+    if (!this.hasDraftChanges || this.isSavingDraft) return;
+    this.saveLineup((saved: boolean) => {
+      if (saved) {
+        this.markConfirmedDraft();
+        this.dialogRef.close({ saved: true });
+      }
+    });
   }
   private setupChemistryPreviewPipeline(): void { runSquadEditorSetupChemistryPreviewPipeline(this); }
   private triggerChemistryPreview(): void { runSquadEditorTriggerChemistryPreview(this); }
@@ -447,10 +475,10 @@ export class SquadEditorModalComponent implements OnInit, OnDestroy {
   ): void { runSquadEditorApplyLineupToSlots(this, formationName, playersList, backendSlots); }
   private applyCurrentXiToFormation(formationName: string): void { runSquadEditorApplyCurrentXiToFormation(this, formationName); }
   private executeFormationChange(newFormation: string): void { runSquadEditorExecuteFormationChange(this, newFormation); }
-  private saveLineup(onDone?: () => void): void { runSquadEditorSaveLineup(this, onDone); }
+  private saveLineup(onDone?: (saved: boolean) => void): void { runSquadEditorSaveLineup(this, onDone); }
   private getUniqueValidHomePlayers(): PlayerOnFieldDto[] { return runSquadEditorGetUniqueValidHomePlayers(this); }
   close(): void {
-    this.dialogRef.close();
+    this.dialogRef.close({ saved: false });
   }
   showConditionWarning(player: PlayerOnFieldDto): void { runSquadEditorShowConditionWarning(this, player); }
   clearConditionWarning(): void {

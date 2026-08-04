@@ -1093,27 +1093,15 @@ describe('SquadManagementComponent', () => {
 
       component.onFormationChange('3-5-2');
 
-      // POST was called exactly once with formation + same playerIds + target formation slots.
-      expect(postCalls).withContext('POST /manual-select must be called').toBe(1);
-      expect(postBody.formation).toBe('3-5-2');
-      expect(Array.isArray(postBody.playerIds)).toBe(true);
-      expect(postBody.playerIds.length).toBe(11);
-      expect(postBody.playerIds[0]).toBe('p0');
-      expect(Array.isArray(postBody.slots)).toBe(true);
-      expect(postBody.slots.length).toBe(11);
-      expect(postBody.slots[0].playerId).toBe('p0');
-      expect(postBody.slots[0].subdivisionId).toBe('NEW-0');
-      expect(postBody.slots[10].playerId).toBe('p10');
-      expect(postBody.slots[10].subdivisionId).toBe('NEW-10');
-
-      // Confirm the persisted lineup is reloaded after POST.
-      expect(getCurrentCalls).withContext('GET /career/lineup/current must be called').toBe(1);
-
-      // lineupSubject$ now reflects the back's updated lineup.
+      // Formation selection is a draft and must not write or reload.
+      expect(postCalls).toBe(0);
+      expect(getCurrentCalls).toBe(0);
+      expect(component.selectedFormation$.value).toBe('4-4-2');
+      // The confirmed lineup remains untouched until the modal is confirmed.
       const after = component.lineupSubject$.value as LineupDTO;
       expect(after).toBeTruthy('lineupSubject$ must not be null after successful refresh');
-      expect(after.formation).toBe('3-5-2');
-      expect(after.chemistryScore).toBe(78);
+      expect(after.formation).toBe('4-4-2');
+      expect(after.chemistryScore).toBe(91);
     });
 
     it('preserves lineupSubject$ and surfaces lineupError$ when POST /manual-select errors (defensive)', () => {
@@ -1143,7 +1131,7 @@ describe('SquadManagementComponent', () => {
       expect(after).toBeTruthy('lineupSubject$ preserved on POST error');
       expect(after.formation).toBe('4-4-2');
       expect(after.chemistryScore).toBe(91);
-      expect(component.lineupError$.value).toBe('formation rejected');
+      expect(component.lineupError$.value).toBeNull();
     });
   });
 });

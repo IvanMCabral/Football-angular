@@ -43,18 +43,11 @@ export function runSquadEditorExecuteAutoSelect(ctx: any, formation: any): any {
 }
 
 export function runSquadEditorExecuteFormationChange(ctx: any, newFormation: any): any {
-    ctx.loadingFormation$.next(true);
-    ctx.cdr.markForCheck();
-
-    const finishFormationChange = () => {
-      ctx.loadingFormation$.next(false);
-      ctx.isFormationChanging = false;
-      ctx.cdr.markForCheck();
-      ctx.cdr.detectChanges();
-    };
-
+    // Formation selection is a local draft.  The only write is the explicit
+    // Save/confirm action exposed by the modal footer.
     ctx.applyCurrentXiToFormation(newFormation);
-    ctx.saveLineup(finishFormationChange);
+    ctx.loadingFormation$.next(false);
+    ctx.isFormationChanging = false;
     ctx.captureRatingsFromFormationEffectiveness();
     ctx.requestRatingsPreview();
     ctx.formationChanged.emit({
@@ -462,7 +455,6 @@ export function runSquadEditorPersistLastModalMoveHarnessCase(ctx: any, player: 
 }
 
 export function runSquadEditorRefreshAfterLineupMutation(ctx: any): any {
-    ctx.saveLineup();
     ctx.triggerChemistryPreview();
     ctx.updateFormationDetection();
     ctx.homePlayers$.next([...ctx.homePlayers$.value]);
@@ -487,7 +479,6 @@ export function runSquadEditorRemovePlayerFromSlot(ctx: any, player: any): any {
     ctx.benchPlayers$.next(mutation.benchPlayers);
 
     ctx.selectedSlot = null;
-    ctx.saveLineup();
     ctx.triggerChemistryPreview();
     ctx.updateFormationDetection();
     ctx.cdr.detectChanges();
@@ -521,7 +512,6 @@ export function runSquadEditorResetCustomPositions(ctx: any): any {
     ctx.homePlayers$.next([...ctx.homePlayers$.value]);
     ctx.lastCoachMoveRead = null;
     ctx.pendingCoachMoveBaseline = null;
-    ctx.saveLineup();
     ctx.triggerChemistryPreview();
     ctx.updateFormationDetection();
     ctx.cdr.markForCheck();

@@ -128,4 +128,41 @@ describe('squad-editor-modal-lineup-remap utils', () => {
     expect(dropped.xPercent).toBeUndefined();
     expect(dropped.yPercent).toBeUndefined();
   });
+
+  it('uses global role scoring so an eligible midfielder gets CM before a striker', () => {
+    const gk = player('gk', 'GK', 'OLD-GK');
+    const striker = player('striker', 'ST', 'OLD-ST');
+    const midfielder = player('midfielder', 'CM', 'OLD-CM');
+    const result = remapSquadEditorCurrentXiToFormation({
+      positions: [position(0, 'GK', 'GK-1'), position(1, 'CM', 'M1'), position(2, 'ST', 'A1')],
+      currentXi: [gk, striker, midfielder],
+      currentHomePlayers: [gk, striker, midfielder],
+      currentBenchPlayers: [],
+      isGoalkeeper: p => p.role === 'GK',
+      canPlayerUseSlot: (p, slotId) => slotId === 'GK-1' ? p.role === 'GK' : p.role !== 'GK',
+      roleFamily: family,
+    });
+
+    expect(result.slotPlayerMap['GK-1']?.playerId).toBe('gk');
+    expect(result.slotPlayerMap['M1']?.playerId).toBe('midfielder');
+    expect(result.slotPlayerMap['A1']?.playerId).toBe('striker');
+    expect(new Set(result.homePlayers.map(p => p.playerId)).size).toBe(3);
+  });
+
+  it('keeps the goalkeeper in the only goalkeeper slot even when the input order changes', () => {
+    const gk = player('gk', 'GK', 'OLD-GK');
+    const defender = player('defender', 'CB', 'OLD-DEF');
+    const result = remapSquadEditorCurrentXiToFormation({
+      positions: [position(0, 'CB', 'D1'), position(1, 'GK', 'GK-1')],
+      currentXi: [defender, gk],
+      currentHomePlayers: [defender, gk],
+      currentBenchPlayers: [],
+      isGoalkeeper: p => p.role === 'GK',
+      canPlayerUseSlot: (p, slotId) => slotId === 'GK-1' ? p.role === 'GK' : p.role !== 'GK',
+      roleFamily: family,
+    });
+
+    expect(result.slotPlayerMap['GK-1']?.playerId).toBe('gk');
+    expect(result.slotPlayerMap['D1']?.playerId).toBe('defender');
+  });
 });

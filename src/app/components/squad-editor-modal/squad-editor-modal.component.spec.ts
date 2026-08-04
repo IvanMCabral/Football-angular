@@ -355,13 +355,14 @@ describe('SquadEditorModalComponent backend formation loading', () => {
       (component as any).isInitializing = false;
       component.onFormationChange('4-3-3');
 
-      // Wait for saveLineup to fire /manual-select and /confirm.
+      // A selector change is a local preview only.
       setTimeout(() => {
         const allPostUrls = httpClientSpy.post.calls.allArgs()
           .map(args => String(args[0]));
 
         expect(allPostUrls.some(u => u.includes('/career/lineup/manual-select')))
-          .toBe(true, 'F4: debe haberse llamado /career/lineup/manual-select con los mismos jugadores');
+          .toBe(false);
+        expect(component.hasDraftChanges).toBeTrue();
         done();
       }, 50);
     }, 30);
@@ -2477,24 +2478,14 @@ describe('SquadEditorModalComponent formation change updates header and markers'
 
   // ---- formation change behavior ----
 
-  it('onFormationChange(3-5-2) saves the same XI with formation=3-5-2', (done) => {
-    // Passing the new formation explicitly matches the production
-    // ngModelChange flow and prevents sending the old formation value.
+  it('formation changes are local drafts until explicit confirmation', (done) => {
     setTimeout(() => {
+      const before = httpClientSpy.post.calls.count();
       component.onFormationChange('3-5-2');
-
-      // Wait for the HTTP call to flush (subscribe is synchronous since
-      // of(...) emits immediately, but cdr.detectChanges etc. may batch).
-      setTimeout(() => {
-        const manualSelectCalls = httpClientSpy.post.calls.allArgs()
-          .filter(args => String(args[0]).includes('/career/lineup/manual-select'));
-        expect(manualSelectCalls.length).withContext('at least 1 /manual-select call expected').toBeGreaterThan(0);
-        const lastCall = manualSelectCalls[manualSelectCalls.length - 1];
-        expect((lastCall[1] as any).formation).withContext(
-          'body.formation must be the NEW formation (3-5-2), not the OLD one (4-4-2)').toBe('3-5-2');
-        expect((lastCall[1] as any).playerIds.length).withContext('formation changes must keep the same 11 starters').toBe(11);
-        done();
-      }, 30);
+      expect(component.homeFormation$.value).toBe('3-5-2');
+      expect(httpClientSpy.post.calls.count()).toBe(before);
+      expect(component.hasDraftChanges).toBeTrue();
+      done();
     }, 30);
   });
 
@@ -2523,7 +2514,7 @@ describe('SquadEditorModalComponent formation change updates header and markers'
     }, 30);
   });
 
-  it('isFormationChanging resets to false after HTTP completes', (done) => {
+  it('formation draft becomes interactive immediately', (done) => {
     // The loading flag resets inside the HTTP callback so the modal
     // does not depend on any parent listener to become interactive again.
     setTimeout(() => {
@@ -2531,42 +2522,20 @@ describe('SquadEditorModalComponent formation change updates header and markers'
         'precondition: flag must start false after init').toBeFalse();
 
       component.onFormationChange('3-5-2');
-      expect(component.isFormationChanging).withContext(
-        'flag must be true synchronously after handler runs').toBeTrue();
-
-      // Wait for HTTP callback to flush + reset the flag.
-      setTimeout(() => {
-        expect(component.isFormationChanging).withContext(
-          'flag must reset to false after HTTP completes').toBeFalse();
-        done();
-      }, 30);
+      expect(component.isFormationChanging).toBeFalse();
+      done();
     }, 30);
   });
 
-  it('changing formation twice in a row is not blocked by the loading flag', (done) => {
-    // After the first formation change completes, the second change
-    // must still reach the backend.
-    // The flag resets after each HTTP response, so repeated changes work.
+  it('changing formation twice keeps the latest local draft without writes', (done) => {
     setTimeout(() => {
       component.onFormationChange('3-5-2');
       setTimeout(() => {
-        // First HTTP completed, flag reset.
-        const callsAfterFirst = httpClientSpy.post.calls.allArgs()
-          .filter(args => String(args[0]).includes('/career/lineup/manual-select')).length;
-
         component.onFormationChange('4-3-3');
         setTimeout(() => {
-          const callsAfterSecond = httpClientSpy.post.calls.allArgs()
-            .filter(args => String(args[0]).includes('/career/lineup/manual-select')).length;
-          expect(callsAfterSecond - callsAfterFirst).withContext(
-            'second formation change must trigger a SECOND /manual-select call').toBe(1);
-
-          // Last call's body must have formation=4-3-3 (the second target),
-          // not 3-5-2 (the first target).
-          const lastCall = httpClientSpy.post.calls.allArgs()
-            .filter(args => String(args[0]).includes('/career/lineup/manual-select'))
-            .pop();
-          expect((lastCall![1] as any).formation).toBe('4-3-3');
+          expect(component.selectedFormation).toBe('4-3-3');
+          expect(httpClientSpy.post.calls.allArgs()
+            .filter(args => String(args[0]).includes('/career/lineup/manual-select')).length).toBe(0);
           done();
         }, 30);
       }, 30);
@@ -2640,7 +2609,7 @@ describe('SquadEditorModalComponent formation change updates header and markers'
     }, 30);
   });
 
-  it('isFormationChanging toggles true-to-false around the HTTP lifecycle', (done) => {
+  it('isFormationChanging is not held by a backend request for a draft', (done) => {
     // Check the JS flag directly: it is the source of truth for the
     // disabled binding and avoids fragile DOM timing in jsdom.
     setTimeout(() => {
@@ -2649,15 +2618,8 @@ describe('SquadEditorModalComponent formation change updates header and markers'
         'precondition: flag must start false after init').toBeFalse();
 
       component.onFormationChange('3-5-2');
-      expect(component.isFormationChanging).withContext(
-        'flag must be true synchronously after handler runs (HTTP in flight)').toBeTrue();
-
-      // Wait for the async mock response and callback.
-      setTimeout(() => {
-        expect(component.isFormationChanging).withContext(
-          'flag must reset to false after HTTP completes').toBeFalse();
-        done();
-      }, 30);
+      expect(component.isFormationChanging).toBeFalse();
+      done();
     }, 30);
   });
 

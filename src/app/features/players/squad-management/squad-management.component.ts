@@ -19,8 +19,6 @@ import { PlayerCardComponent } from 'app/shared/components/player-card/player-ca
 import { LineupPlayerCardComponent } from 'app/shared/components/lineup-player-card/lineup-player-card.component';
 import { SeasonStatsTabComponent } from '../../player-season-stats/components/season-stats-tab/season-stats-tab.component';
 import { LineupDTO, PlayerLineupDTO, ChemistryBreakdownDTO } from 'app/shared/models/lineup/lineup.dto';
-import { FormationDTO } from 'app/shared/models/lineup/formation.dto';
-import { LineupSlotDTO } from 'app/shared/models/lineup/lineup-slot.dto';
 import { LineupWarningDTO } from 'app/shared/models/lineup/lineup-warning.dto';
 import { ALL_FORMATIONS, FormationCode } from 'app/shared/constants/formations';
 import { SquadEditorModalComponent } from 'app/components/squad-editor-modal/squad-editor-modal.component';
@@ -273,63 +271,15 @@ this.squad$ = combineLatest([
       }).format(value);
     }
     onFormationChange(formation: string): void {
-      this.selectedFormation$.next(formation);
-      const current = this.lineupSubject$.value;
-      const playerIds: string[] = (current?.players ?? []).map(p => p.playerId);
-      const currentSlots = current?.slots ?? [];
-      const fallbackSlots = currentSlots.map(s => ({
-        playerId: s.playerId,
-        subdivisionId: s.subdivisionId,
-        customXPercent: s.customXPercent,
-        customYPercent: s.customYPercent,
-      }));
-      const slots$ = this.http.get<FormationDTO[]>(`${environment.apiUrl}/lineup-editor/formations`).pipe(
-        map(formations => this.reflowCurrentPlayersIntoFormation(formation, current, formations) ?? fallbackSlots),
-        catchError(() => of(fallbackSlots))
-      );
-      slots$.pipe(
-        switchMap(slots => this.http.post<LineupDTO>(
-          `${environment.apiUrl}/career/lineup/manual-select`,
-          { formation, playerIds, slots }
-        ))
-      ).subscribe({
-        next: () => {
-          this.http.get<LineupDTO>(`${environment.apiUrl}/career/lineup/current`)
-            .pipe(
-              tap(lineup => {
-                this.applyLineup(lineup);
-              }),
-              catchError(err => {
-                this.applyLineup(null);
-                return of(null);
-              })
-            )
-            .subscribe();
-        },
-        error: (err) => {
-          const userMsg = readableErrorMessage(err, 'Error actualizando formación');
-          this.lineupError$.next(userMsg);
-        }
-      });
-    }
-    private reflowCurrentPlayersIntoFormation(
-      formation: string,
-      current: LineupDTO | null,
-      formations: FormationDTO[]
-    ): LineupSlotDTO[] | null {
-      const players = current?.players ?? [];
-      if (players.length !== 11) {
-        return null;
-      }
-      const target = formations.find(f => f.name === formation);
-      const positions = [...(target?.positions ?? [])].sort((a, b) => a.index - b.index);
-      if (positions.length !== 11) {
-        return null;
-      }
-      return players.map((player, index) => ({
-        playerId: player.playerId,
-        subdivisionId: positions[index].subdivisionId,
-      }));
+      /*
+       * The page-level selector is not a persistence surface. Keep it anchored
+       * to the confirmed lineup; formation drafts are edited and confirmed in
+       * the visual editor, where role-aware reflow is available.
+       */
+      const confirmedFormation = this.lineupSubject$.value?.formation
+        ?? this.selectedFormation$.value;
+      this.selectedFormation$.next(confirmedFormation);
+      this.lineupError$.next(null);
     }
     setActiveTab(tab: 'squad' | 'stats'): void {
       this.activeTab$.next(tab);
@@ -361,7 +311,10 @@ openVisualEditor(): void {
         disableClose: false,
         panelClass: 'squad-editor-panel'
       });
-      ref.afterClosed().subscribe(() => {
+      ref.afterClosed().subscribe((result: { saved?: boolean } | undefined) => {
+        if (!result?.saved) {
+          return;
+        }
 
         this.http.get<LineupDTO>(`${environment.apiUrl}/career/lineup/current`)
           .pipe(

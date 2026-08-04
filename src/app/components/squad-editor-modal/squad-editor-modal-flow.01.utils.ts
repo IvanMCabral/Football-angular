@@ -213,7 +213,6 @@ export function runSquadEditorAssignPlayerToSlot(ctx: any): void {
 
     ctx.selectedSlot = null;
     ctx.selectedPlayerToAssign = '';
-    ctx.saveLineup();
     ctx.triggerChemistryPreview();
     ctx.updateFormationDetection();
     ctx.cdr.detectChanges();
@@ -587,6 +586,7 @@ export function runSquadEditorLoadSquadFromBackend(ctx: any): void {
         ctx.homePlayers$.next(allPlayers.filter((p: any) => p.slotId));
         ctx.benchPlayers$.next(allPlayers.filter((p: any) => !p.slotId));
         ctx.triggerChemistryPreview();
+        ctx.markConfirmedDraft?.();
 
         ctx.isInitializing = false;
         ctx.cdr.detectChanges();
@@ -628,28 +628,30 @@ export function runSquadEditorOnFormationChange(ctx: any, newFormation: any): vo
 
     ctx.isFormationChanging = true;
     ctx.cdr.markForCheck();
-
     ctx.formationChangeCompleteSubject = new Subject<void>();
-
     ctx.homeFormation$.next(targetFormation);
-
+    // This intentionally updates only the in-memory draft.  Backend state is
+    // changed by the explicit confirm action in the modal footer.
     ctx.executeFormationChange(targetFormation);
   
 }
 
 export function runSquadEditorSaveLineup(ctx: any, onDone: any): void {
+    if (ctx.isSavingDraft) {
+      return;
+    }
     const validHomePlayers = ctx.getUniqueValidHomePlayers();
     const playerCount = validHomePlayers.length;
     if (playerCount < 7) {
       ctx.errorMessage$.next('Mínimo 7 jugadores para guardar (puedes tener más)');
       ctx.lineupWarning$.next(null);
-      onDone?.();
+      onDone?.(false);
       return;
     }
     if (playerCount > 11) {
       ctx.errorMessage$.next('Máximo 11 jugadores');
       ctx.lineupWarning$.next(null);
-      onDone?.();
+      onDone?.(false);
       return;
     }
     ctx.errorMessage$.next('');
@@ -664,6 +666,7 @@ export function runSquadEditorSaveLineup(ctx: any, onDone: any): void {
         return dto;
       });
 
+    ctx.isSavingDraft = true;
     (ctx.http as HttpClient).post<{warnings?: LineupWarningDTO[]}>(
       `${environment.apiUrl}/career/lineup/manual-select`,
       {
@@ -680,13 +683,15 @@ export function runSquadEditorSaveLineup(ctx: any, onDone: any): void {
           next: (response: any) => {
             const warnings = response?.warnings ?? [];
             ctx.lineupWarning$.next(warnings.length > 0 ? warnings[0] : null);
-            onDone?.();
+            ctx.isSavingDraft = false;
+            onDone?.(true);
           },
           error: (err: any) => {
             if (err.error?.code) {
               ctx.errorMessage$.next(err.error.message || 'Error al guardar');
             }
-            onDone?.();
+            ctx.isSavingDraft = false;
+            onDone?.(false);
           }
         });
       },
@@ -694,7 +699,8 @@ export function runSquadEditorSaveLineup(ctx: any, onDone: any): void {
         if (err.error?.code) {
           ctx.errorMessage$.next(err.error.message || 'Error al guardar');
         }
-        onDone?.();
+        ctx.isSavingDraft = false;
+        onDone?.(false);
       }
     });
   

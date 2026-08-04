@@ -523,6 +523,17 @@
         <div class="bench-info">
           <span>Slots: {{occupiedSlots}}/11</span>
         </div>
+        <div class="draft-actions" aria-label="Acciones de alineación">
+          <span class="draft-status" *ngIf="hasDraftChanges">Cambios sin guardar</span>
+          <span class="draft-status saved" *ngIf="!hasDraftChanges">Alineación guardada</span>
+          <button mat-button type="button" (click)="close()" [disabled]="isSavingDraft">Cancelar</button>
+          <button mat-raised-button color="primary" type="button"
+                  data-testid="confirm-lineup-draft"
+                  (click)="confirmDraft()"
+                  [disabled]="!hasDraftChanges || isSavingDraft || occupiedSlots !== 11">
+            {{ isSavingDraft ? 'Guardando…' : 'Guardar y confirmar' }}
+          </button>
+        </div>
       </div>
 
       <div *ngIf="selectedSlot" class="assignment-panel">

@@ -2,3 +2,20 @@
 @import './squad-editor-modal.bench.css';
 @import './squad-editor-modal.pitch.css';
 @import './squad-editor-modal.players-responsive.css';
+.draft-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: .5rem;
+  flex-wrap: wrap;
+}
+
+.draft-status {
+  color: #a85b00;
+  font-size: .85rem;
+  margin-right: auto;
+}
+
+.draft-status.saved {
+  color: #2e7d32;
+}
