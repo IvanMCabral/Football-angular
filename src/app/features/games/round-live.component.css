@@ -152,6 +152,12 @@
   margin-bottom: 2rem;
 }
 
+@media (max-width: 600px) {
+  .matches-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 /* Highlight the manager match above the rest of the round. */
 .user-match-section {
   margin-bottom: 1rem;

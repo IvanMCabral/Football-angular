@@ -382,20 +382,20 @@ export class PartidoModalComponent {
 
   selectedNudgePlayerName(): string {
     if (this.selectedNudgeSlotIdx === null) {
-      return 'Ning?n jugador seleccionado';
+      return 'Ningún jugador seleccionado';
     }
-    return this.playerAtSlot(this.selectedNudgeSlotIdx)?.name ?? 'Slot vac?o';
+    return this.playerAtSlot(this.selectedNudgeSlotIdx)?.name ?? 'Slot vacío';
   }
 
   selectedNudgeCoordsLabel(): string {
     if (this.selectedNudgeSlotIdx === null) {
-      return 'Seleccion? una ficha del XI para ajustar p?xeles.';
+      return 'Seleccioná una ficha del XI para ajustar píxeles.';
     }
     const coords = this.freeSlotCoords.get(this.selectedNudgeSlotIdx);
     if (!coords) {
       return 'En posición base de la formación.';
     }
-    return `X ${coords.x.toFixed(1)}% ? Y ${coords.y.toFixed(1)}%`;
+    return `X ${coords.x.toFixed(1)}% · Y ${coords.y.toFixed(1)}%`;
   }
 
   canNudgeSelectedSlot(): boolean {

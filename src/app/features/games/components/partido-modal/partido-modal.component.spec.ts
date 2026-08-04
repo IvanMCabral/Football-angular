@@ -484,6 +484,16 @@ describe('PartidoModalComponent', () => {
     expect(component.isFreePositionedSlot(6)).toBeFalse();
   });
 
+  it('uses readable Spanish labels for pixel selection and coordinates', () => {
+    component.selectedNudgeSlotIdx = null;
+    expect(component.selectedNudgePlayerName()).toBe('Ningún jugador seleccionado');
+    expect(component.selectedNudgeCoordsLabel()).toBe('Seleccioná una ficha del XI para ajustar píxeles.');
+
+    component.selectNudgeSlot(6);
+    component.freeSlotCoords.set(6, { x: 61, y: 82 });
+    expect(component.selectedNudgeCoordsLabel()).toContain(' · Y ');
+  });
+
   it('nudge harness memory uses the current visual coordinate as the before point', () => {
     const setItemSpy = spyOn(window.localStorage, 'setItem');
     component.freeSlotCoords.set(6, { x: 47.25, y: 58.75 });
