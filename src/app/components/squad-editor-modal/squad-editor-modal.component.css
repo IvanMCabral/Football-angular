@@ -19,3 +19,81 @@
 .draft-status.saved {
   color: #2e7d32;
 }
+
+@media (max-width: 600px) {
+  .main-area {
+    flex-direction: column;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 0 6px;
+  }
+
+  .team-stats-panel {
+    flex: 0 0 auto;
+    width: auto;
+    max-height: 220px;
+    min-width: 0;
+  }
+
+  .field-and-bench {
+    flex: 0 0 auto;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .field-container {
+    min-height: 270px;
+    padding: 6px 0;
+  }
+
+  .field {
+    width: min(100%, 330px);
+    height: auto;
+    aspect-ratio: 1.15 / 1;
+  }
+
+  .bench-container {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    min-width: 0;
+  }
+
+  .bench-container .bench-label {
+    width: 100%;
+  }
+
+  .bench-container .bench-list {
+    width: 100%;
+    min-width: 0;
+    grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+    overflow-x: visible;
+  }
+
+  .bench-player {
+    min-width: 0;
+    padding: 0.4rem 0.3rem;
+  }
+
+  .squad-footer {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 10px;
+  }
+
+  .team-info,
+  .bench-info {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .field-orientation {
+    order: 3;
+    flex: 1 1 100%;
+  }
+
+  .draft-actions {
+    order: 4;
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+}
