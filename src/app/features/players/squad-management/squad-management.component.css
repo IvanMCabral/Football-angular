@@ -591,6 +591,17 @@
     align-items: stretch;
   }
 
+  .header-left {
+    width: 100%;
+    min-width: 0;
+    flex-wrap: wrap;
+  }
+
+  .header-left h1 {
+    min-width: 0;
+    font-size: 1.4rem;
+  }
+
   .team-info {
     flex-wrap: wrap;
     gap: 0.5rem;

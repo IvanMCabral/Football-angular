@@ -150,7 +150,8 @@ private normalizeLineupForDisplay(lineup: LineupDTO | null): LineupDTO | null {
     activeTab$ = new BehaviorSubject<'squad' | 'stats'>('squad');
     ngOnInit() {
       const careerStatusSource$ = this.http.get<CareerStatus>(`${environment.apiUrl}/career/status`).pipe(
-        catchError(err => of(null))
+        catchError(err => of(null)),
+        shareReplay({ bufferSize: 1, refCount: true })
       );
       this.careerStatus$ = careerStatusSource$.pipe(
         tap(status => {

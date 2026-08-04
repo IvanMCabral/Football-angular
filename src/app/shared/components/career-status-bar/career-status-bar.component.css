@@ -1,11 +1,39 @@
 .career-status-bar {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   gap: 0;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   padding: 0.5rem 1rem;
   border-radius: 10px;
   box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+@media (max-width: 600px) {
+  .career-status-bar {
+    width: 100%;
+    justify-content: flex-start;
+    padding: 0.5rem;
+  }
+
+  .status-item,
+  .status-item-division {
+    padding: 0.25rem 0.45rem;
+  }
+
+  .status-divider {
+    height: 28px;
+  }
+
+  .btn-action,
+  .btn-standings,
+  .btn-promotions {
+    font-size: 0.75rem;
+    padding: 0.35rem 0.5rem;
+  }
 }
 
 .status-item {
