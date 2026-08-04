@@ -1,4 +1,11 @@
 
+      /* Keep cards inside the authored slot spacing on compact three/five
+         player lines while retaining readable labels on wide pitches. */
+      .player-marker {
+        width: clamp(40px, 10%, 70px);
+        margin-left: calc(clamp(40px, 10%, 70px) / -2);
+      }
+
       .player-marker.color-gk { height: 38px; margin-top: -19px; }
       .player-marker.color-def { height: 48px; margin-top: -24px; }
       .player-marker.color-mid { height: 44px; margin-top: -22px; }
@@ -54,7 +61,7 @@
       background: rgba(0, 0, 0, 0.7);
       padding: 1px 4px;
       border-radius: 3px;
-      max-width: 70px;
+      max-width: 100%;
       overflow: visible;
       text-overflow: clip;
       white-space: normal;
