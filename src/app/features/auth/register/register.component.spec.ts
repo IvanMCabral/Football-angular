@@ -120,4 +120,13 @@ describe('RegisterComponent request lifecycle', () => {
     expect(authService.register).toHaveBeenCalledTimes(1);
     expect(component.loading).toBeFalse();
   });
+
+  it('matches the backend registration policy before sending a request', () => {
+    component.registerForm.patchValue({ username: 'a', password: 'short' });
+
+    expect(component.registerForm.invalid).toBeTrue();
+    component.onSubmit();
+
+    expect(authService.register).not.toHaveBeenCalled();
+  });
 });
