@@ -31,6 +31,19 @@ describe('squad editor drag utilities', () => {
     expect(reset).toHaveBeenCalled();
   });
 
+  it('preserves the drag source receiver when reset uses this', () => {
+    const source = {
+      reset(this: { resetCount: number }) {
+        this.resetCount += 1;
+      },
+      resetCount: 0,
+    };
+
+    resetSquadEditorDragSource(source);
+
+    expect(source.resetCount).toBe(1);
+  });
+
   it('clears the public element transform after a drop', () => {
     const element = document.createElement('div');
     element.style.transform = 'translate3d(4px, 5px, 0)';

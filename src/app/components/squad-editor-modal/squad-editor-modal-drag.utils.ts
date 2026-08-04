@@ -36,9 +36,11 @@ export function getSquadEditorDragData<T>(source: unknown): T | undefined {
 }
 
 export function resetSquadEditorDragSource(source: unknown): void {
-  const reset = (source as SquadEditorDragSource | null)?.reset;
-  if (typeof reset === 'function') {
-    reset();
+  const dragSource = source as SquadEditorDragSource | null;
+  if (typeof dragSource?.reset === 'function') {
+    // Keep CdkDrag as the receiver. Its public reset() delegates to an
+    // internal DragRef and therefore requires the original `this` binding.
+    dragSource.reset();
   }
 }
 
