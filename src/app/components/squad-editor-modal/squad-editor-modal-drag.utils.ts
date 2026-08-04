@@ -37,9 +37,21 @@ export function getSquadEditorDragData<T>(source: unknown): T | undefined {
 
 export function resetSquadEditorDragSource(source: unknown): void {
   const dragSource = source as SquadEditorDragSource | null;
+  const element = dragSource?.element?.nativeElement;
+
+  // Angular CDK owns the internal DragRef behind CdkDrag.  Calling reset()
+  // on a source received from a drag event is not stable across CDK builds:
+  // in the public bundle it can run without the backing ref and throw while
+  // handling an otherwise valid drop.  The element transform is the only
+  // state this editor needs to clear, so prefer the stable DOM surface.
+  if (element?.style) {
+    element.style.transform = '';
+    element.style.webkitTransform = '';
+    return;
+  }
+
   if (typeof dragSource?.reset === 'function') {
-    // Keep CdkDrag as the receiver. Its public reset() delegates to an
-    // internal DragRef and therefore requires the original `this` binding.
+    // Keep the fallback for lightweight non-CDK sources used by tooling.
     dragSource.reset();
   }
 }

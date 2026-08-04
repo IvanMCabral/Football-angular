@@ -44,6 +44,17 @@ describe('squad editor drag utilities', () => {
     expect(source.resetCount).toBe(1);
   });
 
+  it('clears the public element without invoking unstable CDK reset', () => {
+    const element = document.createElement('div');
+    element.style.transform = 'translate3d(4px, 5px, 0)';
+    const reset = jasmine.createSpy('reset');
+
+    resetSquadEditorDragSource({ element: { nativeElement: element }, reset });
+
+    expect(element.style.transform).toBe('');
+    expect(reset).not.toHaveBeenCalled();
+  });
+
   it('clears the public element transform after a drop', () => {
     const element = document.createElement('div');
     element.style.transform = 'translate3d(4px, 5px, 0)';
