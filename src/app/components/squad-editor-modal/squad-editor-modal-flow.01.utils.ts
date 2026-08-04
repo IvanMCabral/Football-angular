@@ -377,6 +377,35 @@ export function runSquadEditorHandleMarkerDragEnd(ctx: any, event: any, player: 
       markerHalfHeight: halfHeight,
     });
 
+    // Dropping a marker on another occupied canonical slot is a slot
+    // operation, not a free-position override.  The marker element sits
+    // above the CDK drop-list, so the marker drag-end callback receives these
+    // drops directly.  Resolve the nearest compatible slot before applying a
+    // pixel move to keep the visible semantics deterministic (swap for an
+    // occupied slot, free positioning everywhere else).
+    const targetSlot = ctx.findClosestSubdivision(xPct, yPct, player);
+    if (targetSlot && targetSlot.subdivisionId !== player.slotId) {
+      const targetCenter = computeSquadEditorSlotCenter({
+        canonicalX: ctx.getFormationPositionCoord(targetSlot.subdivisionId, 'x'),
+        canonicalY: ctx.getFormationPositionCoord(targetSlot.subdivisionId, 'y'),
+        slotRect: targetSlot,
+      });
+      if (isSquadEditorDropNearSlotCenter({
+        drop: { xPct, yPct },
+        center: targetCenter,
+        thresholdPct: 4,
+      })) {
+        const occupant = ctx.slotPlayerMap[targetSlot.subdivisionId] ?? null;
+        ctx.applySlotAssignment(player, player.slotId || null, targetSlot.subdivisionId, occupant);
+        resetSquadEditorDragSource(event.source);
+        const dragRef = getSquadEditorDragRef(event.source);
+        if (dragRef) {
+          clearSquadEditorDragTransform(dragRef);
+        }
+        return;
+      }
+    }
+
     if (ctx.isInsideGoalkeeperProtectedArea(xPct, yPct)) {
       ctx.pendingCoachMoveBaseline = null;
       if (player.slotId) {

@@ -3618,6 +3618,37 @@ describe('SquadEditorModalComponent free positioning on field drop', () => {
     }, 30);
   });
 
+  it('handleMarkerDragEnd swaps when a starter is dropped on another occupied canonical slot', (done) => {
+    setTimeout(() => {
+      const pDef = (component as any).slotPlayerMap['S22-1'];
+      const pMid = (component as any).slotPlayerMap['S13-2'];
+      const pAtt = (component as any).slotPlayerMap['S05-2'];
+      const fieldEl: HTMLElement = fixture.nativeElement.querySelector('.field');
+      fieldEl.getBoundingClientRect = () => ({
+        left: 0, top: 0, right: 1000, bottom: 800, width: 1000, height: 800,
+        x: 0, y: 0, toJSON: () => ({})
+      });
+      (component as any).fieldContainer = { nativeElement: fieldEl };
+
+      // The drop is exactly on the authored S05-2 point (50%, 10%).
+      // Because that slot is occupied, the public drag semantics are a swap.
+      (component as any).handleMarkerDragEnd({
+        dropPoint: { x: 500, y: 80 },
+        source: { element: { nativeElement: document.createElement('div') } },
+      } as any, pDef);
+
+      expect(pDef.slotId).toBe('S05-2');
+      expect(pAtt.slotId).toBe('S22-1');
+      expect((component as any).slotPlayerMap['S05-2']).toBe(pDef);
+      expect((component as any).slotPlayerMap['S22-1']).toBe(pAtt);
+      expect(pDef.xPercent).toBeUndefined();
+      expect(pAtt.yPercent).toBeUndefined();
+      expect(pMid.slotId).toBe('S13-2');
+      expect((component as any).homePlayers$.value.filter((p: any) => p.slotId === 'S05-2').length).toBe(1);
+      done();
+    }, 30);
+  });
+
   it('resetCustomPositions: clears xPercent/yPercent on all home players', (done) => {
     setTimeout(() => {
       const home = (component as any).homePlayers$.value.slice();
