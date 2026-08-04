@@ -79,6 +79,7 @@ export class CareerSetupComponent implements OnInit {
   selectedGameSpeed: string | null = null;
   selectedTeamsPerDivision: number | null = null;
   creating = false;
+  readonly worldRequestTimeoutMs = 25_000;
   
   private divisionChangeSubject = new BehaviorSubject<number | null>(null);
   private leagueChangeSubject = new BehaviorSubject<string | null>(null);
@@ -105,11 +106,13 @@ export class CareerSetupComponent implements OnInit {
       this.authService.getUserInfo(),
       this.refreshLeaguesTrigger
     ]).pipe(
-      switchMap(([userInfo]) =>
-        this.http.get<League[]>(`${environment.apiUrl}/world/leagues?userId=${userInfo.id}`)
+        switchMap(([userInfo]) =>
+        this.http.get<League[]>(`${environment.apiUrl}/world/leagues?userId=${userInfo.id}`, {
+          timeout: this.worldRequestTimeoutMs
+        })
       ),
       catchError(err => {
-        this.error$.next('Error al cargar ligas');
+        this.error$.next('No se pudo cargar el mundo. Revisá tu conexión y reintentá.');
         return of([]);
       }),
       shareReplay({ bufferSize: 1, refCount: false })
@@ -125,7 +128,9 @@ export class CareerSetupComponent implements OnInit {
           of([] as TeamWithOVR[]),
           this.authService.getUserInfo().pipe(
             switchMap(userInfo =>
-              this.http.get<TeamWithOVR[]>(`${environment.apiUrl}/world/leagues/${leagueId}/teams-with-ovr?userId=${userInfo.id}`)
+              this.http.get<TeamWithOVR[]>(`${environment.apiUrl}/world/leagues/${leagueId}/teams-with-ovr?userId=${userInfo.id}`, {
+                timeout: this.worldRequestTimeoutMs
+              })
             ),
             catchError(err => {
               this.error$.next('Error al cargar equipos');
@@ -193,6 +198,11 @@ export class CareerSetupComponent implements OnInit {
         this.selectedLeagueId = leagues[0].realLeagueId;
       }
     });
+  }
+
+  retryWorldLoad(): void {
+    this.error$.next(null);
+    this.refreshLeaguesTrigger.next();
   }
 
   getDivisionName(number: number): string {
