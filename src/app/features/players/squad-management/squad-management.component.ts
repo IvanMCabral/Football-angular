@@ -163,6 +163,10 @@ private normalizeLineupForDisplay(lineup: LineupDTO | null): LineupDTO | null {
         // second status round-trip on the critical Confirmar y jugar click.
         shareReplay({ bufferSize: 1, refCount: false })
       );
+      // Start the single status read as soon as the screen is created. The
+      // async pipes and the formation modal can then consume the same replay
+      // without making the first click pay the network latency.
+      careerStatusSource$.subscribe({ error: () => undefined });
       this.careerStatus$ = careerStatusSource$.pipe(
         tap(status => {
           if (!status || !status.careerId) {
