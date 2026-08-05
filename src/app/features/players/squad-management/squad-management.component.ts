@@ -404,8 +404,8 @@ openVisualEditor(): void {
       this.lineupWarning$.next(null);
       markMatchStartStage('T2_LOCAL_VALIDATION_DONE');
       markMatchStartStage('T7_LINEUP_REQUESTED');
+      markMatchStartStage('T3_STATUS_REQUESTED');
       firstValueFrom(this.careerStatus$).then(careerStatus => {
-        markMatchStartStage('T3_STATUS_REQUESTED');
         markMatchStartStage('T4_STATUS_COMPLETED');
         if (!careerStatus || !careerStatus.careerId) {
           this.lineupLoading$.next(false);
