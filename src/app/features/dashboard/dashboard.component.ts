@@ -18,6 +18,9 @@ import { UserInfo } from '../../shared/models/auth.model';
 import { ConfirmActionDialogComponent } from '../../shared/components/confirm-action-dialog/confirm-action-dialog.component';
 import { readableErrorMessage } from '../../shared/utils/error-message';
 import { WorldCatalogService } from '../../core/services/world-catalog.service';
+import { CareerService } from '../../core/services/career.service';
+import { beginMatchStartTrace, markMatchStartStage } from '../games/match-start-trace';
+import { buildRoundStartNavigationState } from '../games/round-start-navigation-state';
 
 interface UserStats {
   matchesPlayed: number;
@@ -82,6 +85,7 @@ export class DashboardComponent implements OnInit {
   private toastService = inject(ToastService);
   private dialog = inject(MatDialog);
   private catalogService = inject(WorldCatalogService);
+  private careerService = inject(CareerService);
 
   private careerStatusSubject = new BehaviorSubject<CareerStatus | null | undefined>(undefined);
   careerStatus$ = this.careerStatusSubject.asObservable();
@@ -171,7 +175,14 @@ export class DashboardComponent implements OnInit {
         return of(null);
       })
     ).subscribe(status => {
-      this.careerStatusSubject.next(status);
+    this.careerStatusSubject.next(status);
+
+      if (status?.currentRound) {
+        // Warm the exact pending-round snapshot while the manager is reading
+        // the dashboard. The live route reuses this keyed request if it is
+        // still within its short TTL.
+        this.careerService.prefetchFixturesForRound(status.currentRound).subscribe({ error: () => undefined });
+      }
 
       const phase = status?.careerPhase ?? null;
       const season = status?.season ?? 0;
@@ -346,9 +357,14 @@ export class DashboardComponent implements OnInit {
   }
 
   onPlayNextRound(): void {
+    beginMatchStartTrace();
+    markMatchStartStage('T1_HANDLER_STARTED');
     this.loading = true;
 
+    markMatchStartStage('T3_STATUS_REQUESTED');
     firstValueFrom(this.careerStatus$).then(status => {
+      markMatchStartStage('T4_STATUS_COMPLETED');
+      markMatchStartStage('T2_LOCAL_VALIDATION_DONE');
       if (!status?.careerId) {
         this.loading = false;
         this.toastService.error('No se encontró la carrera');
@@ -365,7 +381,20 @@ export class DashboardComponent implements OnInit {
             const careerId = status.careerId!;
 
             if (response.currentRound && response.careerPhase === 'PRE_MATCH') {
-              this.router.navigate([`/games/${careerId}/round/${response.currentRound}/live`]);
+              const navigationStatus = {
+                careerId,
+                currentRound: response.currentRound,
+                totalRounds: status.totalRounds,
+                userSessionTeamId: status.userSessionTeamId,
+                careerPhase: response.careerPhase,
+                season: status.season,
+                userDivision: status.userDivision
+              };
+              markMatchStartStage('T11_NAVIGATION_REQUESTED');
+              this.router.navigate(
+                [`/games/${careerId}/round/${response.currentRound}/live`],
+                { state: buildRoundStartNavigationState(navigationStatus, response.currentRound, careerId) }
+              );
             } else if (response.tournamentFinished) {
               this.router.navigate([`/games/${careerId}/champion`]);
             } else {

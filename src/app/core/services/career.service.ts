@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { shareReplay, tap } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 import {
   SessionTeam,
@@ -40,6 +41,19 @@ export interface CareerCommandResponse {
 export class CareerService {
   private http = inject(HttpClient);
   private apiUrl = `${environment.apiUrl}/career`;
+
+  /**
+   * Fixtures are immutable for a pending round. Keep a short-lived, keyed
+   * request cache so the squad screen can warm the exact request that the
+   * live screen needs without making the live route wait for a duplicate
+   * Redis read. The TTL is intentionally short: it is a latency optimization,
+   * never the authority for whether a round may start.
+   */
+  private static readonly ROUND_FIXTURE_CACHE_TTL_MS = 30_000;
+  private readonly roundFixtureCache = new Map<number, {
+    requestedAt: number;
+    request$: Observable<{ round: number; matches: Fixture[]; byeTeam: string | null }>;
+  }>();
 
   /**
    * Get all teams in the current career session.
@@ -131,7 +145,34 @@ export class CareerService {
 
   // UX-6: BYE indicator
   getFixturesByRoundWithBye(round: number): Observable<{ round: number; matches: Fixture[]; byeTeam: string | null }> {
-    return this.http.get<{ round: number; matches: Fixture[]; byeTeam: string | null }>(`${this.apiUrl}/fixtures/round/${round}`);
+    const cached = this.roundFixtureCache.get(round);
+    const now = Date.now();
+    if (cached && now - cached.requestedAt < CareerService.ROUND_FIXTURE_CACHE_TTL_MS) {
+      return cached.request$;
+    }
+
+    const request$ = this.http
+      .get<{ round: number; matches: Fixture[]; byeTeam: string | null }>(`${this.apiUrl}/fixtures/round/${round}`)
+      .pipe(
+        tap({
+          error: () => {
+            // Do not retain a failed read: the next navigation must be able
+            // to retry instead of replaying an obsolete transport error.
+            const current = this.roundFixtureCache.get(round);
+            if (current?.request$ === request$) {
+              this.roundFixtureCache.delete(round);
+            }
+          }
+        }),
+        shareReplay({ bufferSize: 1, refCount: false })
+      );
+    this.roundFixtureCache.set(round, { requestedAt: now, request$ });
+    return request$;
+  }
+
+  /** Starts the short-lived round fixture read without coupling it to UI rendering. */
+  prefetchFixturesForRound(round: number): Observable<{ round: number; matches: Fixture[]; byeTeam: string | null }> {
+    return this.getFixturesByRoundWithBye(round);
   }
 
   getAllFixturesWithBye(): Observable<{ rounds: { round: number; matches: Fixture[]; byeTeam: string | null }[] }> {

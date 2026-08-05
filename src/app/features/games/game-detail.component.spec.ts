@@ -81,7 +81,10 @@ describe('GameDetailComponent', () => {
     component.playFirstRound();
 
     expect(careerServiceSpy.advanceToNextRound).toHaveBeenCalledWith('career-1');
-    expect(routerSpy.navigate).toHaveBeenCalledWith(['/games/career-1/round/3/live']);
+    expect(routerSpy.navigate).toHaveBeenCalledWith(
+      ['/games/career-1/round/3/live'],
+      jasmine.objectContaining({ state: jasmine.objectContaining({ managerRoundStart: jasmine.any(Object) }) })
+    );
     expect(component.errorMsg).toBe('');
   });
 
@@ -97,7 +100,10 @@ describe('GameDetailComponent', () => {
     component.playFirstRound();
 
     expect(careerServiceSpy.advanceToNextRound).not.toHaveBeenCalled();
-    expect(routerSpy.navigate).toHaveBeenCalledWith(['/games/career-1/round/4/live']);
+    expect(routerSpy.navigate).toHaveBeenCalledWith(
+      ['/games/career-1/round/4/live'],
+      jasmine.objectContaining({ state: jasmine.objectContaining({ managerRoundStart: jasmine.any(Object) }) })
+    );
   });
 
   it('shows a useful error when next-round fails', () => {

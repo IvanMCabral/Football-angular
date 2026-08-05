@@ -2,8 +2,12 @@ import { combineLatest, of } from 'rxjs';
 import { catchError, filter, map, shareReplay, startWith, switchMap, take, takeUntil, tap } from 'rxjs/operators';
 import { Match } from '../../shared/models/match.model';
 import { RoundMatchVM } from './models/round-live.model';
+import { readRoundStartNavigationState } from './round-start-navigation-state';
+import { markMatchStartStage } from './match-start-trace';
 
 export function initializeRoundLiveComponent(ctx: any): void {
+  markMatchStartStage('T12_ROUTE_ACTIVATION');
+  markMatchStartStage('T13_LIVE_COMPONENT_CREATED');
   ctx.vm$ = ctx.vmSubject.asObservable();
   ctx.registerDebugRoundLiveHook();
   setTimeout(() => ctx.registerDebugRoundLiveHook(), 0);
@@ -41,11 +45,26 @@ export function initializeRoundLiveComponent(ctx: any): void {
   const teamMapForStart$ = teams$.pipe(startWith({} as { [id: string]: string }));
 
   const careerStatus$ = routeParams$.pipe(
-    switchMap(() => ctx.careerService.getCareerStatus())
+    switchMap((params: any) => {
+      const navigationStatus = readRoundStartNavigationState(params.gameId, params.roundNumber);
+      if (navigationStatus) {
+        // The squad screen already received and validated this snapshot. Do
+        // not repeat the same Redis read during the critical start path.
+        markMatchStartStage('T4_STATUS_COMPLETED');
+        return of(navigationStatus);
+      }
+      markMatchStartStage('T3_STATUS_REQUESTED');
+      return ctx.careerService.getCareerStatus().pipe(
+        tap(() => markMatchStartStage('T4_STATUS_COMPLETED'))
+      );
+    }),
+    shareReplay({ bufferSize: 1, refCount: true })
   );
 
   const fixtures$ = routeParams$.pipe(
-    switchMap((params: any) => ctx.careerService.getFixturesByRoundWithBye(params.roundNumber))
+    tap(() => markMatchStartStage('T5_FIXTURES_REQUESTED')),
+    switchMap((params: any) => ctx.careerService.getFixturesByRoundWithBye(params.roundNumber)),
+    tap(() => markMatchStartStage('T6_FIXTURES_COMPLETED'))
   );
 
   combineLatest([routeParams$, teamMapForStart$, careerStatus$, fixtures$]).pipe(
@@ -95,9 +114,15 @@ export function initializeRoundLiveComponent(ctx: any): void {
         anyStarted: false
       });
 
+      // Lineup is already confirmed on the squad screen. The backend remains
+      // authoritative during startRound; there is no second lineup read.
+      markMatchStartStage('T7_LINEUP_REQUESTED');
+      markMatchStartStage('T8_LINEUP_COMPLETED');
+
       // The first emission starts the round.  A later team-catalog emission
       // only hydrates labels; roundLiveStartRoundEngine guards the duplicate.
       ctx.startRoundEngine(params.gameId, matches);
+      setTimeout(() => markMatchStartStage('T14_FIRST_RENDER'), 0);
     }),
     catchError((err: unknown) => {
       ctx.logDevError('[ROUND] Error:', err);

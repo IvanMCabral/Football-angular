@@ -16,6 +16,7 @@ import {
   StyleChangeResult,
   TeamStyle
 } from './match-engine.model';
+import { beginMatchStartTrace, completeMatchStartTrace, markMatchStartStage } from '../../features/games/match-start-trace';
 
 /**
  * Configurable backoff schedule for live stream reconnection.
@@ -55,6 +56,9 @@ export class MatchEngineService {
 
   /** Marks the user action without exposing payload or account information. */
   markMatchStartClick(): void {
+    beginMatchStartTrace();
+    markMatchStartStage('T1_HANDLER_STARTED');
+    markMatchStartStage('T2_LOCAL_VALIDATION_DONE');
     this.pendingMatchStartClickAt = this.monotonicNow();
     this.markPerformance('manager.match-start.click');
   }
@@ -76,6 +80,7 @@ export class MatchEngineService {
     const requestId = `ms-${Math.random().toString(36).slice(2, 14)}`;
     const clickAt = this.pendingMatchStartClickAt ?? postAt;
     this.pendingMatchStartClickAt = null;
+    markMatchStartStage('T9_START_POST_SENT');
     this.markPerformance('manager.match-start.post.sent');
     return this.http.post<RoundState>(`${this.apiUrl}/rounds/start`, {
       roundId,
@@ -86,6 +91,7 @@ export class MatchEngineService {
       tap((state: RoundState) => {
         const responseAt = this.monotonicNow();
         const actualRoundId = state?.roundId || roundId;
+        markMatchStartStage('T10_START_POST_RECEIVED');
         this.matchStartTraceByRound.set(actualRoundId, { requestId, clickAt, postAt, responseAt });
         this.markPerformance('manager.match-start.response.received');
         this.logClientTrace(actualRoundId);
@@ -293,6 +299,7 @@ export class MatchEngineService {
           if (trace) {
             trace.streamAt = this.monotonicNow();
           }
+          markMatchStartStage('T15_STREAM_CREATED');
           this.markPerformance('manager.match-start.sse.connected');
           attempt = 0;
           setHealth('HEALTHY');
@@ -343,6 +350,7 @@ export class MatchEngineService {
                       trace.firstEventAt = this.monotonicNow();
                       this.markPerformance('manager.match-start.sse.first');
                       this.logClientTrace(roundId ?? 'unknown');
+                      completeMatchStartTrace(roundId ?? 'unknown');
                     }
                     observer.next(payload);
                     if (isComplete(payload)) {

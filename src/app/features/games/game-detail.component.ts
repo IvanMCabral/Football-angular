@@ -10,6 +10,8 @@ import { DashboardFixtureModalComponent } from '../dashboard/dashboard-fixture-m
 import { DashboardUserInfoComponent } from '../dashboard/dashboard-user-info.component';
 import { Match } from '../../shared/models/match.model';
 import { readableErrorMessage } from '../../shared/utils/error-message';
+import { beginMatchStartTrace, markMatchStartStage } from './match-start-trace';
+import { buildRoundStartNavigationState } from './round-start-navigation-state';
 
 @Component({
   selector: 'app-game-detail',
@@ -46,10 +48,15 @@ export class GameDetailComponent implements OnInit {
 
   playFirstRound() {
     if (!this.game) return;
+    beginMatchStartTrace();
+    markMatchStartStage('T1_HANDLER_STARTED');
     const gameId = this.getValue(this.game.id);
 
+    markMatchStartStage('T3_STATUS_REQUESTED');
     this.careerService.getCareerStatus().subscribe({
       next: (status) => {
+        markMatchStartStage('T2_LOCAL_VALIDATION_DONE');
+        markMatchStartStage('T4_STATUS_COMPLETED');
         if (status?.careerPhase === 'FINISHED') {
           this.router.navigate([`/games/${gameId}/champion`]);
           return;
@@ -57,7 +64,11 @@ export class GameDetailComponent implements OnInit {
 
         if (status?.careerPhase === 'PRE_MATCH' || status?.careerPhase === 'LIVE') {
           const round = status.currentRound || 1;
-          this.router.navigate([`/games/${gameId}/round/${round}/live`]);
+          markMatchStartStage('T11_NAVIGATION_REQUESTED');
+          this.router.navigate(
+            [`/games/${gameId}/round/${round}/live`],
+            { state: buildRoundStartNavigationState(status, round, gameId) }
+          );
           return;
         }
 
@@ -65,7 +76,16 @@ export class GameDetailComponent implements OnInit {
           this.careerService.advanceToNextRound(status.careerId).subscribe({
             next: (response) => {
               if (response?.success && response.currentRound && response.careerPhase === 'PRE_MATCH') {
-                this.router.navigate([`/games/${gameId}/round/${response.currentRound}/live`]);
+                markMatchStartStage('T11_NAVIGATION_REQUESTED');
+                this.router.navigate(
+                  [`/games/${gameId}/round/${response.currentRound}/live`],
+                  { state: buildRoundStartNavigationState({
+                    ...status,
+                    careerId: gameId,
+                    currentRound: response.currentRound,
+                    careerPhase: response.careerPhase
+                  }, response.currentRound, gameId) }
+                );
                 return;
               }
               if (response?.tournamentFinished) {
