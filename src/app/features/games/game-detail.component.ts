@@ -114,7 +114,10 @@ export class GameDetailComponent implements OnInit {
   ngOnInit(): void {
     // Warm the short-lived career status snapshot while the game-detail view
     // renders, so Jugar partido does not start its first status read lazily.
-    this.careerService.getCareerStatus().subscribe({ error: () => undefined });
+    // Test doubles may omit this optional warm-up method result; production
+    // CareerService always returns an Observable and is warmed eagerly.
+    const status$ = this.careerService.getCareerStatus();
+    status$?.subscribe({ error: () => undefined });
     const id = this.route.snapshot.paramMap.get('id');
     if (id) {
       this.gameService.getGameById(id).subscribe({
