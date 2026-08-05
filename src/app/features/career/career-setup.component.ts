@@ -231,29 +231,17 @@ export class CareerSetupComponent implements OnInit {
     }
     this.seedingWorld = true;
     this.error$.next(null);
-    this.authService.getUserInfo().subscribe({
-      next: (userInfo) => {
-        this.http.post(
-          `${environment.apiUrl}/world/seed-la-liga?userId=${userInfo.id}`,
-          {}
-        ).subscribe({
-          next: () => {
-            this.seedingWorld = false;
-            this.catalogService.invalidate();
-            this.refreshLeaguesTrigger.next();
-          },
-          error: (err) => {
-            this.seedingWorld = false;
-            const msg = readableErrorMessage(err, 'Error al inicializar el mundo.');
-            this.error$.next(`Error al inicializar el mundo: ${msg}`);
-            this.logger.error('[CAREER-SETUP] seed error:', err);
-          }
-        });
+    this.catalogService.initializeWorld().subscribe({
+      next: () => {
+        this.seedingWorld = false;
+        this.catalogService.invalidate();
+        this.refreshLeaguesTrigger.next();
       },
       error: (err) => {
         this.seedingWorld = false;
-        this.error$.next('No se pudo obtener el usuario actual para inicializar el mundo.');
-        this.logger.error('[CAREER-SETUP] getUserInfo error:', err);
+        const msg = readableErrorMessage(err, 'Error al inicializar el mundo.');
+        this.error$.next(`Error al inicializar el mundo: ${msg}`);
+        this.logger.error('[CAREER-SETUP] world initialization error:', err);
       }
     });
   }

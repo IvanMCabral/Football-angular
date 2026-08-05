@@ -78,6 +78,26 @@ export class WorldCatalogService {
     return request;
   }
 
+  /**
+   * Ensures that the authenticated user's snapshot is available before the
+   * career setup screen relies on the catalog. Production deliberately does
+   * not expose the historical seed endpoint: the shared dataset is already
+   * imported, so the authenticated dashboard command only materializes the
+   * user's snapshot from that source. Development keeps the seed endpoint so
+   * local tooling and its existing fixtures remain unchanged.
+   */
+  initializeWorld(): Observable<unknown> {
+    if (environment.production) {
+      return this.http.post(`${environment.apiUrl}/dashboard/reload-world`, {});
+    }
+
+    return this.authService.getUserInfo().pipe(
+      switchMap(user => this.http.post(
+        `${environment.apiUrl}/world/seed-la-liga?userId=${user.id}`,
+        {}))
+    );
+  }
+
   /** Non-blocking warm-up used by the dashboard shell. */
   prefetch(): void {
     this.leagues().subscribe({ error: () => undefined });
