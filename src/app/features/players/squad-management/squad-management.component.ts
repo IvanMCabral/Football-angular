@@ -30,6 +30,9 @@ import {
   pickLineupWarning as pickMainLineupWarning
 } from './squad-management-warnings.utils';
 import { AdvanceRoundResponse, ContinueCareerResponse, SessionPlayer, Team } from './squad-management.models';
+import { CareerService } from '../../../core/services/career.service';
+import { beginMatchStartTrace, markMatchStartStage } from '../../games/match-start-trace';
+import { buildRoundStartNavigationState } from '../../games/round-start-navigation-state';
 
 function isFormationCode(value: string): value is FormationCode {
   return (ALL_FORMATIONS as readonly string[]).includes(value);
@@ -53,6 +56,7 @@ export class SquadManagementComponent implements OnInit {
       private http: HttpClient,
       private router: Router,
       private fixtureService: FixtureService,
+      private careerService: CareerService,
       private dialog: MatDialog,
       private logger: AppLoggerService
   ) {}
@@ -148,6 +152,11 @@ private normalizeLineupForDisplay(lineup: LineupDTO | null): LineupDTO | null {
     activeTab$ = new BehaviorSubject<'squad' | 'stats'>('squad');
     ngOnInit() {
       const careerStatusSource$ = this.http.get<CareerStatus>(`${environment.apiUrl}/career/status`).pipe(
+        tap(status => {
+          if (status?.currentRound) {
+            this.careerService.prefetchFixturesForRound(status.currentRound).subscribe({ error: () => undefined });
+          }
+        }),
         catchError(err => of(null)),
         shareReplay({ bufferSize: 1, refCount: true })
       );
@@ -363,6 +372,8 @@ openVisualEditor(): void {
       });
     }
     onConfirmLineup(): void {
+      beginMatchStartTrace();
+      markMatchStartStage('T1_HANDLER_STARTED');
       const currentLineup = this.lineupSubject$.value;
       const playerCount = this.lineupSlotsCount;
 
@@ -384,15 +395,20 @@ openVisualEditor(): void {
       this.lineupLoading$.next(true);
       this.lineupError$.next(null);
       this.lineupWarning$.next(null);
+      markMatchStartStage('T2_LOCAL_VALIDATION_DONE');
+      markMatchStartStage('T7_LINEUP_REQUESTED');
       firstValueFrom(this.careerStatus$).then(careerStatus => {
+        markMatchStartStage('T3_STATUS_REQUESTED');
+        markMatchStartStage('T4_STATUS_COMPLETED');
         if (!careerStatus || !careerStatus.careerId) {
           this.lineupLoading$.next(false);
           this.lineupError$.next('No career found');
           this.resetLineupWarning();
           return;
         }
-this.http.post(`${environment.apiUrl}/career/lineup/confirm`, {}).subscribe({
+        this.http.post(`${environment.apiUrl}/career/lineup/confirm`, {}).subscribe({
           next: () => {
+            markMatchStartStage('T8_LINEUP_COMPLETED');
             this.resetLineupWarning();
             this.refreshSquad();
             if (careerStatus.careerPhase === 'WAITING_USER') {
@@ -404,7 +420,21 @@ this.http.post(`${environment.apiUrl}/career/lineup/confirm`, {}).subscribe({
                       this.lineupError$.next('Temporada completada. Posición final: ' + response.userPosition + '?');
                       this.refreshCareerStatus();
                     } else {
-                      this.router.navigate([`/games/${careerStatus.careerId}/round/${response.currentRound}/live`]);
+                      const nextRound = response.currentRound ?? careerStatus.currentRound;
+                      const navigationStatus = {
+                        careerId: careerStatus.careerId,
+                        currentRound: nextRound,
+                        totalRounds: careerStatus.totalRounds,
+                        userSessionTeamId: careerStatus.userSessionTeamId,
+                        careerPhase: response.careerPhase ?? 'PRE_MATCH',
+                        season: careerStatus.season,
+                        userDivision: careerStatus.userDivision
+                      };
+                      markMatchStartStage('T11_NAVIGATION_REQUESTED');
+                      this.router.navigate(
+                        [`/games/${careerStatus.careerId}/round/${nextRound}/live`],
+                        { state: buildRoundStartNavigationState(navigationStatus, nextRound, careerStatus.careerId!) }
+                      );
                     }
                   } else {
                     this.lineupError$.next(response.message || 'Error al avanzar');
@@ -422,7 +452,11 @@ this.http.post(`${environment.apiUrl}/career/lineup/confirm`, {}).subscribe({
               this.lineupError$.next('El torneo ha finalizado. Usa "Continuar Carrera" para iniciar una nueva temporada.');
             } else {
               this.lineupLoading$.next(false);
-              this.router.navigate([`/games/${careerStatus.careerId}/round/${careerStatus.currentRound}/live`]);
+              markMatchStartStage('T11_NAVIGATION_REQUESTED');
+              this.router.navigate(
+                [`/games/${careerStatus.careerId}/round/${careerStatus.currentRound}/live`],
+                { state: buildRoundStartNavigationState(careerStatus, careerStatus.currentRound, careerStatus.careerId!) }
+              );
             }
           },
           error: (err) => {
