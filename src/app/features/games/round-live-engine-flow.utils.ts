@@ -11,7 +11,6 @@ import {
 } from './utils/round-live-utils';
 
 export function roundLiveStartRoundEngine(ctx: any, gameId: string, matches: RoundMatchVM[]): any {
-    ctx.engineService.markMatchStartClick?.();
     const requestRoundId = gameId;
     const matchData = matches.map(rm => ({
       matchId: String(rm.match.id),
