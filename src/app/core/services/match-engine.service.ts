@@ -348,6 +348,7 @@ export class MatchEngineService {
                   this.ngZone.run(() => {
                     if (trace && trace.firstEventAt === undefined) {
                       trace.firstEventAt = this.monotonicNow();
+                      markMatchStartStage('T16_FIRST_SSE');
                       this.markPerformance('manager.match-start.sse.first');
                       this.logClientTrace(roundId ?? 'unknown');
                       completeMatchStartTrace(roundId ?? 'unknown');
