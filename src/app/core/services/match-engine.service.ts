@@ -302,6 +302,7 @@ export class MatchEngineService {
             trace.streamAt = this.monotonicNow();
           }
           markMatchStartStage('T15_STREAM_CREATED');
+          markMatchStartStage('SSE_CONNECT_REQUESTED');
           this.markPerformance('manager.match-start.sse.connected');
           attempt = 0;
           setHealth('HEALTHY');
@@ -351,6 +352,7 @@ export class MatchEngineService {
                     if (trace && trace.firstEventAt === undefined) {
                       trace.firstEventAt = this.monotonicNow();
                       markMatchStartStage('T16_FIRST_SSE');
+                      markMatchStartStage('FIRST_SSE_PARSED');
                       this.markPerformance('manager.match-start.sse.first');
                       this.logClientTrace(roundId ?? 'unknown');
                       completeMatchStartTrace(roundId ?? 'unknown');

@@ -425,6 +425,7 @@ export class DashboardComponent implements OnInit {
               userDivision: currentStatus.userDivision
             };
             markMatchStartStage('T11_NAVIGATION_REQUESTED');
+            markMatchStartStage('NAVIGATION_REQUESTED');
             this.router.navigate(
               [`/games/${careerId}/round/${response.currentRound}/live`],
               { state: buildRoundStartNavigationState(navigationStatus, response.currentRound, careerId) }

@@ -74,6 +74,7 @@ export class GameDetailComponent implements OnInit {
         if (status?.careerPhase === 'PRE_MATCH' || status?.careerPhase === 'LIVE') {
           const round = status.currentRound || 1;
           markMatchStartStage('T11_NAVIGATION_REQUESTED');
+          markMatchStartStage('NAVIGATION_REQUESTED');
           this.router.navigate(
             [`/games/${gameId}/round/${round}/live`],
             { state: buildRoundStartNavigationState(status, round, gameId) }
@@ -91,6 +92,7 @@ export class GameDetailComponent implements OnInit {
         if (response?.success && response.currentRound && response.careerPhase === 'PRE_MATCH') {
           const navigationStatus = this.buildNavigationStatus(snapshot?.value, response, gameId);
           markMatchStartStage('T11_NAVIGATION_REQUESTED');
+          markMatchStartStage('NAVIGATION_REQUESTED');
           this.router.navigate(
             [`/games/${gameId}/round/${response.currentRound}/live`],
             { state: buildRoundStartNavigationState(navigationStatus, response.currentRound, gameId) }

@@ -7,7 +7,9 @@ import { markMatchStartStage, setMatchStartTraceMetadata } from './match-start-t
 
 export function initializeRoundLiveComponent(ctx: any): void {
   markMatchStartStage('T12_ROUTE_ACTIVATION');
+  markMatchStartStage('ROUTE_ACTIVATION');
   markMatchStartStage('T13_LIVE_COMPONENT_CREATED');
+  markMatchStartStage('LIVE_COMPONENT_CREATED');
   ctx.vm$ = ctx.vmSubject.asObservable();
   ctx.registerDebugRoundLiveHook();
   setTimeout(() => ctx.registerDebugRoundLiveHook(), 0);
@@ -159,7 +161,10 @@ export function initializeRoundLiveComponent(ctx: any): void {
         statusHttpTriggeredByClick: false
       });
       ctx.startRoundEngine(params.gameId, matches);
-      setTimeout(() => markMatchStartStage('T14_FIRST_RENDER'), 0);
+      setTimeout(() => {
+        markMatchStartStage('T14_FIRST_RENDER');
+        markMatchStartStage('LIVE_RENDERED');
+      }, 0);
     }),
     catchError((err: unknown) => {
       ctx.logDevError('[ROUND] Error:', err);
