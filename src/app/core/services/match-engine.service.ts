@@ -1,7 +1,7 @@
 import { Injectable, inject, NgZone } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { BehaviorSubject, Observable, ReplaySubject } from 'rxjs';
-import { map, share, switchMap } from 'rxjs/operators';
+import { map, share, switchMap, tap } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 import { AuthService } from './auth.service';
 import { AppLoggerService } from './app-logger.service';
@@ -43,6 +43,21 @@ export class MatchEngineService {
   private apiUrl = `${environment.apiUrl}/match-engine`;
   /** One transport per URL prevents duplicate SSE connections on route re-entry. */
   private readonly sharedStreams = new Map<string, Observable<unknown>>();
+  private pendingMatchStartClickAt: number | null = null;
+  private readonly matchStartTraceByRound = new Map<string, {
+    requestId: string;
+    clickAt: number;
+    postAt: number;
+    responseAt?: number;
+    streamAt?: number;
+    firstEventAt?: number;
+  }>();
+
+  /** Marks the user action without exposing payload or account information. */
+  markMatchStartClick(): void {
+    this.pendingMatchStartClickAt = this.monotonicNow();
+    this.markPerformance('manager.match-start.click');
+  }
 
   // Starts the engine for one match.
   startEngine(matchId: string, homeTeamId: string, awayTeamId: string): Observable<MatchState> {
@@ -57,10 +72,25 @@ export class MatchEngineService {
    * The round engine owns all match engines and exposes a single live stream.
    */
   startRound(roundId: string, matches: Array<{matchId: string, homeTeamId: string, awayTeamId: string}>): Observable<RoundState> {
+    const postAt = this.monotonicNow();
+    const requestId = `ms-${Math.random().toString(36).slice(2, 14)}`;
+    const clickAt = this.pendingMatchStartClickAt ?? postAt;
+    this.pendingMatchStartClickAt = null;
+    this.markPerformance('manager.match-start.post.sent');
     return this.http.post<RoundState>(`${this.apiUrl}/rounds/start`, {
       roundId,
       matches
-    });
+    }, {
+      headers: new HttpHeaders({ 'X-Request-Id': requestId })
+    }).pipe(
+      tap((state: RoundState) => {
+        const responseAt = this.monotonicNow();
+        const actualRoundId = state?.roundId || roundId;
+        this.matchStartTraceByRound.set(actualRoundId, { requestId, clickAt, postAt, responseAt });
+        this.markPerformance('manager.match-start.response.received');
+        this.logClientTrace(actualRoundId);
+      })
+    );
   }
 
   // Pauses one match engine.
@@ -258,6 +288,12 @@ export class MatchEngineService {
 
           // Connection opened successfully.
           connected = true;
+          const roundId = this.roundIdFromStreamUrl(url);
+          const trace = roundId ? this.matchStartTraceByRound.get(roundId) : undefined;
+          if (trace) {
+            trace.streamAt = this.monotonicNow();
+          }
+          this.markPerformance('manager.match-start.sse.connected');
           attempt = 0;
           setHealth('HEALTHY');
           armDegradedTimer();
@@ -303,6 +339,11 @@ export class MatchEngineService {
                 try {
                   const payload = JSON.parse(dataLine.substring('data:'.length).trim()) as T;
                   this.ngZone.run(() => {
+                    if (trace && trace.firstEventAt === undefined) {
+                      trace.firstEventAt = this.monotonicNow();
+                      this.markPerformance('manager.match-start.sse.first');
+                      this.logClientTrace(roundId ?? 'unknown');
+                    }
                     observer.next(payload);
                     if (isComplete(payload)) {
                       closed = true;
@@ -402,6 +443,39 @@ export class MatchEngineService {
     );
     this.sharedStreams.set(url, shared);
     return shared;
+  }
+
+  private monotonicNow(): number {
+    return typeof performance !== 'undefined' && typeof performance.now === 'function'
+      ? performance.now()
+      : Date.now();
+  }
+
+  private markPerformance(name: string): void {
+    if (typeof performance !== 'undefined' && typeof performance.mark === 'function') {
+      performance.mark(name);
+    }
+  }
+
+  private roundIdFromStreamUrl(url: string): string | null {
+    const match = url.match(/\/rounds\/([^/]+)\/stream/);
+    return match?.[1] ?? null;
+  }
+
+  private logClientTrace(roundId: string): void {
+    const trace = this.matchStartTraceByRound.get(roundId);
+    if (!trace || trace.firstEventAt === undefined || typeof console === 'undefined') {
+      return;
+    }
+    console.info('[MATCH-START-CLIENT-TRACE]', JSON.stringify({
+      requestId: trace.requestId,
+      roundId,
+      clickToLiveMs: Math.round((trace.responseAt ?? trace.firstEventAt) - trace.clickAt),
+      postToResponseMs: trace.responseAt === undefined ? null : Math.round(trace.responseAt - trace.postAt),
+      responseToStreamMs: trace.streamAt === undefined || trace.responseAt === undefined
+        ? null : Math.round(trace.streamAt - trace.responseAt),
+      responseToFirstSseMs: trace.responseAt === undefined ? null : Math.round(trace.firstEventAt - trace.responseAt)
+    }));
   }
 
   // Most recent stream health across active SSE connections.
