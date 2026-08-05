@@ -10,7 +10,7 @@ import { DashboardFixtureModalComponent } from '../dashboard/dashboard-fixture-m
 import { DashboardUserInfoComponent } from '../dashboard/dashboard-user-info.component';
 import { Match } from '../../shared/models/match.model';
 import { readableErrorMessage } from '../../shared/utils/error-message';
-import { beginMatchStartTrace, markMatchStartStage } from './match-start-trace';
+import { beginMatchStartTrace, markMatchStartStage, setMatchStartTraceMetadata } from './match-start-trace';
 import { buildRoundStartNavigationState } from './round-start-navigation-state';
 
 @Component({
@@ -51,17 +51,22 @@ export class GameDetailComponent implements OnInit {
     beginMatchStartTrace(true);
     markMatchStartStage('T1_HANDLER_STARTED');
     const gameId = this.getValue(this.game.id);
-
-    markMatchStartStage('T3_STATUS_REQUESTED');
-    this.careerService.getCareerStatus().subscribe({
-      next: (status) => {
-        markMatchStartStage('T2_LOCAL_VALIDATION_DONE');
-        markMatchStartStage('T4_STATUS_COMPLETED');
-        if (status?.careerPhase === 'FINISHED') {
-          this.router.navigate([`/games/${gameId}/champion`]);
-          return;
-        }
-
+    const snapshot = this.careerService.getCareerStatusSnapshot?.();
+    setMatchStartTraceMetadata({
+      statusSnapshotAvailableAtClick: !!snapshot,
+      statusSnapshotAgeMs: snapshot ? Math.max(0, Date.now() - snapshot.receivedAt) : null,
+      statusHttpTriggeredByClick: false,
+      fixtureSnapshotAvailableAtClick: false,
+      startPayloadReadyMs: 0
+    });
+    markMatchStartStage('T2_LOCAL_VALIDATION_DONE');
+    // The command is authoritative and validates phase, round and ownership.
+    // Do not pay a status read before sending it.
+    const advance$ = this.careerService.advanceToNextRound(gameId);
+    if (!advance$) {
+      // Keep lightweight test doubles and legacy embedding hosts safe; the
+      // production CareerService always returns an Observable here.
+      this.careerService.getCareerStatus?.().subscribe(status => {
         if (status?.careerPhase === 'PRE_MATCH' || status?.careerPhase === 'LIVE') {
           const round = status.currentRound || 1;
           markMatchStartStage('T11_NAVIGATION_REQUESTED');
@@ -69,43 +74,62 @@ export class GameDetailComponent implements OnInit {
             [`/games/${gameId}/round/${round}/live`],
             { state: buildRoundStartNavigationState(status, round, gameId) }
           );
+        }
+      });
+      return;
+    }
+    advance$.subscribe({
+      next: (response) => {
+        if (response?.success && response.currentRound && response.careerPhase === 'PRE_MATCH') {
+          const navigationStatus = this.buildNavigationStatus(snapshot?.value, response, gameId);
+          markMatchStartStage('T11_NAVIGATION_REQUESTED');
+          this.router.navigate(
+            [`/games/${gameId}/round/${response.currentRound}/live`],
+            { state: buildRoundStartNavigationState(navigationStatus, response.currentRound, gameId) }
+          );
           return;
         }
-
-        if (status?.careerPhase === 'WAITING_USER' && status?.careerId) {
-          this.careerService.advanceToNextRound(status.careerId).subscribe({
-            next: (response) => {
-              if (response?.success && response.currentRound && response.careerPhase === 'PRE_MATCH') {
-                markMatchStartStage('T11_NAVIGATION_REQUESTED');
-                this.router.navigate(
-                  [`/games/${gameId}/round/${response.currentRound}/live`],
-                  { state: buildRoundStartNavigationState({
-                    ...status,
-                    careerId: gameId,
-                    currentRound: response.currentRound,
-                    careerPhase: response.careerPhase
-                  }, response.currentRound, gameId) }
-                );
-                return;
-              }
-              if (response?.tournamentFinished) {
-                this.router.navigate([`/games/${gameId}/champion`]);
-                return;
-              }
-              this.router.navigate(['/squad']);
-            },
-            error: (err) => {
-              this.errorMsg = readableErrorMessage(err, 'No se pudo avanzar a la siguiente fecha.');
-              this.cdr.markForCheck();
-            }
-          });
+        if (response?.tournamentFinished || response?.errorCode === 'TORNEO_FINALIZADO') {
+          this.navigateAfterStatusRefresh(gameId);
           return;
         }
-
-        this.router.navigate(['/squad']);
+        this.errorMsg = response?.message || 'No se pudo preparar la siguiente fecha.';
+        this.cdr.markForCheck();
       },
       error: (err) => {
-        this.errorMsg = readableErrorMessage(err, 'No se pudo leer el estado de la carrera.');
+        this.errorMsg = readableErrorMessage(err, 'No se pudo preparar la siguiente fecha.');
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  private buildNavigationStatus(snapshot: any, response: any, careerId: string): any {
+    return {
+      ...(snapshot ?? {}),
+      careerId,
+      currentRound: response.currentRound,
+      totalRounds: response.totalRounds ?? snapshot?.totalRounds ?? response.currentRound,
+      careerPhase: response.careerPhase ?? 'PRE_MATCH',
+      season: response.season ?? snapshot?.season ?? 1
+    };
+  }
+
+  private navigateAfterStatusRefresh(gameId: string): void {
+    setMatchStartTraceMetadata({
+      statusHttpTriggeredByClick: true,
+      statusInvalidationReason: 'start-command-rejected'
+    });
+    this.careerService.getCareerStatus().subscribe({
+      next: status => {
+        if (status?.careerPhase === 'FINISHED') {
+          this.router.navigate([`/games/${gameId}/champion`]);
+        } else {
+          this.errorMsg = 'La carrera no está lista para iniciar esta fecha.';
+          this.cdr.markForCheck();
+        }
+      },
+      error: err => {
+        this.errorMsg = readableErrorMessage(err, 'No se pudo validar el estado de la carrera.');
         this.cdr.markForCheck();
       }
     });

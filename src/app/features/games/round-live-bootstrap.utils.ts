@@ -3,7 +3,7 @@ import { catchError, filter, map, shareReplay, startWith, switchMap, take, takeU
 import { Match } from '../../shared/models/match.model';
 import { RoundMatchVM } from './models/round-live.model';
 import { readRoundStartNavigationState } from './round-start-navigation-state';
-import { markMatchStartStage } from './match-start-trace';
+import { markMatchStartStage, setMatchStartTraceMetadata } from './match-start-trace';
 
 export function initializeRoundLiveComponent(ctx: any): void {
   markMatchStartStage('T12_ROUTE_ACTIVATION');
@@ -47,19 +47,55 @@ export function initializeRoundLiveComponent(ctx: any): void {
   const careerStatus$ = routeParams$.pipe(
     switchMap((params: any) => {
       const navigationStatus = readRoundStartNavigationState(params.gameId, params.roundNumber);
+      const statusSnapshot = ctx.careerService.getCareerStatusSnapshot?.(params.gameId);
+      setMatchStartTraceMetadata({
+        statusSnapshotAvailableAtClick: !!navigationStatus || !!statusSnapshot,
+        statusSnapshotAgeMs: navigationStatus ? 0 : statusSnapshot ? Math.max(0, Date.now() - statusSnapshot.receivedAt) : null,
+        statusHttpTriggeredByClick: false
+      });
       if (navigationStatus) {
         // The squad screen already received and validated this snapshot. Do
         // not repeat the same Redis read during the critical start path.
+        markMatchStartStage('T3_STATUS_REQUESTED');
         markMatchStartStage('T4_STATUS_COMPLETED');
         return of(navigationStatus);
       }
       markMatchStartStage('T3_STATUS_REQUESTED');
       return ctx.careerService.getCareerStatus().pipe(
-        tap(() => markMatchStartStage('T4_STATUS_COMPLETED'))
+        tap(() => markMatchStartStage('T4_STATUS_COMPLETED')),
+        catchError((err: unknown) => {
+          ctx.logDevWarn?.('[ROUND] Status refresh deferred:', err);
+          ctx.loadingSubject.next(false);
+          return of(null);
+        })
       );
     }),
-    shareReplay({ bufferSize: 1, refCount: true })
+    shareReplay({ bufferSize: 1, refCount: false })
   );
+
+  // Status is useful for labels and manager-team highlighting, but it is not
+  // allowed to hold the fixture -> start POST path. It runs in parallel and
+  // patches the view model when it completes.
+  careerStatus$.pipe(takeUntil(ctx.destroy$)).subscribe((status: any) => {
+    if (!status) {
+      return;
+    }
+    ctx.currentUserSessionTeamId = status.userSessionTeamId || null;
+    const currentVm = ctx.vmSubject.value;
+    if (currentVm.matches.length > 0) {
+      const matches = currentVm.matches.map((rm: RoundMatchVM) => {
+        const homeId = String(rm.match.homeTeamId);
+        const awayId = String(rm.match.awayTeamId);
+        const isUserMatch = homeId === ctx.currentUserSessionTeamId || awayId === ctx.currentUserSessionTeamId;
+        return {
+          ...rm,
+          isUserMatch,
+          userTeamId: isUserMatch ? ctx.currentUserSessionTeamId : undefined
+        };
+      });
+      ctx.updateVm({ ...currentVm, matches });
+    }
+  });
 
   const fixtures$ = routeParams$.pipe(
     tap(() => markMatchStartStage('T5_FIXTURES_REQUESTED')),
@@ -67,20 +103,16 @@ export function initializeRoundLiveComponent(ctx: any): void {
     tap(() => markMatchStartStage('T6_FIXTURES_COMPLETED'))
   );
 
-  combineLatest([routeParams$, teamMapForStart$, careerStatus$, fixtures$]).pipe(
+  combineLatest([routeParams$, teamMapForStart$, fixtures$]).pipe(
     takeUntil(ctx.destroy$),
-    tap(([params, teamMap, careerStatus, fixturesData]: any[]) => {
+    tap(([params, teamMap, fixturesData]: any[]) => {
       ctx.loadingSubject.next(false);
       if (typeof performance !== 'undefined' && typeof performance.mark === 'function') {
         performance.mark('manager.match-start.live.state-ready');
       }
 
-      if (careerStatus.careerPhase === 'FINISHED' || params.roundNumber > careerStatus.totalRounds) {
-        ctx.router.navigate([`/games/${params.gameId}/champion`]);
-        return;
-      }
-
-      const userSessionTeamId = careerStatus.userSessionTeamId || '';
+      const navigationStatus = readRoundStartNavigationState(params.gameId, params.roundNumber);
+      const userSessionTeamId = navigationStatus?.userSessionTeamId || ctx.currentUserSessionTeamId || '';
       ctx.currentUserSessionTeamId = userSessionTeamId || null;
       const fixtures = fixturesData.matches;
       const byeTeam: string | null = fixturesData.byeTeam ?? null;
@@ -121,6 +153,11 @@ export function initializeRoundLiveComponent(ctx: any): void {
 
       // The first emission starts the round.  A later team-catalog emission
       // only hydrates labels; roundLiveStartRoundEngine guards the duplicate.
+      setMatchStartTraceMetadata({
+        fixtureSnapshotAvailableAtClick: !!ctx.careerService.getFixtureSnapshot?.(params.roundNumber),
+        startPayloadReadyMs: 0,
+        statusHttpTriggeredByClick: false
+      });
       ctx.startRoundEngine(params.gameId, matches);
       setTimeout(() => markMatchStartStage('T14_FIRST_RENDER'), 0);
     }),

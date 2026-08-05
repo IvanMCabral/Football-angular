@@ -96,10 +96,18 @@ describe('GameDetailComponent', () => {
       totalRounds: 10,
       isFinished: false
     } as any));
+    careerServiceSpy.advanceToNextRound.and.returnValue(of({
+      success: true,
+      careerPhase: 'PRE_MATCH',
+      currentRound: 4,
+      totalRounds: 10
+    } as any));
+    careerServiceSpy.getCareerStatus.calls.reset();
 
     component.playFirstRound();
 
-    expect(careerServiceSpy.advanceToNextRound).not.toHaveBeenCalled();
+    expect(careerServiceSpy.advanceToNextRound).toHaveBeenCalledWith('career-1');
+    expect(careerServiceSpy.getCareerStatus).not.toHaveBeenCalled();
     expect(routerSpy.navigate).toHaveBeenCalledWith(
       ['/games/career-1/round/4/live'],
       jasmine.objectContaining({ state: jasmine.objectContaining({ managerRoundStart: jasmine.any(Object) }) })

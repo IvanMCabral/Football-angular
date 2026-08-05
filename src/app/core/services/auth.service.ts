@@ -89,6 +89,9 @@ export class AuthService {
     if (this.authStatusSubject) {
       this.authStatusSubject.next(false);
     }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('manager:logout'));
+    }
     this.router.navigate(['/login']);
   }
 

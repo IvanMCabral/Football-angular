@@ -23,6 +23,8 @@ export interface CareerCommandResponse {
   currentRound?: number;
   careerPhase?: string;
   tournamentFinished?: boolean;
+  errorCode?: string;
+  userPosition?: number;
   [key: string]: unknown;
 }
 
@@ -53,11 +55,54 @@ export class CareerService {
   private readonly roundFixtureCache = new Map<number, {
     requestedAt: number;
     request$: Observable<{ round: number; matches: Fixture[]; byeTeam: string | null }>;
+    value?: { round: number; matches: Fixture[]; byeTeam: string | null };
+    completedAt?: number;
   }>();
+
+  /** Returns a completed fixture snapshot without starting transport. */
+  getFixtureSnapshot(round: number): { value: { round: number; matches: Fixture[]; byeTeam: string | null }; completedAt: number } | null {
+    const cached = this.roundFixtureCache.get(round);
+    if (!cached?.value || !cached.completedAt) {
+      return null;
+    }
+    if (Date.now() - cached.completedAt >= CareerService.ROUND_FIXTURE_CACHE_TTL_MS) {
+      return null;
+    }
+    return { value: cached.value, completedAt: cached.completedAt };
+  }
 
   /** Shares a very short-lived status read across route transitions. */
   private static readonly CAREER_STATUS_CACHE_TTL_MS = 5_000;
   private careerStatusCache: { requestedAt: number; request$: Observable<CareerStatus> } | null = null;
+  private careerStatusSnapshot: { value: CareerStatus; receivedAt: number } | null = null;
+
+  constructor() {
+    if (typeof window !== 'undefined') {
+      window.addEventListener('manager:logout', () => this.clearCareerStatusSnapshot());
+    }
+  }
+
+  /**
+   * Returns the last completed status without starting an HTTP request.  A
+   * snapshot is a UX hint only; mutating commands and the backend remain
+   * authoritative for phase/round validation.
+   */
+  getCareerStatusSnapshot(careerId?: string): { value: CareerStatus; receivedAt: number } | null {
+    if (!this.careerStatusSnapshot) {
+      return null;
+    }
+    if (careerId && this.careerStatusSnapshot.value.careerId !== careerId) {
+      return null;
+    }
+    return this.careerStatusSnapshot;
+  }
+
+  /** Clears all career-local state on logout or account replacement. */
+  clearCareerStatusSnapshot(): void {
+    this.careerStatusCache = null;
+    this.careerStatusSnapshot = null;
+    this.roundFixtureCache.clear();
+  }
 
   /**
    * Get all teams in the current career session.
@@ -99,6 +144,9 @@ export class CareerService {
     }
 
     const request$ = this.http.get<CareerStatus>(`${this.apiUrl}/status`).pipe(
+      tap(status => {
+        this.careerStatusSnapshot = { value: status, receivedAt: Date.now() };
+      }),
       tap({
         error: () => {
           if (this.careerStatusCache?.request$ === request$) {
@@ -126,7 +174,19 @@ export class CareerService {
    */
   advanceToNextRound(careerId: string): Observable<CareerCommandResponse> {
     return this.http.post<CareerCommandResponse>(`${this.apiUrl}/${careerId}/next-round`, {}).pipe(
-      tap(() => this.invalidateCareerStatus())
+      tap(response => {
+        this.invalidateCareerStatus();
+        if (response?.success && this.careerStatusSnapshot?.value.careerId === careerId) {
+          this.careerStatusSnapshot = {
+            receivedAt: Date.now(),
+            value: {
+              ...this.careerStatusSnapshot.value,
+              currentRound: response.currentRound ?? this.careerStatusSnapshot.value.currentRound,
+              careerPhase: response.careerPhase ?? this.careerStatusSnapshot.value.careerPhase
+            }
+          };
+        }
+      })
     );
   }
 
@@ -184,6 +244,13 @@ export class CareerService {
     const request$ = this.http
       .get<{ round: number; matches: Fixture[]; byeTeam: string | null }>(`${this.apiUrl}/fixtures/round/${round}`)
       .pipe(
+        tap(value => {
+          const current = this.roundFixtureCache.get(round);
+          if (current?.request$ === request$) {
+            current.value = value;
+            current.completedAt = Date.now();
+          }
+        }),
         tap({
           error: () => {
             // Do not retain a failed read: the next navigation must be able

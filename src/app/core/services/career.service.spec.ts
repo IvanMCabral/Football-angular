@@ -61,6 +61,37 @@ describe('CareerService round fixture cache', () => {
     http.expectNone('/api/v1/career/status');
   });
 
+  it('keeps the last completed status synchronously available after subscribers change', () => {
+    const status = { careerId: 'career-1', currentRound: 1, totalRounds: 2, careerPhase: 'PRE_MATCH' } as any;
+    service.getCareerStatus().subscribe();
+    http.expectOne('/api/v1/career/status').flush(status);
+
+    expect(service.getCareerStatusSnapshot()?.value).toEqual(status);
+    service.invalidateCareerStatus();
+    expect(service.getCareerStatusSnapshot()?.value).toEqual(status);
+    http.expectNone('/api/v1/career/status');
+  });
+
+  it('exposes a completed fixture snapshot without starting another request', () => {
+    const fixtures = { round: 4, matches: [], byeTeam: null };
+    service.getFixturesByRoundWithBye(4).subscribe();
+    http.expectOne('/api/v1/career/fixtures/round/4').flush(fixtures);
+
+    expect(service.getFixtureSnapshot(4)?.value).toEqual(fixtures);
+    http.expectNone('/api/v1/career/fixtures/round/4');
+  });
+
+  it('clears the status snapshot on the shared logout signal', () => {
+    const status = { careerId: 'career-1', currentRound: 1, totalRounds: 2, careerPhase: 'PRE_MATCH' } as any;
+    service.getCareerStatus().subscribe();
+    http.expectOne('/api/v1/career/status').flush(status);
+    expect(service.getCareerStatusSnapshot()).not.toBeNull();
+
+    window.dispatchEvent(new CustomEvent('manager:logout'));
+
+    expect(service.getCareerStatusSnapshot()).toBeNull();
+  });
+
   it('invalidates the status snapshot after advancing a round', () => {
     const status = { careerId: 'career-1', currentRound: 1, totalRounds: 2, careerPhase: 'PRE_MATCH' } as any;
     service.getCareerStatus().subscribe();

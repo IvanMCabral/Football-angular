@@ -25,6 +25,18 @@ export type MatchStartTraceStage =
 interface TraceState {
   startedAt: number;
   stages: Partial<Record<MatchStartTraceStage, number>>;
+  metadata: MatchStartTraceMetadata;
+}
+
+export interface MatchStartTraceMetadata {
+  statusSnapshotAvailableAtClick?: boolean;
+  statusSnapshotAgeMs?: number | null;
+  statusHttpTriggeredByClick?: boolean;
+  statusInvalidationReason?: string | null;
+  fixtureSnapshotAvailableAtClick?: boolean;
+  startPayloadReadyMs?: number | null;
+  startPostSentMs?: number | null;
+  backendValidationFailureCode?: string | null;
 }
 
 declare global {
@@ -47,12 +59,22 @@ export function beginMatchStartTrace(reset = false): void {
   if (typeof window !== 'undefined' && window.managerMatchStartTrace && !reset) {
     return;
   }
-  const trace: TraceState = { startedAt: now(), stages: {} };
+  const trace: TraceState = { startedAt: now(), stages: {}, metadata: {} };
   trace.stages.T0_CLICK_RECEIVED = trace.startedAt;
   if (typeof window !== 'undefined') {
     window.managerMatchStartTrace = trace;
   }
   markPerformance('T0_CLICK_RECEIVED');
+}
+
+export function setMatchStartTraceMetadata(patch: MatchStartTraceMetadata): void {
+  if (typeof window === 'undefined' || !window.managerMatchStartTrace) {
+    return;
+  }
+  window.managerMatchStartTrace.metadata = {
+    ...window.managerMatchStartTrace.metadata,
+    ...patch
+  };
 }
 
 /** Clears an abandoned trace when the user starts a fresh attempt. */
@@ -68,6 +90,13 @@ export function markMatchStartStage(stage: MatchStartTraceStage): void {
   }
   const timestamp = now();
   window.managerMatchStartTrace.stages[stage] = timestamp;
+  if (stage === 'T9_START_POST_SENT') {
+    const elapsed = Math.max(0, Math.round(timestamp - window.managerMatchStartTrace.startedAt));
+    window.managerMatchStartTrace.metadata.startPostSentMs = elapsed;
+    if (window.managerMatchStartTrace.metadata.startPayloadReadyMs == null) {
+      window.managerMatchStartTrace.metadata.startPayloadReadyMs = elapsed;
+    }
+  }
   markPerformance(stage);
 }
 
@@ -94,6 +123,7 @@ export function completeMatchStartTrace(roundId: string): void {
     liveComponentInitMs: duration('T13_LIVE_COMPONENT_CREATED', 'T14_FIRST_RENDER'),
     firstRenderMs: duration('T13_LIVE_COMPONENT_CREATED', 'T14_FIRST_RENDER'),
     streamConnectMs: duration('T15_STREAM_CREATED', 'T16_FIRST_SSE'),
+    ...trace.metadata,
     stages: Object.fromEntries(Object.entries(trace.stages).map(([key, value]) => [key, Math.round(value - trace.startedAt)]))
   }));
   delete window.managerMatchStartTrace;
