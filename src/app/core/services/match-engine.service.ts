@@ -57,7 +57,9 @@ export class MatchEngineService {
   /** Marks the user action without exposing payload or account information. */
   markMatchStartClick(): void {
     beginMatchStartTrace();
+    markMatchStartStage('CLICK_HANDLER_ENTER');
     markMatchStartStage('T1_HANDLER_STARTED');
+    markMatchStartStage('START_GUARD_COMPLETE');
     markMatchStartStage('T2_LOCAL_VALIDATION_DONE');
     this.pendingMatchStartClickAt = this.monotonicNow();
     this.markPerformance('manager.match-start.click');

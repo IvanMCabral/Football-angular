@@ -10,7 +10,7 @@ import { DashboardFixtureModalComponent } from '../dashboard/dashboard-fixture-m
 import { DashboardUserInfoComponent } from '../dashboard/dashboard-user-info.component';
 import { Match } from '../../shared/models/match.model';
 import { readableErrorMessage } from '../../shared/utils/error-message';
-import { beginMatchStartTrace, markMatchStartStage, setMatchStartTraceMetadata } from './match-start-trace';
+import { beginMatchStartTrace, markMatchStartPointerEvent, markMatchStartStage, setMatchStartTraceMetadata } from './match-start-trace';
 import { buildRoundStartNavigationState } from './round-start-navigation-state';
 
 @Component({
@@ -48,8 +48,11 @@ export class GameDetailComponent implements OnInit {
 
   playFirstRound() {
     if (!this.game) return;
-    beginMatchStartTrace(true);
+    beginMatchStartTrace();
+    markMatchStartStage('CLICK_HANDLER_ENTER');
     markMatchStartStage('T1_HANDLER_STARTED');
+    markMatchStartStage('START_GUARD_COMPLETE');
+    markMatchStartStage('PAYLOAD_BUILD_START');
     const gameId = this.getValue(this.game.id);
     const snapshot = this.careerService.getCareerStatusSnapshot?.(gameId);
     setMatchStartTraceMetadata({
@@ -59,6 +62,7 @@ export class GameDetailComponent implements OnInit {
       fixtureSnapshotAvailableAtClick: false,
       startPayloadReadyMs: 0
     });
+    markMatchStartStage('PAYLOAD_BUILD_END');
     markMatchStartStage('T2_LOCAL_VALIDATION_DONE');
     // The command is authoritative and validates phase, round and ownership.
     // Do not pay a status read before sending it.
@@ -78,8 +82,12 @@ export class GameDetailComponent implements OnInit {
       });
       return;
     }
+    markMatchStartStage('HTTP_OBSERVABLE_CREATED');
+    markMatchStartStage('HTTP_SUBSCRIBE_START');
+    markMatchStartStage('FETCH_XHR_DISPATCH');
     advance$.subscribe({
       next: (response) => {
+        markMatchStartStage('POST_RESPONSE');
         if (response?.success && response.currentRound && response.careerPhase === 'PRE_MATCH') {
           const navigationStatus = this.buildNavigationStatus(snapshot?.value, response, gameId);
           markMatchStartStage('T11_NAVIGATION_REQUESTED');
@@ -101,6 +109,10 @@ export class GameDetailComponent implements OnInit {
         this.cdr.markForCheck();
       }
     });
+  }
+
+  onMatchStartPointerEvent(): void {
+    markMatchStartPointerEvent();
   }
 
   private buildNavigationStatus(snapshot: any, response: any, careerId: string): any {

@@ -18,7 +18,7 @@ import { ConfirmActionDialogComponent } from '../../shared/components/confirm-ac
 import { readableErrorMessage } from '../../shared/utils/error-message';
 import { WorldCatalogService } from '../../core/services/world-catalog.service';
 import { CareerService } from '../../core/services/career.service';
-import { beginMatchStartTrace, markMatchStartStage, setMatchStartTraceMetadata } from '../games/match-start-trace';
+import { beginMatchStartTrace, markMatchStartPointerEvent, markMatchStartStage, setMatchStartTraceMetadata } from '../games/match-start-trace';
 import { buildRoundStartNavigationState } from '../games/round-start-navigation-state';
 
 interface UserStats {
@@ -354,14 +354,21 @@ export class DashboardComponent implements OnInit {
     this.router.navigate(['/career/setup']);
   }
 
+  onMatchStartPointerEvent(): void {
+    markMatchStartPointerEvent();
+  }
+
   onContinueCareer(): void {
     this.router.navigate(['/squad']);
   }
 
   onPlayNextRound(): void {
-    beginMatchStartTrace(true);
+    beginMatchStartTrace();
+    markMatchStartStage('CLICK_HANDLER_ENTER');
     markMatchStartStage('T1_HANDLER_STARTED');
     this.loading = true;
+    markMatchStartStage('START_GUARD_COMPLETE');
+    markMatchStartStage('PAYLOAD_BUILD_START');
 
     const snapshot = this.careerService.getCareerStatusSnapshot();
     const currentStatus = snapshot
@@ -375,6 +382,7 @@ export class DashboardComponent implements OnInit {
         && !!this.careerService.getFixtureSnapshot?.(currentStatus.currentRound),
       startPayloadReadyMs: 0
     });
+    markMatchStartStage('PAYLOAD_BUILD_END');
     markMatchStartStage('T2_LOCAL_VALIDATION_DONE');
 
     if (!currentStatus?.careerId) {
@@ -396,8 +404,13 @@ export class DashboardComponent implements OnInit {
       return;
     }
 
-    this.careerService.advanceToNextRound(currentStatus.careerId).subscribe({
+    const advance$ = this.careerService.advanceToNextRound(currentStatus.careerId);
+    markMatchStartStage('HTTP_OBSERVABLE_CREATED');
+    markMatchStartStage('HTTP_SUBSCRIBE_START');
+    markMatchStartStage('FETCH_XHR_DISPATCH');
+    advance$.subscribe({
       next: response => {
+        markMatchStartStage('POST_RESPONSE');
         this.loading = false;
         if (response.success) {
           const careerId = currentStatus.careerId!;

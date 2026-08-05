@@ -46,6 +46,7 @@
       </div>
       <button
             class="action-button primary play-next"
+            (pointerdown)="onMatchStartPointerEvent()"
             (click)="onPlayNextRound()"
             [disabled]="loading">
       <span class="action-icon">⚽</span>

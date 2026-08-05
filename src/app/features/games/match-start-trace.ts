@@ -4,8 +4,17 @@
  * caller explicitly starts a trace (the public app never logs payloads).
  */
 export type MatchStartTraceStage =
+  | 'POINTER_EVENT_RECEIVED'
   | 'T0_CLICK_RECEIVED'
+  | 'CLICK_HANDLER_ENTER'
   | 'T1_HANDLER_STARTED'
+  | 'START_GUARD_COMPLETE'
+  | 'PAYLOAD_BUILD_START'
+  | 'PAYLOAD_BUILD_END'
+  | 'HTTP_OBSERVABLE_CREATED'
+  | 'HTTP_SUBSCRIBE_START'
+  | 'FETCH_XHR_DISPATCH'
+  | 'POST_RESPONSE'
   | 'T2_LOCAL_VALIDATION_DONE'
   | 'T3_STATUS_REQUESTED'
   | 'T4_STATUS_COMPLETED'
@@ -67,6 +76,12 @@ export function beginMatchStartTrace(reset = false): void {
   markPerformance('T0_CLICK_RECEIVED');
 }
 
+/** Marks the physical pointer event separately from Angular's click handler. */
+export function markMatchStartPointerEvent(): void {
+  beginMatchStartTrace(true);
+  markMatchStartStage('POINTER_EVENT_RECEIVED');
+}
+
 export function setMatchStartTraceMetadata(patch: MatchStartTraceMetadata): void {
   if (typeof window === 'undefined' || !window.managerMatchStartTrace) {
     return;
@@ -113,6 +128,13 @@ export function completeMatchStartTrace(roundId: string): void {
   };
   console.info('[MATCH-START-FULL-TRACE]', JSON.stringify({
     roundId,
+    pointerToHandlerMs: duration('POINTER_EVENT_RECEIVED', 'CLICK_HANDLER_ENTER'),
+    handlerToPostSubscribeMs: duration('CLICK_HANDLER_ENTER', 'HTTP_SUBSCRIBE_START'),
+    handlerGuardMs: duration('CLICK_HANDLER_ENTER', 'START_GUARD_COMPLETE'),
+    payloadBuildMs: duration('PAYLOAD_BUILD_START', 'PAYLOAD_BUILD_END'),
+    observableCreationMs: duration('PAYLOAD_BUILD_END', 'HTTP_OBSERVABLE_CREATED'),
+    subscribeDispatchMs: duration('HTTP_SUBSCRIBE_START', 'FETCH_XHR_DISPATCH'),
+    handlerToPostResponseMs: duration('CLICK_HANDLER_ENTER', 'POST_RESPONSE'),
     clickHandlerMs: duration('T0_CLICK_RECEIVED', 'T1_HANDLER_STARTED'),
     validationMs: duration('T1_HANDLER_STARTED', 'T2_LOCAL_VALIDATION_DONE'),
     statusWaitMs: duration('T3_STATUS_REQUESTED', 'T4_STATUS_COMPLETED'),

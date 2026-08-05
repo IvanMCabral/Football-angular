@@ -14,7 +14,7 @@
       <div *ngIf="game.teamId"><strong>Equipo:</strong> {{ getValue(game.teamId) }}</div>
     </div>
     <div class="game-detail-actions">
-      <button type="button" class="action-btn play-btn" (click)="playFirstRound()">Jugar partido</button>
+      <button type="button" class="action-btn play-btn" (pointerdown)="onMatchStartPointerEvent()" (click)="playFirstRound()">Jugar partido</button>
       <button type="button" class="action-btn fixture-btn" (click)="openFixtureModal()">Ver fixture</button>
       <a routerLink="/dashboard" class="action-btn back-btn">Volver al inicio</a>
     </div>
