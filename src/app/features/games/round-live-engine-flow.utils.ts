@@ -145,6 +145,7 @@ export function roundLiveIniciarTodos(ctx: any): void {
     const roundId = vm.gameId;
     ctx.startingRound = true;
     ctx.startPhase = 'Iniciando partido';
+    ctx.engineService.markMatchStartClick?.();
     ctx.engineService.startRound(roundId, pending).subscribe({
       next: (state: RoundState) => {
         ctx.startingRound = false;
@@ -178,6 +179,7 @@ export function roundLiveTryAutoStartRound(ctx: any, vm: RoundLiveViewModel): vo
 
     ctx.startingRound = true;
     ctx.startPhase = 'Iniciando partido';
+    ctx.engineService.markMatchStartClick?.();
     ctx.engineService.startRound(vm.gameId, pending).subscribe({
       next: (state: RoundState) => {
         ctx.startingRound = false;
