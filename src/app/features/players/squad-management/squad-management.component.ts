@@ -158,7 +158,10 @@ private normalizeLineupForDisplay(lineup: LineupDTO | null): LineupDTO | null {
           }
         }),
         catchError(err => of(null)),
-        shareReplay({ bufferSize: 1, refCount: true })
+        // Keep the completed status snapshot alive while the formation modal
+        // temporarily removes its async-pipe subscribers. This avoids a
+        // second status round-trip on the critical Confirmar y jugar click.
+        shareReplay({ bufferSize: 1, refCount: false })
       );
       this.careerStatus$ = careerStatusSource$.pipe(
         tap(status => {
