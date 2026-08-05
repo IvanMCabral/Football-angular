@@ -51,7 +51,7 @@ export class GameDetailComponent implements OnInit {
     beginMatchStartTrace(true);
     markMatchStartStage('T1_HANDLER_STARTED');
     const gameId = this.getValue(this.game.id);
-    const snapshot = this.careerService.getCareerStatusSnapshot?.();
+    const snapshot = this.careerService.getCareerStatusSnapshot?.(gameId);
     setMatchStartTraceMetadata({
       statusSnapshotAvailableAtClick: !!snapshot,
       statusSnapshotAgeMs: snapshot ? Math.max(0, Date.now() - snapshot.receivedAt) : null,

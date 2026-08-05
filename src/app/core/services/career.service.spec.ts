@@ -92,6 +92,21 @@ describe('CareerService round fixture cache', () => {
     expect(service.getCareerStatusSnapshot()).toBeNull();
   });
 
+  it('keeps status snapshots isolated by career id', () => {
+    const first = { careerId: 'career-a', currentRound: 1, totalRounds: 2, careerPhase: 'PRE_MATCH' } as any;
+    const second = { careerId: 'career-b', currentRound: 3, totalRounds: 4, careerPhase: 'WAITING_USER' } as any;
+
+    service.getCareerStatus().subscribe();
+    http.expectOne('/api/v1/career/status').flush(first);
+    service.invalidateCareerStatus();
+    service.getCareerStatus().subscribe();
+    http.expectOne('/api/v1/career/status').flush(second);
+
+    expect(service.getCareerStatusSnapshot('career-a')?.value).toEqual(first);
+    expect(service.getCareerStatusSnapshot('career-b')?.value).toEqual(second);
+    expect(service.getCareerStatusSnapshot('career-missing')).toBeNull();
+  });
+
   it('invalidates the status snapshot after advancing a round', () => {
     const status = { careerId: 'career-1', currentRound: 1, totalRounds: 2, careerPhase: 'PRE_MATCH' } as any;
     service.getCareerStatus().subscribe();

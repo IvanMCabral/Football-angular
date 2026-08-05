@@ -74,7 +74,8 @@ export class CareerService {
   /** Shares a very short-lived status read across route transitions. */
   private static readonly CAREER_STATUS_CACHE_TTL_MS = 5_000;
   private careerStatusCache: { requestedAt: number; request$: Observable<CareerStatus> } | null = null;
-  private careerStatusSnapshot: { value: CareerStatus; receivedAt: number } | null = null;
+  private readonly careerStatusSnapshots = new Map<string, { value: CareerStatus; receivedAt: number }>();
+  private lastCareerStatusKey: string | null = null;
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -88,19 +89,15 @@ export class CareerService {
    * authoritative for phase/round validation.
    */
   getCareerStatusSnapshot(careerId?: string): { value: CareerStatus; receivedAt: number } | null {
-    if (!this.careerStatusSnapshot) {
-      return null;
-    }
-    if (careerId && this.careerStatusSnapshot.value.careerId !== careerId) {
-      return null;
-    }
-    return this.careerStatusSnapshot;
+    const key = careerId ?? this.lastCareerStatusKey;
+    return key ? this.careerStatusSnapshots.get(key) ?? null : null;
   }
 
   /** Clears all career-local state on logout or account replacement. */
   clearCareerStatusSnapshot(): void {
     this.careerStatusCache = null;
-    this.careerStatusSnapshot = null;
+    this.careerStatusSnapshots.clear();
+    this.lastCareerStatusKey = null;
     this.roundFixtureCache.clear();
   }
 
@@ -145,7 +142,11 @@ export class CareerService {
 
     const request$ = this.http.get<CareerStatus>(`${this.apiUrl}/status`).pipe(
       tap(status => {
-        this.careerStatusSnapshot = { value: status, receivedAt: Date.now() };
+        const key = status.careerId;
+        if (key) {
+          this.careerStatusSnapshots.set(key, { value: status, receivedAt: Date.now() });
+          this.lastCareerStatusKey = key;
+        }
       }),
       tap({
         error: () => {
@@ -176,15 +177,16 @@ export class CareerService {
     return this.http.post<CareerCommandResponse>(`${this.apiUrl}/${careerId}/next-round`, {}).pipe(
       tap(response => {
         this.invalidateCareerStatus();
-        if (response?.success && this.careerStatusSnapshot?.value.careerId === careerId) {
-          this.careerStatusSnapshot = {
+        const snapshot = this.careerStatusSnapshots.get(careerId);
+        if (response?.success && snapshot) {
+          this.careerStatusSnapshots.set(careerId, {
             receivedAt: Date.now(),
             value: {
-              ...this.careerStatusSnapshot.value,
-              currentRound: response.currentRound ?? this.careerStatusSnapshot.value.currentRound,
-              careerPhase: response.careerPhase ?? this.careerStatusSnapshot.value.careerPhase
+              ...snapshot.value,
+              currentRound: response.currentRound ?? snapshot.value.currentRound,
+              careerPhase: response.careerPhase ?? snapshot.value.careerPhase
             }
-          };
+          });
         }
       })
     );
