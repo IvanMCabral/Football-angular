@@ -357,7 +357,7 @@ export class DashboardComponent implements OnInit {
   }
 
   onPlayNextRound(): void {
-    beginMatchStartTrace();
+    beginMatchStartTrace(true);
     markMatchStartStage('T1_HANDLER_STARTED');
     this.loading = true;
 

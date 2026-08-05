@@ -48,7 +48,7 @@ export class GameDetailComponent implements OnInit {
 
   playFirstRound() {
     if (!this.game) return;
-    beginMatchStartTrace();
+    beginMatchStartTrace(true);
     markMatchStartStage('T1_HANDLER_STARTED');
     const gameId = this.getValue(this.game.id);
 

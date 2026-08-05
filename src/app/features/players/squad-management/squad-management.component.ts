@@ -372,7 +372,7 @@ openVisualEditor(): void {
       });
     }
     onConfirmLineup(): void {
-      beginMatchStartTrace();
+      beginMatchStartTrace(true);
       markMatchStartStage('T1_HANDLER_STARTED');
       const currentLineup = this.lineupSubject$.value;
       const playerCount = this.lineupSlotsCount;

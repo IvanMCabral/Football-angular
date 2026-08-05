@@ -43,8 +43,8 @@ function markPerformance(stage: MatchStartTraceStage): void {
   }
 }
 
-export function beginMatchStartTrace(): void {
-  if (typeof window !== 'undefined' && window.managerMatchStartTrace) {
+export function beginMatchStartTrace(reset = false): void {
+  if (typeof window !== 'undefined' && window.managerMatchStartTrace && !reset) {
     return;
   }
   const trace: TraceState = { startedAt: now(), stages: {} };
@@ -53,6 +53,13 @@ export function beginMatchStartTrace(): void {
     window.managerMatchStartTrace = trace;
   }
   markPerformance('T0_CLICK_RECEIVED');
+}
+
+/** Clears an abandoned trace when the user starts a fresh attempt. */
+export function resetMatchStartTrace(): void {
+  if (typeof window !== 'undefined') {
+    delete window.managerMatchStartTrace;
+  }
 }
 
 export function markMatchStartStage(stage: MatchStartTraceStage): void {

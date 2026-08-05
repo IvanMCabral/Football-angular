@@ -55,6 +55,10 @@ export class CareerService {
     request$: Observable<{ round: number; matches: Fixture[]; byeTeam: string | null }>;
   }>();
 
+  /** Shares a very short-lived status read across route transitions. */
+  private static readonly CAREER_STATUS_CACHE_TTL_MS = 5_000;
+  private careerStatusCache: { requestedAt: number; request$: Observable<CareerStatus> } | null = null;
+
   /**
    * Get all teams in the current career session.
    * Reads from CareerSave, NOT from WorldSnapshot.
@@ -88,7 +92,29 @@ export class CareerService {
    * @returns Observable<CareerStatus>
    */
   getCareerStatus(): Observable<CareerStatus> {
-    return this.http.get<CareerStatus>(`${this.apiUrl}/status`);
+    const now = Date.now();
+    const cached = this.careerStatusCache;
+    if (cached && now - cached.requestedAt < CareerService.CAREER_STATUS_CACHE_TTL_MS) {
+      return cached.request$;
+    }
+
+    const request$ = this.http.get<CareerStatus>(`${this.apiUrl}/status`).pipe(
+      tap({
+        error: () => {
+          if (this.careerStatusCache?.request$ === request$) {
+            this.careerStatusCache = null;
+          }
+        }
+      }),
+      shareReplay({ bufferSize: 1, refCount: false })
+    );
+    this.careerStatusCache = { requestedAt: now, request$ };
+    return request$;
+  }
+
+  /** Invalidates status after a command that can advance or replace a career. */
+  invalidateCareerStatus(): void {
+    this.careerStatusCache = null;
   }
 
   /**
@@ -99,7 +125,9 @@ export class CareerService {
    * @returns Observable<CareerCommandResponse>
    */
   advanceToNextRound(careerId: string): Observable<CareerCommandResponse> {
-    return this.http.post<CareerCommandResponse>(`${this.apiUrl}/${careerId}/next-round`, {});
+    return this.http.post<CareerCommandResponse>(`${this.apiUrl}/${careerId}/next-round`, {}).pipe(
+      tap(() => this.invalidateCareerStatus())
+    );
   }
 
   /**
@@ -109,7 +137,9 @@ export class CareerService {
    * @returns Observable<CareerCommandResponse>
    */
   continueToNewSeason(): Observable<CareerCommandResponse> {
-    return this.http.post<CareerCommandResponse>(`${this.apiUrl}/continue`, {});
+    return this.http.post<CareerCommandResponse>(`${this.apiUrl}/continue`, {}).pipe(
+      tap(() => this.invalidateCareerStatus())
+    );
   }
 
   /**
