@@ -7,7 +7,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { of, Subject } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 
 import { LiveMatchModalsService } from './live-match-modals.service';
 import { CareerService } from './career.service';
@@ -450,6 +450,30 @@ describe('LiveMatchModalsService pause/resume around tactical modals', () => {
     service.openPartidoModal('match-1', finished).subscribe({
       complete: () => {
         expect(engineServiceSpy.pauseRoundForMatch).not.toHaveBeenCalled();
+        expect(snackBarSpy.open).toHaveBeenCalled();
+        done();
+      }
+    });
+  });
+
+  it('openPartidoModal - does not open when the pause response reports a finished round', (done) => {
+    engineServiceSpy.pauseRoundForMatch.and.returnValue(of({ success: true, alreadyFinished: true }));
+
+    service.openPartidoModal('match-1', RUNNING_STATE).subscribe({
+      complete: () => {
+        expect(dialogSpy.open).not.toHaveBeenCalled();
+        expect(snackBarSpy.open).toHaveBeenCalled();
+        done();
+      }
+    });
+  });
+
+  it('openPartidoModal - fails closed when the round cannot be paused', (done) => {
+    engineServiceSpy.pauseRoundForMatch.and.returnValue(throwError(() => new Error('pause unavailable')));
+
+    service.openPartidoModal('match-1', RUNNING_STATE).subscribe({
+      complete: () => {
+        expect(dialogSpy.open).not.toHaveBeenCalled();
         expect(snackBarSpy.open).toHaveBeenCalled();
         done();
       }

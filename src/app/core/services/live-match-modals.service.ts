@@ -3,7 +3,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { Observable, forkJoin, merge, of, switchMap } from 'rxjs';
+import { EMPTY, Observable, forkJoin, merge, of, switchMap } from 'rxjs';
 import { catchError, ignoreElements, map, tap, timeout } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 import { MatchEngineService } from './match-engine.service';
@@ -126,6 +126,10 @@ export class LiveMatchModalsService {
             // Protect the modal from duplicated live rows: each starter and
             // bench player should appear once.
             const stateForModal = liveState ?? state;
+            if (this.isTerminalLiveState(stateForModal)) {
+              this.showTerminalModalNotice('sustituir');
+              return EMPTY;
+            }
             const livePlayers = applyLiveSubstitutionsToLineup(lineup, squad, stateForModal, userTeamId, this.confirmedSubstitutionMemory.get(matchId ?? '') ?? []);
             const seenStarters = new Set<string>();
             const startingXi: SubModalPlayer[] = livePlayers
@@ -270,6 +274,10 @@ export class LiveMatchModalsService {
       switchMap(({ lineup, squad, status, liveState }) => {
         const userTeamId = status.userSessionTeamId;
         const stateForModal = liveState ?? state;
+        if (this.isTerminalLiveState(stateForModal)) {
+          this.showTerminalModalNotice('cambiar la formacion');
+          return EMPTY;
+        }
         const managerIsHome = userTeamId === stateForModal.homeTeamId;
         const currentFormation = managerIsHome
           ? (stateForModal.homeFormation || lineup?.formation || '4-4-2')
@@ -357,6 +365,10 @@ export class LiveMatchModalsService {
         const userTeamId = status.userSessionTeamId;
         const useLocalDebugPartidoState = isLocalDebugPartidoState(state);
         const stateForModal = useLocalDebugPartidoState ? state : (liveState ?? state);
+        if (this.isTerminalLiveState(stateForModal)) {
+          this.showTerminalModalNotice('editar la formacion');
+          return EMPTY;
+        }
         const managerIsHome = userTeamId === stateForModal.homeTeamId;
         const livePlayers = applyLiveSubstitutionsToLineup(lineup, squad, stateForModal, userTeamId, this.confirmedSubstitutionMemory.get(matchId ?? '') ?? []);
         const unavailableBenchIds = unavailableBenchPlayerIds(liveSubstitutionPairs(stateForModal, userTeamId, this.confirmedSubstitutionMemory.get(matchId ?? '') ?? []));
@@ -451,11 +463,39 @@ export class LiveMatchModalsService {
       return of(null);
     }
     return this.engineService.pauseRoundForMatch(careerId, matchId).pipe(
+      timeout(2_000),
+      switchMap(response => {
+        // A race between the injury event and the pause request can finish the
+        // round before the modal is hydrated. Never open an editable dialog
+        // over a terminal match snapshot.
+        if (this.pauseResponseIsTerminal(response)) {
+          this.showTerminalModalNotice('editar el partido');
+          return EMPTY;
+        }
+        return of(response);
+      }),
       catchError(err => {
         this.logger.warn(`Could not pause the round before opening the ${modalName} modal:`, err);
-        return of(null);
+        // Fail closed: without a confirmed pause the manager must not edit a
+        // moving match. The live stream remains authoritative and can finish
+        // or retry the modal on a later event.
+        this.snackBar.open('No se pudo pausar el partido; la decision no se abrio', 'OK', { duration: 3500 });
+        return EMPTY;
       })
     );
+  }
+
+  private pauseResponseIsTerminal(response: unknown): boolean {
+    return !!response && typeof response === 'object'
+      && (response as { alreadyFinished?: boolean }).alreadyFinished === true;
+  }
+
+  private isTerminalLiveState(state: MatchState | null | undefined): boolean {
+    return state?.status === 'FINISHED' || state?.status === 'CANCELLED';
+  }
+
+  private showTerminalModalNotice(action: string): void {
+    this.snackBar.open(`El partido ya termino, no se puede ${action}`, 'OK', { duration: 3000 });
   }
 
   private rememberConfirmedSubstitution(matchId: string, playerOffId: string, playerOnId: string): void {
