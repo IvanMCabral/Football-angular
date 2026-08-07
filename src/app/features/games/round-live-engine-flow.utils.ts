@@ -11,7 +11,12 @@ import {
 } from './utils/round-live-utils';
 
 export function roundLiveStartRoundEngine(ctx: any, gameId: string, matches: RoundMatchVM[]): any {
-    const requestRoundId = gameId;
+    // The career id identifies the owner, not the live round. Reusing it as
+    // the RoundEngine registry key makes every later fixture collide with the
+    // completed first engine. Keep one stable UUID per career/round so a
+    // reload reconnects to the same engine while each new round gets a fresh
+    // registry identity.
+    const requestRoundId = getOrCreateRoundEngineId(gameId, ctx.vmSubject.value.roundNumber);
     const matchData = matches.map(rm => ({
       matchId: String(rm.match.id),
       homeTeamId: String(rm.match.homeTeamId),
@@ -66,6 +71,10 @@ export function roundLiveStartRoundEngine(ctx: any, gameId: string, matches: Rou
           isRoundPaused: updatedMatches.some((m: RoundMatchVM) => m.state?.status === 'PAUSED'),
           anyStarted: updatedMatches.some((m: RoundMatchVM) => hasRoundMatchStarted(m.state?.status))
         };
+
+        if (newVm.allFinished) {
+          clearRoundEngineId(gameId, currentVm.roundNumber);
+        }
 
         ctx.updateVm(newVm);
         ctx.applyDeFreezeIfNeeded(newVm);
@@ -141,7 +150,7 @@ export function roundLiveIniciarTodos(ctx: any): void {
       return;
     }
 
-    const roundId = vm.gameId;
+    const roundId = getOrCreateRoundEngineId(vm.gameId, vm.roundNumber);
     ctx.startingRound = true;
     ctx.startPhase = 'Iniciando partido';
     ctx.engineService.markMatchStartClick?.();
@@ -179,7 +188,7 @@ export function roundLiveTryAutoStartRound(ctx: any, vm: RoundLiveViewModel): vo
     ctx.startingRound = true;
     ctx.startPhase = 'Iniciando partido';
     ctx.engineService.markMatchStartClick?.();
-    ctx.engineService.startRound(vm.gameId, pending).subscribe({
+    ctx.engineService.startRound(getOrCreateRoundEngineId(vm.gameId, vm.roundNumber), pending).subscribe({
       next: (state: RoundState) => {
         ctx.startingRound = false;
         if (state && state.roundId) {
@@ -192,4 +201,40 @@ export function roundLiveTryAutoStartRound(ctx: any, vm: RoundLiveViewModel): vo
       }
     });
   
+}
+
+function roundEngineStorageKey(gameId: string, roundNumber: number): string {
+  return `manager.round-engine-id:${gameId}:${roundNumber}`;
+}
+
+function getOrCreateRoundEngineId(gameId: string, roundNumber: number): string {
+  const key = roundEngineStorageKey(gameId, roundNumber);
+  try {
+    const existing = localStorage.getItem(key);
+    if (existing) {
+      return existing;
+    }
+    const generated = globalThis.crypto?.randomUUID?.() ?? fallbackUuid();
+    localStorage.setItem(key, generated);
+    return generated;
+  } catch {
+    return fallbackUuid();
+  }
+}
+
+function clearRoundEngineId(gameId: string, roundNumber: number): void {
+  try {
+    localStorage.removeItem(roundEngineStorageKey(gameId, roundNumber));
+  } catch {
+    // Storage is an optimization for reload recovery; the backend response
+    // remains authoritative when browser storage is unavailable.
+  }
+}
+
+function fallbackUuid(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
 }

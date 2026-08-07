@@ -1124,8 +1124,10 @@ describe('RoundLiveComponent live round behavior', () => {
       expect(engineServiceSpy.startRound).toHaveBeenCalledTimes(1);
 
       const [roundIdArg, matchesArg] = engineServiceSpy.startRound.calls.mostRecent().args;
-      // roundId must reuse gameId (the existing startRoundEngine convention).
-      expect(roundIdArg).toBe(SAMPLE_GAME_ID);
+      // The registry key is a UUID scoped to this career/round, not the
+      // career id itself (which would collide with the completed prior date).
+      expect(roundIdArg).toMatch(/^[0-9a-f-]{36}$/);
+      expect(roundIdArg).not.toBe(SAMPLE_GAME_ID);
       // Both NOT_STARTED + no-state matches must be in the payload, in order.
       expect(matchesArg.length).toBe(2);
       expect(matchesArg[0].matchId).toBe(SAMPLE_MATCH_ID);
@@ -1338,11 +1340,12 @@ describe('RoundLiveComponent live round behavior', () => {
       setVm([notStartedMatch, noStateMatch]);
 
       // Auto-start must have called engineService.startRound with
-      // roundId = gameId and matches = both NOT_STARTED + no-state.
+      // roundId is a per-round UUID and matches are both NOT_STARTED + no-state.
       expect(engineServiceSpy.startRound).toHaveBeenCalledTimes(1);
 
       const [roundIdArg, matchesArg] = engineServiceSpy.startRound.calls.mostRecent().args;
-      expect(roundIdArg).toBe(SAMPLE_GAME_ID);
+      expect(roundIdArg).toMatch(/^[0-9a-f-]{36}$/);
+      expect(roundIdArg).not.toBe(SAMPLE_GAME_ID);
       expect(matchesArg.length).toBe(2);
       expect(matchesArg[0].matchId).toBe(SAMPLE_MATCH_ID);
       expect(matchesArg[1].matchId).toBe('match-no-state-2');
@@ -1476,7 +1479,8 @@ describe('RoundLiveComponent live round behavior', () => {
       // autoStartTriggered flag does NOT block iniciarTodos).
       expect(engineServiceSpy.startRound).toHaveBeenCalledTimes(1);
       const [roundIdArg, matchesArg] = engineServiceSpy.startRound.calls.mostRecent().args;
-      expect(roundIdArg).toBe(SAMPLE_GAME_ID);
+      expect(roundIdArg).toMatch(/^[0-9a-f-]{36}$/);
+      expect(roundIdArg).not.toBe(SAMPLE_GAME_ID);
       expect(matchesArg.length).toBe(1);
       expect(matchesArg[0].matchId).toBe(SAMPLE_MATCH_ID);
     });
@@ -1518,10 +1522,10 @@ describe('RoundLiveComponent live round behavior', () => {
 
       runAutoStartAndOpenStream();
 
-      // startRound was called once with SAMPLE_GAME_ID (the POST body
-      // roundId, used for idempotency)...
+      // startRound was called once with the per-round UUID used as the POST
+      // idempotency key...
       expect(engineServiceSpy.startRound).toHaveBeenCalledTimes(1);
-      expect(engineServiceSpy.startRound.calls.mostRecent().args[0]).toBe(SAMPLE_GAME_ID);
+      expect(engineServiceSpy.startRound.calls.mostRecent().args[0]).toMatch(/^[0-9a-f-]{36}$/);
 
       // ...and the roundId captured from the POST response was pushed
       // into resolvedRoundId$ (the side effect that the SSE chain
