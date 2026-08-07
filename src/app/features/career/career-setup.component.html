@@ -20,7 +20,7 @@
     </div>
 
     <div *ngIf="!(loading$ | async) && !(error$ | async) && (leagues$ | async) as leagues" class="seed-flow">
-      <div *ngIf="leagues.length === 0 && !seedingWorld" class="seed-prompt">
+      <div *ngIf="(leagues.length === 0 || (selectedLeagueId && (totalTeamsInLeague$ | async) === 0 && !(loadingTeams$ | async))) && !seedingWorld" class="seed-prompt">
         <h3>🌍 Tu mundo aún no está inicializado</h3>
         <p>Pulsa el botón para cargar La Liga 2024/25 con 20 equipos y 406 jugadores.</p>
         <button

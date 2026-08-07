@@ -60,6 +60,8 @@ export class CareerSetupComponent implements OnInit {
 
   seedingWorld = false;
   private refreshLeaguesTrigger = new BehaviorSubject<void>(undefined);
+  private refreshTeamsTrigger = new BehaviorSubject<void>(undefined);
+  private teamsLoadedSubject = new BehaviorSubject<boolean>(false);
 
   private _selectedLeagueId: string | null = null;
   
@@ -71,6 +73,7 @@ export class CareerSetupComponent implements OnInit {
     this._selectedLeagueId = value;
     this.selectedTeamId = null;
     this.selectedTeamsPerDivision = null;
+    this.teamsLoadedSubject.next(false);
     this.divisionChangeSubject.next(null);
     this.leagueChangeSubject.next(value);
   }
@@ -113,10 +116,14 @@ export class CareerSetupComponent implements OnInit {
       shareReplay({ bufferSize: 1, refCount: false })
     );
 
-    this.teamsWithOVR$ = this.leagueChangeSubject.pipe(
-      distinctUntilChanged(),
-      switchMap(leagueId => {
+    this.teamsWithOVR$ = combineLatest([
+      this.leagueChangeSubject,
+      this.refreshTeamsTrigger
+    ]).pipe(
+      switchMap(([leagueId]) => {
+        this.teamsLoadedSubject.next(false);
         if (!leagueId) {
+          this.teamsLoadedSubject.next(true);
           return of([]);
         }
         // Emit an empty list first so the UI can show the team-loading state immediately.
@@ -127,6 +134,10 @@ export class CareerSetupComponent implements OnInit {
             catchError(err => {
               this.error$.next('Error al cargar equipos');
               return of([] as TeamWithOVR[]);
+            }),
+            map(teams => {
+              this.teamsLoadedSubject.next(true);
+              return teams;
             })
           )
         );
@@ -180,9 +191,9 @@ export class CareerSetupComponent implements OnInit {
 
     this.loadingTeams$ = combineLatest([
       this.leagueChangeSubject,
-      this.teamsWithOVR$
+      this.teamsLoadedSubject
     ]).pipe(
-      map(([leagueId, teams]) => leagueId !== null && teams.length === 0),
+      map(([leagueId, loaded]) => leagueId !== null && !loaded),
       distinctUntilChanged()
     );
   }
@@ -199,6 +210,7 @@ export class CareerSetupComponent implements OnInit {
     this.error$.next(null);
     this.catalogService.invalidate();
     this.refreshLeaguesTrigger.next();
+    this.refreshTeamsTrigger.next();
   }
 
   getDivisionName(number: number): string {
@@ -236,6 +248,7 @@ export class CareerSetupComponent implements OnInit {
         this.seedingWorld = false;
         this.catalogService.invalidate();
         this.refreshLeaguesTrigger.next();
+        this.refreshTeamsTrigger.next();
       },
       error: (err) => {
         this.seedingWorld = false;

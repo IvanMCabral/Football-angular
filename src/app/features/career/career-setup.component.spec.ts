@@ -65,9 +65,12 @@ describe('CareerSetupComponent — setup flow', () => {
     });
   });
 
-  it('does not render the world initialization prompt when leagues exist', (done: DoneFn) => {
-    // Setup: GET /world/leagues returns [La Liga] (pre-seeded user)
-    httpSpy.get.and.returnValue(of([LA_LIGA]));
+  it('does not render the world initialization prompt when leagues and teams exist', (done: DoneFn) => {
+    // Setup: the catalog and the user snapshot are both available.
+    httpSpy.get.and.callFake(((url: string) =>
+      url.includes('/teams-with-ovr')
+        ? of([{ worldTeamId: 'team-1', name: 'Team 1', country: 'ES', formation: '4-4-2', ovr: 75, playerCount: 25 }])
+        : of([LA_LIGA])) as any);
     fixture.detectChanges();
 
     fixture.whenStable().then(() => {
@@ -75,9 +78,26 @@ describe('CareerSetupComponent — setup flow', () => {
       const button = fixture.nativeElement.querySelector('[data-testid="seed-world-button"]');
 
       expect(prompt).toBeNull(
-        'seed-prompt MUST NOT render when leagues$ has entries (regression guard)');
+        'seed-prompt MUST NOT render when the selected league has teams');
       expect(button).toBeNull(
-        'seed button MUST NOT render when leagues$ has entries (regression guard)');
+        'seed button MUST NOT render when the selected league has teams');
+      done();
+    });
+  });
+
+  it('offers world initialization when leagues exist but the user snapshot has no teams', (done: DoneFn) => {
+    // A new account can receive the shared league catalog before its snapshot
+    // is materialized. The UI must not leave the manager stuck at zero teams.
+    httpSpy.get.and.callFake(((url: string) =>
+      url.includes('/teams-with-ovr') ? of([]) : of([LA_LIGA])) as any);
+    fixture.detectChanges();
+
+    fixture.whenStable().then(() => {
+      const prompt = fixture.nativeElement.querySelector('.seed-prompt');
+      const button = fixture.nativeElement.querySelector('[data-testid="seed-world-button"]');
+
+      expect(prompt).not.toBeNull();
+      expect(button).not.toBeNull();
       done();
     });
   });
