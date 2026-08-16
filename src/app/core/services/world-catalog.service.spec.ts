@@ -49,15 +49,13 @@ describe('WorldCatalogService', () => {
     );
   });
 
-  it('uses the authenticated production snapshot command instead of the disabled seed route', async () => {
+  it('does not force a full snapshot rebuild during production catalog initialization', async () => {
     const originalProduction = environment.production;
     environment.production = true;
-    http.post.and.returnValue(of({ status: 'ok' }));
-
     try {
       await firstValueFrom(service.initializeWorld());
       expect(auth.getUserInfo).not.toHaveBeenCalled();
-      expect(http.post).toHaveBeenCalledWith('/api/v1/dashboard/reload-world', {});
+      expect(http.post).not.toHaveBeenCalled();
     } finally {
       environment.production = originalProduction;
     }

@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, of } from 'rxjs';
 import { shareReplay, switchMap } from 'rxjs/operators';
 import { AuthService } from './auth.service';
 import { environment } from '../../environments/environment';
@@ -88,7 +88,10 @@ export class WorldCatalogService {
    */
   initializeWorld(): Observable<unknown> {
     if (environment.production) {
-      return this.http.post(`${environment.apiUrl}/dashboard/reload-world`, {});
+      // The catalog queries now read the canonical database directly for a
+      // new manager. Forcing a full owner snapshot rebuild here duplicated
+      // the expensive world bootstrap before career creation.
+      return of({ status: 'ready' });
     }
 
     return this.authService.getUserInfo().pipe(
