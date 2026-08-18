@@ -9,6 +9,7 @@ import {
   RegisterComponent,
   SLOW_SERVER_NOTICE_DELAY_MS
 } from './register.component';
+import { MAX_PASSWORD_UTF8_BYTES, utf8ByteLength } from './password-contract';
 
 describe('RegisterComponent request lifecycle', () => {
   let fixture: ComponentFixture<RegisterComponent>;
@@ -128,5 +129,27 @@ describe('RegisterComponent request lifecycle', () => {
     component.onSubmit();
 
     expect(authService.register).not.toHaveBeenCalled();
+  });
+
+  it('enforces the BCrypt maximum in UTF-8 bytes, not JavaScript characters', () => {
+    const asciiAtBoundary = 'a'.repeat(MAX_PASSWORD_UTF8_BYTES);
+    const asciiOverBoundary = 'a'.repeat(MAX_PASSWORD_UTF8_BYTES + 1);
+    const unicodeAtBoundary = '😀'.repeat(18);
+    const unicodeOverBoundary = '😀'.repeat(19);
+
+    expect(utf8ByteLength(asciiAtBoundary)).toBe(72);
+    expect(utf8ByteLength(unicodeAtBoundary)).toBe(72);
+
+    component.registerForm.patchValue({ password: asciiAtBoundary });
+    expect(component.registerForm.get('password')?.valid).toBeTrue();
+
+    component.registerForm.patchValue({ password: asciiOverBoundary });
+    expect(component.registerForm.get('password')?.hasError('maxUtf8Bytes')).toBeTrue();
+
+    component.registerForm.patchValue({ password: unicodeAtBoundary });
+    expect(component.registerForm.get('password')?.valid).toBeTrue();
+
+    component.registerForm.patchValue({ password: unicodeOverBoundary });
+    expect(component.registerForm.get('password')?.hasError('maxUtf8Bytes')).toBeTrue();
   });
 });

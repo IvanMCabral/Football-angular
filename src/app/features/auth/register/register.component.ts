@@ -5,6 +5,11 @@ import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angula
 import { Router, RouterLink } from '@angular/router';
 import { TimeoutError, finalize, timeout } from 'rxjs';
 import { AuthService } from '../../../core/services/auth.service';
+import {
+  MAX_PASSWORD_UTF8_BYTES,
+  MIN_PASSWORD_CHARACTERS,
+  maxUtf8BytesValidator
+} from './password-contract';
 
 export const REGISTRATION_REQUEST_TIMEOUT_MS = new InjectionToken<number>(
   'REGISTRATION_REQUEST_TIMEOUT_MS',
@@ -47,7 +52,11 @@ export class RegisterComponent {
         Validators.pattern(/^[A-Za-z0-9_.-]+$/)
       ]],
       email: ['', [Validators.required, Validators.email]],
-      password: ['', [Validators.required, Validators.minLength(8), Validators.maxLength(128)]]
+      password: ['', [
+        Validators.required,
+        Validators.minLength(MIN_PASSWORD_CHARACTERS),
+        maxUtf8BytesValidator(MAX_PASSWORD_UTF8_BYTES)
+      ]]
     });
   }
 
