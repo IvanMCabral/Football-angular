@@ -1,11 +1,12 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
 import { AppLoggerService } from '../../core/services/app-logger.service';
 import { TeamService } from './services/team.service';
 import { Team } from '../../shared/models/team.model';
-import { finalize, switchMap } from 'rxjs';
+import { catchError, EMPTY, finalize, switchMap, take } from 'rxjs';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 type ChooseTeamOption = Team;
 
@@ -21,6 +22,7 @@ export class ChooseTeamComponent implements OnInit {
   private authService = inject(AuthService);
   private logger = inject(AppLoggerService);
   private router = inject(Router);
+  private destroyRef = inject(DestroyRef);
 
   teams: ChooseTeamOption[] = [];
   loading = true;
@@ -33,15 +35,24 @@ export class ChooseTeamComponent implements OnInit {
     this.loading = true;
     this.errorMessage = '';
     this.authService.getUserInfo().pipe(
-      switchMap(userInfo => this.teamService.getAllTeams(userInfo.id)),
+      // The current user is a one-shot prerequisite, even if its provider is
+      // backed by a long-lived auth stream.
+      take(1),
+      switchMap(userInfo => this.teamService.getAllTeams(userInfo.id).pipe(
+        // Scope loading to the actual teams request, not to the auth source.
+        finalize(() => this.loading = false)
+      )),
+      catchError(err => {
+        this.logger.error('[CHOOSE TEAM] Error al cargar equipos:', err);
+        this.errorMessage = 'No se pudieron cargar los equipos.';
+        this.loading = false;
+        return EMPTY;
+      }),
+      takeUntilDestroyed(this.destroyRef),
       finalize(() => this.loading = false)
     ).subscribe({
       next: (teams: ChooseTeamOption[]) => {
         this.teams = teams;
-      },
-      error: (err) => {
-        this.logger.error('[CHOOSE TEAM] Error al cargar equipos:', err);
-        this.errorMessage = 'No se pudieron cargar los equipos.';
       }
     });
   }

@@ -61,6 +61,16 @@ describe('ChooseTeamComponent', () => {
     expect(component.errorMessage).toBe('No se pudieron cargar los equipos.');
   });
 
+  it('ends loading when the current-user lookup fails', () => {
+    authService.getUserInfo.and.returnValue(throwError(() => ({ status: 503 })));
+
+    component.ngOnInit();
+
+    expect(component.loading).toBeFalse();
+    expect(component.errorMessage).toBe('No se pudieron cargar los equipos.');
+    expect(teamService.getAllTeams).not.toHaveBeenCalled();
+  });
+
   it('keeps loading true while the teams request is pending', () => {
     const pending = new Subject<any[]>();
     teamService.getAllTeams.and.returnValue(pending.asObservable());
@@ -71,6 +81,90 @@ describe('ChooseTeamComponent', () => {
     pending.next([]);
     pending.complete();
     expect(component.loading).toBeFalse();
+  });
+
+  it('clears loading when teams finish even if the auth source remains alive', () => {
+    const authStream = new Subject<{ id: string; username: string; email: string }>();
+    const realisticTeams = Array.from({ length: 70 }, (_, index) => ({
+      id: `world-team-${index + 1}`,
+      realTeamId: `real-team-${index + 1}`,
+      realLeagueId: `league-${index < 20 ? 1 : index < 50 ? 2 : 3}`,
+      name: `Catalog Team ${index + 1}`,
+      country: index < 20 ? 'ES' : index < 50 ? 'AR' : 'BR',
+      budget: 1000000 + index,
+      formation: index % 2 === 0 ? '4-3-3' : '4-4-2'
+    }));
+    authService.getUserInfo.and.returnValue(authStream.asObservable());
+    teamService.getAllTeams.and.returnValue(of(realisticTeams));
+
+    component.ngOnInit();
+    authStream.next({ id: 'user-1', username: 'manager', email: 'manager@example.test' });
+
+    expect(component.teams).toHaveSize(70);
+    expect(component.loading).toBeFalse();
+  });
+
+  it('loads 70 teams after delayed auth and delayed teams response', (done) => {
+    const authStream = new Subject<{ id: string; username: string; email: string }>();
+    const teamsStream = new Subject<any[]>();
+    const realisticTeams = Array.from({ length: 70 }, (_, index) => ({
+      id: `world-team-${index + 1}`,
+      realTeamId: `real-team-${index + 1}`,
+      realLeagueId: `league-${index < 20 ? 1 : index < 50 ? 2 : 3}`,
+      name: `Catalog Team ${index + 1}`,
+      country: index < 20 ? 'ES' : index < 50 ? 'AR' : 'BR',
+      budget: 1000000 + index,
+      formation: index % 2 === 0 ? '4-3-3' : '4-4-2'
+    }));
+    authService.getUserInfo.and.returnValue(authStream.asObservable());
+    teamService.getAllTeams.and.returnValue(teamsStream.asObservable());
+
+    component.ngOnInit();
+    setTimeout(() => authStream.next({ id: 'user-1', username: 'manager', email: 'manager@example.test' }), 1);
+    setTimeout(() => teamsStream.next(realisticTeams), 3);
+    setTimeout(() => teamsStream.complete(), 4);
+    setTimeout(() => {
+      expect(component.teams).toHaveSize(70);
+      expect(component.loading).toBeFalse();
+      done();
+    }, 10);
+  });
+
+  it('handles quick auth followed by delayed teams', (done) => {
+    const teamsStream = new Subject<any[]>();
+    authService.getUserInfo.and.returnValue(of({
+      id: 'user-1', username: 'manager', email: 'manager@example.test'
+    }));
+    teamService.getAllTeams.and.returnValue(teamsStream.asObservable());
+
+    component.ngOnInit();
+    setTimeout(() => {
+      teamsStream.next(realisticUiTeams());
+      teamsStream.complete();
+    }, 4);
+
+    setTimeout(() => {
+      expect(component.teams).toHaveSize(70);
+      expect(component.loading).toBeFalse();
+      done();
+    }, 10);
+  });
+
+  it('handles delayed auth followed by quick teams', (done) => {
+    const authStream = new Subject<{ id: string; username: string; email: string }>();
+    authService.getUserInfo.and.returnValue(authStream.asObservable());
+    teamService.getAllTeams.and.returnValue(of(realisticUiTeams()));
+
+    component.ngOnInit();
+    setTimeout(() => authStream.next({
+      id: 'user-1', username: 'manager', email: 'manager@example.test'
+    }), 4);
+
+    setTimeout(() => {
+      expect(component.teams).toHaveSize(70);
+      expect(component.loading).toBeFalse();
+      done();
+    }, 10);
   });
 
   it('distinguishes a successful empty catalog from a load error', () => {
@@ -119,3 +213,15 @@ describe('ChooseTeamComponent', () => {
     expect(component.errorMessage).toBe('No se pudo asignar el equipo.');
   });
 });
+
+function realisticUiTeams(): any[] {
+  return Array.from({ length: 70 }, (_, index) => ({
+    id: `world-team-${index + 1}`,
+    realTeamId: `real-team-${index + 1}`,
+    realLeagueId: `league-${index < 20 ? 1 : index < 50 ? 2 : 3}`,
+    name: `Catalog Team ${index + 1}`,
+    country: index < 20 ? 'ES' : index < 50 ? 'AR' : 'BR',
+    budget: 1000000 + index,
+    formation: index % 2 === 0 ? '4-3-3' : '4-4-2'
+  }));
+}
