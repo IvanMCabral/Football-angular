@@ -37,6 +37,18 @@ describe('TeamService', () => {
     expect(result).toEqual(fallbackSquad);
   });
 
+  it('getAllTeams requests the canonical world teams route with the authenticated user', () => {
+    let result: unknown;
+    service.getAllTeams('user/1').subscribe(value => result = value);
+
+    const request = httpMock.expectOne(
+      `${environment.apiUrl}/world/teams?userId=user%2F1`);
+    expect(request.request.method).toBe('GET');
+    request.flush([]);
+
+    expect(result).toEqual([]);
+  });
+
   it('getMyTeamSquad falls back to career players squad when teams/me/squad fails', () => {
     const fallbackSquad = [
       { sessionPlayerId: 'bench-2', name: 'Bench Two', position: 'DEF' }

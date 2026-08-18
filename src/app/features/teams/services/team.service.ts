@@ -19,8 +19,8 @@ export class TeamService {
   private sessionTeamsSubject = new BehaviorSubject<SessionTeam[]>([]);
   sessionTeams$ = this.sessionTeamsSubject.asObservable();
 
-  getAllTeams(): Observable<Team[]> {
-    return this.http.get<Team[]>(`${this.apiUrl}`);
+  getAllTeams(userId: string): Observable<Team[]> {
+    return this.http.get<Team[]>(`${this.worldApiUrl}/teams?userId=${encodeURIComponent(userId)}`);
   }
 
   getTeam(id: string): Observable<Team> {

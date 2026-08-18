@@ -5,6 +5,7 @@ import { AuthService } from '../../core/services/auth.service';
 import { AppLoggerService } from '../../core/services/app-logger.service';
 import { TeamService } from './services/team.service';
 import { Team } from '../../shared/models/team.model';
+import { switchMap } from 'rxjs';
 
 type ChooseTeamOption = Team & {
   nombre?: string;
@@ -31,7 +32,9 @@ export class ChooseTeamComponent implements OnInit {
   saving = false;
 
   ngOnInit(): void {
-    this.teamService.getAllTeams().subscribe({
+    this.authService.getUserInfo().pipe(
+      switchMap(userInfo => this.teamService.getAllTeams(userInfo.id))
+    ).subscribe({
       next: (teams: ChooseTeamOption[]) => {
         this.teams = Array.isArray(teams) ? teams : [];
         this.loading = false;
