@@ -1,13 +1,32 @@
 export interface Team {
+  /** Canonical UI identity: the backend WorldTeam.worldTeamId. */
   id: string;
-  managerId: string;
+  /** Not supplied by the WorldTeam catalog endpoint. */
+  managerId?: string;
   name: string;
   country: string;
   budget: number;
-  formation: Formation;
-  squadSize: number;
-  createdAt: string;
-  updatedAt: string;
+  formation: string;
+  squadSize?: number;
+  createdAt?: string;
+  updatedAt?: string;
+  /** Canonical metadata retained from the WorldTeam wire contract. */
+  realTeamId?: string | null;
+  realLeagueId?: string | null;
+}
+
+/** Exact wire shape returned by GET /api/v1/world/teams. */
+export interface WorldTeamResponse {
+  worldTeamId: string;
+  realTeamId: string | null;
+  realLeagueId: string | null;
+  name: string;
+  country: string;
+  city: string | null;
+  baseBudget: number | null;
+  baseFormation: string | null;
+  origin: 'REAL' | 'CUSTOM' | null;
+  division: string | null;
 }
 
 // SessionTeam - Equipos guardados en Redis/session (NO en base de datos)

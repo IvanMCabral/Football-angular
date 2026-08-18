@@ -1,9 +1,9 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, BehaviorSubject, catchError, of, switchMap, tap } from 'rxjs';
+import { Observable, BehaviorSubject, catchError, map, of, switchMap, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AppLoggerService } from '../../../core/services/app-logger.service';
-import { Team, CreateTeamRequest, SessionTeam, CreateSessionTeamRequest, RandomTeamsRequest, RandomTeamsResponse } from '../../../shared/models/team.model';
+import { Team, WorldTeamResponse, CreateTeamRequest, SessionTeam, CreateSessionTeamRequest, RandomTeamsRequest, RandomTeamsResponse } from '../../../shared/models/team.model';
 import { Player, SessionPlayer } from '../../../shared/models/player.model';
 
 @Injectable({
@@ -20,7 +20,9 @@ export class TeamService {
   sessionTeams$ = this.sessionTeamsSubject.asObservable();
 
   getAllTeams(userId: string): Observable<Team[]> {
-    return this.http.get<Team[]>(`${this.worldApiUrl}/teams?userId=${encodeURIComponent(userId)}`);
+    return this.http.get<WorldTeamResponse[]>(`${this.worldApiUrl}/teams?userId=${encodeURIComponent(userId)}`).pipe(
+      map(worldTeams => worldTeams.map(mapWorldTeamResponseToTeam))
+    );
   }
 
   getTeam(id: string): Observable<Team> {
@@ -108,4 +110,24 @@ export class TeamService {
       catchError(() => fallback$())
     );
   }
+}
+
+/**
+ * Single transport-to-UI boundary for the canonical WorldTeam catalog.
+ * `Team.id` is deliberately the productive worldTeamId used by assign-team.
+ */
+export function mapWorldTeamResponseToTeam(worldTeam: WorldTeamResponse): Team {
+  if (!worldTeam || !worldTeam.worldTeamId || !worldTeam.name) {
+    throw new Error('Invalid WorldTeam response: worldTeamId and name are required');
+  }
+
+  return {
+    id: worldTeam.worldTeamId,
+    name: worldTeam.name,
+    country: worldTeam.country ?? '',
+    budget: worldTeam.baseBudget ?? 0,
+    formation: worldTeam.baseFormation ?? '4-3-3',
+    realTeamId: worldTeam.realTeamId,
+    realLeagueId: worldTeam.realLeagueId
+  };
 }

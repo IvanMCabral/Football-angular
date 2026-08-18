@@ -5,11 +5,9 @@ import { AuthService } from '../../core/services/auth.service';
 import { AppLoggerService } from '../../core/services/app-logger.service';
 import { TeamService } from './services/team.service';
 import { Team } from '../../shared/models/team.model';
-import { switchMap } from 'rxjs';
+import { finalize, switchMap } from 'rxjs';
 
-type ChooseTeamOption = Team & {
-  nombre?: string;
-};
+type ChooseTeamOption = Team;
 
 @Component({
   selector: 'app-choose-team',
@@ -32,20 +30,18 @@ export class ChooseTeamComponent implements OnInit {
   saving = false;
 
   ngOnInit(): void {
+    this.loading = true;
+    this.errorMessage = '';
     this.authService.getUserInfo().pipe(
-      switchMap(userInfo => this.teamService.getAllTeams(userInfo.id))
+      switchMap(userInfo => this.teamService.getAllTeams(userInfo.id)),
+      finalize(() => this.loading = false)
     ).subscribe({
       next: (teams: ChooseTeamOption[]) => {
-        this.teams = Array.isArray(teams) ? teams : [];
-        this.loading = false;
-        if (this.teams.length === 0) {
-          this.errorMessage = 'No hay equipos disponibles.';
-        }
+        this.teams = teams;
       },
       error: (err) => {
         this.logger.error('[CHOOSE TEAM] Error al cargar equipos:', err);
         this.errorMessage = 'No se pudieron cargar los equipos.';
-        this.loading = false;
       }
     });
   }
