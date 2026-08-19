@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component, DestroyRef, NgZone, OnInit, inject } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
@@ -24,8 +24,6 @@ export class ChooseTeamComponent implements OnInit {
   private logger = inject(AppLoggerService);
   private router = inject(Router);
   private destroyRef = inject(DestroyRef);
-  private changeDetector = inject(ChangeDetectorRef);
-  private zone = inject(NgZone);
   private clientDiagnostics = inject(ClientHttpDiagnosticsService);
 
   teams: ChooseTeamOption[] = [];
@@ -41,30 +39,21 @@ export class ChooseTeamComponent implements OnInit {
     this.authService.getUserInfo().pipe(
       take(1),
       switchMap(userInfo => this.teamService.getAllTeams(userInfo.id).pipe(
-        finalize(() => this.commitState(() => this.loading = false))
+        finalize(() => this.loading = false)
       )),
       catchError(err => {
         this.logger.error('[CHOOSE TEAM] Error al cargar equipos:', err);
-        this.commitState(() => {
-          this.errorMessage = 'No se pudieron cargar los equipos.';
-          this.loading = false;
-        });
+        this.errorMessage = 'No se pudieron cargar los equipos.';
+        this.loading = false;
         return EMPTY;
       }),
       takeUntilDestroyed(this.destroyRef),
-      finalize(() => this.commitState(() => this.loading = false))
+      finalize(() => this.loading = false)
     ).subscribe({
       next: (teams: ChooseTeamOption[]) => {
         this.clientDiagnostics.recordChooseTeamNext();
-        this.commitState(() => this.teams = teams);
+        this.teams = teams;
       }
-    });
-  }
-
-  private commitState(update: () => void): void {
-    this.zone.run(() => {
-      update();
-      this.changeDetector.markForCheck();
     });
   }
 

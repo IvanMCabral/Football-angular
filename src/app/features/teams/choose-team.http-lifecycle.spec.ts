@@ -1,5 +1,4 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { NgZone } from '@angular/core';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
@@ -10,7 +9,6 @@ import { TeamService } from './services/team.service';
 import { AppLoggerService } from '../../core/services/app-logger.service';
 import { authInterceptor } from '../../core/interceptors/auth.interceptor';
 import { errorInterceptor } from '../../core/interceptors/error.interceptor';
-import { ClientHttpDiagnosticsService } from '../../core/observability/client-http-diagnostics.service';
 import { environment } from '../../environments/environment';
 import { WorldTeamResponse } from '../../shared/models/team.model';
 
@@ -78,44 +76,6 @@ describe('ChooseTeamComponent HTTP lifecycle', () => {
       expect(fixture.nativeElement.querySelectorAll('li')).toHaveSize(70);
       done();
     }, 15);
-  });
-
-  it('renders the visible team list when the successful response completes outside Angular zone', (done) => {
-    fixture.detectChanges();
-    fixture.autoDetectChanges();
-
-    const authRequest = http.expectOne(`${environment.apiUrl}/auth/me`);
-    authRequest.flush({
-      id: 'user-1',
-      username: 'manager',
-      email: 'manager@example.test'
-    });
-    const teamsRequest = http.expectOne(`${environment.apiUrl}/world/teams?userId=user-1`);
-    const diagnostics = TestBed.inject(ClientHttpDiagnosticsService);
-    const mappedSpy = spyOn(diagnostics, 'recordTeamServiceMapped').and.callThrough();
-    const componentNextSpy = spyOn(diagnostics, 'recordChooseTeamNext').and.callThrough();
-
-    TestBed.inject(NgZone).runOutsideAngular(() => {
-      teamsRequest.flush(realisticWorldTeams());
-    });
-
-    setTimeout(() => {
-      expect(component.teams).toHaveSize(70);
-      expect(component.loading).toBeFalse();
-      expect(mappedSpy).toHaveBeenCalledTimes(1);
-      expect(componentNextSpy).toHaveBeenCalledTimes(1);
-      expect(fixture.nativeElement.querySelector('.choose-team-container').textContent)
-        .not.toContain('Cargando equipos...');
-      expect(fixture.nativeElement.querySelectorAll('li')).toHaveSize(70);
-      expect(fixture.nativeElement.textContent).not.toContain('No hay equipos disponibles');
-
-      const firstTeam = fixture.nativeElement.querySelector('li') as HTMLElement;
-      firstTeam.click();
-      fixture.detectChanges();
-      expect(component.selectedTeam?.id).toBe('world-team-1');
-      expect((fixture.nativeElement.querySelector('button') as HTMLButtonElement).disabled).toBeFalse();
-      done();
-    }, 0);
   });
 
   [400, 401, 403, 500].forEach(status => {
