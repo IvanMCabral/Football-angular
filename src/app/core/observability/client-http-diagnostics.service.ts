@@ -29,7 +29,7 @@ export type ClientDiagnosticEventName = typeof CLIENT_DIAGNOSTIC_EVENT_NAMES[num
 export interface ClientDiagnosticEvent {
   event: ClientDiagnosticEventName;
   normalizedRoute: typeof TEAMS_ROUTE;
-  correlationId?: string;
+  correlationId: string;
   elapsedMs: number;
   readyState?: number;
   status?: number;
@@ -104,14 +104,17 @@ export class ClientHttpDiagnosticsService {
     this.record(this.nextRequest, { event, ...fields });
   }
 
-  recordAngularNext(status?: number): void {
-    this.record(this.nextRequest, { event: 'ANGULAR_HTTP_NEXT', status });
+  recordAngularNext(status?: number, correlationId?: string): void {
+    this.record(this.nextRequest, { event: 'ANGULAR_HTTP_NEXT', status, correlationId });
   }
 
   recordAngularError(error: unknown): void {
     this.record(this.nextRequest, {
       event: 'ANGULAR_HTTP_ERROR',
       status: error instanceof HttpErrorResponse ? error.status : undefined,
+      correlationId: error instanceof HttpErrorResponse
+        ? error.headers.get('X-Request-Id') ?? undefined
+        : undefined,
     });
   }
 
@@ -174,11 +177,12 @@ export class ClientHttpDiagnosticsService {
       request.events.splice(removableIndex, 1);
     }
 
+    const correlationId = this.readCorrelationId(event.correlationId) ?? 'NOT_OBSERVED';
     const diagnosticEvent: ClientDiagnosticEvent = {
       event: event.event,
       normalizedRoute: TEAMS_ROUTE,
       elapsedMs: Math.max(0, Math.round(performance.now() - request.startedAt)),
-      ...(this.readCorrelationId(event.correlationId) ? { correlationId: this.readCorrelationId(event.correlationId) } : {}),
+      correlationId,
       ...(event.readyState === undefined ? {} : { readyState: event.readyState }),
       ...(event.status === undefined ? {} : { status: event.status }),
       ...(event.loadedBytes === undefined ? {} : { loadedBytes: event.loadedBytes }),

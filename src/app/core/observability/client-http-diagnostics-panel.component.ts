@@ -22,7 +22,7 @@ import { ClientHttpDiagnosticsService } from './client-http-diagnostics.service'
           <span *ngIf="item.status !== undefined">status={{ item.status }}</span>
           <span *ngIf="item.loadedBytes !== undefined">bytes={{ item.loadedBytes }}</span>
           <span *ngIf="item.totalBytes !== undefined">total={{ item.totalBytes }}</span>
-          <span *ngIf="item.correlationId">correlationId={{ item.correlationId }}</span>
+          <span>correlationId={{ item.correlationId }}</span>
         </li>
       </ol>
     </section>

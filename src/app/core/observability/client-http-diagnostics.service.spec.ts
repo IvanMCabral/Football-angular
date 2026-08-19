@@ -1,4 +1,4 @@
-import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common/http';
+import { HttpClient, HttpHeaders, provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { ClientHttpDiagnosticsService, TEAMS_ROUTE } from './client-http-diagnostics.service';
@@ -89,6 +89,29 @@ describe('client teams HTTP diagnostics', () => {
       'ANGULAR_HTTP_ERROR',
       'ANGULAR_HTTP_FINALIZE',
     ]);
+  });
+
+  it('reads only X-Request-Id from Angular response headers and displays NOT_OBSERVED when absent', () => {
+    const http = TestBed.inject(HttpClient);
+    const controller = TestBed.inject(HttpTestingController);
+
+    http.get<unknown[]>(TEAMS_ROUTE).subscribe();
+    controller.expectOne(TEAMS_ROUTE).flush([], {
+      status: 200,
+      statusText: 'OK',
+      headers: new HttpHeaders({
+        'X-Request-Id': 'corr-angular-1',
+        Authorization: 'Bearer SHOULD_NOT_BE_RECORDED',
+      }),
+    });
+    expect(diagnostics.snapshot().events.find((event) => event.event === 'ANGULAR_HTTP_NEXT')?.correlationId)
+      .toBe('corr-angular-1');
+    expect(JSON.stringify(diagnostics.snapshot())).not.toContain('SHOULD_NOT_BE_RECORDED');
+
+    diagnostics.resetForTest();
+    diagnostics.startRequest();
+    diagnostics.recordAngularNext(200);
+    expect(diagnostics.snapshot().events[1].correlationId).toBe('NOT_OBSERVED');
   });
 
   it('keeps a request visibly pending until unsubscribe/finalize', () => {

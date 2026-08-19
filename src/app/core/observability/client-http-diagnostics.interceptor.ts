@@ -13,7 +13,7 @@ export const clientHttpDiagnosticsInterceptor: HttpInterceptorFn = (req, next) =
   return next(req).pipe(
     tap((event) => {
       if (event.type === HttpEventType.Response) {
-        diagnostics.recordAngularNext(event.status);
+        diagnostics.recordAngularNext(event.status, event.headers.get('X-Request-Id') ?? undefined);
       }
     }),
     catchError((error: HttpErrorResponse) => {

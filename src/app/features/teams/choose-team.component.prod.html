@@ -1,0 +1,16 @@
+<div class="choose-team-container">
+  <h1>Elegir equipo</h1>
+  <div *ngIf="loading">Cargando equipos...</div>
+  <div *ngIf="!loading && errorMessage" class="error-message">{{ errorMessage }}</div>
+
+  <ul *ngIf="!loading && !errorMessage && teams.length">
+    <li *ngFor="let team of teams" (click)="chooseTeam(team)" [class.selected]="selectedTeam && selectedTeam.id === team.id">
+      <strong>ID: {{ team.id }}</strong>
+      <span *ngIf="team.name"> | Nombre: {{ team.name }}</span>
+      <span *ngIf="team.country"> | País: {{ team.country }}</span>
+    </li>
+  </ul>
+  <div *ngIf="!loading && !errorMessage && !teams.length">No hay equipos disponibles.</div>
+  <button [disabled]="!selectedTeam || saving" (click)="assignTeam()">Confirmar selección</button>
+  <div *ngIf="successMessage" class="success-message">{{ successMessage }}</div>
+</div>
