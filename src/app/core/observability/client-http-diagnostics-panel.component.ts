@@ -18,6 +18,12 @@ import { ClientHttpDiagnosticsService } from './client-http-diagnostics.service'
         <li *ngFor="let item of diagnostics.snapshot().events; trackBy: trackEvent">
           <code>{{ item.event }}</code>
           <span>{{ item.elapsedMs }} ms</span>
+          <span>requestSeq={{ item.requestSeq }}</span>
+          <span *ngIf="item.instanceSeq !== undefined">instanceSeq={{ item.instanceSeq }}</span>
+          <span *ngIf="item.incomingCount !== undefined">incomingCount={{ item.incomingCount }}</span>
+          <span *ngIf="item.assignedCount !== undefined">assignedCount={{ item.assignedCount }}</span>
+          <span *ngIf="item.renderedCount !== undefined">renderedCount={{ item.renderedCount }}</span>
+          <span *ngIf="item.loading !== undefined">loading={{ item.loading }}</span>
           <span *ngIf="item.readyState !== undefined">readyState={{ item.readyState }}</span>
           <span *ngIf="item.status !== undefined">status={{ item.status }}</span>
           <span *ngIf="item.loadedBytes !== undefined">bytes={{ item.loadedBytes }}</span>

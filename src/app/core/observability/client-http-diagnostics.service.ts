@@ -22,6 +22,11 @@ export const CLIENT_DIAGNOSTIC_EVENT_NAMES = [
   'ANGULAR_HTTP_FINALIZE',
   'TEAM_SERVICE_MAPPED',
   'CHOOSE_TEAM_NEXT',
+  'CHOOSE_TEAM_NEXT_ENTER',
+  'CHOOSE_TEAM_TEAMS_ASSIGNED',
+  'CHOOSE_TEAM_LOADING_FALSE',
+  'CHOOSE_TEAM_INSTANCE_DESTROYED',
+  'CHOOSE_TEAM_AFTER_RENDER',
 ] as const;
 
 export type ClientDiagnosticEventName = typeof CLIENT_DIAGNOSTIC_EVENT_NAMES[number];
@@ -29,8 +34,14 @@ export type ClientDiagnosticEventName = typeof CLIENT_DIAGNOSTIC_EVENT_NAMES[num
 export interface ClientDiagnosticEvent {
   event: ClientDiagnosticEventName;
   normalizedRoute: typeof TEAMS_ROUTE;
+  requestSeq: number;
   correlationId: string;
   elapsedMs: number;
+  instanceSeq?: number;
+  incomingCount?: number;
+  assignedCount?: number;
+  renderedCount?: number;
+  loading?: false;
   readyState?: number;
   status?: number;
   loadedBytes?: number;
@@ -44,6 +55,7 @@ export interface ClientDiagnosticRequestSnapshot {
 }
 
 interface DiagnosticRequest {
+  readonly requestSeq: number;
   readonly startedAt: number;
   readonly events: ClientDiagnosticEvent[];
   nativeAttached: boolean;
@@ -59,6 +71,8 @@ export class ClientHttpDiagnosticsService {
   private readonly enabled = environment.enableClientHttpDiagnostics === true;
   private readonly requests = signal<readonly DiagnosticRequest[]>([]);
   private nextRequest: DiagnosticRequest | null = null;
+  private lastRequest: DiagnosticRequest | null = null;
+  private nextRequestSeq = 1;
 
   readonly snapshot = signal<ClientDiagnosticRequestSnapshot>({
     events: [],
@@ -75,12 +89,14 @@ export class ClientHttpDiagnosticsService {
     }
 
     const request: DiagnosticRequest = {
+      requestSeq: this.nextRequestSeq++,
       startedAt: performance.now(),
       events: [],
       nativeAttached: false,
       finalized: false,
     };
     this.nextRequest = request;
+    this.lastRequest = request;
     this.requests.update((requests) => [...requests.slice(-1), request]);
     this.record(request, { event: 'CLIENT_REQUEST_START' });
   }
@@ -126,6 +142,30 @@ export class ClientHttpDiagnosticsService {
     this.record(this.nextRequest, { event: 'CHOOSE_TEAM_NEXT' });
   }
 
+  recordChooseTeamNextEnter(instanceSeq: number, incomingCount: number): number | undefined {
+    return this.recordComponentState('CHOOSE_TEAM_NEXT_ENTER', instanceSeq, undefined, { incomingCount });
+  }
+
+  recordChooseTeamTeamsAssigned(instanceSeq: number, requestSeq: number | undefined, assignedCount: number): void {
+    this.recordComponentState('CHOOSE_TEAM_TEAMS_ASSIGNED', instanceSeq, requestSeq, { assignedCount });
+  }
+
+  recordChooseTeamLoadingFalse(instanceSeq: number, requestSeq: number | undefined): void {
+    this.recordComponentState('CHOOSE_TEAM_LOADING_FALSE', instanceSeq, requestSeq, { loading: false });
+  }
+
+  recordChooseTeamInstanceDestroyed(instanceSeq: number, requestSeq: number | undefined): void {
+    this.recordComponentState('CHOOSE_TEAM_INSTANCE_DESTROYED', instanceSeq, requestSeq);
+  }
+
+  recordChooseTeamAfterRender(instanceSeq: number, requestSeq: number | undefined, renderedCount: number): void {
+    this.recordComponentState('CHOOSE_TEAM_AFTER_RENDER', instanceSeq, requestSeq, { renderedCount });
+  }
+
+  currentRequestSeq(): number | undefined {
+    return this.nextRequest?.requestSeq ?? this.lastRequest?.requestSeq;
+  }
+
   finalizeRequest(): void {
     if (!this.enabled || !this.nextRequest) {
       return;
@@ -138,6 +178,8 @@ export class ClientHttpDiagnosticsService {
 
   resetForTest(): void {
     this.nextRequest = null;
+    this.lastRequest = null;
+    this.nextRequestSeq = 1;
     this.requests.set([]);
     this.snapshot.set({ events: [], inFlight: false });
   }
@@ -164,7 +206,12 @@ export class ClientHttpDiagnosticsService {
         || event.event === 'ANGULAR_HTTP_ERROR'
         || event.event === 'ANGULAR_HTTP_FINALIZE'
         || event.event === 'TEAM_SERVICE_MAPPED'
-        || event.event === 'CHOOSE_TEAM_NEXT';
+        || event.event === 'CHOOSE_TEAM_NEXT'
+        || event.event === 'CHOOSE_TEAM_NEXT_ENTER'
+        || event.event === 'CHOOSE_TEAM_TEAMS_ASSIGNED'
+        || event.event === 'CHOOSE_TEAM_LOADING_FALSE'
+        || event.event === 'CHOOSE_TEAM_INSTANCE_DESTROYED'
+        || event.event === 'CHOOSE_TEAM_AFTER_RENDER';
       if (!isTerminal) {
         return;
       }
@@ -181,8 +228,14 @@ export class ClientHttpDiagnosticsService {
     const diagnosticEvent: ClientDiagnosticEvent = {
       event: event.event,
       normalizedRoute: TEAMS_ROUTE,
+      requestSeq: request.requestSeq,
       elapsedMs: Math.max(0, Math.round(performance.now() - request.startedAt)),
       correlationId,
+      ...(event.instanceSeq === undefined ? {} : { instanceSeq: event.instanceSeq }),
+      ...(event.incomingCount === undefined ? {} : { incomingCount: event.incomingCount }),
+      ...(event.assignedCount === undefined ? {} : { assignedCount: event.assignedCount }),
+      ...(event.renderedCount === undefined ? {} : { renderedCount: event.renderedCount }),
+      ...(event.loading === undefined ? {} : { loading: event.loading }),
       ...(event.readyState === undefined ? {} : { readyState: event.readyState }),
       ...(event.status === undefined ? {} : { status: event.status }),
       ...(event.loadedBytes === undefined ? {} : { loadedBytes: event.loadedBytes }),
@@ -209,6 +262,37 @@ export class ClientHttpDiagnosticsService {
       events: [...request.events],
       inFlight: !request.finalized,
     });
+  }
+
+  private recordComponentState(
+    event: Extract<ClientDiagnosticEventName,
+      'CHOOSE_TEAM_NEXT_ENTER'
+      | 'CHOOSE_TEAM_TEAMS_ASSIGNED'
+      | 'CHOOSE_TEAM_LOADING_FALSE'
+      | 'CHOOSE_TEAM_INSTANCE_DESTROYED'
+      | 'CHOOSE_TEAM_AFTER_RENDER'>,
+    instanceSeq: number,
+    requestSeq: number | undefined,
+    fields: Omit<Partial<ClientDiagnosticEvent>,
+      'event' | 'normalizedRoute' | 'requestSeq' | 'correlationId' | 'elapsedMs' | 'instanceSeq'> = {}
+  ): number | undefined {
+    const request = this.findRequest(requestSeq);
+    if (!request) {
+      return undefined;
+    }
+
+    this.record(request, { event, instanceSeq, ...fields });
+    return request.requestSeq;
+  }
+
+  private findRequest(requestSeq: number | undefined): DiagnosticRequest | null {
+    if (requestSeq === undefined) {
+      return this.nextRequest ?? this.lastRequest;
+    }
+    if (this.nextRequest?.requestSeq === requestSeq) {
+      return this.nextRequest;
+    }
+    return this.lastRequest?.requestSeq === requestSeq ? this.lastRequest : null;
   }
 
   private readCorrelationId(value: string | undefined): string | undefined {

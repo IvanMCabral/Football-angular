@@ -70,6 +70,30 @@ describe('client teams HTTP diagnostics', () => {
     expect(diagnostics.snapshot().events.length).toBeLessThanOrEqual(24);
   });
 
+  it('correlates component state observations across the interceptor finalization', () => {
+    diagnostics.startRequest();
+    const requestSeq = diagnostics.recordChooseTeamNextEnter(7, 70);
+    diagnostics.finalizeRequest();
+    diagnostics.recordChooseTeamTeamsAssigned(7, requestSeq, 70);
+    diagnostics.recordChooseTeamLoadingFalse(7, requestSeq);
+    diagnostics.recordChooseTeamAfterRender(7, requestSeq, 70);
+    diagnostics.recordChooseTeamInstanceDestroyed(7, requestSeq);
+
+    const componentEvents = diagnostics.snapshot().events.filter((event) => event.instanceSeq === 7);
+    expect(componentEvents.map((event) => event.event)).toEqual([
+      'CHOOSE_TEAM_NEXT_ENTER',
+      'CHOOSE_TEAM_TEAMS_ASSIGNED',
+      'CHOOSE_TEAM_LOADING_FALSE',
+      'CHOOSE_TEAM_AFTER_RENDER',
+      'CHOOSE_TEAM_INSTANCE_DESTROYED',
+    ]);
+    expect(componentEvents.every((event) => event.requestSeq === requestSeq)).toBeTrue();
+    expect(componentEvents[0].incomingCount).toBe(70);
+    expect(componentEvents[1].assignedCount).toBe(70);
+    expect(componentEvents[2].loading).toBeFalse();
+    expect(componentEvents[3].renderedCount).toBe(70);
+  });
+
   it('records Angular next/finalize and Angular error/finalize separately', () => {
     const http = TestBed.inject(HttpClient);
     const controller = TestBed.inject(HttpTestingController);

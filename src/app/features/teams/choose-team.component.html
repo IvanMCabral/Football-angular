@@ -5,7 +5,7 @@
   <div *ngIf="!loading && errorMessage" class="error-message">{{ errorMessage }}</div>
 
   <ul *ngIf="!loading && !errorMessage && teams.length">
-    <li *ngFor="let team of teams" (click)="chooseTeam(team)" [class.selected]="selectedTeam && selectedTeam.id === team.id">
+    <li #teamRow *ngFor="let team of teams" (click)="chooseTeam(team)" [class.selected]="selectedTeam && selectedTeam.id === team.id">
       <strong>ID: {{ team.id }}</strong>
       <span *ngIf="team.name"> | Nombre: {{ team.name }}</span>
       <span *ngIf="team.country"> | País: {{ team.country }}</span>

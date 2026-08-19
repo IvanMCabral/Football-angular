@@ -14,6 +14,12 @@ export class ClientHttpDiagnosticsService {
   recordAngularError(..._args: unknown[]): void {}
   recordTeamServiceMapped(): void {}
   recordChooseTeamNext(): void {}
+  recordChooseTeamNextEnter(..._args: unknown[]): undefined { return undefined; }
+  recordChooseTeamTeamsAssigned(..._args: unknown[]): void {}
+  recordChooseTeamLoadingFalse(..._args: unknown[]): void {}
+  recordChooseTeamInstanceDestroyed(..._args: unknown[]): void {}
+  recordChooseTeamAfterRender(..._args: unknown[]): void {}
+  currentRequestSeq(): undefined { return undefined; }
   finalizeRequest(): void {}
   resetForTest(): void {}
 }

@@ -1,4 +1,4 @@
-import { Component, DestroyRef, OnInit, inject } from '@angular/core';
+import { AfterViewChecked, Component, DestroyRef, OnDestroy, OnInit, QueryList, ViewChildren, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
@@ -18,13 +18,15 @@ type ChooseTeamOption = Team;
   templateUrl: './choose-team.component.prod.html',
   styleUrls: ['./choose-team.component.css']
 })
-export class ChooseTeamComponent implements OnInit {
+export class ChooseTeamComponent implements AfterViewChecked, OnDestroy, OnInit {
+  private static nextInstanceSeq = 1;
   private teamService = inject(TeamService);
   private authService = inject(AuthService);
   private logger = inject(AppLoggerService);
   private router = inject(Router);
   private destroyRef = inject(DestroyRef);
   private clientDiagnostics = inject(ClientHttpDiagnosticsService);
+  @ViewChildren('teamRow') private teamRows!: QueryList<unknown>;
 
   teams: ChooseTeamOption[] = [];
   loading = true;
@@ -32,6 +34,10 @@ export class ChooseTeamComponent implements OnInit {
   successMessage = '';
   selectedTeam: ChooseTeamOption | null = null;
   saving = false;
+  readonly diagnosticInstanceSeq = ChooseTeamComponent.nextInstanceSeq++;
+  private diagnosticRequestSeq: number | undefined;
+  private diagnosticLoadingFalseRecorded = false;
+  private diagnosticAfterRenderPending = false;
 
   ngOnInit(): void {
     this.loading = true;
@@ -39,22 +45,64 @@ export class ChooseTeamComponent implements OnInit {
     this.authService.getUserInfo().pipe(
       take(1),
       switchMap(userInfo => this.teamService.getAllTeams(userInfo.id).pipe(
-        finalize(() => this.loading = false)
+        finalize(() => this.setLoadingFalse())
       )),
       catchError(err => {
         this.logger.error('[CHOOSE TEAM] Error al cargar equipos:', err);
         this.errorMessage = 'No se pudieron cargar los equipos.';
-        this.loading = false;
+        this.setLoadingFalse();
         return EMPTY;
       }),
       takeUntilDestroyed(this.destroyRef),
-      finalize(() => this.loading = false)
+      finalize(() => this.setLoadingFalse())
     ).subscribe({
       next: (teams: ChooseTeamOption[]) => {
-        this.clientDiagnostics.recordChooseTeamNext();
+        this.diagnosticRequestSeq = this.clientDiagnostics.recordChooseTeamNextEnter(
+          this.diagnosticInstanceSeq,
+          teams.length
+        );
         this.teams = teams;
+        this.clientDiagnostics.recordChooseTeamTeamsAssigned(
+          this.diagnosticInstanceSeq,
+          this.diagnosticRequestSeq,
+          this.teams.length
+        );
+        this.diagnosticAfterRenderPending = true;
       }
     });
+  }
+
+  ngAfterViewChecked(): void {
+    if (!this.diagnosticAfterRenderPending) {
+      return;
+    }
+
+    this.diagnosticAfterRenderPending = false;
+    this.clientDiagnostics.recordChooseTeamAfterRender(
+      this.diagnosticInstanceSeq,
+      this.diagnosticRequestSeq,
+      this.teamRows.length
+    );
+  }
+
+  ngOnDestroy(): void {
+    this.clientDiagnostics.recordChooseTeamInstanceDestroyed(
+      this.diagnosticInstanceSeq,
+      this.diagnosticRequestSeq ?? this.clientDiagnostics.currentRequestSeq()
+    );
+  }
+
+  private setLoadingFalse(): void {
+    this.loading = false;
+    if (this.diagnosticLoadingFalseRecorded) {
+      return;
+    }
+
+    this.diagnosticLoadingFalseRecorded = true;
+    this.clientDiagnostics.recordChooseTeamLoadingFalse(
+      this.diagnosticInstanceSeq,
+      this.diagnosticRequestSeq ?? this.clientDiagnostics.currentRequestSeq()
+    );
   }
 
   chooseTeam(team: ChooseTeamOption): void {
