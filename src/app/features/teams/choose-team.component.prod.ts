@@ -1,4 +1,4 @@
-import { AfterViewChecked, Component, DestroyRef, OnDestroy, OnInit, QueryList, ViewChildren, inject } from '@angular/core';
+import { AfterViewChecked, ChangeDetectorRef, Component, DestroyRef, OnDestroy, OnInit, QueryList, ViewChildren, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
@@ -25,6 +25,7 @@ export class ChooseTeamComponent implements AfterViewChecked, OnDestroy, OnInit 
   private logger = inject(AppLoggerService);
   private router = inject(Router);
   private destroyRef = inject(DestroyRef);
+  private changeDetectorRef = inject(ChangeDetectorRef);
   private clientDiagnostics = inject(ClientHttpDiagnosticsService);
   @ViewChildren('teamRow') private teamRows!: QueryList<unknown>;
 
@@ -38,19 +39,19 @@ export class ChooseTeamComponent implements AfterViewChecked, OnDestroy, OnInit 
   private diagnosticRequestSeq: number | undefined;
   private diagnosticLoadingFalseRecorded = false;
   private diagnosticAfterRenderPending = false;
+  private terminalNotificationSent = false;
 
   ngOnInit(): void {
     this.loading = true;
     this.errorMessage = '';
+    this.terminalNotificationSent = false;
+    this.diagnosticLoadingFalseRecorded = false;
     this.authService.getUserInfo().pipe(
       take(1),
-      switchMap(userInfo => this.teamService.getAllTeams(userInfo.id).pipe(
-        finalize(() => this.setLoadingFalse())
-      )),
+      switchMap(userInfo => this.teamService.getAllTeams(userInfo.id)),
       catchError(err => {
         this.logger.error('[CHOOSE TEAM] Error al cargar equipos:', err);
         this.errorMessage = 'No se pudieron cargar los equipos.';
-        this.setLoadingFalse();
         return EMPTY;
       }),
       takeUntilDestroyed(this.destroyRef),
@@ -93,16 +94,20 @@ export class ChooseTeamComponent implements AfterViewChecked, OnDestroy, OnInit 
   }
 
   private setLoadingFalse(): void {
-    this.loading = false;
-    if (this.diagnosticLoadingFalseRecorded) {
+    if (this.terminalNotificationSent) {
       return;
     }
 
-    this.diagnosticLoadingFalseRecorded = true;
-    this.clientDiagnostics.recordChooseTeamLoadingFalse(
-      this.diagnosticInstanceSeq,
-      this.diagnosticRequestSeq ?? this.clientDiagnostics.currentRequestSeq()
-    );
+    this.terminalNotificationSent = true;
+    this.loading = false;
+    if (!this.diagnosticLoadingFalseRecorded) {
+      this.diagnosticLoadingFalseRecorded = true;
+      this.clientDiagnostics.recordChooseTeamLoadingFalse(
+        this.diagnosticInstanceSeq,
+        this.diagnosticRequestSeq ?? this.clientDiagnostics.currentRequestSeq()
+      );
+    }
+    this.changeDetectorRef.markForCheck();
   }
 
   chooseTeam(team: ChooseTeamOption): void {
