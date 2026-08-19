@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Observable, BehaviorSubject, catchError, map, of, switchMap, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AppLoggerService } from '../../../core/services/app-logger.service';
+import { ClientHttpDiagnosticsService } from '../../../core/observability/client-http-diagnostics.service';
 import { Team, WorldTeamResponse, CreateTeamRequest, SessionTeam, CreateSessionTeamRequest, RandomTeamsRequest, RandomTeamsResponse } from '../../../shared/models/team.model';
 import { Player, SessionPlayer } from '../../../shared/models/player.model';
 
@@ -12,6 +13,7 @@ import { Player, SessionPlayer } from '../../../shared/models/player.model';
 export class TeamService {
   private http = inject(HttpClient);
   private logger = inject(AppLoggerService);
+  private clientDiagnostics = inject(ClientHttpDiagnosticsService);
   private apiUrl = `${environment.apiUrl}/teams`;
   private careerApiUrl = `${environment.apiUrl}/career`;
   private worldApiUrl = `${environment.apiUrl}/world`;
@@ -21,7 +23,8 @@ export class TeamService {
 
   getAllTeams(userId: string): Observable<Team[]> {
     return this.http.get<WorldTeamResponse[]>(`${this.worldApiUrl}/teams?userId=${encodeURIComponent(userId)}`).pipe(
-      map(worldTeams => worldTeams.map(mapWorldTeamResponseToTeam))
+      map(worldTeams => worldTeams.map(mapWorldTeamResponseToTeam)),
+      tap(() => this.clientDiagnostics.recordTeamServiceMapped())
     );
   }
 

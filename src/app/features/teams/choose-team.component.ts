@@ -7,13 +7,16 @@ import { TeamService } from './services/team.service';
 import { Team } from '../../shared/models/team.model';
 import { catchError, EMPTY, finalize, switchMap, take } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { ClientHttpDiagnosticsPanelComponent } from '../../core/observability/client-http-diagnostics-panel.component';
+import { ClientHttpDiagnosticsService } from '../../core/observability/client-http-diagnostics.service';
+import { environment } from '../../environments/environment';
 
 type ChooseTeamOption = Team;
 
 @Component({
   selector: 'app-choose-team',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, ClientHttpDiagnosticsPanelComponent],
   templateUrl: './choose-team.component.html',
   styleUrls: ['./choose-team.component.css']
 })
@@ -23,6 +26,7 @@ export class ChooseTeamComponent implements OnInit {
   private logger = inject(AppLoggerService);
   private router = inject(Router);
   private destroyRef = inject(DestroyRef);
+  private clientDiagnostics = inject(ClientHttpDiagnosticsService);
 
   teams: ChooseTeamOption[] = [];
   loading = true;
@@ -30,6 +34,7 @@ export class ChooseTeamComponent implements OnInit {
   successMessage = '';
   selectedTeam: ChooseTeamOption | null = null;
   saving = false;
+  readonly showClientHttpDiagnostics = environment.enableClientHttpDiagnostics === true;
 
   ngOnInit(): void {
     this.loading = true;
@@ -52,6 +57,7 @@ export class ChooseTeamComponent implements OnInit {
       finalize(() => this.loading = false)
     ).subscribe({
       next: (teams: ChooseTeamOption[]) => {
+        this.clientDiagnostics.recordChooseTeamNext();
         this.teams = teams;
       }
     });

@@ -15,3 +15,4 @@
   <button [disabled]="!selectedTeam || saving" (click)="assignTeam()">Confirmar selección</button>
   <div *ngIf="successMessage" class="success-message">{{ successMessage }}</div>
 </div>
+<app-client-http-diagnostics-panel *ngIf="showClientHttpDiagnostics"></app-client-http-diagnostics-panel>
