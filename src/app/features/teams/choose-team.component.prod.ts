@@ -1,4 +1,4 @@
-import { AfterViewChecked, ChangeDetectorRef, Component, DestroyRef, OnDestroy, OnInit, QueryList, ViewChildren, inject } from '@angular/core';
+import { AfterViewChecked, AfterViewInit, ChangeDetectorRef, Component, DestroyRef, ElementRef, OnDestroy, OnInit, QueryList, ViewChild, ViewChildren, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
@@ -8,6 +8,7 @@ import { Team } from '../../shared/models/team.model';
 import { catchError, EMPTY, finalize, switchMap, take } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ClientHttpDiagnosticsService } from '../../core/observability/client-http-diagnostics.service';
+import { ProductionC10ProbeService } from '../../core/observability/production-c10-probe.service';
 
 type ChooseTeamOption = Team;
 
@@ -18,7 +19,7 @@ type ChooseTeamOption = Team;
   templateUrl: './choose-team.component.prod.html',
   styleUrls: ['./choose-team.component.css']
 })
-export class ChooseTeamComponent implements AfterViewChecked, OnDestroy, OnInit {
+export class ChooseTeamComponent implements AfterViewChecked, AfterViewInit, OnDestroy, OnInit {
   private static nextInstanceSeq = 1;
   private teamService = inject(TeamService);
   private authService = inject(AuthService);
@@ -27,7 +28,9 @@ export class ChooseTeamComponent implements AfterViewChecked, OnDestroy, OnInit 
   private destroyRef = inject(DestroyRef);
   private changeDetectorRef = inject(ChangeDetectorRef);
   private clientDiagnostics = inject(ClientHttpDiagnosticsService);
+  private productionC10Probe = inject(ProductionC10ProbeService);
   @ViewChildren('teamRow') private teamRows!: QueryList<unknown>;
+  @ViewChild('productionC10ProbeSurface') private productionC10ProbeSurface?: ElementRef<HTMLElement>;
 
   teams: ChooseTeamOption[] = [];
   loading = true;
@@ -35,11 +38,19 @@ export class ChooseTeamComponent implements AfterViewChecked, OnDestroy, OnInit 
   successMessage = '';
   selectedTeam: ChooseTeamOption | null = null;
   saving = false;
+  readonly showProductionC10Probe = this.productionC10Probe.enabled;
   readonly diagnosticInstanceSeq = ChooseTeamComponent.nextInstanceSeq++;
   private diagnosticRequestSeq: number | undefined;
   private diagnosticLoadingFalseRecorded = false;
   private diagnosticAfterRenderPending = false;
+  private productionC10AfterRenderPending = false;
   private terminalNotificationSent = false;
+
+  ngAfterViewInit(): void {
+    if (this.productionC10ProbeSurface) {
+      this.productionC10Probe.attachSurface(this.productionC10ProbeSurface.nativeElement);
+    }
+  }
 
   ngOnInit(): void {
     this.loading = true;
@@ -58,35 +69,42 @@ export class ChooseTeamComponent implements AfterViewChecked, OnDestroy, OnInit 
       finalize(() => this.setLoadingFalse())
     ).subscribe({
       next: (teams: ChooseTeamOption[]) => {
+        this.productionC10Probe.recordNextEnter(this.diagnosticInstanceSeq, teams.length);
         this.diagnosticRequestSeq = this.clientDiagnostics.recordChooseTeamNextEnter(
           this.diagnosticInstanceSeq,
           teams.length
         );
         this.teams = teams;
+        this.productionC10Probe.recordTeamsAssigned(this.diagnosticInstanceSeq, this.teams.length);
         this.clientDiagnostics.recordChooseTeamTeamsAssigned(
           this.diagnosticInstanceSeq,
           this.diagnosticRequestSeq,
           this.teams.length
         );
         this.diagnosticAfterRenderPending = true;
+        this.productionC10AfterRenderPending = true;
       }
     });
   }
 
   ngAfterViewChecked(): void {
-    if (!this.diagnosticAfterRenderPending) {
-      return;
+    if (this.diagnosticAfterRenderPending) {
+      this.diagnosticAfterRenderPending = false;
+      this.clientDiagnostics.recordChooseTeamAfterRender(
+        this.diagnosticInstanceSeq,
+        this.diagnosticRequestSeq,
+        this.teamRows.length
+      );
     }
 
-    this.diagnosticAfterRenderPending = false;
-    this.clientDiagnostics.recordChooseTeamAfterRender(
-      this.diagnosticInstanceSeq,
-      this.diagnosticRequestSeq,
-      this.teamRows.length
-    );
+    if (this.productionC10AfterRenderPending) {
+      this.productionC10AfterRenderPending = false;
+      this.productionC10Probe.recordAfterRender(this.diagnosticInstanceSeq, this.teamRows.length);
+    }
   }
 
   ngOnDestroy(): void {
+    this.productionC10Probe.recordInstanceDestroyed(this.diagnosticInstanceSeq);
     this.clientDiagnostics.recordChooseTeamInstanceDestroyed(
       this.diagnosticInstanceSeq,
       this.diagnosticRequestSeq ?? this.clientDiagnostics.currentRequestSeq()
@@ -100,6 +118,7 @@ export class ChooseTeamComponent implements AfterViewChecked, OnDestroy, OnInit 
 
     this.terminalNotificationSent = true;
     this.loading = false;
+    this.productionC10Probe.recordLoadingFalse(this.diagnosticInstanceSeq);
     if (!this.diagnosticLoadingFalseRecorded) {
       this.diagnosticLoadingFalseRecorded = true;
       this.clientDiagnostics.recordChooseTeamLoadingFalse(

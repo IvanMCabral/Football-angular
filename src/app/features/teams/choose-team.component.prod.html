@@ -14,3 +14,4 @@
   <button [disabled]="!selectedTeam || saving" (click)="assignTeam()">Confirmar selección</button>
   <div *ngIf="successMessage" class="success-message">{{ successMessage }}</div>
 </div>
+<section *ngIf="showProductionC10Probe" #productionC10ProbeSurface data-testid="production-c10-probe" aria-live="polite"></section>
