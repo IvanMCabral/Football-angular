@@ -6,6 +6,9 @@
     "start": "ng serve",
     "build": "ng build",
     "build:diagnostic": "ng build --configuration diagnostic",
+    "firebase:version": "firebase --version",
+    "firebase:authority:read": "firebase hosting:sites:list --config firebase.json --project manager-4f952",
+    "firebase:deploy:prod": "firebase deploy --config firebase.json --project manager-4f952 --only hosting",
     "pretest": "node tools/check-visible-text-encoding.mjs",
     "test": "ng test"
   },
@@ -30,6 +33,7 @@
     "@angular/compiler-cli": "21.2.19",
     "@types/jasmine": "^6.0.0",
     "@types/karma": "^6.3.9",
+    "firebase-tools": "15.28.1",
     "jasmine-core": "^6.3.0",
     "karma": "^6.4.4",
     "karma-chrome-launcher": "^3.2.0",
