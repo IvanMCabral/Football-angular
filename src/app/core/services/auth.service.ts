@@ -7,6 +7,7 @@ import { AuthResponse, LoginRequest, RegisterRequest } from '../../shared/models
 import { RefreshRequest } from '../../shared/models/refresh-request.model';
 
 export type AssignTeamResponse = string;
+export type AuthStatus = 'unknown' | 'authenticated' | 'anonymous';
 
 @Injectable({
   providedIn: 'root'
@@ -16,26 +17,34 @@ export class AuthService {
   private router = inject(Router);
 
   constructor() {
-    this.tryRestoreSession();
+    this.restoreInitialSession();
   }
   /**
-   * Intenta restaurar la sesión usando el refreshToken si el accessToken está expirado.
+   * Resuelve la sesión inicial antes de exponer controles de navegación autenticados.
    */
-  private tryRestoreSession(): void {
+  private restoreInitialSession(): void {
     const expiresAt = localStorage.getItem(this.EXPIRES_AT_KEY);
     const refreshToken = localStorage.getItem(this.REFRESH_TOKEN_KEY);
     const now = new Date().getTime();
+    const hasValidAccessToken = Boolean(this.getToken() && expiresAt && now < parseInt(expiresAt));
+
+    if (hasValidAccessToken) {
+      this.authStatusSubject.next('authenticated');
+      return;
+    }
     if (expiresAt && refreshToken && now > parseInt(expiresAt)) {
-      // accessToken expirado, intentar renovar
+      // Keep navigation neutral while the one existing refresh attempt resolves.
       this.refreshTokenRequest().subscribe({
         next: () => {
-          this.authStatusSubject.next(true);
+          this.authStatusSubject.next('authenticated');
         },
         error: () => {
           this.logout();
         }
       });
+      return;
     }
+    this.authStatusSubject.next('anonymous');
   }
 
   // Asigna un equipo al usuario actual
@@ -47,7 +56,7 @@ export class AuthService {
   private readonly REFRESH_TOKEN_KEY = 'refreshToken';
   private readonly EXPIRES_AT_KEY = 'expiresAt';
 
-  private authStatusSubject = new BehaviorSubject<boolean>(this.isAuthenticated());
+  private authStatusSubject = new BehaviorSubject<AuthStatus>('unknown');
   public authStatus$ = this.authStatusSubject.asObservable();
 
   // Normaliza credenciales capturadas desde UI/autofill antes de enviarlas.
@@ -87,7 +96,7 @@ export class AuthService {
     localStorage.removeItem(this.REFRESH_TOKEN_KEY);
     localStorage.removeItem(this.EXPIRES_AT_KEY);
     if (this.authStatusSubject) {
-      this.authStatusSubject.next(false);
+      this.authStatusSubject.next('anonymous');
     }
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('manager:logout'));
@@ -106,17 +115,9 @@ export class AuthService {
     if (now < parseInt(expiresAt)) {
       return true;
     }
-    // Si el accessToken está expirado pero hay refreshToken, intentar renovar de forma síncrona
+    // La restauración ya fue iniciada una sola vez durante la construcción del servicio.
+    // El guard conserva el acceso mientras esa restauración pendiente se resuelve.
     if (refreshToken) {
-      this.refreshTokenRequest().subscribe({
-        next: () => {
-          this.authStatusSubject.next(true);
-        },
-        error: () => {
-          this.logout();
-        }
-      });
-      // Considerar autenticado mientras se intenta renovar
       return true;
     }
     return false;
@@ -138,7 +139,7 @@ export class AuthService {
     localStorage.setItem(this.REFRESH_TOKEN_KEY, response.refreshToken);
     localStorage.setItem(this.EXPIRES_AT_KEY, expiresAt.toString());
 
-    this.authStatusSubject.next(true);
+    this.authStatusSubject.next('authenticated');
   }
 
     refreshTokenRequest(): Observable<AuthResponse> {

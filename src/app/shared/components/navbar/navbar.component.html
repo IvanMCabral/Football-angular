@@ -12,13 +12,17 @@
     </button>
 
     <div class="navbar-menu" [class.active]="menuOpen">
-      @if (isAuthenticated$ | async) {
+      @if (authStatus$ | async; as authStatus) {
+        @if (authStatus === 'authenticated') {
         <a routerLink="/dashboard" routerLinkActive="active" class="nav-link">Inicio</a>
         <a routerLink="/matches" routerLinkActive="active" class="nav-link">Partidos</a>
         <button (click)="logout()" class="nav-button logout">Salir</button>
-      } @else {
+        } @else if (authStatus === 'anonymous') {
         <a routerLink="/login" routerLinkActive="active" class="nav-link">Ingresar</a>
         <a routerLink="/register" class="nav-button register">Registrarse</a>
+        } @else {
+        <span class="navbar-session-status" role="status" aria-live="polite">Comprobando sesión…</span>
+        }
       }
     </div>
   </div>

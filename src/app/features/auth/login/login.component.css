@@ -1,6 +1,6 @@
 .login-container {
   padding: 2rem;
-  max-width: 350px;
+  max-width: 380px;
   margin: 2rem auto;
   text-align: center;
   border: 1px solid #eee;
@@ -8,12 +8,25 @@
   background: #fff;
 }
 
+label {
+  display: block;
+  margin-bottom: 0.35rem;
+  text-align: left;
+  font-weight: 600;
+}
+
 input {
+  width: 100%;
+  box-sizing: border-box;
   width: 100%;
   margin-bottom: 0.5rem;
   padding: 0.5rem;
   border-radius: 4px;
   border: 1px solid #ccc;
+}
+
+input[readonly] {
+  background: #f7f7f7;
 }
 
 button {
@@ -31,4 +44,35 @@ button {
   color: #d32f2f;
   font-size: 0.9rem;
   margin-bottom: 0.5rem;
+}
+
+.login-feedback {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  border-radius: 6px;
+  text-align: left;
+  line-height: 1.4;
+}
+
+.login-feedback p {
+  margin: 0.25rem 0;
+  overflow-wrap: anywhere;
+}
+
+.login-feedback.pending {
+  background: #eaf3ff;
+  color: #164a7c;
+}
+
+.login-feedback.error {
+  background: #fff1f1;
+  border: 1px solid #f1b5b5;
+  color: #9d1e1e;
+}
+
+@media (max-width: 480px) {
+  .login-container {
+    margin: 1rem;
+    padding: 1.25rem;
+  }
 }

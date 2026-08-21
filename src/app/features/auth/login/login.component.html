@@ -1,17 +1,37 @@
 <div class="login-container">
-  <h1>Login</h1>
-  <form [formGroup]="loginForm" (ngSubmit)="onSubmit()">
+  <h1>Ingresar</h1>
+  <form [formGroup]="loginForm" (ngSubmit)="onSubmit()" [attr.aria-busy]="isRequestPending">
     <div>
-      <input type="email" formControlName="email" placeholder="Email" />
+      <label for="login-email">Email</label>
+      <input id="login-email" type="email" formControlName="email" placeholder="tu@email.com" autocomplete="email" [readonly]="isRequestPending" />
       <div *ngIf="isFieldInvalid('email')" class="error">Email inválido</div>
     </div>
     <div>
-      <input type="password" formControlName="password" placeholder="Contraseña" />
+      <label for="login-password">Contraseña</label>
+      <input id="login-password" type="password" formControlName="password" autocomplete="current-password" [readonly]="isRequestPending" />
       <div *ngIf="isFieldInvalid('password')" class="error">Contraseña inválida</div>
     </div>
-    <button type="submit" [disabled]="loading || loginForm.invalid">Entrar</button>
-    <app-loading-spinner *ngIf="loading"></app-loading-spinner>
-    <app-error-message *ngIf="errorMessage" [message]="errorMessage"></app-error-message>
+    <button type="submit" [disabled]="isRequestPending || loginForm.invalid">
+      {{ isRequestPending ? 'Ingresando…' : 'Entrar' }}
+    </button>
+
+    @if (isRequestPending) {
+      <div class="login-feedback pending" role="status" aria-live="polite">
+        <app-loading-spinner aria-hidden="true"></app-loading-spinner>
+        @if (uiState === 'SLOW') {
+          <p>Está tardando más de lo esperado. Podés esperar un poco más; no enviaremos otro intento automáticamente.</p>
+        } @else {
+          <p>Ingresando… estamos verificando tus datos.</p>
+        }
+      </div>
+    }
+
+    @if (uiState === 'CONTROLLED_ERROR') {
+      <div class="login-feedback error" role="alert" aria-live="assertive" tabindex="-1">
+        <p>{{ errorMessage }}</p>
+        <p>Cuando quieras, podés corregir los datos o intentar de nuevo.</p>
+      </div>
+    }
   </form>
   <div style="margin-top:1rem;">
     <a routerLink="/register">¿No tienes cuenta? Regístrate</a>

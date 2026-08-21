@@ -81,6 +81,12 @@
   gap: 1.5rem;
 }
 
+.navbar-session-status {
+  color: white;
+  font-size: 0.95rem;
+  padding: 0.5rem 0;
+}
+
 @media (max-width: 768px) {
   .navbar-menu {
     position: absolute;
