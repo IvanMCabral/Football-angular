@@ -29,6 +29,16 @@ input[readonly] {
   background: #f7f7f7;
 }
 
+@keyframes login-autofill-start {
+  from { opacity: 0.99; }
+  to { opacity: 1; }
+}
+
+input:-webkit-autofill {
+  animation-name: login-autofill-start;
+  animation-duration: 0.01s;
+}
+
 button {
   width: 100%;
   min-height: 44px;

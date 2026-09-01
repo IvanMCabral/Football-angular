@@ -1,11 +1,9 @@
-import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
-import { provideRouter, Router } from '@angular/router';
+import { Router } from '@angular/router';
 import { AppComponent } from '../../../app.component';
-import { routes } from '../../../app.routes';
-import { LoginComponent } from './login.component';
+import { appConfig } from '../../../app.config';
 
 describe('Login route integration', () => {
   let fixture: ComponentFixture<AppComponent>;
@@ -18,7 +16,7 @@ describe('Login route integration', () => {
     localStorage.removeItem('expiresAt');
     await TestBed.configureTestingModule({
       imports: [AppComponent],
-      providers: [provideRouter(routes), provideHttpClient(), provideHttpClientTesting()]
+      providers: [...appConfig.providers, provideHttpClientTesting()]
     }).compileComponents();
     router = TestBed.inject(Router);
     http = TestBed.inject(HttpTestingController);
@@ -32,19 +30,25 @@ describe('Login route integration', () => {
     localStorage.removeItem('expiresAt');
   });
 
-  it('navigates from the real login route only after its single login request succeeds', async () => {
+  it('syncs silent autofill, enables the actual button, and navigates after its single real-route click', async () => {
     await router.navigateByUrl('/login');
     fixture.detectChanges();
     await fixture.whenStable();
     fixture.detectChanges();
 
-    const login = fixture.debugElement.query(By.directive(LoginComponent))?.componentInstance as LoginComponent;
-    expect(login).toBeTruthy();
-    login.loginForm.setValue({ email: 'integration@example.test', password: 'SyntheticPassword123!' });
-    login.onSubmit();
+    const email: HTMLInputElement = fixture.nativeElement.querySelector('#login-email');
+    const password: HTMLInputElement = fixture.nativeElement.querySelector('#login-password');
+    const submit: HTMLButtonElement = fixture.nativeElement.querySelector('button[type="submit"]');
+    email.value = 'integration@example.test';
+    password.value = 'SyntheticPassword123!';
+    email.dispatchEvent(new AnimationEvent('animationstart', { bubbles: true, animationName: 'login-autofill-start' }));
+    fixture.detectChanges();
+    expect(submit.disabled).toBeFalse();
+    submit.click();
 
     const request = http.expectOne(candidate => candidate.url.endsWith('/auth/login'));
     expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({ email: 'integration@example.test', password: 'SyntheticPassword123!' });
     request.flush({ accessToken: 'access', refreshToken: 'refresh', expiresIn: 3600, tokenType: 'Bearer' });
 
     await fixture.whenStable();

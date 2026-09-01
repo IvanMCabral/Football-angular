@@ -1,6 +1,6 @@
 <div class="login-container">
   <h1>Ingresar</h1>
-  <form [formGroup]="loginForm" (ngSubmit)="onSubmit()" (focusin)="syncAutofillValues()" [attr.aria-busy]="isRequestPending">
+  <form [formGroup]="loginForm" (ngSubmit)="onSubmit()" (focusin)="syncAutofillValues()" (animationstart)="onAutofillAnimation($event)" [attr.aria-busy]="isRequestPending">
     <div>
       <label for="login-email">Email</label>
       <input #emailInput id="login-email" name="email" type="email" formControlName="email" placeholder="tu@email.com" autocomplete="username" [readonly]="isRequestPending" aria-describedby="login-email-error" />

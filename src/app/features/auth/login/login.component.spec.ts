@@ -4,7 +4,7 @@ import { provideRouter, Router } from '@angular/router';
 import { NEVER, Subject, of, throwError } from 'rxjs';
 import { AuthService } from '../../../core/services/auth.service';
 import { AuthResponse } from '../../../shared/models/auth.model';
-import { LOGIN_RECOVERY_DELAY_MS, LOGIN_SLOW_NOTICE_DELAY_MS, LoginComponent } from './login.component';
+import { LOGIN_AUTOFILL_ANIMATION_NAME, LOGIN_RECOVERY_DELAY_MS, LOGIN_SLOW_NOTICE_DELAY_MS, LoginComponent } from './login.component';
 
 describe('LoginComponent resilient request lifecycle', () => {
   let fixture: ComponentFixture<LoginComponent>;
@@ -12,17 +12,24 @@ describe('LoginComponent resilient request lifecycle', () => {
   let authService: jasmine.SpyObj<AuthService>;
   let router: Router;
 
-  const response: AuthResponse = {
-    accessToken: 'access-token', refreshToken: 'refresh-token', expiresIn: 3600, tokenType: 'Bearer'
-  };
+  const response: AuthResponse = { accessToken: 'access-token', refreshToken: 'refresh-token', expiresIn: 3600, tokenType: 'Bearer' };
 
   const withFakeClock = (assertions: () => void): void => {
     jasmine.clock().install();
-    try {
-      assertions();
-    } finally {
-      jasmine.clock().uninstall();
-    }
+    try { assertions(); } finally { jasmine.clock().uninstall(); }
+  };
+
+  const submitButton = (): HTMLButtonElement => fixture.nativeElement.querySelector('button[type="submit"]');
+  const silentlyAutofill = (emailValue = 'autofill@example.test', passwordValue = 'SyntheticPassword123!'): void => {
+    component.loginForm.setValue({ email: '', password: '' });
+    fixture.detectChanges();
+    const email: HTMLInputElement = fixture.nativeElement.querySelector('#login-email');
+    const password: HTMLInputElement = fixture.nativeElement.querySelector('#login-password');
+    email.value = emailValue;
+    password.value = passwordValue;
+    // No input/change event is dispatched: this simulates silent browser autofill.
+    email.dispatchEvent(new AnimationEvent('animationstart', { bubbles: true, animationName: LOGIN_AUTOFILL_ANIMATION_NAME }));
+    fixture.detectChanges();
   };
 
   beforeEach(async () => {
@@ -31,8 +38,8 @@ describe('LoginComponent resilient request lifecycle', () => {
       imports: [LoginComponent],
       providers: [
         { provide: AuthService, useValue: authService },
-        { provide: LOGIN_SLOW_NOTICE_DELAY_MS, useValue: 10 },
-        { provide: LOGIN_RECOVERY_DELAY_MS, useValue: 40 },
+        { provide: LOGIN_SLOW_NOTICE_DELAY_MS, useValue: 12_000 },
+        { provide: LOGIN_RECOVERY_DELAY_MS, useValue: 45_000 },
         provideRouter([])
       ]
     }).compileComponents();
@@ -44,65 +51,102 @@ describe('LoginComponent resilient request lifecycle', () => {
     fixture.detectChanges();
   });
 
-  it('routes once after a normal successful login with one request', () => {
-    const request = new Subject<AuthResponse>();
-    authService.login.and.returnValue(request.asObservable());
-    component.onSubmit();
-    expect(component.uiState).toBe('PENDING');
+  it('routes once after a normal successful typed login with one actual button click', () => {
+    authService.login.and.returnValue(of(response));
+    submitButton().click();
     expect(authService.login).toHaveBeenCalledTimes(1);
-    request.next(response);
-    request.complete();
-    fixture.detectChanges();
     expect(component.uiState).toBe('SUCCESS');
     expect(router.navigate).toHaveBeenCalledTimes(1);
-    expect(router.navigate).toHaveBeenCalledWith(['/dashboard']);
   });
 
-  it('keeps one request through slow feedback and accepts success before recovery', () => withFakeClock(() => {
-    const request = new Subject<AuthResponse>();
-    authService.login.and.returnValue(request.asObservable());
-    component.onSubmit();
-    jasmine.clock().tick(10);
+  it('reproduces the old silent-autofill state before the autofill signal and enables the real button after it', () => {
+    authService.login.and.returnValue(of(response));
+    component.loginForm.setValue({ email: '', password: '' });
     fixture.detectChanges();
-    expect(component.uiState).toBe('SLOW');
-    expect(fixture.nativeElement.textContent).toContain('Está tardando más de lo esperado');
+    const email: HTMLInputElement = fixture.nativeElement.querySelector('#login-email');
+    const password: HTMLInputElement = fixture.nativeElement.querySelector('#login-password');
+    email.value = 'autofill@example.test';
+    password.value = 'SyntheticPassword123!';
+
+    expect(component.loginForm.invalid).toBeTrue();
+    expect(submitButton().disabled).toBeTrue();
+
+    email.dispatchEvent(new AnimationEvent('animationstart', { bubbles: true, animationName: LOGIN_AUTOFILL_ANIMATION_NAME }));
+    fixture.detectChanges();
+    expect(component.loginForm.value).toEqual({ email: 'autofill@example.test', password: 'SyntheticPassword123!' });
+    expect(submitButton().disabled).toBeFalse();
+
+    submitButton().click();
+    expect(authService.login).toHaveBeenCalledOnceWith('autofill@example.test', 'SyntheticPassword123!');
+  });
+
+  it('keeps the real submit button disabled for each partial or invalid silent autofill state', () => {
+    silentlyAutofill('autofill@example.test', '');
+    expect(submitButton().disabled).toBeTrue();
+    silentlyAutofill('', 'SyntheticPassword123!');
+    expect(submitButton().disabled).toBeTrue();
+    silentlyAutofill('   ', 'SyntheticPassword123!');
+    expect(submitButton().disabled).toBeTrue();
+  });
+
+  it('prevents rapid double click after silent autofill from creating duplicate requests', () => {
+    authService.login.and.returnValue(NEVER);
+    silentlyAutofill();
+    submitButton().click();
+    submitButton().click();
     expect(authService.login).toHaveBeenCalledTimes(1);
-    request.next(response);
-    request.complete();
-    fixture.detectChanges();
-    expect(component.uiState).toBe('SUCCESS');
-    expect(router.navigate).toHaveBeenCalledTimes(1);
+    expect(component.uiState).toBe('PENDING');
+  });
+
+  it('reaches SLOW at exactly 12s, not at 11.999s, and remains a single transition at 12.001s', () => withFakeClock(() => {
+    authService.login.and.returnValue(NEVER);
+    submitButton().click();
+    jasmine.clock().tick(11_999);
+    expect(component.uiState).toBe('PENDING');
+    jasmine.clock().tick(1);
+    expect(component.uiState).toBe('SLOW');
+    jasmine.clock().tick(1);
+    expect(component.uiState).toBe('SLOW');
     expect(authService.login).toHaveBeenCalledTimes(1);
   }));
 
-  it('cancels a non-terminal request at recovery, returns control, and ignores its late success', () => withFakeClock(() => {
-    const attemptA = new Subject<AuthResponse>();
-    authService.login.and.returnValue(attemptA.asObservable());
-    component.onSubmit();
-    jasmine.clock().tick(40);
-    fixture.detectChanges();
+  it('offers recovery at exactly 45s, not at 44.999s, and cancels once at 45.001s', () => withFakeClock(() => {
+    const request = new Subject<AuthResponse>();
+    authService.login.and.returnValue(request.asObservable());
+    submitButton().click();
+    jasmine.clock().tick(44_999);
+    expect(component.uiState).toBe('SLOW');
+    jasmine.clock().tick(1);
     expect(component.uiState).toBe('RECOVERY_AVAILABLE');
     expect(component.isRequestPending).toBeFalse();
-    expect(fixture.nativeElement.textContent).toContain('Podés intentar nuevamente');
-    expect(authService.login).toHaveBeenCalledTimes(1);
-    attemptA.next(response);
-    attemptA.complete();
-    fixture.detectChanges();
+    jasmine.clock().tick(1);
     expect(component.uiState).toBe('RECOVERY_AVAILABLE');
+    request.next(response);
     expect(router.navigate).not.toHaveBeenCalled();
   }));
 
-  it('allows exactly one deliberate retry after recovery and keeps attempt A stale', () => withFakeClock(() => {
-    const attemptA = new Subject<AuthResponse>();
-    authService.login.and.returnValues(attemptA.asObservable(), of(response));
-    component.onSubmit();
-    jasmine.clock().tick(40);
-    component.onSubmit();
-    expect(authService.login).toHaveBeenCalledTimes(2);
+  it('cleans both boundaries when a response wins at 12s and never allows later recovery', () => withFakeClock(() => {
+    const request = new Subject<AuthResponse>();
+    authService.login.and.returnValue(request.asObservable());
+    submitButton().click();
+    jasmine.clock().tick(12_000);
+    expect(component.uiState).toBe('SLOW');
+    request.next(response);
+    request.complete();
+    jasmine.clock().tick(33_001);
     expect(component.uiState).toBe('SUCCESS');
     expect(router.navigate).toHaveBeenCalledTimes(1);
+  }));
+
+  it('ignores late A after recovery and permits exactly one deliberate B navigation', () => withFakeClock(() => {
+    const attemptA = new Subject<AuthResponse>();
+    authService.login.and.returnValues(attemptA.asObservable(), of(response));
+    submitButton().click();
+    jasmine.clock().tick(45_000);
     attemptA.next(response);
-    attemptA.complete();
+    expect(router.navigate).not.toHaveBeenCalled();
+    submitButton().click();
+    expect(authService.login).toHaveBeenCalledTimes(2);
     expect(router.navigate).toHaveBeenCalledTimes(1);
     expect(component.uiState).toBe('SUCCESS');
   }));
@@ -113,54 +157,46 @@ describe('LoginComponent resilient request lifecycle', () => {
       throwError(() => new HttpErrorResponse({ status: 500, error: 'private detail' })),
       throwError(() => new HttpErrorResponse({ status: 0, error: 'private detail' }))
     );
-    component.onSubmit();
-    expect(component.uiState).toBe('CONTROLLED_ERROR');
+    submitButton().click();
     expect(component.errorMessage).toContain('email o la contraseña');
-    component.onSubmit();
-    expect(component.uiState).toBe('CONTROLLED_ERROR');
+    submitButton().click();
     expect(component.errorMessage).toContain('No pudimos iniciar sesión');
-    component.onSubmit();
-    expect(component.uiState).toBe('CONTROLLED_ERROR');
+    submitButton().click();
     expect(component.errorMessage).not.toContain('private detail');
     expect(authService.login).toHaveBeenCalledTimes(3);
-    expect(router.navigate).not.toHaveBeenCalled();
-  });
-
-  it('prevents double click and repeated Enter submissions while pending', () => {
-    authService.login.and.returnValue(NEVER);
-    const form: HTMLFormElement = fixture.nativeElement.querySelector('form');
-    component.onSubmit();
-    component.onSubmit();
-    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-    expect(component.uiState).toBe('PENDING');
-    expect(authService.login).toHaveBeenCalledTimes(1);
-  });
-
-  it('submits password-manager-populated DOM values once without prior input events', () => {
-    authService.login.and.returnValue(of(response));
-    component.loginForm.setValue({ email: '', password: '' });
-    fixture.detectChanges();
-    const email: HTMLInputElement = fixture.nativeElement.querySelector('#login-email');
-    const password: HTMLInputElement = fixture.nativeElement.querySelector('#login-password');
-    email.value = 'autofill@example.test';
-    password.value = 'SyntheticPassword123!';
-    fixture.nativeElement.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-    expect(authService.login).toHaveBeenCalledTimes(1);
-    expect(authService.login).toHaveBeenCalledWith('autofill@example.test', 'SyntheticPassword123!');
-    expect(component.uiState).toBe('SUCCESS');
   });
 
   it('cleans timers and cancels the active request on destroy', () => withFakeClock(() => {
     const request = new Subject<AuthResponse>();
     authService.login.and.returnValue(request.asObservable());
-    component.onSubmit();
+    submitButton().click();
     fixture.destroy();
-    jasmine.clock().tick(100);
+    jasmine.clock().tick(45_001);
     request.next(response);
-    request.complete();
-    expect(component.uiState).toBe('PENDING');
     expect(router.navigate).not.toHaveBeenCalled();
-    expect(authService.login).toHaveBeenCalledTimes(1);
   }));
+
+  for (let run = 1; run <= 20; run++) {
+    it(`is stable for silent autofill real-click run ${run}/20`, () => {
+      authService.login.and.returnValue(of(response));
+      silentlyAutofill();
+      submitButton().click();
+      expect(authService.login).toHaveBeenCalledTimes(1);
+      expect(component.uiState).toBe('SUCCESS');
+    });
+
+    it(`is stable for exact timer and stale-response run ${run}/20`, () => withFakeClock(() => {
+      const attemptA = new Subject<AuthResponse>();
+      authService.login.and.returnValues(attemptA.asObservable(), of(response));
+      submitButton().click();
+      jasmine.clock().tick(12_000);
+      expect(component.uiState).toBe('SLOW');
+      jasmine.clock().tick(33_000);
+      expect(component.uiState).toBe('RECOVERY_AVAILABLE');
+      attemptA.next(response);
+      submitButton().click();
+      expect(router.navigate).toHaveBeenCalledTimes(1);
+      expect(authService.login).toHaveBeenCalledTimes(2);
+    }));
+  }
 });

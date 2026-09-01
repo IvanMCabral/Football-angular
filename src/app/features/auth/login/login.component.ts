@@ -20,6 +20,8 @@ export const LOGIN_RECOVERY_DELAY_MS = new InjectionToken<number>(
   { providedIn: 'root', factory: () => 45_000 }
 );
 
+export const LOGIN_AUTOFILL_ANIMATION_NAME = 'login-autofill-start';
+
 @Component({
   selector: 'app-login',
   standalone: true,
@@ -105,6 +107,13 @@ export class LoginComponent implements OnDestroy {
   syncAutofillValues(): void {
     this.syncControlWithInput('email', this.emailInput?.nativeElement.value);
     this.syncControlWithInput('password', this.passwordInput?.nativeElement.value);
+  }
+
+  /** Chrome applies :-webkit-autofill silently; its one-shot animation is the earliest DOM→form signal. */
+  onAutofillAnimation(event: AnimationEvent): void {
+    if (event.animationName === LOGIN_AUTOFILL_ANIMATION_NAME) {
+      this.syncAutofillValues();
+    }
   }
 
   ngOnDestroy(): void {
