@@ -31,6 +31,7 @@ input[readonly] {
 
 button {
   width: 100%;
+  min-height: 44px;
   padding: 0.5rem;
   border-radius: 4px;
   border: none;
@@ -68,6 +69,12 @@ button {
   background: #fff1f1;
   border: 1px solid #f1b5b5;
   color: #9d1e1e;
+}
+
+.login-feedback.recovery {
+  background: #fff8e7;
+  border: 1px solid #f0cf87;
+  color: #74500c;
 }
 
 @media (max-width: 480px) {

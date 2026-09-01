@@ -34,4 +34,9 @@ describe('AppComponent guest routing integration', () => {
     expect(fixture.nativeElement.textContent).toContain('Registrarse');
     expect(fixture.nativeElement.textContent).not.toContain('Salir');
   });
+
+  it('renders the footer year from the current date instead of a stale literal', () => {
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain(String(new Date().getFullYear()));
+  });
 });

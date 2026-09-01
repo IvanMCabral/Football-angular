@@ -1,15 +1,15 @@
 <div class="login-container">
   <h1>Ingresar</h1>
-  <form [formGroup]="loginForm" (ngSubmit)="onSubmit()" [attr.aria-busy]="isRequestPending">
+  <form [formGroup]="loginForm" (ngSubmit)="onSubmit()" (focusin)="syncAutofillValues()" [attr.aria-busy]="isRequestPending">
     <div>
       <label for="login-email">Email</label>
-      <input id="login-email" type="email" formControlName="email" placeholder="tu@email.com" autocomplete="email" [readonly]="isRequestPending" />
-      <div *ngIf="isFieldInvalid('email')" class="error">Email inválido</div>
+      <input #emailInput id="login-email" name="email" type="email" formControlName="email" placeholder="tu@email.com" autocomplete="username" [readonly]="isRequestPending" aria-describedby="login-email-error" />
+      <div *ngIf="isFieldInvalid('email')" id="login-email-error" class="error">Email inválido</div>
     </div>
     <div>
       <label for="login-password">Contraseña</label>
-      <input id="login-password" type="password" formControlName="password" autocomplete="current-password" [readonly]="isRequestPending" />
-      <div *ngIf="isFieldInvalid('password')" class="error">Contraseña inválida</div>
+      <input #passwordInput id="login-password" name="password" type="password" formControlName="password" autocomplete="current-password" [readonly]="isRequestPending" aria-describedby="login-password-error" />
+      <div *ngIf="isFieldInvalid('password')" id="login-password-error" class="error">Contraseña inválida</div>
     </div>
     <button type="submit" [disabled]="isRequestPending || loginForm.invalid">
       {{ isRequestPending ? 'Ingresando…' : 'Entrar' }}
@@ -30,6 +30,13 @@
       <div class="login-feedback error" role="alert" aria-live="assertive" tabindex="-1">
         <p>{{ errorMessage }}</p>
         <p>Cuando quieras, podés corregir los datos o intentar de nuevo.</p>
+      </div>
+    }
+
+    @if (uiState === 'RECOVERY_AVAILABLE') {
+      <div class="login-feedback recovery" role="alert" aria-live="assertive" tabindex="-1">
+        <p>{{ errorMessage }}</p>
+        <p>Podés volver a enviar el formulario. No haremos reintentos automáticamente.</p>
       </div>
     }
   </form>

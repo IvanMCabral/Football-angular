@@ -10,4 +10,6 @@ import { ToastContainerComponent } from './shared/components/toast-container/toa
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.css']
 })
-export class AppComponent {}
+export class AppComponent {
+  readonly currentYear = new Date().getFullYear();
+}

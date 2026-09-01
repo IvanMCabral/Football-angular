@@ -37,4 +37,15 @@ describe('NavbarComponent initial session resolution', () => {
     expect(fixture.nativeElement.textContent).toContain('Registrarse');
     expect(fixture.nativeElement.textContent).not.toContain('Comprobando sesión');
   });
+
+  it('gives the mobile menu control an accessible name and expanded state', () => {
+    fixture.detectChanges();
+    const toggle: HTMLButtonElement = fixture.nativeElement.querySelector('.navbar-toggle');
+    expect(toggle.getAttribute('aria-label')).toBe('Abrir menú de navegación');
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    toggle.click();
+    fixture.detectChanges();
+    expect(toggle.getAttribute('aria-label')).toBe('Cerrar menú de navegación');
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+  });
 });
