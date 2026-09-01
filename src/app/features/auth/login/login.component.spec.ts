@@ -31,6 +31,17 @@ describe('LoginComponent resilient request lifecycle', () => {
     email.dispatchEvent(new AnimationEvent('animationstart', { bubbles: true, animationName: LOGIN_AUTOFILL_ANIMATION_NAME }));
     fixture.detectChanges();
   };
+  const typeCredentials = (emailValue = 'manager@example.com', passwordValue = 'Password123!'): void => {
+    component.loginForm.setValue({ email: '', password: '' });
+    fixture.detectChanges();
+    const email: HTMLInputElement = fixture.nativeElement.querySelector('#login-email');
+    const password: HTMLInputElement = fixture.nativeElement.querySelector('#login-password');
+    email.value = emailValue;
+    email.dispatchEvent(new Event('input', { bubbles: true }));
+    password.value = passwordValue;
+    password.dispatchEvent(new Event('input', { bubbles: true }));
+    fixture.detectChanges();
+  };
 
   beforeEach(async () => {
     authService = jasmine.createSpyObj<AuthService>('AuthService', ['login']);
@@ -53,6 +64,7 @@ describe('LoginComponent resilient request lifecycle', () => {
 
   it('routes once after a normal successful typed login with one actual button click', () => {
     authService.login.and.returnValue(of(response));
+    typeCredentials();
     submitButton().click();
     expect(authService.login).toHaveBeenCalledTimes(1);
     expect(component.uiState).toBe('SUCCESS');
@@ -93,6 +105,16 @@ describe('LoginComponent resilient request lifecycle', () => {
     authService.login.and.returnValue(NEVER);
     silentlyAutofill();
     submitButton().click();
+    submitButton().click();
+    expect(authService.login).toHaveBeenCalledTimes(1);
+    expect(component.uiState).toBe('PENDING');
+  });
+
+  it('prevents a native Enter-submit and actual-click race after silent autofill from creating duplicate requests', () => {
+    authService.login.and.returnValue(NEVER);
+    silentlyAutofill();
+    const form: HTMLFormElement = fixture.nativeElement.querySelector('form');
+    form.requestSubmit();
     submitButton().click();
     expect(authService.login).toHaveBeenCalledTimes(1);
     expect(component.uiState).toBe('PENDING');
