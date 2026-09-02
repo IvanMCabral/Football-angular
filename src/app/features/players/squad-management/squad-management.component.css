@@ -858,3 +858,78 @@
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+@media (max-width: 768px) {
+  .container,
+  .squad-section,
+  .section,
+  .lineup-display,
+  .lineup-container {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .formation-selector,
+  .tournament-actions,
+  .sticky-confirm-bar {
+    align-items: stretch;
+  }
+
+  .formation-selector {
+    flex-wrap: wrap;
+  }
+
+  .formation-selector label {
+    flex: 0 0 auto;
+    align-self: center;
+  }
+
+  .formation-select {
+    flex: 1 1 7rem;
+    min-width: 0;
+  }
+
+  .btn-auto-select,
+  .btn-visual-editor,
+  .btn-confirm-lineup,
+  .tab-btn,
+  .tournament-actions .action-button {
+    min-height: 44px;
+  }
+
+  .lineup-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  }
+}
+
+@media (max-width: 480px) {
+  .container {
+    padding: 0.875rem;
+  }
+
+  .tab-bar {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+  }
+
+  .tab-btn {
+    flex: 1 0 max-content;
+    padding-left: 0.875rem;
+    padding-right: 0.875rem;
+  }
+
+  .formation-selector > button,
+  .tournament-actions .action-button,
+  .sticky-confirm-bar > * {
+    width: 100%;
+  }
+
+  .sticky-confirm-bar {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .lineup-grid {
+    grid-template-columns: 1fr;
+  }
+}

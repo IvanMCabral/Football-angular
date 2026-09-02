@@ -96,4 +96,40 @@
     flex: 1 1 100%;
     min-width: 0;
   }
+
+  .squad-editor-container {
+    width: 100%;
+    max-width: 100%;
+    height: min(92vh, 760px);
+  }
+
+  .squad-header,
+  .squad-header-left,
+  .formation-selector {
+    min-width: 0;
+    flex-wrap: wrap;
+  }
+
+  .squad-header h2 {
+    overflow-wrap: anywhere;
+  }
+
+  .draft-actions > button {
+    flex: 1 1 44%;
+    min-height: 44px;
+  }
+
+  .assignment-panel,
+  .error-message,
+  .condition-warning-message {
+    left: 0.75rem;
+    right: 0.75rem;
+    transform: none;
+    min-width: 0;
+    max-width: none;
+  }
+
+  .assignment-panel {
+    bottom: 4.5rem;
+  }
 }

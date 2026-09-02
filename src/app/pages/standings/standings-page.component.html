@@ -58,6 +58,7 @@
           </ng-template>
 
           <div class="division-content">
+            <div class="standings-table-scroll" tabindex="0" role="region" aria-label="Tabla de posiciones desplazable horizontalmente">
             <table class="standings-table">
               <thead>
                 <tr>
@@ -94,6 +95,7 @@
                 </tr>
               </tbody>
             </table>
+            </div>
 
             <div *ngIf="div.standings.length === 0" class="no-data">
               Sin datos disponibles

@@ -135,6 +135,10 @@
   .nav-link {
     width: 100%;
     text-align: center;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 }
 
@@ -172,5 +176,20 @@
 @media (max-width: 768px) {
   .nav-button {
     width: 100%;
+    min-height: 44px;
+  }
+}
+
+.navbar-toggle:focus-visible,
+.nav-link:focus-visible,
+.nav-button:focus-visible {
+  outline: 3px solid #facc15;
+  outline-offset: 2px;
+}
+
+@media (max-width: 480px) {
+  .navbar .container {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
   }
 }

@@ -384,6 +384,7 @@
 @media (max-width: 768px) {
   .dashboard-container {
     padding: 1rem;
+    min-width: 0;
   }
 
   .welcome-title {
@@ -408,6 +409,38 @@
 
   .stat-value {
     font-size: 2rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard-container {
+    padding: 0.875rem;
+  }
+
+  .welcome-title,
+  .play-label,
+  .action-label {
+    overflow-wrap: anywhere;
+  }
+
+  .play-card,
+  .action-button {
+    padding: 1rem;
+  }
+
+  .action-button {
+    align-items: flex-start;
+  }
+
+  .action-icon {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    font-size: 1.5rem;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
   }
 }
 
