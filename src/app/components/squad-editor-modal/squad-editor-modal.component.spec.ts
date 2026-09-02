@@ -91,6 +91,19 @@ describe('SquadEditorModalComponent basic flow', () => {
     expect(component).toBeTruthy();
   });
 
+  it('keeps the close control and formation selector semantically addressable', () => {
+    fixture.detectChanges();
+
+    const formation = fixture.nativeElement.querySelector('#squad-editor-formation') as HTMLSelectElement;
+    const formationLabel = fixture.nativeElement.querySelector('label[for="squad-editor-formation"]') as HTMLLabelElement;
+    const closeControl = fixture.nativeElement.querySelector('.close-btn') as HTMLButtonElement;
+
+    expect(formation).withContext('the formation control should retain a stable id').toBeTruthy();
+    expect(formationLabel?.htmlFor).toBe('squad-editor-formation');
+    expect(closeControl?.getAttribute('aria-label')).toBe('Cerrar editor de formación');
+    expect(closeControl?.parentElement?.classList.contains('squad-header')).toBeTrue();
+  });
+
   it('should call /lineup-editor/subdivisions on init', () => {
     fixture.detectChanges(); // triggers ngOnInit
     const subdivisionsCall = httpClientSpy.get.calls.allArgs()

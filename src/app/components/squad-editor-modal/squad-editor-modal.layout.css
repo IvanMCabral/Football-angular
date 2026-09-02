@@ -13,7 +13,7 @@
 
     .squad-header {
       display: grid;
-      grid-template-columns: 1fr auto;
+      grid-template-columns: minmax(0, 1fr) auto auto;
       align-items: center;
       gap: 1rem;
       padding: 1rem 1.5rem;
@@ -92,6 +92,7 @@
 
     .formation-selector select {
       padding: 8px 16px;
+      min-height: 44px;
       border-radius: 6px;
       border: 1px solid #4a7c59;
       background: #1a472a;
@@ -107,6 +108,12 @@
 
     .close-btn {
       color: #a0d4a8;
+      width: 44px !important;
+      min-width: 44px !important;
+      height: 44px !important;
+      min-height: 44px !important;
+      padding: 0;
+      flex-shrink: 0;
     }
 
     .header-preview-stack {
