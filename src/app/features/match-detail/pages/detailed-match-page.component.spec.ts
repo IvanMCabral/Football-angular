@@ -213,6 +213,105 @@ describe('DetailedMatchPageComponent input path', () => {
     );
   });
 
+  it('renders the responsive narrative in the required information order', async () => {
+    const detail = makeDetail('match-1', 'career-1', 2, 1);
+    spyOn(api, 'getMatchDetail').and.returnValue(of(detail));
+    component.inputCareerId = 'career-1';
+    component.inputMatchId = 'match-1';
+
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const root: HTMLElement = fixture.nativeElement;
+    const selectors = ['.match-header', '.summary-cards', '#match-events', '#match-stats', '#match-lineups', '#match-players', '#match-shots'];
+    const allElements = Array.from(root.querySelectorAll('*'));
+    const positions = selectors.map(selector => allElements.indexOf(root.querySelector(selector)!));
+    expect(positions).toEqual([...positions].sort((a, b) => a - b));
+    expect(root.querySelector('h1')?.textContent).toContain('Home 2–1 Away');
+    expect(root.querySelector('nav[aria-label="Secciones del detalle del partido"]')).not.toBeNull();
+  });
+
+  it('separates important events from the complete supporting narrative', () => {
+    const detail = makeDetail('match-1', 'career-1', 1, 0);
+    detail.timeline = [
+      makeEvent('SHOT', 'Shot missed'),
+      makeEvent('GOAL', 'Alex scored'),
+      makeEvent('CORNER', 'Corner'),
+      makeEvent('YELLOW_CARD', 'Alex received a yellow card'),
+    ];
+    component.detail = detail;
+
+    expect(component.importantEvents().map(event => event.type)).toEqual(['GOAL', 'YELLOW_CARD']);
+    expect(component.supportingEvents().map(event => event.type)).toEqual(['SHOT', 'CORNER']);
+  });
+
+  it('uses correct Spanish accents for event labels and descriptions', () => {
+    expect(component.eventTypeLabel('INJURY')).toBe('Lesión');
+    expect(component.eventTypeLabel('CORNER')).toBe('Córner');
+    expect(component.eventDescriptionLabel('Alex committed a foul')).toBe('Alex cometió una falta');
+    expect(component.eventDescriptionLabel('Alex received a yellow card')).toBe('Alex recibió amarilla');
+    expect(component.eventDescriptionLabel('Alex was injured')).toBe('Alex se lesionó');
+  });
+
+  it('resets collapsed mobile sections when match A changes to match B', async () => {
+    const detailA = makeDetail('match-A', 'career-1', 1, 0);
+    const detailB = makeDetail('match-B', 'career-1', 0, 2);
+    spyOn(api, 'getMatchDetail').and.returnValues(of(detailA), of(detailB));
+    component.inputCareerId = 'career-1';
+    component.inputMatchId = 'match-A';
+    fixture.detectChanges();
+    component.disclosures.players = true;
+    component.disclosures.lineups = true;
+
+    component.inputMatchId = 'match-B';
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(component.detail?.matchId).toBe('match-B');
+    expect(component.disclosures.players).toBeFalse();
+    expect(component.disclosures.lineups).toBeFalse();
+    expect(api.getMatchDetail).toHaveBeenCalledTimes(2);
+  });
+
+  it('exposes both teams lineups without changing backend data', () => {
+    const detail = makeDetail('match-1', 'career-1', 0, 0);
+    detail.homeStartingPlayers = [makeLineupPlayer('home-1', 'Local Uno')];
+    detail.awayBenchPlayers = [makeLineupPlayer('away-1', 'Visitante Uno')];
+    component.detail = detail;
+
+    expect(component.hasLineups()).toBeTrue();
+    expect(component.lineupTeams().map(team => team.name)).toEqual(['Home', 'Away']);
+    expect(component.lineupTeams()[0].starters[0].name).toBe('Local Uno');
+    expect(component.lineupTeams()[1].bench[0].name).toBe('Visitante Uno');
+  });
+
+  it('uses named native disclosures and route-safe section fragments', async () => {
+    const detail = makeDetail('match-1', 'career-1', 0, 0);
+    detail.timeline = [makeEvent('SHOT', 'Shot missed'), makeEvent('GOAL', 'Alex scored')];
+    spyOn(api, 'getMatchDetail').and.returnValue(of(detail));
+    component.inputCareerId = 'career-1';
+    component.inputMatchId = 'match-1';
+
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const root: HTMLElement = fixture.nativeElement;
+    const fragments = Array.from(root.querySelectorAll<HTMLAnchorElement>('.section-nav a'))
+      .map(link => link.getAttribute('href'));
+    expect(fragments.map((href, index) => href?.endsWith([
+      '#match-events', '#match-stats', '#match-lineups', '#match-players', '#match-shots'
+    ][index]))).toEqual([true, true, true, true, true]);
+    const eventsSection = root.querySelector<HTMLElement>('#match-events')!;
+    const scrollSpy = spyOn(eventsSection, 'scrollIntoView');
+    root.querySelector<HTMLAnchorElement>('.section-nav a')!.click();
+    expect(scrollSpy).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
+    const summaries = Array.from(root.querySelectorAll<HTMLElement>('details > summary'));
+    expect(summaries.length).toBe(4);
+    expect(summaries.every(summary => summary.textContent?.trim().length)).toBeTrue();
+  });
+
   it('builds substitution modal data with real lineup players from match detail', () => {
     const detail = makeDetail('match-1', 'career-1', 0, 0);
     detail.homeStartingPlayers = Array.from({ length: 11 }, (_, i) => ({
@@ -258,6 +357,31 @@ describe('DetailedMatchPageComponent input path', () => {
     expect(message).toContain('modo live');
   });
 });
+
+function makeEvent(type: MatchDetail['timeline'][number]['type'], description: string): MatchDetail['timeline'][number] {
+  return {
+    minute: 12,
+    type,
+    teamId: 'home',
+    playerId: 'player-1',
+    playerName: 'Alex',
+    description,
+  };
+}
+
+function makeLineupPlayer(sessionPlayerId: string, name: string): NonNullable<MatchDetail['homeStartingPlayers']>[number] {
+  return {
+    sessionPlayerId,
+    name,
+    position: 'MID',
+    overall: 75,
+    attack: 75,
+    defense: 70,
+    energy: 100,
+    form: 50,
+    injured: false,
+  };
+}
 
 function makeDetail(matchId: string, careerId: string, homeGoals: number, awayGoals: number): MatchDetail {
   return {

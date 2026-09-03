@@ -1,11 +1,12 @@
 ﻿import { Component, OnInit, OnChanges, SimpleChanges, Input, inject, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { HostListener } from '@angular/core';
 import { RouterLink, ActivatedRoute } from '@angular/router';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatchDetailApiService } from '../services/match-detail-api.service';
-import { MatchDetail } from '../models/match-detail.model';
+import { MatchDetail, MatchEvent, MatchLineupPlayer } from '../models/match-detail.model';
 import { MatchShotMapComponent } from '../components/shot-map/match-shot-map.component';
 import { ShotInput } from '../components/shot-map/match-shot-map.model';
 import { MatchEngineService } from '../../../core/services/match-engine.service';
@@ -38,6 +39,18 @@ export class DetailedMatchPageComponent implements OnInit, OnChanges {
   detail: MatchDetail | null = null;
   careerId: string | null = null;
   matchId: string | null = null;
+  disclosures = {
+    supportingEvents: false,
+    lineups: false,
+    players: false,
+    shots: false,
+  };
+  isWideViewport = window.matchMedia('(min-width: 768px)').matches;
+
+  @HostListener('window:resize')
+  onViewportResize(): void {
+    this.isWideViewport = window.matchMedia('(min-width: 768px)').matches;
+  }
 
   // Optional input bindings let debug surfaces mount this page directly.
   private _inputCareerId: string | null | undefined = undefined;
@@ -120,6 +133,7 @@ export class DetailedMatchPageComponent implements OnInit, OnChanges {
   retry(): void { this.ngOnInit(); }
 
   private fetchDetail(careerId: string, matchId: string): void {
+    this.resetNarrativeState();
     this.loading = true;
     this.error = '';
     this.detail = null;
@@ -145,7 +159,8 @@ export class DetailedMatchPageComponent implements OnInit, OnChanges {
     'BLOCK': 'event-block', 'MISS': 'event-miss', 'FOUL': 'event-foul',
     'YELLOW_CARD': 'event-yellow_card', 'RED_CARD': 'event-red_card',
     'INJURY': 'event-injury', 'SUBSTITUTION': 'event-substitution',
-    'OFFSIDE': 'event-offside', 'CORNER': 'event-corner', 'CHANCE_CREATED': 'event-chance_created'
+    'OFFSIDE': 'event-offside', 'CORNER': 'event-corner', 'CHANCE_CREATED': 'event-chance_created',
+    'TACTICAL_CHANGE': 'event-tactical_change'
   };
   eventClass(type: string): string { return this.typeMap[type] ?? 'event-shot'; }
 
@@ -158,11 +173,12 @@ export class DetailedMatchPageComponent implements OnInit, OnChanges {
     FOUL: 'Falta',
     YELLOW_CARD: 'Amarilla',
     RED_CARD: 'Roja',
-    INJURY: 'Lesi?n',
+    INJURY: 'Lesión',
     SUBSTITUTION: 'Cambio',
     OFFSIDE: 'Offside',
-    CORNER: 'C?rner',
-    CHANCE_CREATED: 'Chance creada'
+    CORNER: 'Córner',
+    CHANCE_CREATED: 'Chance creada',
+    TACTICAL_CHANGE: 'Ajuste táctico'
   };
 
   eventTypeLabel(type: string): string {
@@ -176,12 +192,63 @@ export class DetailedMatchPageComponent implements OnInit, OnChanges {
       .replace(/^Shot saved$/i, 'Tiro atajado')
       .replace(/^Shot missed$/i, 'Tiro desviado')
       .replace(/^Offside$/i, 'Offside')
-      .replace(/^(.+) committed a foul$/i, '$1 cometi? una falta')
-      .replace(/^(.+) received a yellow card$/i, '$1 recibi? amarilla')
-      .replace(/^(.+) received a red card$/i, '$1 recibi? roja')
+      .replace(/^(.+) committed a foul$/i, '$1 cometió una falta')
+      .replace(/^(.+) received a yellow card$/i, '$1 recibió amarilla')
+      .replace(/^(.+) received a red card$/i, '$1 recibió roja')
       .replace(/^(.+) scored$/i, 'Gol de $1')
-      .replace(/^(.+) was injured$/i, '$1 se lesion?')
+      .replace(/^(.+) was injured$/i, '$1 se lesionó')
       .replace(/^Substitution: (.+)$/i, 'Cambio: $1');
+  }
+
+  importantEvents(): MatchEvent[] {
+    const importantTypes = new Set(['GOAL', 'YELLOW_CARD', 'RED_CARD', 'INJURY', 'SUBSTITUTION', 'TACTICAL_CHANGE']);
+    return (this.detail?.timeline ?? []).filter(event => importantTypes.has(event.type));
+  }
+
+  supportingEvents(): MatchEvent[] {
+    const important = new Set(this.importantEvents());
+    return (this.detail?.timeline ?? []).filter(event => !important.has(event));
+  }
+
+  hasLineups(): boolean {
+    return this.lineupTeams().some(team => team.starters.length > 0 || team.bench.length > 0);
+  }
+
+  lineupTeams(): { name: string; starters: MatchLineupPlayer[]; bench: MatchLineupPlayer[] }[] {
+    if (!this.detail) return [];
+    return [
+      {
+        name: this.detail.homeTeamName,
+        starters: this.detail.homeStartingPlayers ?? [],
+        bench: this.detail.homeBenchPlayers ?? [],
+      },
+      {
+        name: this.detail.awayTeamName,
+        starters: this.detail.awayStartingPlayers ?? [],
+        bench: this.detail.awayBenchPlayers ?? [],
+      },
+    ];
+  }
+
+  onDisclosureToggle(
+    key: 'supportingEvents' | 'lineups' | 'players' | 'shots',
+    event: Event
+  ): void {
+    this.disclosures[key] = (event.currentTarget as HTMLDetailsElement).open;
+  }
+
+  scrollToSection(sectionId: string): void {
+    document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  private resetNarrativeState(): void {
+    this.disclosures = {
+      supportingEvents: false,
+      lineups: false,
+      players: false,
+      shots: false,
+    };
+    window.scrollTo(0, 0);
   }
 
   // Stats comparison includes a delta field for visual indication.
@@ -253,7 +320,7 @@ export class DetailedMatchPageComponent implements OnInit, OnChanges {
 
   postMatchConditionLabel(): string {
     if (this.hasInjuryEvents()) {
-      return `?? ${this.injuryEventsCount()} evento${this.injuryEventsCount() > 1 ? 's' : ''} de lesi?n`;
+      return `${this.injuryEventsCount()} evento${this.injuryEventsCount() > 1 ? 's' : ''} de lesión`;
     }
     return 'No se registraron lesiones en este partido.';
   }
@@ -293,7 +360,7 @@ export class DetailedMatchPageComponent implements OnInit, OnChanges {
     const data = this.buildRealSubstitutionDialogData();
     if (!data) {
       this.snackBar.open(
-        'Sustituciones reales bloqueadas: el detalle del partido todav?a no expone titulares y suplentes reales. Hay que extender el DTO antes de habilitar este modal.',
+        'Sustituciones reales bloqueadas: el detalle del partido todavía no expone titulares y suplentes reales. Hay que extender el DTO antes de habilitar este modal.',
         'Cerrar',
         {
           duration: 7000,
@@ -321,8 +388,8 @@ export class DetailedMatchPageComponent implements OnInit, OnChanges {
       ).subscribe({
         next: (subResult: { success: boolean; minuteApplied: number; substitutionsRemaining: number; error?: string }) => {
           const msg = subResult.success
-            ? `Sustituci?n registrada (minuto ${subResult.minuteApplied || result.minute}). Te quedan ${subResult.substitutionsRemaining ?? '?'}.`
-            : `Error: ${subResult.error || 'sustituci?n no aplicada'}`;
+            ? `Sustitución registrada (minuto ${subResult.minuteApplied || result.minute}). Te quedan ${subResult.substitutionsRemaining ?? '?'}.`
+            : `Error: ${subResult.error || 'sustitución no aplicada'}`;
           this.snackBar.open(msg, 'Cerrar', {
             duration: 5000,
             panelClass: subResult.success ? 'snack-success' : 'snack-error',
