@@ -118,6 +118,7 @@
   </section>
 
   <!-- Mundo -->
+  @defer (on viewport) {
   <section class="stats-section">
     <h2 class="section-title">🌍 ESTADO DEL MUNDO</h2>
     <div class="stats-grid world-stats" *ngIf="worldStatus$ | async as worldStatus; else loadingWorldStatus">
@@ -151,6 +152,16 @@
       </div>
     </ng-template>
   </section>
+  } @placeholder {
+    <section class="stats-section" aria-label="Estado del mundo">
+      <h2 class="section-title">🌍 ESTADO DEL MUNDO</h2>
+      <div class="stats-grid world-stats" aria-busy="true">
+        <div class="stat-card"><div class="skeleton-loader"></div><div class="stat-label">Clubes</div></div>
+        <div class="stat-card"><div class="skeleton-loader"></div><div class="stat-label">Jugadores</div></div>
+        <div class="stat-card"><div class="skeleton-loader"></div><div class="stat-label">Partidos</div></div>
+      </div>
+    </section>
+  }
 
   <!-- Acciones -->
   <section class="actions-section">

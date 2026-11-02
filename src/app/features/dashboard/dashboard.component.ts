@@ -1,10 +1,11 @@
-import { Component, inject, OnInit } from '@angular/core';
+import { Component, DestroyRef, inject, OnInit } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { RouterLink, Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { Observable, of, BehaviorSubject } from 'rxjs';
-import { map, catchError, shareReplay, tap } from 'rxjs/operators';
+import { map, catchError, shareReplay, tap, filter, take, switchMap } from 'rxjs/operators';
 import { TeamService } from '../teams/services/team.service';
 import { MatchService } from '../matches/services/match.service';
 import { AuthService } from '../../core/services/auth.service';
@@ -83,6 +84,7 @@ export class DashboardComponent implements OnInit {
   private toastService = inject(ToastService);
   private dialog = inject(MatDialog);
   private careerService = inject(CareerService);
+  private readonly destroyRef = inject(DestroyRef);
 
   private careerStatusSubject = new BehaviorSubject<CareerStatus | null | undefined>(undefined);
   careerStatus$ = this.careerStatusSubject.asObservable();
@@ -171,26 +173,23 @@ export class DashboardComponent implements OnInit {
         }
         return null;
       }),
+      takeUntilDestroyed(this.destroyRef),
       catchError(err => {
         return of(null);
       })
     ).subscribe(status => {
     this.careerStatusSubject.next(status);
 
-      if (status?.currentRound) {
-        // Warm the exact pending-round snapshot while the manager is reading
-        // the dashboard. The live route reuses this keyed request if it is
-        // still within its short TTL.
-        this.careerService.prefetchFixturesForRound(status.currentRound).subscribe({ error: () => undefined });
-      }
-
+      // The entry screen only needs squad conditions before a pending round.
+      // Fixture transport belongs to the screen that actually displays it.
       const phase = status?.careerPhase ?? null;
       const season = status?.season ?? 0;
+      const changed = phase !== this.lastSeenPhase || season !== this.lastSeenSeason;
+      if (status?.careerPhase === 'WAITING_USER' && changed) this.loadSquadData();
       if (this.lastSeenPhase !== null) {
         const phaseChanged = phase !== this.lastSeenPhase;
         const seasonChanged = season !== this.lastSeenSeason;
         if (phaseChanged || seasonChanged) {
-          this.loadSquadData();
           this.refreshUserStats();
           this.refreshWorldStatus();
         }
@@ -247,6 +246,7 @@ export class DashboardComponent implements OnInit {
 
   private loadSquadData(): void {
     this.http.get<SessionPlayer[]>(`${environment.apiUrl}/career/players/squad`).pipe(
+      takeUntilDestroyed(this.destroyRef),
       catchError(err => {
         return of([]);
       })
@@ -314,25 +314,31 @@ export class DashboardComponent implements OnInit {
   loadDashboardData(): void {
     // Catalog screens load their own metadata on demand. Hydrating the world
     // here competed with the career and statistics needed by this screen.
-    this.user$ = this.authService.getUserInfo().pipe(
+    this.user$ = this.afterCareerReady(() => this.authService.getUserInfo()).pipe(
       catchError(err => {
         return of(null);
       }),
-      shareReplay(1)
+      shareReplay({ bufferSize: 1, refCount: true })
     );
-
-    this.loadCareerStatus();
-
-    this.loadSquadData();
 
     this.refreshUserStats();
 
     this.refreshWorldStatus();
+    this.loadCareerStatus(false);
+  }
+
+  private afterCareerReady<T>(load: () => Observable<T>): Observable<T> {
+    return this.careerStatus$.pipe(
+      filter(status => status !== undefined),
+      take(1),
+      switchMap(load),
+      takeUntilDestroyed(this.destroyRef)
+    );
   }
 
   private refreshUserStats(): void {
-    this.userStats$ = this.http.get<UserStats>(`${environment.apiUrl}/dashboard/user-stats`).pipe(
-      shareReplay(1),
+    this.userStats$ = this.afterCareerReady(() => this.http.get<UserStats>(`${environment.apiUrl}/dashboard/user-stats`)).pipe(
+      shareReplay({ bufferSize: 1, refCount: true }),
       catchError(err => {
         return of({ matchesPlayed: 0, matchesWon: 0, matchesLost: 0, winPercentage: 0 });
       })
@@ -340,8 +346,8 @@ export class DashboardComponent implements OnInit {
   }
 
   private refreshWorldStatus(): void {
-    this.worldStatus$ = this.http.get<WorldStatus>(`${environment.apiUrl}/dashboard/world-status`).pipe(
-      shareReplay(1),
+    this.worldStatus$ = this.afterCareerReady(() => this.http.get<WorldStatus>(`${environment.apiUrl}/dashboard/world-status`)).pipe(
+      shareReplay({ bufferSize: 1, refCount: true }),
       catchError(err => {
         return of({ clubs: 0, players: 0, matches: 0 });
       })
@@ -477,6 +483,7 @@ export class DashboardComponent implements OnInit {
       }
       this.http.delete(`${environment.apiUrl}/career/reset`).subscribe({
         next: () => {
+          this.careerService.invalidateCareerStatus();
           this.refreshCareerStatus();
         },
         error: () => {

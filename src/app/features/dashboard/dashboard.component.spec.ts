@@ -1,5 +1,5 @@
 import { Component, NO_ERRORS_SCHEMA } from '@angular/core';
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ComponentFixture, DeferBlockState, TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
 import { MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
@@ -377,7 +377,10 @@ describe('DashboardComponent — division and promotions state', () => {
     }) as any);
 
     fixture.detectChanges();
-    fixture.whenStable().then(() => {
+    fixture.whenStable().then(async () => {
+      // Display the deferred world section before checking its refresh behavior.
+      const blocks = await fixture.getDeferBlocks();
+      await blocks[0].render(DeferBlockState.Complete);
       // Baseline counts after the first load.
       const squadCallsBefore = httpSpy.get.calls.allArgs().filter(a => String(a[0]).includes('/career/players/squad')).length;
       const userStatsCallsBefore = httpSpy.get.calls.allArgs().filter(a => String(a[0]).includes('/dashboard/user-stats')).length;
@@ -411,14 +414,15 @@ describe('DashboardComponent — division and promotions state', () => {
       // method directly (same entry point the dashboard uses in production
       // when refreshCareerStatus() runs after /career/continue).
       (component as any).loadCareerStatus();
+      fixture.detectChanges();
 
       fixture.whenStable().then(() => {
         const squadCallsAfter = httpSpy.get.calls.allArgs().filter(a => String(a[0]).includes('/career/players/squad')).length;
         const userStatsCallsAfter = httpSpy.get.calls.allArgs().filter(a => String(a[0]).includes('/dashboard/user-stats')).length;
         const worldStatusCallsAfter = httpSpy.get.calls.allArgs().filter(a => String(a[0]).includes('/dashboard/world-status')).length;
 
-        expect(squadCallsAfter).toBe(squadCallsBefore + 1,
-          `squad GET must re-fire on phase change (was ${squadCallsBefore}, now ${squadCallsAfter})`);
+        expect(squadCallsAfter).toBe(squadCallsBefore,
+          'POST_SEASON does not display squad condition warnings');
         expect(userStatsCallsAfter).toBe(userStatsCallsBefore + 1,
           `user-stats GET must re-fire on phase change (was ${userStatsCallsBefore}, now ${userStatsCallsAfter})`);
         expect(worldStatusCallsAfter).toBe(worldStatusCallsBefore + 1,
@@ -474,13 +478,14 @@ describe('DashboardComponent — division and promotions state', () => {
       }) as any);
 
       (component as any).loadCareerStatus();
+      fixture.detectChanges();
 
       fixture.whenStable().then(() => {
         const squadCallsAfter = httpSpy.get.calls.allArgs().filter(a => String(a[0]).includes('/career/players/squad')).length;
         const userStatsCallsAfter = httpSpy.get.calls.allArgs().filter(a => String(a[0]).includes('/dashboard/user-stats')).length;
 
-        expect(squadCallsAfter).toBe(squadCallsBefore + 1,
-          'squad GET must re-fire on season change (POST_SEASON → PRE_MATCH with season 1→2)');
+        expect(squadCallsAfter).toBe(squadCallsBefore,
+          'PRE_MATCH does not display squad condition warnings');
         expect(userStatsCallsAfter).toBe(userStatsCallsBefore + 1,
           'user-stats GET must re-fire on season change');
         done();
