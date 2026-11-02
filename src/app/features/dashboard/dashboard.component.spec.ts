@@ -82,6 +82,11 @@ describe('DashboardComponent — division and promotions state', () => {
     component = fixture.componentInstance;
   });
 
+  it('does not hydrate the league catalog when opening the dashboard', () => {
+    component.loadDashboardData();
+    expect(httpSpy.get.calls.allArgs().some(args => String(args[0]).includes('/world/leagues'))).toBeFalse();
+  });
+
   it('renders user-division pill when careerStatus.userDivision is set', (done: DoneFn) => {
     httpSpy.get.and.callFake(((url: string) => {
       if (url.includes('/career/status')) {

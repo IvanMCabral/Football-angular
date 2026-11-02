@@ -16,7 +16,6 @@ import { PromotionResult } from '../../core/services/career.model';
 import { UserInfo } from '../../shared/models/auth.model';
 import { ConfirmActionDialogComponent } from '../../shared/components/confirm-action-dialog/confirm-action-dialog.component';
 import { readableErrorMessage } from '../../shared/utils/error-message';
-import { WorldCatalogService } from '../../core/services/world-catalog.service';
 import { CareerService } from '../../core/services/career.service';
 import { beginMatchStartTrace, markMatchStartPointerEvent, markMatchStartStage, setMatchStartTraceMetadata } from '../games/match-start-trace';
 import { buildRoundStartNavigationState } from '../games/round-start-navigation-state';
@@ -83,7 +82,6 @@ export class DashboardComponent implements OnInit {
   private router = inject(Router);
   private toastService = inject(ToastService);
   private dialog = inject(MatDialog);
-  private catalogService = inject(WorldCatalogService);
   private careerService = inject(CareerService);
 
   private careerStatusSubject = new BehaviorSubject<CareerStatus | null | undefined>(undefined);
@@ -314,9 +312,8 @@ export class DashboardComponent implements OnInit {
   }
 
   loadDashboardData(): void {
-    // Warm only reusable league metadata; dashboard rendering remains
-    // independent and usable if the catalog endpoint is unavailable.
-    this.catalogService.prefetch();
+    // Catalog screens load their own metadata on demand. Hydrating the world
+    // here competed with the career and statistics needed by this screen.
     this.user$ = this.authService.getUserInfo().pipe(
       catchError(err => {
         return of(null);
