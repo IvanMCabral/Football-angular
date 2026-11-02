@@ -33,9 +33,9 @@ interface TimelineCompareRow {
   template: `
     <div class="compare-page">
       <header class="compare-header">
-        <a (click)="navigateBack()" class="back-link">
+        <button type="button" (click)="navigateBack()" class="back-link">
           ← Volver al detalle
-        </a>
+        </button>
         <h1 class="compare-title">🔄 Comparación de partido: simulación base y resultado final</h1>
         <p *ngIf="comparison" class="compare-subtitle">
           {{ comparison.baseline.homeTeamName }} vs {{ comparison.baseline.awayTeamName }}
@@ -50,6 +50,7 @@ interface TimelineCompareRow {
         <div class="compare-grid">
           <section class="stats-section">
             <h2>📊 Estadísticas</h2>
+            <div class="table-scroll" tabindex="0" role="region" aria-label="Estadísticas comparadas del partido">
             <table class="stats-table">
               <thead>
                 <tr>
@@ -114,6 +115,7 @@ interface TimelineCompareRow {
                 </tr>
               </tbody>
             </table>
+            </div>
           </section>
 
           <section class="coach-read-section">
@@ -178,6 +180,10 @@ interface TimelineCompareRow {
     }
     .compare-header { margin-bottom: 1.5rem; }
     .back-link {
+      border: 0;
+      background: none;
+      padding: .5rem 0;
+      font: inherit;
       display: inline-block;
       margin-bottom: 0.5rem;
       color: #1976d2;
@@ -202,14 +208,15 @@ interface TimelineCompareRow {
     .error { color: #c62828; }
     .compare-grid {
       display: grid;
-      grid-template-columns: 1fr;
+      grid-template-columns: minmax(0, 1fr);
       gap: 1.5rem;
     }
     @media (min-width: 960px) {
-      .compare-grid { grid-template-columns: 1fr 1fr; }
+      .compare-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .timeline-section { grid-column: 1 / -1; }
     }
     .stats-section, .timeline-section, .coach-read-section {
+      min-width: 0;
       background: #fff;
       border: 1px solid #e0e0e0;
       border-radius: 8px;
@@ -309,6 +316,17 @@ interface TimelineCompareRow {
     }
     .legend-base::before { content: '▼ '; color: #555; }
     .legend-live::before { content: '▼ '; color: #1976d2; }
+    .table-scroll { max-width: 100%; overflow-x: auto; }
+    .stats-table { min-width: 340px; }
+    @media (max-width: 600px) {
+      .compare-page { padding: 1rem; }
+      .stats-section, .timeline-section, .coach-read-section { padding: 1rem; }
+      .timeline-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .bucket-label { grid-column: 1 / -1; grid-row: 1; }
+      .bucket-side { grid-row: 2; min-width: 0; overflow-wrap: anywhere; }
+      .live-side { grid-column: 2; }
+      .bucket-delta { grid-column: 1 / -1; grid-row: 3; justify-self: start; }
+    }
   `],
 })
 export class MatchComparePageComponent implements OnInit {
