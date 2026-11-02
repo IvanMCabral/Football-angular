@@ -4,7 +4,7 @@ import { CommonModule } from '@angular/common';
 import { GameService } from '../../core/services/game.service';
 import { CareerService } from '../../core/services/career.service';
 import { Observable, of } from 'rxjs';
-import { switchMap, catchError } from 'rxjs/operators';
+import { switchMap, catchError, finalize } from 'rxjs/operators';
 import { Location } from '@angular/common';
 import { readableErrorMessage } from '../../shared/utils/error-message';
 
@@ -51,6 +51,7 @@ export class TournamentChampionComponent implements OnInit {
   errorMsg: string = '';
   isCareerMode: boolean = false;
   careerPhase: string = ''; // Para usar directamente en template
+  startingSeason = false;
 
   ngOnInit() {
     const gameIdParam = this.route.snapshot.paramMap.get('gameId');
@@ -154,7 +155,13 @@ export class TournamentChampionComponent implements OnInit {
   }
 
   continueToNewSeason() {
-    this.careerService.continueToNewSeason().subscribe({
+    if (this.startingSeason) return;
+    this.startingSeason = true;
+    this.cdr.markForCheck();
+    this.careerService.continueToNewSeason().pipe(finalize(() => {
+      this.startingSeason = false;
+      this.cdr.markForCheck();
+    })).subscribe({
       next: (response) => {
         if (response.success) {
           // Usar Location.reload() para forzar recarga completa de la página

@@ -220,9 +220,18 @@ describe('StandingsPageComponent', () => {
     });
   });
 
-  it('exposes TEAMS_PROMOTED_OR_RELEGATED = 3 constant', () => {
-    expect(component.TEAMS_PROMOTED_OR_RELEGATED).toBe(3,
-      'TEAMS_PROMOTED_OR_RELEGATED must mirror PromotionRelegationService.TEAMS_PROMOTED_OR_RELEGATED');
+  it('matches the career rule of one champion promoted and one last-place club relegated', () => {
+    expect(component.TEAMS_PROMOTED_OR_RELEGATED).toBe(1);
+  });
+
+  it('marks only the last club for relegation in the top division, without an impossible promotion', async () => {
+    fixture.detectChanges(); await fixture.whenStable(); fixture.detectChanges();
+    const rows = fixture.nativeElement.querySelectorAll('.mat-mdc-tab-body-active tbody tr');
+    expect(rows.length).toBe(4);
+    expect(rows[0].classList.contains('zone-promotion')).toBeFalse();
+    expect(rows[1].classList.contains('zone-relegation')).toBeFalse();
+    expect(rows[2].classList.contains('zone-relegation')).toBeFalse();
+    expect(rows[3].classList.contains('zone-relegation')).toBeTrue();
   });
 
   it('reads userTeamId from careerStatus (used for row highlight)', (done: DoneFn) => {
@@ -253,8 +262,7 @@ describe('StandingsPageComponent', () => {
     });
   });
 
-  it('keeps user-team highlight when the row is also in a promotion zone', (done: DoneFn) => {
-    // (top-3) the highlighted row must still be visible. The new CSS
+  it('does not invent promotion or relegation zones in a single-division career', (done: DoneFn) => {
     const PRIMERA_PROMO_USER = [
       { teamId: 'bottom-1', teamName: 'Bottom PRIMERA', division: 'PRIMERA', played: 5, won: 0, drawn: 0, lost: 5, goalsFor: 1, goalsAgainst: 10, goalDifference: -9, points: 0 },
       { teamId: 'bot-2', teamName: 'Bot2 PRIMERA', division: 'PRIMERA', played: 5, won: 0, drawn: 0, lost: 5, goalsFor: 1, goalsAgainst: 10, goalDifference: -9, points: 0 },
@@ -274,7 +282,9 @@ describe('StandingsPageComponent', () => {
       ) as HTMLElement | undefined;
       expect(userRow).toBeDefined('user row must render');
       expect(userRow!.classList.contains('highlight')).toBeTrue();
-      expect(userRow!.classList.contains('zone-promotion')).toBeTrue();
+      expect(userRow!.classList.contains('zone-promotion')).toBeFalse();
+      expect(userRow!.classList.contains('zone-relegation')).toBeFalse();
+      expect(fixture.nativeElement.querySelector('.zone-legend')).toBeNull();
       done();
     });
   });

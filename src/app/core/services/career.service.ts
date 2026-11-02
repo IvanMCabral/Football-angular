@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, of } from 'rxjs';
-import { shareReplay, tap } from 'rxjs/operators';
+import { finalize, shareReplay, tap } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 import {
   SessionTeam,
@@ -76,10 +76,14 @@ export class CareerService {
   private careerStatusCache: { requestedAt: number; request$: Observable<CareerStatus> } | null = null;
   private readonly careerStatusSnapshots = new Map<string, { value: CareerStatus; receivedAt: number }>();
   private lastCareerStatusKey: string | null = null;
+  private pendingSeasonContinuation: Observable<CareerCommandResponse> | null = null;
 
   constructor() {
     if (typeof window !== 'undefined') {
-      window.addEventListener('manager:logout', () => this.clearCareerStatusSnapshot());
+      window.addEventListener('manager:logout', () => {
+        this.pendingSeasonContinuation = null;
+        this.clearCareerStatusSnapshot();
+      });
     }
   }
 
@@ -213,9 +217,20 @@ export class CareerService {
    * @returns Observable<CareerCommandResponse>
    */
   continueToNewSeason(): Observable<CareerCommandResponse> {
-    return this.http.post<CareerCommandResponse>(`${this.apiUrl}/continue`, {}).pipe(
-      tap(() => this.invalidateCareerStatus())
+    if (this.pendingSeasonContinuation) return this.pendingSeasonContinuation;
+    const request$ = this.http.post<CareerCommandResponse>(`${this.apiUrl}/continue`, {}).pipe(
+      tap(response => {
+        // Round numbers restart at one. Never reuse fixtures or status from
+        // the previous season after the server accepts the transition.
+        if (response.success && this.pendingSeasonContinuation === request$) this.clearCareerStatusSnapshot();
+      }),
+      finalize(() => {
+        if (this.pendingSeasonContinuation === request$) this.pendingSeasonContinuation = null;
+      }),
+      shareReplay({ bufferSize: 1, refCount: false })
     );
+    this.pendingSeasonContinuation = request$;
+    return request$;
   }
 
   /**

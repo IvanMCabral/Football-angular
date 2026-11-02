@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatButtonModule } from '@angular/material/button';
@@ -21,8 +21,10 @@ import { readableErrorMessage } from 'app/shared/utils/error-message';
   styleUrls: ['./standings-page.component.css']
 })
 export class StandingsPageComponent implements OnInit {
-  /** Top and bottom rows marked as promotion/relegation zones. */
-  readonly TEAMS_PROMOTED_OR_RELEGATED = 3;
+  /** Career PromotionCalculator moves the champion and last-place club. */
+  readonly TEAMS_PROMOTED_OR_RELEGATED = 1;
+  divisionCount = 0;
+  private readonly cdr = inject(ChangeDetectorRef);
 
   loading$ = new BehaviorSubject<boolean>(true);
   error$ = new BehaviorSubject<string | null>(null);
@@ -40,10 +42,11 @@ export class StandingsPageComponent implements OnInit {
     this.careerService.getCareerStatus().subscribe({
       next: (status: CareerStatus | null) => {
         if (status) {
-          this.userTeamId = status.userTeamId;
+          this.userTeamId = status.userSessionTeamId || status.userTeamId;
           if (status.userDivision) {
             this.userDivision = status.userDivision;
           }
+          this.cdr.markForCheck();
         }
       },
       error: () => { /* legacy backend may not expose userDivision; safe to ignore */ }
@@ -58,12 +61,14 @@ export class StandingsPageComponent implements OnInit {
     this.careerService.getAllStandings().subscribe({
       next: (response) => {
         const divisions = response.divisions || [];
+        this.divisionCount = divisions.length;
         const userDivIndex = divisions.findIndex(
           (d: DivisionStandings) => d.isUserDivision
         );
         this.selectedTabIndex$.next(userDivIndex >= 0 ? userDivIndex : 0);
         this.loading$.next(false);
         this.divisions$ = new BehaviorSubject(divisions).asObservable();
+        this.cdr.markForCheck();
       },
       error: (err: unknown) => {
         this.error$.next('Error al cargar tablas de posiciones: ' + readableErrorMessage(err));

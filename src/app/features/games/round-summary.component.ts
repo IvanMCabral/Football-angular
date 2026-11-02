@@ -17,6 +17,7 @@ import { readableErrorMessage } from '../../shared/utils/error-message';
   styleUrls: ['./round-summary.component.css']
 })
 export class RoundSummaryComponent implements OnInit, OnDestroy {
+  startingSeason = false;
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private careerService = inject(CareerService);
@@ -321,11 +322,14 @@ export class RoundSummaryComponent implements OnInit, OnDestroy {
   }
 
   continueToNewSeason() {
+    if (this.startingSeason) return;
+    this.startingSeason = true;
     this.careerService.continueToNewSeason().subscribe({
       next: (response) => {
         if (response.success) {
           this.router.navigate(['/squad']);
         } else {
+          this.startingSeason = false;
           this.vmSubject.next({
             ...this.vmSubject.value,
             errorMsg: response.message || 'Error al iniciar nueva temporada'
@@ -333,6 +337,7 @@ export class RoundSummaryComponent implements OnInit, OnDestroy {
         }
       },
       error: (err) => {
+        this.startingSeason = false;
         this.vmSubject.next({
           ...this.vmSubject.value,
           errorMsg: readableErrorMessage(err, 'Error al iniciar nueva temporada')

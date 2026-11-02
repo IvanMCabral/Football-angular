@@ -4,7 +4,7 @@ import { RouterLink, Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { Observable, combineLatest, forkJoin, of, switchMap, map, tap, catchError, shareReplay, BehaviorSubject, firstValueFrom, take } from 'rxjs';
-import { startWith, distinctUntilChanged } from 'rxjs/operators';
+import { startWith, distinctUntilChanged, finalize } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 import { FixtureService } from 'app/core/services/fixture.service';
 import { AppLoggerService } from 'app/core/services/app-logger.service';
@@ -54,6 +54,7 @@ function isFormationCode(value: string): value is FormationCode {
 })
 export class SquadManagementComponent implements OnInit {
   rosterView: 'table' | 'cards' = 'table';
+  startingSeason = false;
   constructor(
       private http: HttpClient,
       private router: Router,
@@ -541,7 +542,9 @@ openVisualEditor(): void {
       });
     }
     continueToNewSeason(): void {
-      this.http.post<ContinueCareerResponse>(`${environment.apiUrl}/career/continue`, {}).subscribe({
+      if (this.startingSeason) return;
+      this.startingSeason = true;
+      this.careerService.continueToNewSeason().pipe(finalize(() => this.startingSeason = false)).subscribe({
         next: (response) => {
           if (response.success) {
             this.refreshCareerStatus();

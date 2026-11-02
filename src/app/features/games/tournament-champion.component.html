@@ -91,8 +91,8 @@
   </div>
 
   <div class="actions">
-    <button *ngIf="careerPhase === 'FINISHED'" (click)="continueToNewSeason()" class="btn btn-success">
-      🚀 Jugar Siguiente Temporada
+    <button *ngIf="careerPhase === 'FINISHED'" (click)="continueToNewSeason()" class="btn btn-success" [disabled]="startingSeason">
+      {{ startingSeason ? 'Iniciando temporada…' : '🚀 Jugar Siguiente Temporada' }}
     </button>
     <button (click)="backToGame()" class="btn btn-primary">
       🏠 Volver al Torneo

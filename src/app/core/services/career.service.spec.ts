@@ -129,4 +129,43 @@ describe('CareerService round fixture cache', () => {
     service.getCareerStatus().subscribe();
     http.expectOne('/api/v1/career/status').flush({ ...status, currentRound: 2 });
   });
+
+  it('replaces round-one fixtures and all status snapshots after a successful new season', () => {
+    service.seedCareerStatus({ careerId: 'career', season: 1, currentRound: 6, careerPhase: 'FINISHED' } as any);
+    service.getFixturesByRoundWithBye(1).subscribe();
+    http.expectOne('/api/v1/career/fixtures/round/1').flush({ round: 1, matches: [{ matchId: 'old-season' }], byeTeam: null });
+    service.continueToNewSeason().subscribe();
+    http.expectOne('/api/v1/career/continue').flush({ success: true, newSeason: 2 });
+    expect(service.getFixtureSnapshot(1)).toBeNull();
+    expect(service.getCareerStatusSnapshot()).toBeNull();
+    service.getFixturesByRoundWithBye(1).subscribe(value => expect(value.matches[0].matchId).toBe('new-season'));
+    http.expectOne('/api/v1/career/fixtures/round/1').flush({ round: 1, matches: [{ matchId: 'new-season' }], byeTeam: null });
+    service.getCareerStatus().subscribe();
+    http.expectOne('/api/v1/career/status').flush({ careerId: 'career', season: 2 });
+  });
+
+  it('coalesces duplicate season commands but allows retry after rejection or transport error', () => {
+    const first = jasmine.createSpy(); const second = jasmine.createSpy();
+    service.continueToNewSeason().subscribe(first);
+    service.continueToNewSeason().subscribe(second);
+    http.expectOne('/api/v1/career/continue').flush({ success: false, message: 'Season is active' });
+    expect(first).toHaveBeenCalled(); expect(second).toHaveBeenCalled();
+    service.continueToNewSeason().subscribe({ error: () => undefined });
+    http.expectOne('/api/v1/career/continue').flush({}, { status: 503, statusText: 'Unavailable' });
+    service.continueToNewSeason().subscribe();
+    http.expectOne('/api/v1/career/continue').flush({ success: true });
+  });
+
+  it('does not share an old account command or let it clear a replacement account snapshot', () => {
+    service.continueToNewSeason().subscribe();
+    const previous = http.expectOne('/api/v1/career/continue');
+    window.dispatchEvent(new CustomEvent('manager:logout'));
+    const replacement = { careerId: 'new-owner-career', season: 1 } as any;
+    service.seedCareerStatus(replacement);
+    service.continueToNewSeason().subscribe();
+    const current = http.expectOne('/api/v1/career/continue');
+    previous.flush({ success: true });
+    expect(service.getCareerStatusSnapshot()?.value).toEqual(replacement);
+    current.flush({ success: false });
+  });
 });

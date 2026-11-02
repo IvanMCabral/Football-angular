@@ -106,8 +106,8 @@
         📊 Ver Tabla Final
       </button>
 
-      <button (click)="continueToNewSeason()" class="btn btn-success btn-large">
-        🚀 Continuar Carrera (Nueva Temporada)
+      <button (click)="continueToNewSeason()" class="btn btn-success btn-large" [disabled]="startingSeason">
+        {{ startingSeason ? 'Iniciando temporada…' : '🚀 Continuar Carrera (Nueva Temporada)' }}
       </button>
     </ng-container>
 

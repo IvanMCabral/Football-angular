@@ -52,10 +52,10 @@
             <span class="action-subtitle">Clasificación definitiva</span>
           </span>
         </button>
-        <button class="action-button success" (click)="continueToNewSeason()">
+        <button class="action-button success" (click)="continueToNewSeason()" [disabled]="startingSeason">
           <span class="action-icon">🚀</span>
           <span class="action-text">
-            <span class="action-label">Continuar carrera</span>
+            <span class="action-label">{{ startingSeason ? 'Iniciando temporada…' : 'Continuar carrera' }}</span>
             <span class="action-subtitle">Iniciar nueva temporada</span>
           </span>
         </button>
