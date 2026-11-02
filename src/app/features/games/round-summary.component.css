@@ -2,7 +2,7 @@
   max-width: 1200px;
   margin: 0 auto;
   padding: 2rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #edf2f7;
   min-height: 100vh;
 }
 .header {
@@ -11,7 +11,7 @@
   align-items: center;
   gap: 1rem;
   margin-bottom: 2rem;
-  color: white;
+  color: #1e3c72;
 }
 .header h2 {
   font-size: 2rem;
@@ -51,7 +51,8 @@
   gap: 0.75rem;
 }
 .match-result {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   justify-content: space-between;
   padding: 1rem;
@@ -66,14 +67,16 @@
 .team-info {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: .5rem;
+  min-width: 0;
   flex: 1;
 }
-.team-info:last-child {
+.team-info:nth-of-type(3) {
   justify-content: flex-end;
 }
 .team-name {
   font-weight: 500;
+  overflow-wrap: anywhere;
 }
 .team-score {
   font-size: 1.5rem;
@@ -90,6 +93,8 @@
 
 /* Button to open match detail for a completed match. */
 .btn-detail {
+  grid-column: 1 / -1;
+  justify-self: end;
   background: #1e3c72;
   color: white;
   border: none;
@@ -104,6 +109,7 @@
 .btn-detail:hover { background: #2a5298; }
 .table-responsive {
   overflow-x: auto;
+  max-width: 100%;
 }
 .standings-table {
   width: 100%;
@@ -256,4 +262,15 @@
 .btn-success:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 8px rgba(72, 187, 120, 0.3);
+}
+
+.match-state { grid-column: 1 / -1; color: #59697b; font-size: .8rem; margin-top: .4rem; }
+@media (max-width: 600px) {
+  .summary-container { padding: 1rem; }
+  .card { padding: 1rem; min-width: 0; }
+  .header { flex-wrap: wrap; }
+  .header h2 { font-size: 1.5rem; }
+  .match-result { padding: .6rem; }
+  .match-vs { padding: 0 .3rem; }
+  .team-score { min-width: 1rem; font-size: 1.2rem; }
 }

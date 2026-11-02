@@ -16,11 +16,14 @@ a {
 }
 .game-detail-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 1.5rem;
   margin-top: 2rem;
 }
 .action-btn {
   display: inline-block;
+  flex: 1 1 180px;
+  min-height: 44px;
   padding: 1rem 2.2rem;
   font-size: 1.1rem;
   border-radius: 8px;
@@ -57,4 +60,11 @@ a {
 .play-btn:hover {
   background: linear-gradient(135deg, #27ae60 0%, #2ecc40 100%);
   color: #fff;
+}
+
+:host { display: block; max-width: 1100px; margin: auto; padding: 1rem; }
+@media (max-width: 600px) {
+  .game-detail-card { padding: 1rem; }
+  .game-detail-actions { gap: .75rem; }
+  .action-btn { flex-basis: 100%; margin-right: 0; }
 }

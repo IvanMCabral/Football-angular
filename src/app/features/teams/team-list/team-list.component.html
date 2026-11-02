@@ -29,7 +29,7 @@
         <h3>{{ team.name }}</h3>
       </div>
       <div class="team-info">
-        <div class="info-row">
+        <div class="info-row" *ngIf="team.country">
           <span class="label">🌍 País:</span>
           <span class="value">{{ team.country }}</span>
         </div>

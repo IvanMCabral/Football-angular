@@ -23,7 +23,7 @@
           <span class="team-name">{{ getTeamName(match.awayTeamId) }}</span>
         </div>
 
-        <span *ngIf="!hasPlayedResult(match.status)">Sin resultado final</span>
+        <span *ngIf="!hasPlayedResult(match.status)" class="match-state">Sin resultado final</span>
         <button *ngIf="hasPlayedResult(match.status)"
                 type="button"
                 class="btn-detail"
