@@ -6,6 +6,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { DashboardComponent } from './dashboard.component';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
+import { CareerService } from '../../core/services/career.service';
 import { environment } from '../../environments/environment';
 
 describe('Dashboard entry request priority', () => {
@@ -32,19 +33,19 @@ describe('Dashboard entry request priority', () => {
   afterEach(() => { fixture.destroy(); backend.verify({ ignoreCancelled: true }); });
 
   function resolveCareer(phase = 'PRE_MATCH'): void {
-    backend.expectOne(`${api}/career/status`).flush({ ...status, careerPhase: phase });
+    backend.expectOne(`${api}/dashboard/entry`).flush({ user: { id: 'owner', username: 'Manager' }, careerStatus: { ...status, careerPhase: phase }, userStats: { matchesPlayed: 0, matchesWon: 0, matchesLost: 0, winPercentage: 0 } });
     fixture.detectChanges();
   }
   function resolveSecondaryReads(): void {
-    backend.expectOne(`${api}/auth/me`).flush({ id: 'owner', username: 'Manager' });
-    backend.expectOne(`${api}/dashboard/user-stats`).flush({ matchesPlayed: 0, matchesWon: 0, matchesLost: 0, winPercentage: 0 });
+    backend.expectNone(`${api}/auth/me`);
+    backend.expectNone(`${api}/dashboard/user-stats`);
     fixture.detectChanges();
   }
 
   it('requests only career state before enabling continue, without a fixture or squad prefetch', () => {
     fixture.detectChanges();
     expect(auth.getUserInfo).not.toHaveBeenCalled();
-    backend.expectNone(req => !req.url.endsWith('/career/status'));
+    backend.expectNone(req => !req.url.endsWith('/dashboard/entry'));
     resolveCareer();
     expect(fixture.nativeElement.textContent).toContain('Continuar carrera');
     expect(fixture.nativeElement.textContent).toContain('Fecha 1/34');
@@ -70,22 +71,16 @@ describe('Dashboard entry request priority', () => {
     backend.expectNone(req => req.url.includes('/fixtures'));
   });
 
-  it('cancels secondary transport when leaving the dashboard', () => {
-    fixture.detectChanges(); resolveCareer();
-    const profile = backend.expectOne(`${api}/auth/me`);
-    const stats = backend.expectOne(`${api}/dashboard/user-stats`);
+  it('cancels entry transport when leaving the dashboard', () => {
+    fixture.detectChanges();
+    const entry = backend.expectOne(`${api}/dashboard/entry`);
     fixture.destroy();
-    expect(profile.cancelled).toBeTrue();
-    expect(stats.cancelled).toBeTrue();
+    expect(entry.cancelled).toBeTrue();
   });
 
-  it('reuses a recent career response on returning instead of forcing another request', () => {
+  it('shares the returned career status with the next route without another request', () => {
     fixture.detectChanges(); resolveCareer(); resolveSecondaryReads();
-    fixture.destroy();
-    fixture = TestBed.createComponent(DashboardComponent);
-    fixture.detectChanges();
+    TestBed.inject(CareerService).getCareerStatus().subscribe(value => expect(value.careerId).toBe('career'));
     backend.expectNone(`${api}/career/status`);
-    expect(fixture.nativeElement.textContent).toContain('Continuar carrera');
-    resolveSecondaryReads();
   });
 });

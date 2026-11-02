@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, of } from 'rxjs';
 import { shareReplay, tap } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 import {
@@ -142,6 +142,7 @@ export class CareerService {
 
     const request$ = this.http.get<CareerStatus>(`${this.apiUrl}/status`).pipe(
       tap(status => {
+        if (this.careerStatusCache?.request$ !== request$) return;
         const key = status.careerId;
         if (key) {
           this.careerStatusSnapshots.set(key, { value: status, receivedAt: Date.now() });
@@ -159,6 +160,19 @@ export class CareerService {
     );
     this.careerStatusCache = { requestedAt: now, request$ };
     return request$;
+  }
+
+  /** Reuses the canonical status already returned by the dashboard entry read. */
+  seedCareerStatus(status: CareerStatus): void {
+    const receivedAt = Date.now();
+    this.careerStatusCache = { requestedAt: receivedAt, request$: of(status) };
+    if (status.careerId) {
+      this.careerStatusSnapshots.set(status.careerId, { value: status, receivedAt });
+      this.lastCareerStatusKey = status.careerId;
+    } else {
+      this.careerStatusSnapshots.clear();
+      this.lastCareerStatusKey = null;
+    }
   }
 
   /** Invalidates status after a command that can advance or replace a career. */

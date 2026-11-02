@@ -4,7 +4,7 @@ import { CommonModule } from '@angular/common';
 import { RouterLink, Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
-import { Observable, of, BehaviorSubject } from 'rxjs';
+import { Observable, of, BehaviorSubject, ReplaySubject, share } from 'rxjs';
 import { map, catchError, shareReplay, tap, filter, take, switchMap } from 'rxjs/operators';
 import { TeamService } from '../teams/services/team.service';
 import { MatchService } from '../matches/services/match.service';
@@ -13,7 +13,7 @@ import { ToastService } from '../../core/services/toast.service';
 import { environment } from '../../environments/environment';
 import { SessionPlayer } from '../../shared/models/player.model';
 import { PromotionsDialogComponent } from '../../components/promotions-dialog/promotions-dialog.component';
-import { PromotionResult } from '../../core/services/career.model';
+import { PromotionResult, CareerStatus as ApiCareerStatus } from '../../core/services/career.model';
 import { UserInfo } from '../../shared/models/auth.model';
 import { ConfirmActionDialogComponent } from '../../shared/components/confirm-action-dialog/confirm-action-dialog.component';
 import { readableErrorMessage } from '../../shared/utils/error-message';
@@ -32,6 +32,12 @@ interface WorldStatus {
   clubs: number;
   players: number;
   matches: number;
+}
+
+interface DashboardEntry {
+  user: UserInfo;
+  careerStatus: ApiCareerStatus;
+  userStats: UserStats;
 }
 
 interface CareerStatus {
@@ -152,11 +158,11 @@ export class DashboardComponent implements OnInit {
     this.loadDashboardData();
   }
 
-  private loadCareerStatus(forceRefresh = true): void {
+  private loadCareerStatus(forceRefresh = true, initialStatus$?: Observable<ApiCareerStatus>): void {
     if (forceRefresh) {
       this.careerService.invalidateCareerStatus();
     }
-    this.careerService.getCareerStatus().pipe(
+    (initialStatus$ ?? this.careerService.getCareerStatus()).pipe(
       map(status => {
         if (status && status.careerId) {
           return {
@@ -312,19 +318,26 @@ export class DashboardComponent implements OnInit {
   }
 
   loadDashboardData(): void {
-    // Catalog screens load their own metadata on demand. Hydrating the world
-    // here competed with the career and statistics needed by this screen.
-    this.user$ = this.afterCareerReady(() => this.authService.getUserInfo()).pipe(
+    // One owner-authenticated request loads the entire visible entry screen.
+    // The world catalog and fixtures are not part of this response.
+    const entry$ = this.http.get<DashboardEntry>(`${environment.apiUrl}/dashboard/entry`).pipe(
+      tap(entry => this.careerService.seedCareerStatus(entry.careerStatus)),
+      takeUntilDestroyed(this.destroyRef),
+      share({ connector: () => new ReplaySubject<DashboardEntry>(1), resetOnError: false,
+        resetOnComplete: false, resetOnRefCountZero: true })
+    );
+    this.user$ = entry$.pipe(
+      map(entry => entry.user),
       catchError(err => {
         return of(null);
       }),
       shareReplay({ bufferSize: 1, refCount: true })
     );
 
-    this.refreshUserStats();
-
+    this.userStats$ = entry$.pipe(map(entry => entry.userStats),
+      catchError(() => of({ matchesPlayed: 0, matchesWon: 0, matchesLost: 0, winPercentage: 0 })));
     this.refreshWorldStatus();
-    this.loadCareerStatus(false);
+    this.loadCareerStatus(false, entry$.pipe(map(entry => entry.careerStatus)));
   }
 
   private afterCareerReady<T>(load: () => Observable<T>): Observable<T> {

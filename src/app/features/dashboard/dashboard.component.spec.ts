@@ -16,6 +16,13 @@ import { PromotionResult } from '../../core/services/career.model';
 })
 class StubComponent {}
 
+function entryOrStatus(url: string, careerStatus: unknown): unknown {
+  return url.includes('/dashboard/entry') ? {
+    user: { id: 'user-1234', username: 'test', email: 'test@example.com' }, careerStatus,
+    userStats: { matchesPlayed: 0, matchesWon: 0, matchesLost: 0, winPercentage: 0 }
+  } : careerStatus;
+}
+
 describe('DashboardComponent — division and promotions state', () => {
   let component: DashboardComponent;
   let fixture: ComponentFixture<DashboardComponent>;
@@ -42,8 +49,8 @@ describe('DashboardComponent — division and promotions state', () => {
 
     // Default /career/status (no division, no promotions available).
     httpSpy.get.and.callFake(((url: string) => {
-      if (url.includes('/career/status')) {
-        return of({
+      if (url.includes('/career/status') || url.includes('/dashboard/entry')) {
+        return of(entryOrStatus(url, {
           careerId: CAREER_ID,
           userSessionTeamId: 'session-team-1',
           currentRound: 5,
@@ -51,7 +58,7 @@ describe('DashboardComponent — division and promotions state', () => {
           isFinished: false,
           careerPhase: 'WAITING_USER',
           season: SEASON
-        });
+        }));
       }
       if (url.includes('/career/players/squad')) return of([]);  // squadSubject must be an array
       if (url.includes('/dashboard/user-stats')) return of({ matchesPlayed: 0, matchesWon: 0, matchesLost: 0, winPercentage: 0 });
@@ -89,8 +96,8 @@ describe('DashboardComponent — division and promotions state', () => {
 
   it('renders user-division pill when careerStatus.userDivision is set', (done: DoneFn) => {
     httpSpy.get.and.callFake(((url: string) => {
-      if (url.includes('/career/status')) {
-        return of({
+      if (url.includes('/career/status') || url.includes('/dashboard/entry')) {
+        return of(entryOrStatus(url, {
           careerId: CAREER_ID,
           userSessionTeamId: 'session-team-1',
           currentRound: 5,
@@ -99,7 +106,7 @@ describe('DashboardComponent — division and promotions state', () => {
           careerPhase: 'WAITING_USER',
           season: SEASON,
           userDivision: 'SEGUNDA'
-        });
+        }));
       }
       if (url.includes('/career/players/squad')) return of([]);
       if (url.includes('/dashboard/user-stats')) return of({ matchesPlayed: 0, matchesWon: 0, matchesLost: 0, winPercentage: 0 });
@@ -119,7 +126,7 @@ describe('DashboardComponent — division and promotions state', () => {
 
   it('does not show create-career while career status is still loading', () => {
     httpSpy.get.and.callFake(((url: string) => {
-      if (url.includes('/career/status')) return NEVER;
+      if (url.includes('/career/status') || url.includes('/dashboard/entry')) return NEVER;
       if (url.includes('/career/players/squad')) return of([]);
       if (url.includes('/dashboard/user-stats')) return of({ matchesPlayed: 0, matchesWon: 0, matchesLost: 0, winPercentage: 0 });
       if (url.includes('/dashboard/world-status')) return of({ clubs: 0, players: 0, matches: 0 });
@@ -135,8 +142,8 @@ describe('DashboardComponent — division and promotions state', () => {
 
   it('hides user-division pill when careerStatus.userDivision is null', (done: DoneFn) => {
     httpSpy.get.and.callFake(((url: string) => {
-      if (url.includes('/career/status')) {
-        return of({
+      if (url.includes('/career/status') || url.includes('/dashboard/entry')) {
+        return of(entryOrStatus(url, {
           careerId: CAREER_ID,
           userSessionTeamId: null,
           currentRound: 1,
@@ -145,7 +152,7 @@ describe('DashboardComponent — division and promotions state', () => {
           careerPhase: 'WAITING_USER',
           season: SEASON,
           userDivision: null
-        });
+        }));
       }
       if (url.includes('/career/players/squad')) return of([]);
       if (url.includes('/dashboard/user-stats')) return of({ matchesPlayed: 0, matchesWon: 0, matchesLost: 0, winPercentage: 0 });
@@ -163,8 +170,8 @@ describe('DashboardComponent — division and promotions state', () => {
 
   it('renders lower-division labels verbatim with tier-default fallback', (done: DoneFn) => {
     httpSpy.get.and.callFake(((url: string) => {
-      if (url.includes('/career/status')) {
-        return of({
+      if (url.includes('/career/status') || url.includes('/dashboard/entry')) {
+        return of(entryOrStatus(url, {
           careerId: CAREER_ID,
           userSessionTeamId: 'session-team-1',
           currentRound: 5,
@@ -173,7 +180,7 @@ describe('DashboardComponent — division and promotions state', () => {
           careerPhase: 'WAITING_USER',
           season: SEASON,
           userDivision: 'CUARTA'
-        });
+        }));
       }
       if (url.includes('/career/players/squad')) return of([]);
       if (url.includes('/dashboard/user-stats')) return of({ matchesPlayed: 0, matchesWon: 0, matchesLost: 0, winPercentage: 0 });
@@ -243,8 +250,8 @@ describe('DashboardComponent — division and promotions state', () => {
     localStorage.setItem(`c55.phase4.viewedSeason.${CAREER_ID}`, String(SEASON));
 
     httpSpy.get.and.callFake(((url: string) => {
-      if (url.includes('/career/status')) {
-        return of({
+      if (url.includes('/career/status') || url.includes('/dashboard/entry')) {
+        return of(entryOrStatus(url, {
           careerId: CAREER_ID,
           userSessionTeamId: 'session-team-1',
           currentRound: 38,
@@ -254,7 +261,7 @@ describe('DashboardComponent — division and promotions state', () => {
           season: SEASON,
           userDivision: 'PRIMERA',
           promotionsAvailable: true
-        });
+        }));
       }
       if (url.includes('/career/promotions')) return of([]);
       if (url.includes('/career/players/squad')) return of([]);
@@ -272,8 +279,8 @@ describe('DashboardComponent — division and promotions state', () => {
 
   it('does not open promotions dialog when /career/promotions returns an empty list', (done: DoneFn) => {
     httpSpy.get.and.callFake(((url: string) => {
-      if (url.includes('/career/status')) {
-        return of({
+      if (url.includes('/career/status') || url.includes('/dashboard/entry')) {
+        return of(entryOrStatus(url, {
           careerId: CAREER_ID,
           userSessionTeamId: 'session-team-1',
           currentRound: 38,
@@ -283,7 +290,7 @@ describe('DashboardComponent — division and promotions state', () => {
           season: SEASON,
           userDivision: 'PRIMERA',
           promotionsAvailable: true
-        });
+        }));
       }
       if (url.includes('/career/promotions')) return of([]); // engine says no movements
       if (url.includes('/career/players/squad')) return of([]);
@@ -301,8 +308,8 @@ describe('DashboardComponent — division and promotions state', () => {
 
   it('does not open promotions dialog when promotionsAvailable=false', (done: DoneFn) => {
     httpSpy.get.and.callFake(((url: string) => {
-      if (url.includes('/career/status')) {
-        return of({
+      if (url.includes('/career/status') || url.includes('/dashboard/entry')) {
+        return of(entryOrStatus(url, {
           careerId: CAREER_ID,
           userSessionTeamId: 'session-team-1',
           currentRound: 5,
@@ -312,7 +319,7 @@ describe('DashboardComponent — division and promotions state', () => {
           season: SEASON,
           userDivision: 'PRIMERA',
           promotionsAvailable: false
-        });
+        }));
       }
       if (url.includes('/career/players/squad')) return of([]);
       if (url.includes('/dashboard/user-stats')) return of({ matchesPlayed: 0, matchesWon: 0, matchesLost: 0, winPercentage: 0 });
@@ -329,8 +336,8 @@ describe('DashboardComponent — division and promotions state', () => {
 
   it('does not crash when /career/promotions fails', (done: DoneFn) => {
     httpSpy.get.and.callFake(((url: string) => {
-      if (url.includes('/career/status')) {
-        return of({
+      if (url.includes('/career/status') || url.includes('/dashboard/entry')) {
+        return of(entryOrStatus(url, {
           careerId: CAREER_ID,
           userSessionTeamId: 'session-team-1',
           currentRound: 38,
@@ -340,7 +347,7 @@ describe('DashboardComponent — division and promotions state', () => {
           season: SEASON,
           userDivision: 'PRIMERA',
           promotionsAvailable: true
-        });
+        }));
       }
       if (url.includes('/career/promotions')) return throwError(() => ({ status: 500 }));
       if (url.includes('/career/players/squad')) return of([]);
@@ -358,8 +365,8 @@ describe('DashboardComponent — division and promotions state', () => {
 
   it('re-fetches dependent datasets when careerPhase changes to POST_SEASON', (done: DoneFn) => {
     httpSpy.get.and.callFake(((url: string) => {
-      if (url.includes('/career/status')) {
-        return of({
+      if (url.includes('/career/status') || url.includes('/dashboard/entry')) {
+        return of(entryOrStatus(url, {
           careerId: CAREER_ID,
           userSessionTeamId: 'session-team-1',
           currentRound: 38,
@@ -368,7 +375,7 @@ describe('DashboardComponent — division and promotions state', () => {
           careerPhase: 'WAITING_USER',
           season: SEASON,
           userDivision: 'PRIMERA'
-        });
+        }));
       }
       if (url.includes('/career/players/squad')) return of([]);
       if (url.includes('/dashboard/user-stats')) return of({ matchesPlayed: 0, matchesWon: 0, matchesLost: 0, winPercentage: 0 });
@@ -387,13 +394,13 @@ describe('DashboardComponent — division and promotions state', () => {
       const worldStatusCallsBefore = httpSpy.get.calls.allArgs().filter(a => String(a[0]).includes('/dashboard/world-status')).length;
 
       expect(squadCallsBefore).toBeGreaterThanOrEqual(1, 'initial load must fetch squad');
-      expect(userStatsCallsBefore).toBeGreaterThanOrEqual(1, 'initial load must fetch user-stats');
+      expect(userStatsCallsBefore).toBe(0, 'entry already includes user stats');
       expect(worldStatusCallsBefore).toBeGreaterThanOrEqual(1, 'initial load must fetch world-status');
 
       // SECOND emission: POST_SEASON (season just ended).
       httpSpy.get.and.callFake(((url: string) => {
-        if (url.includes('/career/status')) {
-          return of({
+        if (url.includes('/career/status') || url.includes('/dashboard/entry')) {
+          return of(entryOrStatus(url, {
             careerId: CAREER_ID,
             userSessionTeamId: 'session-team-1',
             currentRound: 38,
@@ -402,7 +409,7 @@ describe('DashboardComponent — division and promotions state', () => {
             careerPhase: 'POST_SEASON',
             season: SEASON,
             userDivision: 'PRIMERA'
-          });
+          }));
         }
         if (url.includes('/career/players/squad')) return of([]);
         if (url.includes('/dashboard/user-stats')) return of({ matchesPlayed: 38, matchesWon: 25, matchesLost: 6, winPercentage: 65 });
@@ -434,8 +441,8 @@ describe('DashboardComponent — division and promotions state', () => {
 
   it('re-fetches dependent datasets when season changes after career continue', (done: DoneFn) => {
     httpSpy.get.and.callFake(((url: string) => {
-      if (url.includes('/career/status')) {
-        return of({
+      if (url.includes('/career/status') || url.includes('/dashboard/entry')) {
+        return of(entryOrStatus(url, {
           careerId: CAREER_ID,
           userSessionTeamId: 'session-team-1',
           currentRound: 38,
@@ -444,7 +451,7 @@ describe('DashboardComponent — division and promotions state', () => {
           careerPhase: 'POST_SEASON',
           season: 1,
           userDivision: 'PRIMERA'
-        });
+        }));
       }
       if (url.includes('/career/players/squad')) return of([]);
       if (url.includes('/dashboard/user-stats')) return of({ matchesPlayed: 38, matchesWon: 20, matchesLost: 8, winPercentage: 52 });
@@ -459,8 +466,8 @@ describe('DashboardComponent — division and promotions state', () => {
 
       // SECOND emission: season 2 (post-/career/continue).
       httpSpy.get.and.callFake(((url: string) => {
-        if (url.includes('/career/status')) {
-          return of({
+        if (url.includes('/career/status') || url.includes('/dashboard/entry')) {
+          return of(entryOrStatus(url, {
             careerId: CAREER_ID,
             userSessionTeamId: 'session-team-1',
             currentRound: 1,
@@ -469,7 +476,7 @@ describe('DashboardComponent — division and promotions state', () => {
             careerPhase: 'PRE_MATCH',
             season: 2,
             userDivision: 'SEGUNDA'  // promoted/relegated tier
-          });
+          }));
         }
         if (url.includes('/career/players/squad')) return of([]);
         if (url.includes('/dashboard/user-stats')) return of({ matchesPlayed: 0, matchesWon: 0, matchesLost: 0, winPercentage: 0 });
@@ -500,8 +507,8 @@ describe('DashboardComponent — division and promotions state', () => {
     // backend traffic on every poll.
 
     httpSpy.get.and.callFake(((url: string) => {
-      if (url.includes('/career/status')) {
-        return of({
+      if (url.includes('/career/status') || url.includes('/dashboard/entry')) {
+        return of(entryOrStatus(url, {
           careerId: CAREER_ID,
           userSessionTeamId: 'session-team-1',
           currentRound: 5,
@@ -510,7 +517,7 @@ describe('DashboardComponent — division and promotions state', () => {
           careerPhase: 'WAITING_USER',
           season: SEASON,
           userDivision: 'PRIMERA'
-        });
+        }));
       }
       if (url.includes('/career/players/squad')) return of([]);
       if (url.includes('/dashboard/user-stats')) return of({ matchesPlayed: 0, matchesWon: 0, matchesLost: 0, winPercentage: 0 });

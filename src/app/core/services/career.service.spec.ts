@@ -72,6 +72,17 @@ describe('CareerService round fixture cache', () => {
     http.expectNone('/api/v1/career/status');
   });
 
+  it('does not let an older pending read replace status returned by entry', () => {
+    const current = { careerId: 'career-1', currentRound: 2, totalRounds: 34, careerPhase: 'PRE_MATCH' } as any;
+    service.getCareerStatus().subscribe();
+    const pending = http.expectOne('/api/v1/career/status');
+    service.seedCareerStatus(current);
+    pending.flush({ ...current, currentRound: 1 });
+    expect(service.getCareerStatusSnapshot()?.value).toEqual(current);
+    service.getCareerStatus().subscribe(value => expect(value).toEqual(current));
+    http.expectNone('/api/v1/career/status');
+  });
+
   it('exposes a completed fixture snapshot without starting another request', () => {
     const fixtures = { round: 4, matches: [], byeTeam: null };
     service.getFixturesByRoundWithBye(4).subscribe();

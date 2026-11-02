@@ -117,51 +117,34 @@
     </div>
   </section>
 
-  <!-- Mundo -->
-  @defer (on viewport) {
+  <!-- Mundo: observe the cards only after the visible entry has its final layout. -->
   <section class="stats-section">
     <h2 class="section-title">🌍 ESTADO DEL MUNDO</h2>
-    <div class="stats-grid world-stats" *ngIf="worldStatus$ | async as worldStatus; else loadingWorldStatus">
-      <div class="stat-card">
-        <div class="stat-value">{{worldStatus.clubs}}</div>
-        <div class="stat-label">Clubes</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value">{{worldStatus.players}}</div>
-        <div class="stat-label">Jugadores</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value">{{worldStatus.matches}}</div>
-        <div class="stat-label">Partidos</div>
-      </div>
-    </div>
+    @if (userStats$ | async) {
+      @defer (on viewport) {
+        <div class="stats-grid world-stats" *ngIf="worldStatus$ | async as worldStatus; else loadingWorldStatus">
+          <div class="stat-card"><div class="stat-value">{{worldStatus.clubs}}</div><div class="stat-label">Clubes</div></div>
+          <div class="stat-card"><div class="stat-value">{{worldStatus.players}}</div><div class="stat-label">Jugadores</div></div>
+          <div class="stat-card"><div class="stat-value">{{worldStatus.matches}}</div><div class="stat-label">Partidos</div></div>
+        </div>
+      } @placeholder {
+        <div class="stats-grid world-stats" aria-busy="true">
+          <div class="stat-card"><div class="skeleton-loader"></div><div class="stat-label">Clubes</div></div>
+          <div class="stat-card"><div class="skeleton-loader"></div><div class="stat-label">Jugadores</div></div>
+          <div class="stat-card"><div class="skeleton-loader"></div><div class="stat-label">Partidos</div></div>
+        </div>
+      }
+    } @else {
+      <ng-container *ngTemplateOutlet="loadingWorldStatus"></ng-container>
+    }
     <ng-template #loadingWorldStatus>
-      <div class="stats-grid world-stats">
-        <div class="stat-card">
-          <div class="skeleton-loader"></div>
-          <div class="stat-label">Clubes</div>
-        </div>
-        <div class="stat-card">
-          <div class="skeleton-loader"></div>
-          <div class="stat-label">Jugadores</div>
-        </div>
-        <div class="stat-card">
-          <div class="skeleton-loader"></div>
-          <div class="stat-label">Partidos</div>
-        </div>
-      </div>
-    </ng-template>
-  </section>
-  } @placeholder {
-    <section class="stats-section" aria-label="Estado del mundo">
-      <h2 class="section-title">🌍 ESTADO DEL MUNDO</h2>
       <div class="stats-grid world-stats" aria-busy="true">
         <div class="stat-card"><div class="skeleton-loader"></div><div class="stat-label">Clubes</div></div>
         <div class="stat-card"><div class="skeleton-loader"></div><div class="stat-label">Jugadores</div></div>
         <div class="stat-card"><div class="skeleton-loader"></div><div class="stat-label">Partidos</div></div>
       </div>
-    </section>
-  }
+    </ng-template>
+  </section>
 
   <!-- Acciones -->
   <section class="actions-section">
