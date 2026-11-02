@@ -3,8 +3,8 @@
   <div class="random-section">
     <h3>🎲 Generar jugadores aleatorios</h3>
     <div class="random-controls">
-      <label>Cantidad de jugadores? (Max {{ MAX_RANDOM_PLAYERS }})</label>
-      <input type="number" [(ngModel)]="randomCount" min="1" [max]="MAX_RANDOM_PLAYERS" class="form-control-inline" />
+      <label for="random-player-count">Cantidad de jugadores (máximo {{ MAX_RANDOM_PLAYERS }})</label>
+      <input id="random-player-count" type="number" [(ngModel)]="randomCount" min="1" [max]="MAX_RANDOM_PLAYERS" class="form-control-inline" />
       <button type="button" (click)="createRandomBatch()" class="btn-random">
         Generar {{ randomCount }} jugador{{ randomCount > 1 ? 'es' : '' }} aleatorio{{ randomCount > 1 ? 's' : '' }}
       </button>
@@ -24,17 +24,17 @@
   <form [formGroup]="playerForm" (ngSubmit)="onSubmit()">
     <div class="row">
       <div class="form-group">
-        <label>Nombre *</label>
-        <input type="text" formControlName="name" class="form-control" />
+        <label for="player-name">Nombre *</label>
+        <input type="text" id="player-name" formControlName="name" class="form-control" />
       </div>
       <div class="form-group">
-        <label>Edad *</label>
-        <input type="number" formControlName="age" class="form-control" />
+        <label for="player-age">Edad *</label>
+        <input type="number" id="player-age" formControlName="age" class="form-control" />
       </div>
     </div>
     <div class="form-group">
-      <label>Posicion *</label>
-      <select formControlName="position" class="form-control">
+      <label for="player-position">Posicion *</label>
+      <select id="player-position" formControlName="position" class="form-control">
         <option value="GK">Arquero</option>
         <option value="DEF">Defensor</option>
         <option value="MID">Mediocampista</option>
@@ -44,28 +44,28 @@
     </div>
     <div class="stats-grid">
       <div class="form-group">
-        <label>Ataque (40-90)</label>
-        <input type="number" formControlName="attack" class="form-control" min="40" max="90" />
+        <label for="player-attack">Ataque (40-90)</label>
+        <input type="number" id="player-attack" formControlName="attack" class="form-control" min="40" max="90" />
       </div>
       <div class="form-group">
-        <label>Defensa (40-90)</label>
-        <input type="number" formControlName="defense" class="form-control" min="40" max="90" />
+        <label for="player-defense">Defensa (40-90)</label>
+        <input type="number" id="player-defense" formControlName="defense" class="form-control" min="40" max="90" />
       </div>
       <div class="form-group">
-        <label>Tecnica (40-90)</label>
-        <input type="number" formControlName="technique" class="form-control" min="40" max="90" />
+        <label for="player-technique">Tecnica (40-90)</label>
+        <input type="number" id="player-technique" formControlName="technique" class="form-control" min="40" max="90" />
       </div>
       <div class="form-group">
-        <label>Velocidad (40-90)</label>
-        <input type="number" formControlName="speed" class="form-control" min="40" max="90" />
+        <label for="player-speed">Velocidad (40-90)</label>
+        <input type="number" id="player-speed" formControlName="speed" class="form-control" min="40" max="90" />
       </div>
       <div class="form-group">
-        <label>Resistencia (40-90)</label>
-        <input type="number" formControlName="stamina" class="form-control" min="40" max="90" />
+        <label for="player-stamina">Resistencia (40-90)</label>
+        <input type="number" id="player-stamina" formControlName="stamina" class="form-control" min="40" max="90" />
       </div>
       <div class="form-group">
-        <label>Mentalidad (40-90)</label>
-        <input type="number" formControlName="mentality" class="form-control" min="40" max="90" />
+        <label for="player-mentality">Mentalidad (40-90)</label>
+        <input type="number" id="player-mentality" formControlName="mentality" class="form-control" min="40" max="90" />
       </div>
     </div>
     <div class="actions">
