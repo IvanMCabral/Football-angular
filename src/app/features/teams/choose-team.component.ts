@@ -126,7 +126,7 @@ export class ChooseTeamComponent implements AfterViewChecked, OnDestroy, OnInit 
       next: () => {
         this.successMessage = '¡Equipo asignado correctamente!';
         this.saving = false;
-        this.router.navigate(['/dashboard']);
+        this.router.navigate(['/careers']);
       },
       error: (err) => {
         this.errorMessage = 'No se pudo asignar el equipo.';

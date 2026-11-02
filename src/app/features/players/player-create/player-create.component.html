@@ -70,7 +70,7 @@
     </div>
     <div class="actions">
       <button type="submit" [disabled]="!playerForm.valid || loading">{{ loading ? 'Creando...' : 'Crear jugador' }}</button>
-      <a routerLink="/dashboard" class="btn-cancel">Volver al inicio</a>
+      <a routerLink="/careers" class="btn-cancel">Volver a Carreras</a>
     </div>
   </form>
   <div *ngIf="errorMessage" class="error">{{ errorMessage }}</div>

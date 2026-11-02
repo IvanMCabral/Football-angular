@@ -11,7 +11,7 @@
   <div class="page-header">
     <div class="header-left">
       <h1>⚽ Mi equipo</h1>
-      <a routerLink="/dashboard" class="btn-back">← Volver</a>
+      <a routerLink="/careers" class="btn-back">← Volver</a>
     </div>
 
 
@@ -34,7 +34,7 @@
 
   <div *ngIf="!(loading$ | async) && !(careerStatus$ | async)" class="warning">
     ⚠️ No hay una carrera activa. Primero crea una carrera.
-    <a routerLink="/dashboard" class="btn-link">Ir al inicio</a>
+    <a routerLink="/careers" class="btn-link">Ir a Carreras</a>
   </div>
 
 

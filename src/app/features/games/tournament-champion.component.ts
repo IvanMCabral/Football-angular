@@ -150,7 +150,7 @@ export class TournamentChampionComponent implements OnInit {
   }
 
   backToDashboard() {
-    this.router.navigate(['/dashboard']);
+    this.router.navigate(['/careers']);
   }
 
   continueToNewSeason() {

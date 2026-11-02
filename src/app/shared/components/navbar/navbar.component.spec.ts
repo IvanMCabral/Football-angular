@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { BehaviorSubject } from 'rxjs';
 import { AuthService, AuthStatus } from '../../../core/services/auth.service';
 import { NavbarComponent } from './navbar.component';
@@ -50,12 +50,22 @@ describe('NavbarComponent initial session resolution', () => {
     expect(toggle.getAttribute('aria-expanded')).toBe('true');
   });
 
-  it('provides the core management destinations and closes the menu with Escape', () => {
+  it('separates the lobby from careers and closes the menu with Escape', () => {
     authStatus.next('authenticated'); fixture.detectChanges();
     const links = [...fixture.nativeElement.querySelectorAll('a.nav-link')].map((a: any) => a.getAttribute('href'));
-    expect(links).toEqual(['/dashboard','/squad','/matches','/standings','/teams']);
+    expect(links).toEqual(['/dashboard','/careers']);
+    expect(fixture.nativeElement.querySelector('.career-navigation')).toBeNull();
     fixture.componentInstance.toggleMenu(); fixture.detectChanges();
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })); fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('.navbar-toggle').getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('shows team management only inside the career section', () => {
+    spyOnProperty(TestBed.inject(Router), 'url', 'get').and.returnValue('/squad');
+    authStatus.next('authenticated'); fixture.detectChanges();
+    const links = [...fixture.nativeElement.querySelectorAll('.career-navigation a')]
+      .map((a: any) => a.getAttribute('href'));
+    expect(links).toEqual(['/careers', '/squad', '/matches', '/standings', '/teams']);
+    expect(fixture.nativeElement.querySelector('a[href="/careers"].nav-link').classList).toContain('active');
   });
 });

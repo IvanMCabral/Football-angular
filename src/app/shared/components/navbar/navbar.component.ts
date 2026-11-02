@@ -20,6 +20,10 @@ export class NavbarComponent implements OnInit {
   authStatus$ = this.authService.authStatus$;
   menuOpen = false;
 
+  get isCareerSection(): boolean {
+    return /^\/(careers|career|squad|matches|standings|teams|players|games|choose-team)(\/|[?#]|$)/.test(this.router.url);
+  }
+
   ngOnInit(): void {
     this.router.events.pipe(filter(event => event instanceof NavigationEnd), takeUntilDestroyed(this.destroyRef))
       .subscribe(() => this.closeMenu());

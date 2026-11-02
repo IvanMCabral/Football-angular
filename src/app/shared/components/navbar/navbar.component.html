@@ -15,11 +15,8 @@
     <div id="main-navigation" class="navbar-menu" [class.active]="menuOpen">
       @if (authStatus$ | async; as authStatus) {
         @if (authStatus === 'authenticated') {
-        <a routerLink="/dashboard" routerLinkActive="active" ariaCurrentWhenActive="page" class="nav-link" (click)="closeMenu()">Inicio</a>
-        <a routerLink="/squad" routerLinkActive="active" ariaCurrentWhenActive="page" class="nav-link" (click)="closeMenu()">Mi equipo</a>
-        <a routerLink="/matches" routerLinkActive="active" ariaCurrentWhenActive="page" class="nav-link" (click)="closeMenu()">Calendario</a>
-        <a routerLink="/standings" routerLinkActive="active" ariaCurrentWhenActive="page" class="nav-link" (click)="closeMenu()">Tabla</a>
-        <a routerLink="/teams" routerLinkActive="active" [routerLinkActiveOptions]="{exact:true}" ariaCurrentWhenActive="page" class="nav-link" (click)="closeMenu()">Clubes</a>
+        <a routerLink="/dashboard" routerLinkActive="active" [routerLinkActiveOptions]="{exact:true}" ariaCurrentWhenActive="page" class="nav-link" (click)="closeMenu()">Lobby</a>
+        <a routerLink="/careers" [class.active]="isCareerSection" [attr.aria-current]="isCareerSection ? 'location' : null" class="nav-link" (click)="closeMenu()">Carreras</a>
         <button (click)="logout()" class="nav-button logout">Salir</button>
         } @else if (authStatus === 'anonymous') {
         <a routerLink="/login" routerLinkActive="active" class="nav-link">Ingresar</a>
@@ -31,3 +28,12 @@
     </div>
   </div>
 </nav>
+@if ((authStatus$ | async) === 'authenticated' && isCareerSection) {
+  <nav class="career-navigation" aria-label="Navegación de Carreras">
+    <a routerLink="/careers" routerLinkActive="active" [routerLinkActiveOptions]="{exact:true}" ariaCurrentWhenActive="page">Mi carrera</a>
+    <a routerLink="/squad" routerLinkActive="active" ariaCurrentWhenActive="page">Mi equipo</a>
+    <a routerLink="/matches" routerLinkActive="active" ariaCurrentWhenActive="page">Calendario</a>
+    <a routerLink="/standings" routerLinkActive="active" ariaCurrentWhenActive="page">Tabla</a>
+    <a routerLink="/teams" routerLinkActive="active" ariaCurrentWhenActive="page">Clubes</a>
+  </nav>
+}

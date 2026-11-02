@@ -195,6 +195,9 @@
 }
 
 /* Compact game navigation shared by every screen. */
+.career-navigation { display: flex; flex-wrap: wrap; gap: .3rem; justify-content: center; padding: .4rem .75rem; background: #1b2940; border-bottom: 1px solid #34445e; }
+.career-navigation a { color: #bdcada; padding: .7rem .8rem; min-height: 44px; border-radius: 5px; text-decoration: none; font-size: .9rem; }
+.career-navigation a:hover, .career-navigation a.active { background: #304763; color: #fff; }
 .navbar-container { gap: 1rem; padding-block: .65rem; }
 .navbar-menu { gap: .25rem; }
 .nav-link { padding: .55rem .7rem; white-space: nowrap; }

@@ -20,6 +20,13 @@ export const routes: Routes = [
   },
   {
     path: 'dashboard',
+    loadComponent: () => import('./features/lobby/lobby.component')
+      .then((m) => m.LobbyComponent),
+    canActivate: guarded,
+  },
+  { path: 'lobby', redirectTo: '/dashboard', pathMatch: 'full' },
+  {
+    path: 'careers',
     loadComponent: () => import('./features/dashboard/dashboard.component')
       .then((m) => m.DashboardComponent),
     canActivate: guarded,
