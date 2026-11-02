@@ -214,3 +214,16 @@
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(72, 187, 120, 0.4);
 }
+
+.table-container { max-width: 100%; }
+@media (max-width: 600px) {
+  .champion-container { padding: 1rem; }
+  .champion-banner { padding: 1.5rem .5rem; }
+  .champion-banner h1 { font-size: 1.8rem; }
+  .final-standings-section { padding: 1rem; min-width: 0; }
+  .podium { padding: 0; flex-direction: column; align-items: stretch; }
+  .podium-place, .podium-place.first { min-width: 0; transform: none; }
+  .podium-place.first { order: -1; }
+  .champion-stats { flex-wrap: wrap; }
+  .actions .btn { flex: 1 1 100%; }
+}

@@ -70,27 +70,16 @@
         <span class="meta-dot">·</span>
         <span class="meta-item">Temporada {{ detail.seasonNumber }}</span>
         <span class="meta-dot">·</span>
-        <span class="badge badge-detailed-engine">Motor de partido detallado</span>
+        <span class="badge badge-detailed-engine">Informe del partido</span>
       </div>
       <div class="match-nav">
-        <button type="button" class="btn-nav btn-nav-prev" disabled
-                aria-label="Partido anterior no disponible todavía"
-                title="Próximamente">← Partido anterior</button>
-        <button type="button" class="btn-nav btn-nav-substitute"
-                (click)="openSubstitutionDialog()"
-                aria-label="Sustituir jugador"
-                title="Sustituir jugador con datos reales del partido">
-          Sustituir
-        </button>
+        <a [routerLink]="['/games', careerId, 'round', detail.round, 'summary']" class="btn-nav">Resumen de fecha</a>
         <a [routerLink]="['/careers', careerId, 'matches', matchId, 'compare']"
            class="btn-nav btn-nav-compare"
            aria-label="Comparar simulación base con resultado final"
            title="La simulación base puede diferir del resultado final registrado">
           Comparar base / final
         </a>
-        <button type="button" class="btn-nav btn-nav-next" disabled
-                aria-label="Partido siguiente no disponible todavía"
-                title="Próximamente">Partido siguiente →</button>
       </div>
     </div>
 

@@ -69,7 +69,14 @@ export class TournamentChampionComponent implements OnInit {
         // Solo es modo career si hay un careerId válido
         if (status && status.careerId) {
           this.isCareerMode = true;
-          this.loadChampionFromCareer();
+          if (status.careerId !== this.gameId) {
+            this.errorMsg = 'Esta temporada no corresponde a tu carrera activa.';
+            this.cdr.markForCheck();
+            return;
+          }
+          if (status.careerPhase === 'FINISHED' || status.careerPhase === 'POST_SEASON') {
+            this.loadChampionFromCareer();
+          }
           this.loadStandingsFromCareer();
         } else {
           this.isCareerMode = false;

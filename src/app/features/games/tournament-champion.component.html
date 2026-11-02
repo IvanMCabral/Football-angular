@@ -1,7 +1,7 @@
 <div class="champion-container">
   <div class="champion-banner">
     <div class="trophy-animation">🏆</div>
-    <h1>¡Torneo Finalizado!</h1>
+    <h1>{{ champion ? '¡Torneo finalizado!' : 'Resumen de temporada' }}</h1>
     <div class="champion-card" *ngIf="champion">
       <div class="champion-badge">CAMPEÓN</div>
       <h2>{{ champion.teamName }}</h2>
@@ -20,13 +20,14 @@
         </div>
       </div>
     </div>
-    <div *ngIf="!champion && !errorMsg" class="loading">Cargando campeón...</div>
+    <div *ngIf="isCareerMode && careerPhase && careerPhase !== 'FINISHED' && careerPhase !== 'POST_SEASON' && !errorMsg" class="loading">La temporada sigue en juego. El campeón se confirma al finalizar todas las fechas.</div>
+    <div *ngIf="!champion && !errorMsg && (!isCareerMode || careerPhase === 'FINISHED' || careerPhase === 'POST_SEASON')" class="loading">Cargando campeón...</div>
     <div *ngIf="errorMsg" class="error">{{ errorMsg }}</div>
   </div>
 
   <div class="final-standings-section">
-    <h3>🏆 Clasificación Final</h3>
-    <div class="podium" *ngIf="standings.length >= 3">
+    <h3>{{ champion ? '🏆 Clasificación final' : 'Tabla de posiciones' }}</h3>
+    <div class="podium" *ngIf="champion && standings.length >= 3">
       <div class="podium-place second">
         <div class="medal">🥈</div>
         <div class="place-number">2°</div>
@@ -64,12 +65,12 @@
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let standing of standings; let i = index" [class.champion-row]="i === 0">
+          <tr *ngFor="let standing of standings; let i = index" [class.champion-row]="!!champion && i === 0">
             <td class="position">
-              <span *ngIf="i === 0">🏆</span>
-              <span *ngIf="i === 1">🥈</span>
-              <span *ngIf="i === 2">🥉</span>
-              <span *ngIf="i > 2">{{ i + 1 }}</span>
+              <span *ngIf="champion && i === 0">🏆</span>
+              <span *ngIf="champion && i === 1">🥈</span>
+              <span *ngIf="champion && i === 2">🥉</span>
+              <span *ngIf="!champion || i > 2">{{ i + 1 }}</span>
             </td>
             <td class="team-name">{{ standing.teamName }}</td>
             <td>{{ standing.played }}</td>

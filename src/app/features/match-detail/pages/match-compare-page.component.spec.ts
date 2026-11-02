@@ -52,8 +52,8 @@ describe('MatchComparePageComponent', () => {
     expect(component.error).toBe('');
 
     const html = fixture.nativeElement.textContent;
-    expect(html).toContain('Baseline');
-    expect(html).toContain('Live');
+    expect(html).toContain('Simulación base');
+    expect(html).toContain('Resultado final');
     expect(html).toContain('Comparaci\u00f3n de partido');
   });
 

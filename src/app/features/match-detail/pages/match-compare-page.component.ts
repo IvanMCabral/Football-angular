@@ -36,7 +36,7 @@ interface TimelineCompareRow {
         <a (click)="navigateBack()" class="back-link">
           ← Volver al detalle
         </a>
-        <h1 class="compare-title">🔄 Comparación de partido: baseline vs live</h1>
+        <h1 class="compare-title">🔄 Comparación de partido: simulación base y resultado final</h1>
         <p *ngIf="comparison" class="compare-subtitle">
           {{ comparison.baseline.homeTeamName }} vs {{ comparison.baseline.awayTeamName }}
           · Temporada {{ comparison.baseline.seasonNumber }} · Fecha {{ comparison.baseline.round }}
@@ -54,9 +54,9 @@ interface TimelineCompareRow {
               <thead>
                 <tr>
                   <th></th>
-                  <th class="col-baseline">Baseline</th>
+                  <th class="col-baseline">Simulación base</th>
                   <th>Δ</th>
-                  <th class="col-live">Live</th>
+                  <th class="col-live">Resultado final</th>
                 </tr>
               </thead>
               <tbody>
@@ -139,29 +139,29 @@ interface TimelineCompareRow {
           </section>
 
           <section class="timeline-section">
-            <h2>⏱️ Timeline profesional (bloques de 5 min)</h2>
+            <h2>⏱️ Evolución del partido (tramos de 5 minutos)</h2>
             <p class="timeline-hint">
-              Lectura por tramo: eventos, xG y dominio. No matchea jugador por jugador porque el engine consume draws distintos en cada corrida.
+              Compará eventos, ocasiones y dominio por tramo. Cada simulación puede generar jugadas diferentes, por eso los eventos se agrupan cada cinco minutos.
             </p>
             <div class="timeline-grid">
               <div *ngFor="let row of timelineRows(comparison)" class="timeline-row" [class.quiet-row]="row.quiet">
                 <div class="bucket-label">{{ row.label }}</div>
                 <div class="bucket-side">
-                  <strong>Baseline</strong>
+                  <strong>Simulación base</strong>
                   <span>{{ row.baselineSummary }}</span>
                 </div>
                 <div class="bucket-delta" [class]="deltaClass(row.xgDeltaHome + row.xgDeltaAway)">
                   ΔxG {{ formatDelta(row.xgDeltaHome, 2) }} / {{ formatDelta(row.xgDeltaAway, 2) }}
                 </div>
                 <div class="bucket-side live-side">
-                  <strong>Live</strong>
+                  <strong>Resultado final</strong>
                   <span>{{ row.liveSummary }}</span>
                 </div>
               </div>
             </div>
             <div class="timeline-legend">
-              <span class="legend-base">baseline</span>
-              <span class="legend-live">live</span>
+              <span class="legend-base">Simulación base</span>
+              <span class="legend-live">Resultado final</span>
               <span>G gol · T tiro · C chance · Y amarilla · R roja · S cambio</span>
             </div>
           </section>
