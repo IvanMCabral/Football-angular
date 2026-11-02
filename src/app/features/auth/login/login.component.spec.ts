@@ -50,7 +50,6 @@ describe('LoginComponent resilient request lifecycle', () => {
       providers: [
         { provide: AuthService, useValue: authService },
         { provide: LOGIN_SLOW_NOTICE_DELAY_MS, useValue: 12_000 },
-        { provide: LOGIN_RECOVERY_DELAY_MS, useValue: 45_000 },
         provideRouter([])
       ]
     }).compileComponents();
@@ -132,11 +131,11 @@ describe('LoginComponent resilient request lifecycle', () => {
     expect(authService.login).toHaveBeenCalledTimes(1);
   }));
 
-  it('offers recovery at exactly 45s, not at 44.999s, and cancels once at 45.001s', () => withFakeClock(() => {
+  it('offers recovery at exactly 180s and ignores the cancelled response', () => withFakeClock(() => {
     const request = new Subject<AuthResponse>();
     authService.login.and.returnValue(request.asObservable());
     submitButton().click();
-    jasmine.clock().tick(44_999);
+    jasmine.clock().tick(179_999);
     expect(component.uiState).toBe('SLOW');
     jasmine.clock().tick(1);
     expect(component.uiState).toBe('RECOVERY_AVAILABLE');
@@ -155,7 +154,7 @@ describe('LoginComponent resilient request lifecycle', () => {
     expect(component.uiState).toBe('SLOW');
     request.next(response);
     request.complete();
-    jasmine.clock().tick(33_001);
+    jasmine.clock().tick(168_001);
     expect(component.uiState).toBe('SUCCESS');
     expect(router.navigate).toHaveBeenCalledTimes(1);
   }));
@@ -164,13 +163,39 @@ describe('LoginComponent resilient request lifecycle', () => {
     const attemptA = new Subject<AuthResponse>();
     authService.login.and.returnValues(attemptA.asObservable(), of(response));
     submitButton().click();
-    jasmine.clock().tick(45_000);
+    jasmine.clock().tick(180_000);
     attemptA.next(response);
     expect(router.navigate).not.toHaveBeenCalled();
     submitButton().click();
     expect(authService.login).toHaveBeenCalledTimes(2);
     expect(router.navigate).toHaveBeenCalledTimes(1);
     expect(component.uiState).toBe('SUCCESS');
+  }));
+
+  it('accepts a response after the observed 152-second free-host startup without resubmitting', () => withFakeClock(() => {
+    const request = new Subject<AuthResponse>();
+    authService.login.and.returnValue(request.asObservable());
+    submitButton().click();
+    jasmine.clock().tick(152_000);
+    expect(component.uiState).toBe('SLOW');
+    request.next(response);
+    expect(component.uiState).toBe('SUCCESS');
+    expect(router.navigate).toHaveBeenCalledTimes(1);
+    expect(authService.login).toHaveBeenCalledTimes(1);
+  }));
+
+  it('lets the user cancel a slow wait and ignores its late response', () => withFakeClock(() => {
+    const request = new Subject<AuthResponse>();
+    authService.login.and.returnValue(request.asObservable());
+    submitButton().click();
+    jasmine.clock().tick(12_000);
+    fixture.detectChanges();
+    (fixture.nativeElement.querySelector('button[type="button"]') as HTMLButtonElement).click();
+    expect(component.uiState).toBe('RECOVERY_AVAILABLE');
+    expect(request.observed).toBeFalse();
+    request.next(response);
+    expect(router.navigate).not.toHaveBeenCalled();
+    expect(authService.login).toHaveBeenCalledTimes(1);
   }));
 
   it('maps 401, 500, and network failures to controlled errors without automatic retry', () => {
@@ -193,7 +218,7 @@ describe('LoginComponent resilient request lifecycle', () => {
     authService.login.and.returnValue(request.asObservable());
     submitButton().click();
     fixture.destroy();
-    jasmine.clock().tick(45_001);
+    jasmine.clock().tick(180_001);
     request.next(response);
     expect(router.navigate).not.toHaveBeenCalled();
   }));
@@ -213,7 +238,7 @@ describe('LoginComponent resilient request lifecycle', () => {
       submitButton().click();
       jasmine.clock().tick(12_000);
       expect(component.uiState).toBe('SLOW');
-      jasmine.clock().tick(33_000);
+      jasmine.clock().tick(168_000);
       expect(component.uiState).toBe('RECOVERY_AVAILABLE');
       attemptA.next(response);
       submitButton().click();

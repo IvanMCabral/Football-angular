@@ -37,7 +37,9 @@
   <!-- Tabla de posiciones -->
   <div class="standings-section card">
     <h3>🏆 Tabla de Posiciones</h3>
-    <div class="table-responsive">
+    <p *ngIf="vm.standingsLoading" role="status">Cargando clasificación…</p>
+    <p *ngIf="vm.standingsError" role="alert">{{ vm.standingsError }}</p>
+    <div class="table-responsive" *ngIf="!vm.standingsLoading && !vm.standingsError">
       <table class="standings-table">
         <thead>
           <tr>
@@ -85,7 +87,8 @@
     <h3>⭐ Tu Equipo: {{ vm.userTeamName || 'Cargando...' }}</h3>
     <p class="info-text">
       <span *ngIf="vm.userPosition > 0">Posición actual: <strong>{{ vm.userPosition }}°</strong></span>
-      <span *ngIf="vm.userPosition === 0">Tu equipo no está en esta clasificación</span>
+      <span *ngIf="vm.standingsLoading">Consultando posición…</span>
+      <span *ngIf="vm.userPosition === 0 && !vm.standingsLoading && !vm.standingsError">Tu equipo no está en esta clasificación</span>
     </p>
   </div>
 

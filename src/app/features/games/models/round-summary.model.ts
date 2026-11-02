@@ -34,6 +34,8 @@ export interface RoundSummaryViewModel {
   careerId: string;
   matches: SummaryMatchVM[];
   standings: Standing[];
+  standingsLoading?: boolean;
+  standingsError?: string;
   teamNameMap: { [id: string]: string };
   userTeamId: string;
   userTeamName: string;

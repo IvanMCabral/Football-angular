@@ -29,6 +29,8 @@ export class RoundSummaryComponent implements OnInit, OnDestroy {
     careerId: '',
     matches: [],
     standings: [],
+    standingsLoading: true,
+    standingsError: '',
     teamNameMap: {},
     userTeamId: '',
     userTeamName: '',
@@ -102,6 +104,8 @@ export class RoundSummaryComponent implements OnInit, OnDestroy {
               careerId: careerStatus.careerId || '',
               matches,
               standings: [],
+              standingsLoading: true,
+              standingsError: '',
               teamNameMap: teamMap,
               userTeamId: userSessionTeamId,
               userTeamName: userTeamName,
@@ -149,7 +153,7 @@ export class RoundSummaryComponent implements OnInit, OnDestroy {
   }
 
   private loadStandings() {
-    this.careerService.getStandings().subscribe({
+    this.careerService.getStandings().pipe(takeUntil(this.destroy$)).subscribe({
       next: (standings) => {
         const vm = this.vmSubject.value;
         const userPosition = standings.findIndex(s => s.teamId === vm.userTeamId) + 1;
@@ -164,11 +168,17 @@ export class RoundSummaryComponent implements OnInit, OnDestroy {
         this.updateVm({
           ...vm,
           standings: frontendStandings,
+          standingsLoading: false,
+          standingsError: '',
           userPosition
         });
       },
       error: () => {
-        this.calculateStandingsFromMatches();
+        this.updateVm({
+          ...this.vmSubject.value,
+          standingsLoading: false,
+          standingsError: 'No pudimos cargar la clasificación. Volvé a abrir el resumen para intentar nuevamente.'
+        });
       }
     });
   }

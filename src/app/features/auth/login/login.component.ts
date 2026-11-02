@@ -17,7 +17,7 @@ export const LOGIN_SLOW_NOTICE_DELAY_MS = new InjectionToken<number>(
 /** Gives the user control back without confusing the informational slow notice with a transport timeout. */
 export const LOGIN_RECOVERY_DELAY_MS = new InjectionToken<number>(
   'LOGIN_RECOVERY_DELAY_MS',
-  { providedIn: 'root', factory: () => 45_000 }
+  { providedIn: 'root', factory: () => 180_000 }
 );
 
 export const LOGIN_AUTOFILL_ANIMATION_NAME = 'login-autofill-start';
@@ -121,6 +121,12 @@ export class LoginComponent implements OnDestroy {
     this.activeAttemptId = undefined;
     this.clearRequestTimers();
     this.cancelActiveRequest();
+  }
+
+  cancelLogin(): void {
+    if (this.isRequestPending && this.activeAttemptId !== undefined) {
+      this.makeRecoveryAvailable(this.activeAttemptId);
+    }
   }
 
   private loginErrorMessage(error: unknown): string {

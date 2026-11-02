@@ -19,7 +19,8 @@
       <div class="login-feedback pending" role="status" aria-live="polite">
         <app-loading-spinner aria-hidden="true"></app-loading-spinner>
         @if (uiState === 'SLOW') {
-          <p>Está tardando más de lo esperado. Podés esperar un poco más; no enviaremos otro intento automáticamente.</p>
+          <p>El servidor gratuito puede estar despertándose. El primer acceso puede tardar hasta 3 minutos. Seguimos esperando sin enviar otro intento.</p>
+          <button type="button" (click)="cancelLogin()">Cancelar espera</button>
         } @else {
           <p>Ingresando… estamos verificando tus datos.</p>
         }

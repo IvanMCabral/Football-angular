@@ -6,7 +6,7 @@ import { ActivatedRoute, provideRouter, Router } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { BehaviorSubject, of } from 'rxjs';
+import { BehaviorSubject, Subject, of } from 'rxjs';
 import { RoundSummaryComponent } from './round-summary.component';
 import { CareerService } from '../../core/services/career.service';
 import { RoundSummaryViewModel } from './models/round-summary.model';
@@ -57,6 +57,35 @@ describe('RoundSummaryComponent navigation', () => {
     component = fixture.componentInstance;
     router = TestBed.inject(Router);
     spyOn(router, 'navigate').and.returnValue(Promise.resolve(true));
+  });
+
+  it('shows loading instead of claiming the team is absent until standings arrive', () => {
+    const standings = new Subject<any[]>();
+    careerServiceSpy.getStandings.and.returnValue(standings);
+    fixture.destroy();
+    fixture = TestBed.createComponent(RoundSummaryComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Cargando clasificación');
+    expect(fixture.nativeElement.textContent).not.toContain('Tu equipo no está');
+    standings.next([]);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).not.toContain('Cargando clasificación');
+    expect(fixture.nativeElement.textContent).toContain('Tu equipo no está');
+  });
+
+  it('shows a standings error without fabricating a table from one round', () => {
+    const standings = new Subject<any[]>();
+    careerServiceSpy.getStandings.and.returnValue(standings);
+    fixture.destroy();
+    fixture = TestBed.createComponent(RoundSummaryComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    standings.error(new Error('synthetic failure'));
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('No pudimos cargar la clasificación');
+    expect(fixture.nativeElement.textContent).not.toContain('Tu equipo no está');
+    expect(fixture.nativeElement.querySelector('.standings-table')).toBeNull();
   });
 
   function setVm(vm: Partial<RoundSummaryViewModel>) {
