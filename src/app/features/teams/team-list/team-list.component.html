@@ -1,11 +1,11 @@
 <div class="container" *ngIf="sessionTeams$ | async as sessionTeams">
   <div class="header">
-    <h1>🏟️ Equipos en Session</h1>
-    <p class="subtitle">Estos equipos están guardados en tu sesión (Redis), no en la base de datos</p>
+    <h1>Clubes de tu temporada</h1>
+    <p class="subtitle">Planteles, formación y presupuesto de los equipos de tu carrera.</p>
   </div>
    
   <div class="actions-bar">
-    <a routerLink="/teams/create" class="btn btn-primary">➕ Crear Nuevo Equipo</a>
+    <a routerLink="/squad" class="btn btn-primary">Mi equipo</a>
     <button (click)="loadSessionTeams()" class="btn btn-secondary" [disabled]="loading">
       {{ loading ? 'Cargando...' : '🔄 Refrescar' }}
     </button>
@@ -18,16 +18,15 @@
    
   <div *ngIf="!loading && sessionTeams.length === 0" class="empty-state">
     <div class="empty-icon">🏟️</div>
-    <h3>No hay equipos en tu sesión</h3>
-    <p>Crea equipos personalizados o aleatorios para empezar</p>
-    <a routerLink="/teams/create" class="btn btn-primary">Crear Primer Equipo</a>
+    <h3>No hay una temporada activa</h3>
+    <p>Elegí tu club para empezar una nueva carrera.</p>
+    <a routerLink="/career/setup" class="btn btn-primary">Iniciar carrera</a>
   </div>
    
   <div *ngIf="!loading && sessionTeams.length > 0" class="teams-grid">
     <div *ngFor="let team of sessionTeams" class="team-card" [class.cloned]="team.origin === 'CLONED'" [class.custom]="team.origin === 'CUSTOM'" [class.random]="team.origin === 'RANDOM'">
       <div class="team-header">
         <h3>{{ team.name }}</h3>
-        <span class="origin-badge">{{ getOriginLabel(team.origin) }}</span>
       </div>
       <div class="team-info">
         <div class="info-row">
@@ -52,8 +51,7 @@
         </div>
       </div>
       <div class="team-actions">
-        <a [routerLink]="['/teams', team.sessionTeamId]" class="btn-small btn-view">Ver Squad</a>
-        <button (click)="deleteTeam(team)" class="btn-small btn-delete">🗑️ Eliminar</button>
+        <a [routerLink]="['/teams', team.sessionTeamId]" class="btn-small btn-view">Ver club y plantel</a>
       </div>
     </div>
   </div>

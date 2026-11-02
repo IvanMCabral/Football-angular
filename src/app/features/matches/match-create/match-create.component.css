@@ -1,1 +1,1 @@
-div { padding: 2rem; }
+.match-schedule-help { max-width: 760px; margin: 2rem auto; padding: 1.5rem; } p { margin: 1rem 0; } nav { display: flex; gap: .75rem; flex-wrap: wrap; } nav a { padding: .85rem; border: 1px solid #aec0d3; background: #eaf1f7; border-radius: 6px; min-height: 44px; }

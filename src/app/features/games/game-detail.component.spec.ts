@@ -64,6 +64,18 @@ describe('GameDetailComponent', () => {
     fixture.detectChanges();
   });
 
+  it('uses the career club instead of profile assignment and hides internal identifiers', () => {
+    careerServiceSpy.getCareerStatus.and.returnValue(of({ careerId: 'career-1',
+      userTeamName: 'Athletic Club', season: 3, currentRound: 8, totalRounds: 38 } as any));
+    component.ngOnInit();
+    fixture.detectChanges();
+    expect(component.teamName).toBe('Athletic Club');
+    expect(fixture.nativeElement.textContent).toContain('Athletic Club');
+    expect(fixture.nativeElement.textContent).not.toContain('career-1');
+    expect(fixture.nativeElement.textContent).not.toContain('user-1');
+    expect(component.currentRound).toBe(8);
+  });
+
   it('advances from WAITING_USER using career next-round instead of legacy match list', () => {
     careerServiceSpy.getCareerStatus.and.returnValue(of({
       careerId: 'career-1',

@@ -172,6 +172,25 @@ describe('MatchListComponent — career fixture list', () => {
     expect(html()).toContain('Iniciar carrera');
   });
 
+  it('filters dates and own fixtures locally instead of rendering the entire season', async () => {
+    render();
+    const other = { ...makeFixture('other'), homeTeamId: 'other-home', awayTeamId: 'other-away' };
+    fixturesResponse$.next({ rounds: [
+      { round: 1, matches: [makeFixture('mine'), other], byeTeam: null },
+      { round: 2, matches: [{ ...makeFixture('next'), round: 2 }], byeTeam: null }
+    ] }); fixturesResponse$.complete();
+    careerStatusResponse$.next(makeCareerStatus({ userSessionTeamId: 'team-home' })); careerStatusResponse$.complete();
+    await fixture.whenStable(); render();
+    expect(fixture.nativeElement.querySelectorAll('.match-card').length).toBe(2);
+    const checkbox: HTMLInputElement = fixture.nativeElement.querySelector('.my-fixtures input');
+    checkbox.click(); await fixture.whenStable(); render();
+    expect(fixture.nativeElement.querySelectorAll('.match-card').length).toBe(1);
+    const select: HTMLSelectElement = fixture.nativeElement.querySelector('.fixture-filters select');
+    select.value = 'all'; select.dispatchEvent(new Event('change')); await fixture.whenStable(); render();
+    expect(fixture.nativeElement.querySelectorAll('.match-card').length).toBe(2);
+    expect(careerServiceSpy.getAllFixturesWithBye).toHaveBeenCalledTimes(1);
+  });
+
   it('re-clears the error and re-shows the spinner on a second loadMatches() call', async () => {
     render();
 

@@ -1,21 +1,25 @@
-<nav class="navbar">
+<a class="skip-link" href="#main-content">Ir al contenido</a>
+<nav class="navbar" aria-label="Navegación principal">
   <div class="navbar-container">
     <a routerLink="/" class="navbar-brand">
       <span class="brand-icon">⚽</span>
       <span class="brand-name">Football Manager</span>
     </a>
 
-    <button class="navbar-toggle" type="button" (click)="toggleMenu()" [class.active]="menuOpen" [attr.aria-expanded]="menuOpen" [attr.aria-label]="menuOpen ? 'Cerrar menú de navegación' : 'Abrir menú de navegación'">
+    <button class="navbar-toggle" type="button" aria-controls="main-navigation" (click)="toggleMenu()" [class.active]="menuOpen" [attr.aria-expanded]="menuOpen" [attr.aria-label]="menuOpen ? 'Cerrar menú de navegación' : 'Abrir menú de navegación'">
       <span></span>
       <span></span>
       <span></span>
     </button>
 
-    <div class="navbar-menu" [class.active]="menuOpen">
+    <div id="main-navigation" class="navbar-menu" [class.active]="menuOpen">
       @if (authStatus$ | async; as authStatus) {
         @if (authStatus === 'authenticated') {
-        <a routerLink="/dashboard" routerLinkActive="active" class="nav-link">Inicio</a>
-        <a routerLink="/matches" routerLinkActive="active" class="nav-link">Partidos</a>
+        <a routerLink="/dashboard" routerLinkActive="active" ariaCurrentWhenActive="page" class="nav-link" (click)="closeMenu()">Inicio</a>
+        <a routerLink="/squad" routerLinkActive="active" ariaCurrentWhenActive="page" class="nav-link" (click)="closeMenu()">Mi equipo</a>
+        <a routerLink="/matches" routerLinkActive="active" ariaCurrentWhenActive="page" class="nav-link" (click)="closeMenu()">Calendario</a>
+        <a routerLink="/standings" routerLinkActive="active" ariaCurrentWhenActive="page" class="nav-link" (click)="closeMenu()">Tabla</a>
+        <a routerLink="/teams" routerLinkActive="active" [routerLinkActiveOptions]="{exact:true}" ariaCurrentWhenActive="page" class="nav-link" (click)="closeMenu()">Clubes</a>
         <button (click)="logout()" class="nav-button logout">Salir</button>
         } @else if (authStatus === 'anonymous') {
         <a routerLink="/login" routerLinkActive="active" class="nav-link">Ingresar</a>

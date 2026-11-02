@@ -154,4 +154,38 @@ describe('Dashboard entry request priority', () => {
     expect(fixture.nativeElement.querySelector('.action-button.danger').disabled).toBeFalse();
     expect(TestBed.inject(CareerService).getCareerStatusSnapshot()?.value.careerId).toBe('career');
   });
+
+  it('shows owner club information and the next opponent from the same entry request', () => {
+    fixture.detectChanges();
+    backend.expectOne(`${api}/dashboard/entry`).flush({ user: { id: 'owner', username: 'Manager' },
+      careerStatus: { ...status, userTeamName: 'Own Club', squadSize: 24 },
+      userStats: { matchesPlayed: 0, matchesWon: 0, matchesLost: 0, winPercentage: 0 },
+      squadConditions: { suspended: 0, injured: 0, exhausted: 0, veryTired: 0 },
+      careerOverview: { club: { name: 'Own Club', budget: 1234567, formation: '4-4-2', morale: 81 },
+        nextMatch: { matchId: 'next', round: 1, homeTeamName: 'Own Club', awayTeamName: 'Rival Club', home: true, status: 'PENDING' } }
+    }); fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Own Club');
+    expect(fixture.nativeElement.textContent).toContain('Rival Club');
+    expect(fixture.nativeElement.textContent).toContain('Presupuesto disponible');
+    expect(fixture.nativeElement.textContent).toContain('24 jugadores');
+    backend.expectNone(req => req.url.includes('/fixtures') || req.url.includes('/players/squad'));
+  });
+
+  it('keeps an entry failure distinct from a missing career and retries once on request', () => {
+    fixture.detectChanges();
+    backend.expectOne(`${api}/dashboard/entry`).flush({}, { status: 503, statusText: 'Unavailable' });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('No pudimos cargar tu carrera');
+    expect(fixture.nativeElement.textContent).not.toContain('CREAR CARRERA');
+    [...fixture.nativeElement.querySelectorAll('button')].find((b: any) => b.textContent.trim() === 'Reintentar').click();
+    resolveCareer();
+    expect(fixture.nativeElement.textContent).toContain('Continuar carrera');
+  });
+
+  it('resumes the active date instead of returning an in-progress career to squad preparation', () => {
+    fixture.detectChanges(); resolveCareer('IN_MATCH');
+    const navigate = spyOn(TestBed.inject(Router), 'navigate').and.resolveTo(true);
+    fixture.componentInstance.onContinueCareer();
+    expect(navigate).toHaveBeenCalledOnceWith(['/games/career/round/1/live']);
+  });
 });

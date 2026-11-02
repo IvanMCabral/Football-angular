@@ -205,3 +205,5 @@
     display: none;
   }
 }
+
+.fixture-filters { display: flex; flex-wrap: wrap; gap: 1rem; align-items: end; margin-block: 1rem; padding: 1rem; background: #edf2f7; border: 1px solid #b9c8d9; border-radius: 8px; color: #20344d; }.fixture-filters label { display: flex; flex-direction: column; gap: .3rem; }.fixture-filters select { min-height: 44px; padding: .5rem; border: 1px solid #9cb1c9; border-radius: 5px; }.fixture-filters .my-fixtures { display: flex; flex-direction: row; align-items: center; min-height: 44px; gap: .5rem; }.fixture-filters a { min-height: 44px; display: flex; align-items: center; text-decoration: underline; }

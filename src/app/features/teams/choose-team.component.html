@@ -6,9 +6,9 @@
 
   <ul *ngIf="!loading && !errorMessage && teams.length">
     <li #teamRow *ngFor="let team of teams" (click)="chooseTeam(team)" [class.selected]="selectedTeam && selectedTeam.id === team.id">
-      <strong>ID: {{ team.id }}</strong>
-      <span *ngIf="team.name"> | Nombre: {{ team.name }}</span>
-      <span *ngIf="team.country"> | País: {{ team.country }}</span>
+      <button type="button" class="team-option" [attr.aria-pressed]="selectedTeam?.id === team.id"><strong>{{ team.name }}</strong>
+
+      <span *ngIf="team.country"> · {{ team.country }}</span></button>
     </li>
   </ul>
   <div *ngIf="!loading && !errorMessage && !teams.length">No hay equipos disponibles.</div>

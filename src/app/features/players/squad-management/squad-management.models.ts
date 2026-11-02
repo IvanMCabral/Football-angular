@@ -13,6 +13,7 @@ export interface ContinueCareerResponse {
 }
 
 export interface SessionPlayer {
+  overall?: number;
   sessionPlayerId: string;
   name: string;
   age: number;

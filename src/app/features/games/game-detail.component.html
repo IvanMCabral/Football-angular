@@ -5,13 +5,11 @@
 <ng-template #loadedOrLoading>
   <div *ngIf="game && getValue(game.id); else loading">
     <app-dashboard-user-info [username]="username" [teamName]="teamName"></app-dashboard-user-info>
-    <h2>Detalle de carrera</h2>
+    <h2>{{ teamName || 'Tu carrera' }}</h2>
     <div class="game-detail-card">
-      <div><strong>ID:</strong> {{ getValue(game.id) }}</div>
-      <div><strong>Nombre:</strong> {{ game.name }}</div>
-      <div><strong>Creado:</strong> {{ game.createdAt | date:'short' }}</div>
-      <div><strong>Usuario:</strong> {{ getValue(game.userId) }}</div>
-      <div *ngIf="game.teamId"><strong>Equipo:</strong> {{ getValue(game.teamId) }}</div>
+      <div><strong>Temporada:</strong> {{ season }}</div>
+      <div><strong>Fecha:</strong> {{ currentRound }}<span *ngIf="totalRounds"> de {{ totalRounds }}</span></div>
+      <div><strong>Creada:</strong> {{ game.createdAt | date:'short' }}</div>
     </div>
     <div class="game-detail-actions">
       <button type="button" class="action-btn play-btn" (pointerdown)="onMatchStartPointerEvent()" (click)="playFirstRound()">Jugar partido</button>

@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, OnInit } from '@angular/core';
 import { CommonModule, AsyncPipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
+import { FormsModule } from '@angular/forms';
 import { BehaviorSubject, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { CareerService } from '../../../core/services/career.service';
@@ -22,6 +23,8 @@ interface MatchListRound {
 }
 
 interface MatchListFixture {
+  homeTeamId: string;
+  awayTeamId: string;
   matchId: string;
   round: number;
   homeTeamName: string;
@@ -41,13 +44,15 @@ const EMPTY_STATE: MatchListViewState = {
 @Component({
   selector: 'app-match-list',
   standalone: true,
-  imports: [CommonModule, AsyncPipe, RouterLink, LoadingSpinnerComponent, ErrorMessageComponent],
+  imports: [CommonModule, AsyncPipe, RouterLink, FormsModule, LoadingSpinnerComponent, ErrorMessageComponent],
   templateUrl: './match-list.component.html',
   styleUrls: ['./match-list.component.css'],
   // The async pipe is the single source of change-detection triggers.
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class MatchListComponent implements OnInit {
+  roundFilter = 'current';
+  onlyMyTeam = false;
   private careerService = inject(CareerService);
 
   // A single view-state stream drives the whole template.
@@ -88,6 +93,16 @@ export class MatchListComponent implements OnInit {
     return state.rounds.some(round => round.matches.length > 0);
   }
 
+  visibleRounds(state: MatchListViewState): MatchListRound[] {
+    const ownId = state.careerStatus?.userSessionTeamId ?? state.careerStatus?.userTeamId;
+    const roundNumber = this.roundFilter === 'current' ? (state.careerStatus?.currentRound ?? state.rounds[0]?.round)
+      : this.roundFilter === 'all' ? null : Number(this.roundFilter);
+    return state.rounds.filter(round => roundNumber == null || round.round === roundNumber).map(round => ({ ...round,
+      matches: !this.onlyMyTeam || !ownId ? round.matches : round.matches.filter(m => m.homeTeamId === ownId || m.awayTeamId === ownId),
+      byeTeam: !this.onlyMyTeam || round.byeTeam === ownId || round.byeTeam === state.careerStatus?.userTeamName ? round.byeTeam : null
+    })).filter(round => round.matches.length > 0 || !!round.byeTeam);
+  }
+
   matchDetailLink(match: MatchListFixture, state: MatchListViewState): unknown[] {
     const careerId = state.careerStatus?.careerId;
     return careerId
@@ -97,22 +112,24 @@ export class MatchListComponent implements OnInit {
 
   formatStatus(status: string): string {
     const normalized = status.toUpperCase();
-    if (normalized === 'COMPLETED' || normalized === 'SIMULATED') return 'Completado';
+    if (['COMPLETED', 'SIMULATED', 'FINISHED'].includes(normalized)) return 'Completado';
     if (normalized === 'PENDING' || normalized === 'SCHEDULED') return 'Pendiente';
-    if (normalized === 'SIMULATING') return 'En juego';
+    if (['SIMULATING', 'IN_PROGRESS', 'RUNNING'].includes(normalized)) return 'En juego';
+    if (normalized === 'PAUSED') return 'Pausado';
     if (normalized === 'CANCELLED') return 'Cancelado';
     return status.charAt(0) + status.slice(1).toLowerCase();
   }
 
   statusCss(status: string): string {
     const normalized = status.toLowerCase();
-    if (normalized === 'completed') return 'simulated';
+    if (normalized === 'completed' || normalized === 'finished') return 'simulated';
+    if (['in_progress', 'running'].includes(normalized)) return 'simulating';
     if (normalized === 'pending') return 'scheduled';
     return normalized;
   }
 
   isCompleted(match: MatchListFixture): boolean {
-    return ['COMPLETED', 'SIMULATED'].includes(match.status.toUpperCase());
+    return ['COMPLETED', 'SIMULATED', 'FINISHED'].includes(match.status.toUpperCase());
   }
 
   hasResult(match: MatchListFixture): boolean {
@@ -136,6 +153,8 @@ export class MatchListComponent implements OnInit {
     if (!match?.matchId) return null;
 
     return {
+      homeTeamId: match.homeTeamId,
+      awayTeamId: match.awayTeamId,
       matchId: String(match.matchId),
       round: Number(match.round ?? fallbackRound),
       homeTeamName: match.homeTeamName || match.homeTeamId || 'Local',

@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { Observable } from 'rxjs';
@@ -19,6 +19,7 @@ export class TeamListComponent implements OnInit {
   private teamService = inject(TeamService);
   private toastService = inject(ToastService);
   private logger = inject(AppLoggerService);
+  private changeDetector = inject(ChangeDetectorRef);
 
   sessionTeams$: Observable<SessionTeam[]> = this.teamService.sessionTeams$;
   loading = false;
@@ -35,11 +36,13 @@ export class TeamListComponent implements OnInit {
     this.teamService.getSessionTeams().subscribe({
       next: () => {
         this.loading = false;
+        this.changeDetector.markForCheck();
       },
       error: (err) => {
         this.logger.error('[TEAM LIST] Error loading session teams:', err);
         this.loading = false;
         this.errorMessage = readableErrorMessage(err, 'Error cargando equipos');
+        this.changeDetector.markForCheck();
       }
     });
   }

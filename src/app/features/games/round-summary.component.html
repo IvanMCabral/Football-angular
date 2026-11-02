@@ -9,21 +9,22 @@
 
   <!-- Resultados de la fecha -->
   <div class="results-section card">
-    <h3>⚽ Resultados de la Fecha</h3>
+    <h3>⚽ Partidos de la fecha</h3>
     <div class="results-grid">
       <div *ngFor="let match of vm.matches" class="match-result"
            [class.user-match]="match.isUserMatch">
         <div class="team-info">
           <span class="team-name">{{ getTeamName(match.homeTeamId) }}</span>
-          <span class="team-score">{{ match.homeGoals }}</span>
+          <span class="team-score">{{ hasPlayedResult(match.status) ? match.homeGoals : '—' }}</span>
         </div>
         <div class="match-vs">-</div>
         <div class="team-info">
-          <span class="team-score">{{ match.awayGoals }}</span>
+          <span class="team-score">{{ hasPlayedResult(match.status) ? match.awayGoals : '—' }}</span>
           <span class="team-name">{{ getTeamName(match.awayTeamId) }}</span>
         </div>
 
-        <button *ngIf="match.status === 'COMPLETED'"
+        <span *ngIf="!hasPlayedResult(match.status)">Sin resultado final</span>
+        <button *ngIf="hasPlayedResult(match.status)"
                 type="button"
                 class="btn-detail"
                 (click)="goToMatchDetail(match.matchId)"

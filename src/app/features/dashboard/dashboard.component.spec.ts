@@ -565,12 +565,18 @@ describe('DashboardComponent — season-aware play-next labels', () => {
     expect(component.playNextRoundSubtitle(status)).toBe('Confirmar para iniciar');
   });
 
-  it('returns continue-season label after the last round', () => {
-    const status = { currentRound: 10, totalRounds: 10, season: 1 } as any;
+  it('returns continue-season label only after the season is finished', () => {
+    const status = { currentRound: 10, totalRounds: 10, season: 1, careerPhase: 'FINISHED' } as any;
     expect(component.playNextRoundLabel(status))
       .toBe('Continuar Temporada 2');
     expect(component.playNextRoundSubtitle(status))
       .toBe('Temporada finalizada, ver resultados');
+  });
+
+  it('keeps the final unplayed date playable instead of announcing the next season early', () => {
+    const status = { currentRound: 10, totalRounds: 10, season: 1, careerPhase: 'WAITING_USER' } as any;
+    expect(component.playNextRoundLabel(status)).toBe('Jugar Fecha 10');
+    expect(component.playNextRoundSubtitle(status)).toBe('Confirmar para iniciar');
   });
 
   it('returns next-round label after a new season has started', () => {

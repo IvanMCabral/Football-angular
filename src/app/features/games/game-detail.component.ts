@@ -25,6 +25,9 @@ export class GameDetailComponent implements OnInit {
   game?: Game;
   username = '';
   teamName = '';
+  season = 1;
+  currentRound = 1;
+  totalRounds = 0;
   showFixtureModal = false;
   fixtureMatches: Match[] = [];
   teamNameMap: { [id: string]: string } = {};
@@ -154,9 +157,19 @@ export class GameDetailComponent implements OnInit {
     // renders, so Jugar partido does not start its first status read lazily.
     // Test doubles may omit this optional warm-up method result; production
     // CareerService always returns an Observable and is warmed eagerly.
-    const status$ = this.careerService.getCareerStatus();
-    status$?.subscribe({ error: () => undefined });
     const id = this.route.snapshot.paramMap.get('id');
+    const status$ = this.careerService.getCareerStatus();
+    status$?.subscribe({
+      next: status => {
+        if (status?.careerId !== id) return;
+        this.teamName = status.userTeamName || this.teamName;
+        this.season = status.season || 1;
+        this.currentRound = status.currentRound || 1;
+        this.totalRounds = status.totalRounds || 0;
+        this.cdr.markForCheck();
+      },
+      error: () => undefined
+    });
     if (id) {
       this.gameService.getGameById(id).subscribe({
         next: (game) => {
@@ -173,7 +186,7 @@ export class GameDetailComponent implements OnInit {
           // Fetch user info
           this.authService.getUserInfo().subscribe(user => {
             this.username = user.username;
-            this.teamName = user.teamName || '';
+            this.teamName = this.teamName || user.teamName || '';
             this.cdr.detectChanges();
           });
           // Fetch team name map (from CareerSave for fixture modal)

@@ -1,6 +1,6 @@
 <div class="matches-container">
   <div class="matches-header">
-    <h1>Fixture de carrera</h1>
+    <h1>Calendario y resultados</h1>
   </div>
 
 
@@ -30,8 +30,13 @@
         </div>
       }
     } @else {
+      <div class="fixture-filters">
+        <label>Fecha<select [(ngModel)]="roundFilter"><option value="current">Fecha actual</option><option value="all">Toda la temporada</option>@for (round of state.rounds; track round.round) { <option [value]="round.round">Fecha {{round.round}}</option> }</select></label>
+        <label class="my-fixtures"><input type="checkbox" [(ngModel)]="onlyMyTeam"> Sólo mi equipo</label>
+        <a routerLink="/squad">Preparar equipo</a>
+      </div>
       <div class="matches-list">
-        @for (round of state.rounds; track round.round) {
+        @for (round of visibleRounds(state); track round.round) {
           <section class="round-block">
             <div class="round-title">
               <h2>Fecha {{ round.round }}</h2>
@@ -69,6 +74,8 @@
               </a>
             }
           </section>
+        } @empty {
+          <div class="empty-state"><p>No hay partidos para estos filtros.</p><button type="button" (click)="roundFilter = 'all'; onlyMyTeam = false">Ver toda la temporada</button></div>
         }
       </div>
     }

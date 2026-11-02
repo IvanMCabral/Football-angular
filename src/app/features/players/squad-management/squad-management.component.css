@@ -933,3 +933,5 @@
     grid-template-columns: 1fr;
   }
 }
+
+.roster-view-controls { display: flex; gap: .5rem; margin: .8rem 0; }.roster-view-controls button { min-height: 44px; padding: .5rem .8rem; border: 1px solid #9cb1c9; border-radius: 5px; background: #edf2f7; color: #1b324d; cursor: pointer; }.roster-view-controls button[aria-pressed="true"] { background: #213956; color: #fff; }

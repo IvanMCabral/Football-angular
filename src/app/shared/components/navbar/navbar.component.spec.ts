@@ -13,6 +13,7 @@ describe('NavbarComponent initial session resolution', () => {
   };
 
   beforeEach(async () => {
+    authStatus.next('unknown');
     await TestBed.configureTestingModule({
       imports: [NavbarComponent],
       providers: [
@@ -47,5 +48,14 @@ describe('NavbarComponent initial session resolution', () => {
     fixture.detectChanges();
     expect(toggle.getAttribute('aria-label')).toBe('Cerrar menú de navegación');
     expect(toggle.getAttribute('aria-expanded')).toBe('true');
+  });
+
+  it('provides the core management destinations and closes the menu with Escape', () => {
+    authStatus.next('authenticated'); fixture.detectChanges();
+    const links = [...fixture.nativeElement.querySelectorAll('a.nav-link')].map((a: any) => a.getAttribute('href'));
+    expect(links).toEqual(['/dashboard','/squad','/matches','/standings','/teams']);
+    fixture.componentInstance.toggleMenu(); fixture.detectChanges();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })); fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.navbar-toggle').getAttribute('aria-expanded')).toBe('false');
   });
 });

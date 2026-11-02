@@ -102,7 +102,7 @@
       <div *ngIf="(activeTab$ | async) === 'squad'">
         <div class="section-header">
           <h3>👥 Tu plantilla ({{availableSquadCount(squad$ | async)}} / {{(squad$ | async)?.length || 0}} disponibles)</h3>
-          <a routerLink="/players/manage" class="btn-create" title="Ir a gestion de jugadores">⚙️ Gestionar</a>
+          <button type="button" class="btn-create" (click)="openVisualEditor()">Preparar alineación</button>
         </div>
 
 
@@ -142,7 +142,12 @@
           Tu plantilla está vacía. Ve a "Gestionar" para agregar jugadores.
         </div>
 
-        <div class="players-grid">
+        <div class="roster-view-controls" role="group" aria-label="Vista del plantel">
+          <button type="button" (click)="rosterView = 'table'" [attr.aria-pressed]="rosterView === 'table'">Lista compacta</button>
+          <button type="button" (click)="rosterView = 'cards'" [attr.aria-pressed]="rosterView === 'cards'">Tarjetas</button>
+        </div>
+        <app-roster-table *ngIf="rosterView === 'table'" [players]="(squad$ | async) ?? []"></app-roster-table>
+        <div class="players-grid" *ngIf="rosterView === 'cards'">
           <app-player-card
             *ngFor="let player of (squad$ | async)"
             [player]="player"

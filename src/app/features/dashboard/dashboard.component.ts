@@ -39,6 +39,10 @@ interface DashboardEntry {
   careerStatus: ApiCareerStatus;
   userStats: UserStats;
   squadConditions?: { suspended: number; injured: number; exhausted: number; veryTired: number };
+  careerOverview?: {
+    club: { name: string; country: string; budget: number | null; formation: string; morale: number | null } | null;
+    nextMatch: { matchId: string; round: number; homeTeamName: string; awayTeamName: string; home: boolean; status: string } | null;
+  } | null;
 }
 
 interface CareerStatus {
@@ -51,6 +55,7 @@ interface CareerStatus {
   season: number;
   userDivision?: string | null;
   promotionsAvailable?: boolean;
+  userTeamName?: string | null;
 }
 
 interface AdvanceRoundResponse {
@@ -121,6 +126,13 @@ export class DashboardComponent implements OnInit {
   deletingCareer = false;
   private careerViewVersion = 0;
   generatingPlayers = false;
+  dashboardError: string | null = null;
+  clubOverview: DashboardEntry['careerOverview'] = null;
+  squadSize = 0;
+
+  formatBudget(value: number): string {
+    return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(value);
+  }
 
   playNextRoundLabel(status: CareerStatus | null | undefined): string {
     if (!status) return 'Jugar Próxima Fecha';
@@ -129,14 +141,13 @@ export class DashboardComponent implements OnInit {
     // Fecha 4 immediately after Fecha 2 had completed.
     const currentRound = status.currentRound ?? 1;
     const totalRounds = status.totalRounds ?? 0;
-    const seasonComplete = currentRound > totalRounds
-      || (currentRound === totalRounds
-        && (!status.careerPhase || status.careerPhase === 'WAITING_USER'));
+    const seasonComplete = status.isFinished || ['FINISHED', 'POST_SEASON'].includes(status.careerPhase ?? '')
+      || (totalRounds > 0 && currentRound > totalRounds);
     if (seasonComplete) {
       const nextSeason = (status.season ?? 1) + 1;
       return `Continuar Temporada ${nextSeason}`;
     }
-    if (status.careerPhase === 'LIVE' || status.careerPhase === 'IN_MATCH') {
+    if (['LIVE', 'IN_MATCH', 'POST_MATCH'].includes(status.careerPhase ?? '')) {
       return `Continuar Fecha ${currentRound}`;
     }
     return `Jugar Fecha ${currentRound}`;
@@ -146,13 +157,12 @@ export class DashboardComponent implements OnInit {
     if (!status) return 'Confirmar para iniciar';
     const currentRound = status.currentRound ?? 1;
     const totalRounds = status.totalRounds ?? 0;
-    const seasonComplete = currentRound > totalRounds
-      || (currentRound === totalRounds
-        && (!status.careerPhase || status.careerPhase === 'WAITING_USER'));
+    const seasonComplete = status.isFinished || ['FINISHED', 'POST_SEASON'].includes(status.careerPhase ?? '')
+      || (totalRounds > 0 && currentRound > totalRounds);
     if (seasonComplete) {
       return 'Temporada finalizada, ver resultados';
     }
-    if (status.careerPhase === 'LIVE' || status.careerPhase === 'IN_MATCH') {
+    if (['LIVE', 'IN_MATCH', 'POST_MATCH'].includes(status.careerPhase ?? '')) {
       return 'Partido en curso';
     }
     return 'Confirmar para iniciar';
@@ -175,9 +185,10 @@ export class DashboardComponent implements OnInit {
           return {
             careerId: status.careerId,
             userSessionTeamId: status.userSessionTeamId || null,
+            userTeamName: status.userTeamName ?? null,
             currentRound: status.currentRound || 1,
             totalRounds: status.totalRounds || 38,
-            isFinished: status.careerPhase === 'FINISHED',
+            isFinished: ['FINISHED', 'POST_SEASON'].includes(status.careerPhase ?? ''),
             careerPhase: status.careerPhase || 'PRE_MATCH',
             season: status.season || 1,
             userDivision: status.userDivision ?? null,
@@ -188,6 +199,10 @@ export class DashboardComponent implements OnInit {
       }),
       takeUntilDestroyed(this.destroyRef),
       catchError(err => {
+        if (initialStatus$) {
+          this.dashboardError = 'No pudimos cargar tu carrera. Reintentá para recuperar el estado actual.';
+          return of(undefined);
+        }
         return of(null);
       })
     ).subscribe(status => {
@@ -330,12 +345,16 @@ export class DashboardComponent implements OnInit {
   }
 
   loadDashboardData(): void {
+    this.dashboardError = null;
+    this.careerStatusSubject.next(undefined);
     // One owner-authenticated request loads the entire visible entry screen.
     // The world catalog and fixtures are not part of this response.
     const entry$ = this.http.get<DashboardEntry>(`${environment.apiUrl}/dashboard/entry`).pipe(
       tap(entry => {
         this.careerService.seedCareerStatus(entry.careerStatus);
         this.squadConditionCounts = entry.squadConditions ?? null;
+        this.clubOverview = entry.careerOverview ?? null;
+        this.squadSize = entry.careerStatus.squadSize ?? 0;
       }),
       takeUntilDestroyed(this.destroyRef),
       share({ connector: () => new ReplaySubject<DashboardEntry>(1), resetOnError: false,
@@ -390,7 +409,12 @@ export class DashboardComponent implements OnInit {
   }
 
   onContinueCareer(): void {
-    this.router.navigate(['/squad']);
+    const status = this.careerStatusSubject.value;
+    if (status?.careerId && ['LIVE', 'IN_MATCH', 'POST_MATCH'].includes(status.careerPhase ?? '')) {
+      this.router.navigate([`/games/${status.careerId}/round/${status.currentRound}/live`]);
+    } else {
+      this.router.navigate(['/squad']);
+    }
   }
 
   onPlayNextRound(): void {

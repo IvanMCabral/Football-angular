@@ -6,7 +6,7 @@
     <h3>Elegir equipo</h3>
     <select [(ngModel)]="selectedTeamId" (change)="onTeamChange()" class="select-control">
       <option value="">-- Elegir equipo --</option>
-      <option *ngFor="let team of teams$ | async" [value]="team.sessionTeamId">{{ team.name }} ({{ team.country }})</option>
+      <option *ngFor="let team of teams$ | async" [value]="team.sessionTeamId">{{ team.name }}{{ team.country ? ' (' + team.country + ')' : '' }}</option>
     </select>
     <p *ngIf="(teams$ | async)?.length === 0" class="warning-text">Todavia no hay equipos creados. Primero crea equipos.</p>
   </div>

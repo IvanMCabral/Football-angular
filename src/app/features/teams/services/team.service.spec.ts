@@ -38,6 +38,12 @@ describe('TeamService', () => {
     expect(result).toEqual(fallbackSquad);
   });
 
+  it('loads season clubs from the supported career team route', () => {
+    service.getSessionTeams().subscribe();
+    httpMock.expectOne(`${environment.apiUrl}/career/teams`).flush([]);
+    httpMock.expectNone(`${environment.apiUrl}/career/session-teams`);
+  });
+
   it('getAllTeams requests the canonical world teams route with the authenticated user', () => {
     let result: unknown;
     service.getAllTeams('user/1').subscribe(value => result = value);

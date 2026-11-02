@@ -121,6 +121,19 @@ describe('RoundSummaryComponent navigation', () => {
     });
   }
 
+  it('distinguishes an unplayed fixture from an actual goalless draw', () => {
+    const match = { matchId: 'pending', homeTeamId: 'a', awayTeamId: 'b',
+      homeGoals: 0, awayGoals: 0, status: 'PENDING', isUserMatch: true };
+    setVm({ matches: [match, { ...match, matchId: 'played', status: 'COMPLETED' }] });
+    fixture.detectChanges();
+    const rows = fixture.nativeElement.querySelectorAll('.match-result');
+    expect(rows[0].querySelector('.team-score').textContent.trim()).toBe('—');
+    expect(rows[0].textContent).toContain('Sin resultado final');
+    expect(rows[0].querySelector('.btn-detail')).toBeNull();
+    expect(rows[1].querySelector('.team-score').textContent.trim()).toBe('0');
+    expect(rows[1].querySelector('.btn-detail')).not.toBeNull();
+  });
+
   it('playNextRound navigates to tournamentStatus.currentRound + 1 when set', () => {
     // URL round=2 but careerStatus.currentRound=5 -> must navigate to round 6.
     setVm({

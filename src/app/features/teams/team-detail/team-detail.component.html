@@ -1,1 +1,17 @@
-<div><h1>Team Detail</h1></div>
+<section class="club-detail">
+  <a routerLink="/teams" class="back-link">← Clubes de la temporada</a>
+  @if (state$ | async; as state) {
+    @if (state.loading) { <p role="status">Cargando club y plantel...</p> }
+    @else if (state.error) { <p role="alert">{{state.error}}</p> }
+    @else if (state.team; as team) {
+      <header><h1>{{team.name}}</h1><p>{{team.country}}</p></header>
+      <dl><div><dt>Presupuesto</dt><dd>{{formatBudget(team.budget)}}</dd></div><div><dt>Formación</dt><dd>{{team.formation}}</dd></div><div><dt>Moral</dt><dd>{{team.morale}}%</dd></div></dl>
+      <h2>Plantel · {{state.players.length}} jugadores</h2>
+      <div class="table-scroll"><table><caption class="sr-only">Plantel de {{team.name}}</caption><thead><tr><th>Jugador</th><th>Posición</th><th>Edad</th><th>Media</th><th>Energía</th><th>Estado</th></tr></thead><tbody>
+        @for (player of state.players; track player.sessionPlayerId) {
+          <tr><th scope="row">{{player.name}}</th><td>{{player.position}}</td><td>{{player.age}}</td><td>{{player.overall ?? '—'}}</td><td>{{player.energy ?? 100}}%</td><td>{{player.suspended || (player.suspensionRemainingMatches ?? 0) > 0 ? 'Suspendido' : player.injured ? 'Lesionado' : 'Disponible'}}</td></tr>
+        } @empty { <tr><td colspan="6">Este club no tiene jugadores asignados.</td></tr> }
+      </tbody></table></div>
+    }
+  }
+</section>

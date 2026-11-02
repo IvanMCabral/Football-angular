@@ -1,0 +1,23 @@
+<div class="roster-filters" role="search" aria-label="Filtrar plantel">
+  <label>Buscar jugador<input type="search" [(ngModel)]="query" placeholder="Nombre del jugador"></label>
+  <label>Posición<select [(ngModel)]="position"><option value="">Todas</option>@for (p of positions; track p) { <option [value]="p">{{p}}</option> }</select></label>
+  <label>Disponibilidad<select [(ngModel)]="availability"><option value="">Todos</option><option value="available">Disponibles</option><option value="unavailable">Lesionados o suspendidos</option></select></label>
+  <label>Ordenar por<select [(ngModel)]="sortBy"><option value="position">Posición</option><option value="name">Nombre</option><option value="overall">Media</option><option value="energy">Energía</option><option value="age">Edad</option></select></label>
+</div>
+<p class="roster-count" aria-live="polite">{{filtered.length}} de {{players.length}} jugadores</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Plantel del equipo">
+  <table><caption>Plantel y estado de los jugadores. Seleccioná un nombre para ver sus atributos.</caption><thead><tr><th scope="col">Jugador</th><th scope="col">Pos.</th><th scope="col">Edad</th><th scope="col">Media</th><th scope="col">Energía</th><th scope="col">Forma</th><th scope="col">Estado</th></tr></thead><tbody>
+    @for (player of filtered; track player.sessionPlayerId) {
+      <tr [class.unavailable]="!available(player)"><th scope="row"><button type="button" [attr.aria-expanded]="expandedId === player.sessionPlayerId" (click)="expandedId = expandedId === player.sessionPlayerId ? null : player.sessionPlayerId">{{player.name}}</button></th>
+        <td>{{player.position}}</td><td>{{player.age}}</td><td>{{player.overall ?? '—'}}</td><td>{{player.energy ?? 100}}%</td><td>{{player.form ?? '—'}}{{player.form == null ? '' : '%'}}</td><td>{{status(player)}}</td></tr>
+      @if (expandedId === player.sessionPlayerId) {
+        <tr class="player-detail"><td colspan="7"><strong>{{player.name}}</strong><dl><div><dt>Ataque</dt><dd>{{player.attack ?? '—'}}</dd></div><div><dt>Defensa</dt><dd>{{player.defense ?? '—'}}</dd></div><div><dt>Técnica</dt><dd>{{player.technique ?? '—'}}</dd></div><div><dt>Velocidad</dt><dd>{{player.speed ?? '—'}}</dd></div><div><dt>Resistencia</dt><dd>{{player.stamina ?? '—'}}</dd></div><div><dt>Mentalidad</dt><dd>{{player.mentality ?? '—'}}</dd></div></dl>
+          @if (player.marketValue != null) { <p>Valor de mercado: {{money(player.marketValue)}}</p> }
+          @if (player.injured) { <p>Lesión: {{player.injuryRemainingMatches ?? 0}} partidos de recuperación.</p> }
+          @if ((player.suspensionRemainingMatches ?? 0) > 0) { <p>Suspensión: {{player.suspensionRemainingMatches}} partidos.</p> }
+          @for (trait of player.specialTraits ?? []; track trait.code) { <span class="trait">{{trait.name}}</span> }
+        </td></tr>
+      }
+    } @empty { <tr><td colspan="7">No hay jugadores que coincidan con los filtros.</td></tr> }
+  </tbody></table>
+</div>

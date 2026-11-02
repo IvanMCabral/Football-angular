@@ -33,6 +33,7 @@ import { AdvanceRoundResponse, ContinueCareerResponse, SessionPlayer, Team } fro
 import { CareerService } from '../../../core/services/career.service';
 import { beginMatchStartTrace, markMatchStartStage, setMatchStartTraceMetadata } from '../../games/match-start-trace';
 import { buildRoundStartNavigationState } from '../../games/round-start-navigation-state';
+import { RosterTableComponent } from '../../../shared/components/roster-table/roster-table.component';
 
 function isFormationCode(value: string): value is FormationCode {
   return (ALL_FORMATIONS as readonly string[]).includes(value);
@@ -46,12 +47,13 @@ function isFormationCode(value: string): value is FormationCode {
   imports: [
     CommonModule, RouterLink, FormsModule, MatDialogModule,
     CareerStatusBarComponent, PlayerCardComponent, LineupPlayerCardComponent,
-    SeasonStatsTabComponent
+    SeasonStatsTabComponent, RosterTableComponent
   ],
   templateUrl: './squad-management.component.html',
   styleUrls: ['./squad-management.component.css']
 })
 export class SquadManagementComponent implements OnInit {
+  rosterView: 'table' | 'cards' = 'table';
   constructor(
       private http: HttpClient,
       private router: Router,
@@ -304,11 +306,12 @@ availableSquadCount(squad: SessionPlayer[] | null): number {
   if (!squad) return 0;
   return squad.filter(p =>
     p.injured !== true &&
+    p.suspended !== true &&
     !(p.suspensionRemainingMatches != null && p.suspensionRemainingMatches > 0)
   ).length;
 }
 openVisualEditor(): void {
-  this.careerStatus$.subscribe(status => {
+  this.careerStatus$.pipe(take(1)).subscribe(status => {
     if (!status || !status.careerId) {
       return;
     }

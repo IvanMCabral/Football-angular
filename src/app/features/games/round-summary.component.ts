@@ -116,6 +116,10 @@ export class RoundSummaryComponent implements OnInit, OnDestroy {
   ngOnInit() {
   }
 
+  hasPlayedResult(status: string | null | undefined): boolean {
+    return ['COMPLETED', 'SIMULATED', 'FINISHED'].includes(status || '');
+  }
+
   ngOnDestroy() {
     this.destroy$.next();
     this.destroy$.complete();

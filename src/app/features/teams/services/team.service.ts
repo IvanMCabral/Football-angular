@@ -69,20 +69,20 @@ export class TeamService {
   }
 
   getSessionTeams(): Observable<SessionTeam[]> {
-    return this.http.get<SessionTeam[]>(`${this.careerApiUrl}/session-teams`).pipe(
+    return this.http.get<SessionTeam[]>(`${this.careerApiUrl}/teams`).pipe(
       tap(teams => this.sessionTeamsSubject.next(teams))
     );
   }
 
   refreshSessionTeams(): void {
-    this.http.get<SessionTeam[]>(`${this.careerApiUrl}/session-teams`).subscribe({
+    this.http.get<SessionTeam[]>(`${this.careerApiUrl}/teams`).subscribe({
       next: (teams) => this.sessionTeamsSubject.next(teams),
       error: (err) => this.logger.error('[TEAM] Error refreshing teams:', err)
     });
   }
 
   deleteSessionTeam(sessionTeamId: string): Observable<void> {
-    return this.http.delete<void>(`${this.careerApiUrl}/session-teams/${sessionTeamId}`).pipe(
+    return this.http.delete<void>(`${this.careerApiUrl}/teams/${sessionTeamId}`).pipe(
       tap(() => {
         const currentTeams = this.sessionTeamsSubject.value.filter(
           t => t.sessionTeamId !== sessionTeamId

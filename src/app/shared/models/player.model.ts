@@ -11,6 +11,7 @@ export interface Player {
 
 // SessionPlayer - Jugadores guardados en Redis/session (NO en base de datos)
 export interface SessionPlayer {
+  overall?: number;
   sessionPlayerId: string;
   basePlayerId: string | null;  // null si fue creado desde cero
   name: string;
