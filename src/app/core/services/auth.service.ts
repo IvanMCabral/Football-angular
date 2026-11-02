@@ -1,18 +1,27 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { BehaviorSubject, Observable, tap } from 'rxjs';
+import { BehaviorSubject, Observable, defer, finalize, shareReplay, tap } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { AuthResponse, LoginRequest, RegisterRequest } from '../../shared/models/auth.model';
 import { RefreshRequest } from '../../shared/models/refresh-request.model';
 
 export type AssignTeamResponse = string;
 export type AuthStatus = 'unknown' | 'authenticated' | 'anonymous';
+export interface CurrentUserInfo {
+  id: string;
+  username: string;
+  email: string;
+  teamId?: string;
+  teamName?: string;
+  displayName?: string | null;
+}
 
 @Injectable({
   providedIn: 'root'
 })
 export class AuthService {
+  private userInfoRequest?: Observable<CurrentUserInfo>;
   private http = inject(HttpClient);
   private router = inject(Router);
 
@@ -92,6 +101,7 @@ export class AuthService {
   }
 
   logout(): void {
+    this.userInfoRequest = undefined;
     localStorage.removeItem(this.TOKEN_KEY);
     localStorage.removeItem(this.REFRESH_TOKEN_KEY);
     localStorage.removeItem(this.EXPIRES_AT_KEY);
@@ -128,11 +138,21 @@ export class AuthService {
   }
 
   // Obtiene la información del usuario actual (id, nombre y equipo)
-  getUserInfo(): Observable<{ id: string; username: string; email: string; teamId?: string; teamName?: string; displayName?: string | null }> {
-    return this.http.get<{ id: string; username: string; email: string; teamId?: string; teamName?: string; displayName?: string | null }>(`${environment.apiUrl}/auth/me`);
+  getUserInfo(): Observable<CurrentUserInfo> {
+    if (!this.userInfoRequest) {
+      const request$ = defer(() => this.http.get<CurrentUserInfo>(`${environment.apiUrl}/auth/me`)).pipe(
+        finalize(() => {
+          if (this.userInfoRequest === request$) this.userInfoRequest = undefined;
+        }),
+        shareReplay({ bufferSize: 1, refCount: true })
+      );
+      this.userInfoRequest = request$;
+    }
+    return this.userInfoRequest;
   }
 
   private handleAuthResponse(response: AuthResponse): void {
+    this.userInfoRequest = undefined;
     const expiresAt = new Date().getTime() + response.expiresIn * 1000;
 
     localStorage.setItem(this.TOKEN_KEY, response.accessToken);

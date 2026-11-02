@@ -3,8 +3,8 @@ import { CommonModule } from '@angular/common';
 import { Router, ActivatedRoute } from '@angular/router';
 import { CareerService } from '../../core/services/career.service';
 import { Standing } from '../../core/services/career.model';
-import { BehaviorSubject, Observable, combineLatest, of } from 'rxjs';
-import { map, switchMap, tap, takeUntil, catchError, shareReplay } from 'rxjs/operators';
+import { BehaviorSubject, Observable, forkJoin, of, timer } from 'rxjs';
+import { map, switchMap, takeUntil, catchError } from 'rxjs/operators';
 import { Subject } from 'rxjs';
 import { RoundSummaryViewModel, SummaryMatchVM } from './models/round-summary.model';
 import { readableErrorMessage } from '../../shared/utils/error-message';
@@ -46,98 +46,71 @@ export class RoundSummaryComponent implements OnInit, OnDestroy {
   constructor() {
     this.vm$ = this.vmSubject.asObservable();
 
-    const routeParams$ = this.route.paramMap.pipe(
+    this.route.paramMap.pipe(
       map(params => ({
         gameId: params.get('gameId') || '',
         roundNumber: params.get('round') ? parseInt(params.get('round')!) : 1
       })),
-      shareReplay(1)
-    );
-
-    const teams$ = routeParams$.pipe(
-      switchMap(params => this.careerService.getCareerTeams(params.gameId)),
-      map(teams => {
+      switchMap(params => {
+        this.updateVm({ ...this.vmSubject.value, standingsLoading: true, standingsError: '', errorMsg: '' });
+        // These reads depend only on the route/session. Start them together
+        // instead of waiting for teams, then fixtures, then standings.
+        return forkJoin({
+          teams: this.careerService.getCareerTeams(params.gameId),
+          status: this.careerService.getCareerStatus(),
+          fixtures: this.careerService.getFixturesByRoundWithBye(params.roundNumber),
+          standings: this.careerService.getStandings().pipe(catchError(() => of(null)))
+        }).pipe(map(data => ({ ...data, params })));
+      }),
+      takeUntil(this.destroy$)
+    ).subscribe({
+      next: ({ params, teams, status, fixtures, standings }) => {
         const teamMap: { [id: string]: string } = {};
-        teams.forEach(team => {
-          const teamId = team.sessionTeamId || String(team.id);
-          teamMap[teamId] = team.name;
-        });
-        return teamMap;
-      }),
-      shareReplay(1)
-    );
-
-    const careerStatus$ = routeParams$.pipe(
-      switchMap(params => this.careerService.getCareerStatus())
-    );
-
-    combineLatest([routeParams$, teams$, careerStatus$]).pipe(
-      takeUntil(this.destroy$),
-      tap(([params, teamMap, careerStatus]) => {
-        const userSessionTeamId = careerStatus.userSessionTeamId || '';
-        const userTeamName = teamMap[userSessionTeamId] || '';
-
-        this.careerService.getFixturesByRoundWithBye(params.roundNumber).subscribe({
-          next: (fixturesData) => {
-            const fixtures = fixturesData.matches;
-            const byeTeam: string | null = fixturesData.byeTeam ?? null;
-            const matches: SummaryMatchVM[] = fixtures.map(fixture => ({
-              matchId: fixture.matchId,
-              homeTeamId: fixture.homeTeamId,
-              awayTeamId: fixture.awayTeamId,
-              homeGoals: fixture.homeGoals ?? 0,
-              awayGoals: fixture.awayGoals ?? 0,
-              status: fixture.status,
-              isUserMatch: String(fixture.homeTeamId) === String(userSessionTeamId) ||
-                           String(fixture.awayTeamId) === String(userSessionTeamId)
-            }));
-
-            const canPlayNextRound = careerStatus.canAdvanceRound &&
-                                      careerStatus.currentRound <= careerStatus.totalRounds;
-            const hasNextRound = params.roundNumber < careerStatus.totalRounds;
-            const isTournamentEnded = careerStatus.careerPhase === 'FINISHED' ||
-                                       careerStatus.currentRound > careerStatus.totalRounds;
-
-            this.updateVm({
-              gameId: params.gameId,
-              roundNumber: params.roundNumber,
-              careerId: careerStatus.careerId || '',
-              matches,
-              standings: [],
-              standingsLoading: true,
-              standingsError: '',
-              teamNameMap: teamMap,
-              userTeamId: userSessionTeamId,
-              userTeamName: userTeamName,
-              userPosition: 0,
-              careerPhase: careerStatus.careerPhase || 'WAITING_USER',
-              tournamentStatus: {
-                currentRound: careerStatus.currentRound,
-                totalRounds: careerStatus.totalRounds,
-                hasNextRound,
-                isFinished: isTournamentEnded,
-                canPlayCurrentRound: canPlayNextRound,
-                season: careerStatus.season
-              },
-              errorMsg: '',
-              byeTeam
-            });
-
-            this.loadStandings();
-            setTimeout(() => this.reloadCareerStatus(), 100);
+        teams.forEach(team => teamMap[team.sessionTeamId || String(team.id)] = team.name);
+        const userTeamId = status.userSessionTeamId || '';
+        this.updateVm({
+          gameId: params.gameId,
+          roundNumber: params.roundNumber,
+          careerId: status.careerId || '',
+          matches: fixtures.matches.map(fixture => ({
+            matchId: fixture.matchId,
+            homeTeamId: fixture.homeTeamId,
+            awayTeamId: fixture.awayTeamId,
+            homeGoals: fixture.homeGoals ?? 0,
+            awayGoals: fixture.awayGoals ?? 0,
+            status: fixture.status,
+            isUserMatch: String(fixture.homeTeamId) === String(userTeamId) ||
+                         String(fixture.awayTeamId) === String(userTeamId)
+          })),
+          standings: (standings || []).map(s => ({ ...s, wins: s.won, draws: s.drawn, losses: s.lost })),
+          standingsLoading: false,
+          standingsError: standings === null
+            ? 'No pudimos cargar la clasificación. Volvé a abrir el resumen para intentar nuevamente.' : '',
+          teamNameMap: teamMap,
+          userTeamId,
+          userTeamName: teamMap[userTeamId] || '',
+          userPosition: standings ? standings.findIndex(s => s.teamId === userTeamId) + 1 : 0,
+          careerPhase: status.careerPhase || 'WAITING_USER',
+          tournamentStatus: {
+            currentRound: status.currentRound,
+            totalRounds: status.totalRounds,
+            hasNextRound: params.roundNumber < status.totalRounds,
+            isFinished: status.careerPhase === 'FINISHED' || status.currentRound > status.totalRounds,
+            canPlayCurrentRound: status.canAdvanceRound && status.currentRound <= status.totalRounds,
+            season: status.season
           },
-          error: () => {
-            this.updateVm({
-              ...this.vmSubject.value,
-              errorMsg: 'Error al cargar los partidos'
-            });
-          }
+          errorMsg: '',
+          byeTeam: fixtures.byeTeam ?? null
         });
-      }),
-      catchError(() => {
-        return of(null);
+        // Retain the completion-status refresh, bounded by component lifetime.
+        timer(100).pipe(takeUntil(this.destroy$)).subscribe(() => this.reloadCareerStatus());
+      },
+      error: () => this.updateVm({
+        ...this.vmSubject.value, standingsLoading: false,
+        standingsError: 'No pudimos cargar la clasificación.',
+        errorMsg: 'Error al cargar el resumen. Volvé a abrirlo para intentar nuevamente.'
       })
-    ).subscribe();
+    });
   }
 
   ngOnInit() {

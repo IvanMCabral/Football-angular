@@ -69,6 +69,7 @@ describe('RoundSummaryComponent navigation', () => {
     expect(fixture.nativeElement.textContent).toContain('Cargando clasificación');
     expect(fixture.nativeElement.textContent).not.toContain('Tu equipo no está');
     standings.next([]);
+    standings.complete();
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).not.toContain('Cargando clasificación');
     expect(fixture.nativeElement.textContent).toContain('Tu equipo no está');
@@ -86,6 +87,19 @@ describe('RoundSummaryComponent navigation', () => {
     expect(fixture.nativeElement.textContent).toContain('No pudimos cargar la clasificación');
     expect(fixture.nativeElement.textContent).not.toContain('Tu equipo no está');
     expect(fixture.nativeElement.querySelector('.standings-table')).toBeNull();
+  });
+
+  it('starts fixtures and standings while the teams request is still pending', () => {
+    const teams = new Subject<any[]>();
+    careerServiceSpy.getCareerTeams.and.returnValue(teams);
+    careerServiceSpy.getFixturesByRoundWithBye.calls.reset();
+    careerServiceSpy.getStandings.calls.reset();
+    fixture.destroy();
+    fixture = TestBed.createComponent(RoundSummaryComponent);
+    expect(careerServiceSpy.getFixturesByRoundWithBye).toHaveBeenCalledTimes(1);
+    expect(careerServiceSpy.getStandings).toHaveBeenCalledTimes(1);
+    fixture.destroy();
+    expect(teams.observed).toBeFalse();
   });
 
   function setVm(vm: Partial<RoundSummaryViewModel>) {

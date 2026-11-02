@@ -3,7 +3,7 @@
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
-import { of } from 'rxjs';
+import { Subject, of } from 'rxjs';
 import { AuthService } from './auth.service';
 import { AuthResponse } from '../../shared/models/auth.model';
 
@@ -22,7 +22,7 @@ describe('AuthService payload hygiene', () => {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('expiresAt');
-    httpSpy = jasmine.createSpyObj('HttpClient', ['post']);
+    httpSpy = jasmine.createSpyObj('HttpClient', ['post', 'get']);
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
@@ -32,6 +32,42 @@ describe('AuthService payload hygiene', () => {
     });
     httpSpy.post.and.returnValue(of(fakeResponse));
     service = TestBed.inject(AuthService);
+  });
+
+  it('shares only simultaneous user-info reads and fetches fresh data after completion', () => {
+    const response = new Subject<any>();
+    httpSpy.get.and.returnValues(response, of({ id: 'fresh', username: 'fresh', email: 'fresh@test.invalid' }));
+    const ids: string[] = [];
+    service.getUserInfo().subscribe(user => ids.push(user.id));
+    service.getUserInfo().subscribe(user => ids.push(user.id));
+    expect(httpSpy.get).toHaveBeenCalledTimes(1);
+    response.next({ id: 'shared', username: 'shared', email: 'shared@test.invalid' });
+    response.complete();
+    service.getUserInfo().subscribe(user => ids.push(user.id));
+    expect(ids).toEqual(['shared', 'shared', 'fresh']);
+    expect(httpSpy.get).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not let a previous session request replace the next session request', () => {
+    const old = new Subject<any>();
+    const current = new Subject<any>();
+    httpSpy.get.and.returnValues(old, current);
+    service.getUserInfo().subscribe();
+    service.logout();
+    service.getUserInfo().subscribe();
+    old.complete();
+    service.getUserInfo().subscribe();
+    expect(httpSpy.get).toHaveBeenCalledTimes(2);
+    current.complete();
+  });
+
+  it('allows a fresh user-info request after failure', () => {
+    const failed = new Subject<any>();
+    httpSpy.get.and.returnValues(failed, of({ id: 'recovered' }));
+    service.getUserInfo().subscribe({ error: () => undefined });
+    failed.error(new Error('synthetic'));
+    service.getUserInfo().subscribe(user => expect(user.id).toBe('recovered'));
+    expect(httpSpy.get).toHaveBeenCalledTimes(2);
   });
 
   describe('login()', () => {
