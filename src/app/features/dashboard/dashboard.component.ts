@@ -1,4 +1,4 @@
-import { Component, DestroyRef, inject, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, DestroyRef, inject, OnInit } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { RouterLink, Router } from '@angular/router';
@@ -92,6 +92,7 @@ export class DashboardComponent implements OnInit {
   private dialog = inject(MatDialog);
   private careerService = inject(CareerService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly changeDetector = inject(ChangeDetectorRef);
 
   private careerStatusSubject = new BehaviorSubject<CareerStatus | null | undefined>(undefined);
   careerStatus$ = this.careerStatusSubject.asObservable();
@@ -117,6 +118,8 @@ export class DashboardComponent implements OnInit {
   recentActivities: RecentActivity[] = [];
 
   loading = false;
+  deletingCareer = false;
+  private careerViewVersion = 0;
   generatingPlayers = false;
 
   playNextRoundLabel(status: CareerStatus | null | undefined): string {
@@ -161,6 +164,7 @@ export class DashboardComponent implements OnInit {
   }
 
   private loadCareerStatus(forceRefresh = true, initialStatus$?: Observable<ApiCareerStatus>): void {
+    const version = this.careerViewVersion;
     if (!initialStatus$) this.squadConditionCounts = null;
     if (forceRefresh) {
       this.careerService.invalidateCareerStatus();
@@ -187,6 +191,7 @@ export class DashboardComponent implements OnInit {
         return of(null);
       })
     ).subscribe(status => {
+      if (this.destroyRef.destroyed || version !== this.careerViewVersion) return;
     this.careerStatusSubject.next(status);
 
       // The entry screen only needs squad conditions before a pending round.
@@ -389,6 +394,8 @@ export class DashboardComponent implements OnInit {
   }
 
   onPlayNextRound(): void {
+    if (this.deletingCareer) return;
+    const version = this.careerViewVersion;
     beginMatchStartTrace();
     markMatchStartStage('CLICK_HANDLER_ENTER');
     markMatchStartStage('T1_HANDLER_STARTED');
@@ -419,13 +426,16 @@ export class DashboardComponent implements OnInit {
       });
       this.careerService.getCareerStatus().subscribe({
         next: refreshed => {
+          if (this.destroyRef.destroyed || version !== this.careerViewVersion) return;
           this.careerStatusSubject.next({
             ...refreshed,
             isFinished: refreshed.careerPhase === 'FINISHED'
           } as CareerStatus);
           this.toastService.error('Career state refreshed. Try starting the date again.');
         },
-        error: () => this.toastService.error('Career state is unavailable.')
+        error: () => {
+          if (!this.destroyRef.destroyed && version === this.careerViewVersion) this.toastService.error('Career state is unavailable.');
+        }
       });
       return;
     }
@@ -436,6 +446,7 @@ export class DashboardComponent implements OnInit {
     markMatchStartStage('FETCH_XHR_DISPATCH');
     advance$.subscribe({
       next: response => {
+        if (this.destroyRef.destroyed || version !== this.careerViewVersion) return;
         markMatchStartStage('POST_RESPONSE');
         this.loading = false;
         if (response.success) {
@@ -470,6 +481,7 @@ export class DashboardComponent implements OnInit {
         this.refreshCareerStatus();
       },
       error: err => {
+        if (this.destroyRef.destroyed || version !== this.careerViewVersion) return;
         this.loading = false;
         setMatchStartTraceMetadata({
           statusInvalidationReason: 'start-command-error',
@@ -488,6 +500,7 @@ export class DashboardComponent implements OnInit {
   }
 
   onDeleteCareer(): void {
+    if (this.deletingCareer) return;
     const ref = this.dialog.open<ConfirmActionDialogComponent, ConfirmDialogData, boolean>(ConfirmActionDialogComponent, {
       data: {
         title: 'Borrar carrera',
@@ -501,16 +514,30 @@ export class DashboardComponent implements OnInit {
     });
 
     ref.afterClosed().subscribe(confirmed => {
-      if (!confirmed) {
+      if (!confirmed || this.deletingCareer || this.destroyRef.destroyed) {
         return;
       }
+      this.deletingCareer = true;
+      this.careerViewVersion++;
       this.http.delete(`${environment.apiUrl}/career/reset`).subscribe({
         next: () => {
-          this.careerService.invalidateCareerStatus();
-          this.refreshCareerStatus();
+          this.careerService.clearCareerStatusSnapshot();
+          this.loading = false;
+          this.deletingCareer = false;
+          if (this.destroyRef.destroyed) return;
+          this.lastSeenPhase = null;
+          this.lastSeenSeason = null;
+          this.squadSubject.next([]);
+          this.squadConditionCounts = null;
+          this.careerStatusSubject.next(undefined);
+          this.loadDashboardData();
         },
         error: () => {
+          this.loading = false;
+          this.deletingCareer = false;
+          if (this.destroyRef.destroyed) return;
           this.toastService.error('No se pudo borrar la carrera. Probá de nuevo.');
+          this.changeDetector.markForCheck();
         }
       });
     });

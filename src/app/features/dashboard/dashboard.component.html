@@ -48,7 +48,7 @@
             class="action-button primary play-next"
             (pointerdown)="onMatchStartPointerEvent()"
             (click)="onPlayNextRound()"
-            [disabled]="loading">
+            [disabled]="loading || deletingCareer">
       <span class="action-icon">⚽</span>
       <span class="action-text">
 
@@ -62,7 +62,7 @@
     <button *ngIf="careerStatus.careerPhase !== 'WAITING_USER'"
             class="action-button primary"
             (click)="onContinueCareer()"
-            [disabled]="loading">
+            [disabled]="loading || deletingCareer">
       <span class="action-icon">▶️</span>
       <span class="action-text">
         <span class="action-label">Continuar carrera</span>
@@ -70,7 +70,7 @@
       </span>
     </button>
 
-    <button class="action-button danger" (click)="onDeleteCareer()" [disabled]="loading">
+    <button class="action-button danger" (click)="onDeleteCareer()" [disabled]="loading || deletingCareer">
       <span class="action-icon">🗑️</span>
       <span class="action-text">
         <span class="action-label">Borrar carrera</span>
@@ -80,7 +80,7 @@
   </div>
   <!-- Carrera finalizada -->
   <div class="play-card play-finished" *ngIf="careerStatus && careerStatus.isFinished">
-    <button class="play-button" (click)="onPlayNow()" [disabled]="loading">
+    <button class="play-button" (click)="onPlayNow()" [disabled]="loading || deletingCareer">
       <span class="play-label">🏆 TEMPORADA COMPLETADA</span>
       <span class="play-subtitle">Iniciar nueva temporada</span>
     </button>
