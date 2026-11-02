@@ -7,8 +7,8 @@ import { AuthService } from '../../../core/services/auth.service';
 import { AppLoggerService } from '../../../core/services/app-logger.service';
 import { environment } from '../../../environments/environment';
 import { readableErrorMessage } from '../../../shared/utils/error-message';
-import { Observable, of, BehaviorSubject, Subject, merge } from 'rxjs';
-import { switchMap, catchError, startWith, map } from 'rxjs/operators';
+import { Observable, of, BehaviorSubject, Subject } from 'rxjs';
+import { switchMap, catchError, startWith, map, shareReplay } from 'rxjs/operators';
 
 interface League {
   id: string;
@@ -67,78 +67,42 @@ export class PlayerManagementComponent {
     catchError(() => of([]))
   );
 
-  // Full team catalog: real and custom teams.
-  teams$: Observable<Team[]> = merge(
-    this.reloadTeams$
-  ).pipe(
-    startWith(null),
-    switchMap(_ => 
-      this.authService.getUserInfo().pipe(
-        switchMap(userInfo => 
-          this.http.get<WorldTeam[]>(`${this.apiUrl}/world/teams?userId=${userInfo.id}`).pipe(
-            map(worldTeams => worldTeams.map(wt => ({
-              sessionTeamId: wt.worldTeamId,
-              name: wt.name,
-              country: wt.country
-            }))),
-            catchError(() => of([]))
-          )
-        ),
-        catchError(() => of([]))
-      )
-    )
+  // Share one owner-authenticated request across all async template subscribers.
+  teams$: Observable<Team[]> = this.reloadTeams$.pipe(
+    startWith(undefined),
+    switchMap(() => this.http.get<WorldTeam[]>(`${this.apiUrl}/world/teams`).pipe(
+      map(teams => teams.map(team => ({
+        sessionTeamId: team.worldTeamId, name: team.name, country: team.country
+      }))),
+      catchError(() => of([]))
+    )),
+    shareReplay({ bufferSize: 1, refCount: true })
   );
 
-  // Squad actual del equipo desde WorldSnapshot (jugadores reales + custom)
   assignedPlayers$: Observable<Player[]> = this.teamId$.pipe(
-    switchMap(worldTeamId => {
-      if (!worldTeamId) return of([]);
-      
-      // Obtener jugadores del WorldTeam en WorldSnapshot
-      return this.authService.getUserInfo().pipe(
-        switchMap(userInfo => 
-          this.http.get<WorldPlayer[]>(`${this.apiUrl}/world/teams/${worldTeamId}/players?userId=${userInfo.id}`).pipe(
-            map(worldPlayers => worldPlayers.map(wp => ({
-              sessionPlayerId: wp.worldPlayerId, // Usar worldPlayerId como ID
-              name: wp.name,
-              position: wp.position,
-              age: wp.age,
-              overall: wp.overall
-            }))),
-            catchError(() => of([]))
-          )
-        ),
+    switchMap(teamId => !teamId ? of([]) :
+      this.http.get<WorldPlayer[]>(`${this.apiUrl}/world/teams/${teamId}/players`).pipe(
+        map(players => players.map(player => ({
+          sessionPlayerId: player.worldPlayerId, name: player.name,
+          position: player.position, age: player.age, overall: player.overall
+        }))),
         catchError(() => of([]))
-      );
-    })
+      )),
+    shareReplay({ bufferSize: 1, refCount: true })
   );
 
-  // SOLO jugadores sin equipo (worldTeamId === null) = Free Agents
-  availablePlayers$: Observable<Player[]> = merge(
-    this.teamId$,
-    this.reloadAvailablePlayers$
-  ).pipe(
-    startWith(null),
-    switchMap(_ =>
-      this.authService.getUserInfo().pipe(
-        switchMap(userInfo => 
-          this.http.get<WorldPlayer[]>(`${this.apiUrl}/world/players?userId=${userInfo.id}`).pipe(
-            map(worldPlayers => worldPlayers
-              .filter(wp => !wp.worldTeamId) // Filtrar solo free agents (sin equipo)
-              .map(wp => ({
-                sessionPlayerId: wp.worldPlayerId, // Usar worldPlayerId como ID
-                name: wp.name,
-                position: wp.position,
-                age: wp.age,
-                overall: wp.overall
-              }))
-            ),
-            catchError(() => of([]))
-          )
-        ),
-        catchError(() => of([]))
-      )
-    )
+  // Changing the selected club does not change the free-agent pool. Commands
+  // explicitly reload this list after assigning or removing a player.
+  availablePlayers$: Observable<Player[]> = this.reloadAvailablePlayers$.pipe(
+    startWith(undefined),
+    switchMap(() => this.http.get<WorldPlayer[]>(`${this.apiUrl}/world/free-players`).pipe(
+      map(players => players.map(player => ({
+        sessionPlayerId: player.worldPlayerId, name: player.name,
+        position: player.position, age: player.age, overall: player.overall
+      }))),
+      catchError(() => of([]))
+    )),
+    shareReplay({ bufferSize: 1, refCount: true })
   );
 
   selectedTeamId: string | null = null;

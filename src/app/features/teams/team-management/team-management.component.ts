@@ -8,7 +8,7 @@ import { AuthService } from '../../../core/services/auth.service';
 import { AppLoggerService } from '../../../core/services/app-logger.service';
 import { environment } from '../../../environments/environment';
 import { readableErrorMessage } from '../../../shared/utils/error-message';
-import { Observable, of, BehaviorSubject, Subject, merge, combineLatest } from 'rxjs';
+import { Observable, of, BehaviorSubject, Subject, combineLatest } from 'rxjs';
 import { switchMap, catchError, startWith, map, shareReplay } from 'rxjs/operators';
 
 interface League {
@@ -64,18 +64,14 @@ export class TeamManagementComponent {
   reloadTeams$ = new Subject<void>();
   selectedTeamForRoster$ = new BehaviorSubject<Team | null>(null);
 
-  // Leagues observable - usa world endpoint que tiene WorldLeague
-  leagues$: Observable<League[]> = this.authService.getUserInfo().pipe(
-    switchMap((userInfo: CurrentUser) =>
-      this.http.get<League[]>(`${this.apiUrl}/world/leagues?userId=${userInfo.id}`).pipe(
-        catchError(err => {
-          this.logger.error('Failed to load leagues:', err);
-          this.toastService.error(readableErrorMessage(err, 'No se pudieron cargar las ligas.'));
-          return of([]);
-        })
-      )
-    ),
-    shareReplay(1)
+  // The server resolves the owner from the verified JWT; no profile waterfall.
+  leagues$: Observable<League[]> = this.http.get<League[]>(`${this.apiUrl}/world/leagues`).pipe(
+    catchError(err => {
+      this.logger.error('Failed to load leagues:', err);
+      this.toastService.error(readableErrorMessage(err, 'No se pudieron cargar las ligas.'));
+      return of([]);
+    }),
+    shareReplay({ bufferSize: 1, refCount: true })
   );
 
   // Selected league name
@@ -90,35 +86,19 @@ export class TeamManagementComponent {
     })
   );
 
-  // All teams observable with reload trigger - usa WorldTeams como player-management
-  allTeams$: Observable<Team[]> = merge(
-    this.reloadTeams$
-  ).pipe(
-    startWith(null),
-    switchMap(_ => 
-      this.authService.getUserInfo().pipe(
-        switchMap((userInfo: CurrentUser) => 
-          this.http.get<WorldTeam[]>(`${this.apiUrl}/world/teams?userId=${userInfo.id}`).pipe(
-            map(worldTeams => worldTeams.map((wt) => ({
-              id: wt.worldTeamId,
-              name: wt.name,
-              country: wt.country,
-              city: wt.city || 'N/A',
-              leagueId: wt.realLeagueId?.toString() // El campo correcto es realLeagueId
-            }))),
-            catchError(err => {
-              this.logger.error('Failed to load teams:', err);
-              return of([]);
-            })
-          )
-        ),
-        catchError(err => {
-          this.logger.error('Failed to get user info:', err);
-          return of([]);
-        })
-      )
-    ),
-    shareReplay(1)
+  allTeams$: Observable<Team[]> = this.reloadTeams$.pipe(
+    startWith(undefined),
+    switchMap(() => this.http.get<WorldTeam[]>(`${this.apiUrl}/world/teams`).pipe(
+      map(teams => teams.map(team => ({
+        id: team.worldTeamId, name: team.name, country: team.country,
+        city: team.city || 'N/A', leagueId: team.realLeagueId?.toString()
+      }))),
+      catchError(err => {
+        this.logger.error('Failed to load teams:', err);
+        return of([]);
+      })
+    )),
+    shareReplay({ bufferSize: 1, refCount: true })
   );
 
   // Teams in selected league
@@ -154,7 +134,8 @@ export class TeamManagementComponent {
           return of([]);
         })
       );
-    })
+    }),
+    shareReplay({ bufferSize: 1, refCount: true })
   );
 
   // For ngModel binding
