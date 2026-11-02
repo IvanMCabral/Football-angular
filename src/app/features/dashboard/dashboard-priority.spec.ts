@@ -32,8 +32,8 @@ describe('Dashboard entry request priority', () => {
   });
   afterEach(() => { fixture.destroy(); backend.verify({ ignoreCancelled: true }); });
 
-  function resolveCareer(phase = 'PRE_MATCH'): void {
-    backend.expectOne(`${api}/dashboard/entry`).flush({ user: { id: 'owner', username: 'Manager' }, careerStatus: { ...status, careerPhase: phase }, userStats: { matchesPlayed: 0, matchesWon: 0, matchesLost: 0, winPercentage: 0 } });
+  function resolveCareer(phase = 'PRE_MATCH', injured = 0): void {
+    backend.expectOne(`${api}/dashboard/entry`).flush({ user: { id: 'owner', username: 'Manager' }, careerStatus: { ...status, careerPhase: phase }, userStats: { matchesPlayed: 0, matchesWon: 0, matchesLost: 0, winPercentage: 0 }, squadConditions: { suspended: 0, injured, exhausted: 0, veryTired: 0 } });
     fixture.detectChanges();
   }
   function resolveSecondaryReads(): void {
@@ -63,9 +63,9 @@ describe('Dashboard entry request priority', () => {
     expect(fixture.nativeElement.textContent).toContain('1680');
   });
 
-  it('still loads squad conditions before a pending round without prefetching fixtures', () => {
-    fixture.detectChanges(); resolveCareer('WAITING_USER'); resolveSecondaryReads();
-    backend.expectOne(`${api}/career/players/squad`).flush([{ sessionPlayerId: 'player', injured: true }]);
+  it('renders accurate squad conditions from entry without downloading the roster', () => {
+    fixture.detectChanges(); resolveCareer('WAITING_USER', 1); resolveSecondaryReads();
+    backend.expectNone(`${api}/career/players/squad`);
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('jugador lesionado');
     backend.expectNone(req => req.url.includes('/fixtures'));

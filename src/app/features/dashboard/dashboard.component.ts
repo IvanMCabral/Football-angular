@@ -38,6 +38,7 @@ interface DashboardEntry {
   user: UserInfo;
   careerStatus: ApiCareerStatus;
   userStats: UserStats;
+  squadConditions?: { suspended: number; injured: number; exhausted: number; veryTired: number };
 }
 
 interface CareerStatus {
@@ -99,6 +100,7 @@ export class DashboardComponent implements OnInit {
   private lastSeenSeason: number | null = null;
 
   private squadSubject = new BehaviorSubject<SessionPlayer[]>([]);
+  private squadConditionCounts: DashboardEntry['squadConditions'] | null = null;
   squad$ = this.squadSubject.asObservable();
 
   user$?: Observable<UserInfo | null>;
@@ -159,6 +161,7 @@ export class DashboardComponent implements OnInit {
   }
 
   private loadCareerStatus(forceRefresh = true, initialStatus$?: Observable<ApiCareerStatus>): void {
+    if (!initialStatus$) this.squadConditionCounts = null;
     if (forceRefresh) {
       this.careerService.invalidateCareerStatus();
     }
@@ -191,7 +194,7 @@ export class DashboardComponent implements OnInit {
       const phase = status?.careerPhase ?? null;
       const season = status?.season ?? 0;
       const changed = phase !== this.lastSeenPhase || season !== this.lastSeenSeason;
-      if (status?.careerPhase === 'WAITING_USER' && changed) this.loadSquadData();
+      if (status?.careerPhase === 'WAITING_USER' && changed && !this.squadConditionCounts) this.loadSquadData();
       if (this.lastSeenPhase !== null) {
         const phaseChanged = phase !== this.lastSeenPhase;
         const seasonChanged = season !== this.lastSeenSeason;
@@ -270,20 +273,24 @@ export class DashboardComponent implements OnInit {
   }
 
   suspendedCount(): number {
+    if (this.squadConditionCounts) return this.squadConditionCounts.suspended;
     return this.getSquadPlayers().filter(p => this.isSuspended(p)).length;
   }
 
   injuredCount(): number {
+    if (this.squadConditionCounts) return this.squadConditionCounts.injured;
     return this.getSquadPlayers().filter(p => p.injured === true && !this.isSuspended(p)).length;
   }
 
   exhaustedCount(): number {
+    if (this.squadConditionCounts) return this.squadConditionCounts.exhausted;
     return this.getSquadPlayers().filter(p =>
       !this.isSuspended(p) && p.injured !== true && (p.energy ?? 100) <= 19
     ).length;
   }
 
   veryTiredCount(): number {
+    if (this.squadConditionCounts) return this.squadConditionCounts.veryTired;
     return this.getSquadPlayers().filter(p => {
       const e = p.energy ?? 100;
       return !this.isSuspended(p) && p.injured !== true && e >= 20 && e <= 39;
@@ -321,7 +328,10 @@ export class DashboardComponent implements OnInit {
     // One owner-authenticated request loads the entire visible entry screen.
     // The world catalog and fixtures are not part of this response.
     const entry$ = this.http.get<DashboardEntry>(`${environment.apiUrl}/dashboard/entry`).pipe(
-      tap(entry => this.careerService.seedCareerStatus(entry.careerStatus)),
+      tap(entry => {
+        this.careerService.seedCareerStatus(entry.careerStatus);
+        this.squadConditionCounts = entry.squadConditions ?? null;
+      }),
       takeUntilDestroyed(this.destroyRef),
       share({ connector: () => new ReplaySubject<DashboardEntry>(1), resetOnError: false,
         resetOnComplete: false, resetOnRefCountZero: true })
