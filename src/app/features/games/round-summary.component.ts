@@ -1,12 +1,13 @@
 import { Component, inject, OnInit, OnDestroy } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpContext } from '@angular/common/http';
+import { REFRESH_CAREER_READ } from '../../core/interceptors/career-read-cache.interceptor';
 import { environment } from '../../environments/environment';
 import { buildRoundStartNavigationState } from './round-start-navigation-state';
 import { CommonModule } from '@angular/common';
 import { Router, ActivatedRoute } from '@angular/router';
 import { CareerService } from '../../core/services/career.service';
 import { Standing } from '../../core/services/career.model';
-import { BehaviorSubject, Observable, forkJoin, of, timer, merge } from 'rxjs';
+import { BehaviorSubject, Observable, combineLatest, forkJoin, of, timer, merge } from 'rxjs';
 import { map, switchMap, exhaustMap, distinctUntilChanged, takeUntil, catchError, take, takeWhile, tap } from 'rxjs/operators';
 import { Subject } from 'rxjs';
 import { RoundSummaryViewModel, SummaryMatchVM } from './models/round-summary.model';
@@ -56,18 +57,29 @@ export class RoundSummaryComponent implements OnInit, OnDestroy {
   });
 
   vm$: Observable<RoundSummaryViewModel>;
+  private overviewRequest = new BehaviorSubject<Observable<NextRoundOverview | null>>(of(null));
   nextRoundOverview$!: Observable<NextRoundOverview | null>;
 
   constructor() {
     this.vm$ = this.vmSubject.asObservable();
-    this.nextRoundOverview$ = this.vm$.pipe(
+    const pendingRound$ = this.vm$.pipe(
       map(vm => this.canStartNextRound(vm) ? { careerId: vm.careerId, round: vm.tournamentStatus!.currentRound } : null),
-      distinctUntilChanged((before, after) => before?.careerId === after?.careerId && before?.round === after?.round),
-      switchMap(next => next ? this.http.get<NextRoundOverview>(`${environment.apiUrl}/dashboard/entry`).pipe(
-        map(entry => entry.careerStatus.careerId === next.careerId && entry.careerStatus.currentRound === next.round
-          ? entry : null),
-        catchError(() => of(null))
-      ) : of(null))
+      distinctUntilChanged((before, after) => before?.careerId === after?.careerId && before?.round === after?.round)
+    );
+    this.nextRoundOverview$ = combineLatest([
+      pendingRound$,
+      this.overviewRequest.pipe(switchMap(request => request))
+    ]).pipe(
+      switchMap(([next, entry]) => {
+        if (!next || !entry) return of(null);
+        if (entry.careerStatus.careerId === next.careerId && entry.careerStatus.currentRound === next.round) {
+          return of(entry);
+        }
+        return this.loadNextRoundOverview(true).pipe(
+          map(fresh => fresh?.careerStatus.careerId === next.careerId && fresh.careerStatus.currentRound === next.round
+            ? fresh : null)
+        );
+      })
     );
 
     this.route.paramMap.pipe(
@@ -77,6 +89,7 @@ export class RoundSummaryComponent implements OnInit, OnDestroy {
         roundNumber: params.get('round') ? parseInt(params.get('round')!) : 1
       })),
       switchMap(params => {
+        this.overviewRequest.next(this.loadNextRoundOverview());
         this.updateVm({ ...this.vmSubject.value, standingsLoading: true, standingsError: '', errorMsg: '' });
         // These reads depend only on the route/session. Start them together
         // instead of waiting for teams, then fixtures, then standings.
@@ -141,6 +154,12 @@ export class RoundSummaryComponent implements OnInit, OnDestroy {
         errorMsg: 'Error al cargar el resumen. Volvé a abrirlo para intentar nuevamente.'
       })
     });
+  }
+
+  private loadNextRoundOverview(refresh = false): Observable<NextRoundOverview | null> {
+    return this.http.get<NextRoundOverview>(`${environment.apiUrl}/dashboard/entry`, {
+      context: new HttpContext().set(REFRESH_CAREER_READ, refresh)
+    }).pipe(catchError(() => of(null)));
   }
 
   ngOnInit() {

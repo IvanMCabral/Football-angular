@@ -4,7 +4,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, provideRouter, Router } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
-import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { BehaviorSubject, Subject, of, throwError } from 'rxjs';
 import { RoundSummaryComponent } from './round-summary.component';
@@ -258,6 +258,30 @@ describe('RoundSummaryComponent navigation', () => {
     expect(rows[0].querySelector('.btn-detail')).toBeNull();
     expect(rows[1].querySelector('.team-score').textContent.trim()).toBe('0');
     expect(rows[1].querySelector('.btn-detail')).not.toBeNull();
+  });
+
+  it('loads the next opponent and active absences before standings finish', () => {
+    const standings = new Subject<any[]>();
+    careerServiceSpy.getStandings.and.returnValue(standings);
+    fixture.destroy();
+    fixture = TestBed.createComponent(RoundSummaryComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    const request = TestBed.inject(HttpTestingController).match(req => req.url.endsWith('/dashboard/entry')).at(-1);
+    expect(request).toBeDefined();
+    request!.flush({
+      careerStatus: { careerId: SAMPLE_GAME_ID, currentRound: 3 },
+      careerOverview: { nextMatch: { round: 3, homeTeamName: 'Mi club', awayTeamName: 'Rival', home: true } },
+      squadConditions: { injured: 1, suspended: 1 }
+    });
+    setVm({
+      roundNumber: 2,
+      tournamentStatus: { currentRound: 3, totalRounds: 38, hasNextRound: true, isFinished: false, canPlayCurrentRound: true }
+    });
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('1 lesión · 1 suspensión');
+    expect(fixture.nativeElement.textContent).toContain('Rival · Local');
   });
 
   it('starts the pending round in simulation mode without skipping a date', () => {

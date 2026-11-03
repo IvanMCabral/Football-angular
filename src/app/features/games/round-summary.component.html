@@ -1,3 +1,4 @@
+@let overview = nextRoundOverview$ | async;
 <div class="summary-container" *ngIf="vm$ | async as vm">
 
   <div class="header">
@@ -20,11 +21,12 @@
         <ng-template #positionUnavailable><strong>{{ vm.standingsLoading ? 'Consultando…' : 'Sin dato' }}</strong></ng-template>
       </div>
       <ng-container *ngIf="canStartNextRound(vm)">
-        <ng-container *ngIf="nextRoundOverview$ | async as overview; else overviewUnavailable">
+        <ng-container *ngIf="overview; else overviewUnavailable">
           <div>
             <span>Bajas del plantel</span>
             <strong *ngIf="overview.squadConditions as conditions; else noConditions">
-              {{ conditions.injured }} lesiones · {{ conditions.suspended }} suspensiones
+              {{ conditions.injured }} {{ conditions.injured === 1 ? 'lesión' : 'lesiones' }} ·
+              {{ conditions.suspended }} {{ conditions.suspended === 1 ? 'suspensión' : 'suspensiones' }}
             </strong>
             <ng-template #noConditions><strong>Sin dato</strong></ng-template>
           </div>
