@@ -79,7 +79,7 @@ export class MatchEngineService {
    * Starts every match in a round with one backend request.
    * The round engine owns all match engines and exposes a single live stream.
    */
-  startRound(roundId: string, matches: Array<{matchId: string, homeTeamId: string, awayTeamId: string}>): Observable<RoundState> {
+  startRound(roundId: string, matches: Array<{matchId: string, homeTeamId: string, awayTeamId: string}>, simulate = false): Observable<RoundState> {
     const postAt = this.monotonicNow();
     const requestId = `ms-${Math.random().toString(36).slice(2, 14)}`;
     const clickAt = this.pendingMatchStartClickAt ?? postAt;
@@ -88,7 +88,8 @@ export class MatchEngineService {
     this.markPerformance('manager.match-start.post.sent');
     return this.http.post<RoundState>(`${this.apiUrl}/rounds/start`, {
       roundId,
-      matches
+      matches,
+      ...(simulate ? { simulate: true } : {})
     }, {
       headers: new HttpHeaders({ 'X-Request-Id': requestId })
     }).pipe(

@@ -96,6 +96,9 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
   private modals = inject(LiveMatchModalsService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
+  get simulateRound(): boolean {
+    return this.route.snapshot.queryParamMap?.get('simular') === '1';
+  }
   private logger = inject(AppLoggerService);
 
   private destroy$ = new Subject<void>();

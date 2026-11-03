@@ -346,7 +346,15 @@ export class DashboardComponent implements OnInit {
 
   loadDashboardData(): void {
     this.dashboardError = null;
-    this.careerStatusSubject.next(undefined);
+    const snapshot = this.careerService.getCareerStatusSnapshot();
+    if (snapshot && Date.now() - snapshot.receivedAt < 30_000) {
+      this.careerStatusSubject.next({
+        ...snapshot.value,
+        isFinished: ['FINISHED', 'POST_SEASON'].includes(snapshot.value.careerPhase ?? '')
+      });
+    } else {
+      this.careerStatusSubject.next(undefined);
+    }
     // One owner-authenticated request loads the entire visible entry screen.
     // The world catalog and fixtures are not part of this response.
     const entry$ = this.http.get<DashboardEntry>(`${environment.apiUrl}/dashboard/entry`).pipe(
@@ -417,8 +425,8 @@ export class DashboardComponent implements OnInit {
     }
   }
 
-  onPlayNextRound(): void {
-    if (this.deletingCareer) return;
+  onPlayNextRound(simulate = false): void {
+    if (this.loading || this.deletingCareer) return;
     const version = this.careerViewVersion;
     beginMatchStartTrace();
     markMatchStartStage('CLICK_HANDLER_ENTER');
@@ -489,7 +497,10 @@ export class DashboardComponent implements OnInit {
             markMatchStartStage('NAVIGATION_REQUESTED');
             this.router.navigate(
               [`/games/${careerId}/round/${response.currentRound}/live`],
-              { state: buildRoundStartNavigationState(navigationStatus, response.currentRound, careerId) }
+              {
+                state: buildRoundStartNavigationState(navigationStatus, response.currentRound, careerId),
+                ...(simulate ? { queryParams: { simular: 1 } } : {})
+              }
             );
           } else if (response.tournamentFinished) {
             this.router.navigate([`/games/${careerId}/champion`]);

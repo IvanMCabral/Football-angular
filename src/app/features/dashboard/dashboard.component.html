@@ -39,6 +39,10 @@
           <span class="action-label">{{ careerStatus.isFinished ? 'Revisar temporada y continuar' : 'Continuar carrera' }}</span>
           <span class="action-subtitle">{{ careerStatus.isFinished ? 'Clasificación, ascensos y próxima temporada' : 'Fecha ' + careerStatus.currentRound + '/' + careerStatus.totalRounds }}</span>
         </button>
+        <button *ngIf="!careerStatus.isFinished && (careerStatus.careerPhase === 'WAITING_USER' || careerStatus.careerPhase === 'PRE_MATCH')"
+          class="action-button secondary" (click)="onPlayNextRound(true)" [disabled]="loading || deletingCareer">
+          <span class="action-label">Simular fecha</span><span class="action-subtitle">Ir directo a los resultados</span>
+        </button>
         <a routerLink="/squad" class="action-button secondary">Preparar alineación</a>
       </div>
       <div *ngIf="careerStatus.careerPhase === 'WAITING_USER' && hasSquadConditionWarning()" class="squad-condition-warning" role="alert">

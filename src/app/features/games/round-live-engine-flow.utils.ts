@@ -10,6 +10,10 @@ import {
   normalizeTerminalLiveState
 } from './utils/round-live-utils';
 
+function startEngine(ctx: any, roundId: string, matches: Array<{ matchId: string; homeTeamId: string; awayTeamId: string }>): Observable<RoundState> {
+  return ctx.simulateRound ? ctx.engineService.startRound(roundId, matches, true) : ctx.engineService.startRound(roundId, matches);
+}
+
 export function roundLiveStartRoundEngine(ctx: any, gameId: string, matches: RoundMatchVM[]): any {
     // The career id identifies the owner, not the live round. Reusing it as
     // the RoundEngine registry key makes every later fixture collide with the
@@ -25,7 +29,7 @@ export function roundLiveStartRoundEngine(ctx: any, gameId: string, matches: Rou
 
     const startRound$: Observable<RoundState | null> = ctx.autoStartTriggered
       ? of(null)
-      : (ctx.startingRound = true, ctx.startPhase = 'Iniciando partido', ctx.engineService.startRound(requestRoundId, matchData).pipe(
+      : (ctx.startingRound = true, ctx.startPhase = 'Iniciando partido', startEngine(ctx, requestRoundId, matchData).pipe(
           tap((state: RoundState) => {
             ctx.startingRound = false;
             if (state && state.roundId) {
@@ -82,6 +86,10 @@ export function roundLiveStartRoundEngine(ctx: any, gameId: string, matches: Rou
         }
 
         ctx.updateVm(newVm);
+        if (ctx.simulateRound && newVm.allFinished) {
+          ctx.goToRoundSummary();
+          return;
+        }
         ctx.applyDeFreezeIfNeeded(newVm);
         ctx.restorePersistedInjuryAutoModals(updatedMatches);
 
@@ -159,7 +167,7 @@ export function roundLiveIniciarTodos(ctx: any): void {
     ctx.startingRound = true;
     ctx.startPhase = 'Iniciando partido';
     ctx.engineService.markMatchStartClick?.();
-    ctx.engineService.startRound(roundId, pending).subscribe({
+    startEngine(ctx, roundId, pending).subscribe({
       next: (state: RoundState) => {
         ctx.startingRound = false;
         if (state && state.roundId) {
@@ -193,7 +201,7 @@ export function roundLiveTryAutoStartRound(ctx: any, vm: RoundLiveViewModel): vo
     ctx.startingRound = true;
     ctx.startPhase = 'Iniciando partido';
     ctx.engineService.markMatchStartClick?.();
-    ctx.engineService.startRound(getOrCreateRoundEngineId(vm.gameId, vm.roundNumber), pending).subscribe({
+    startEngine(ctx, getOrCreateRoundEngineId(vm.gameId, vm.roundNumber), pending).subscribe({
       next: (state: RoundState) => {
         ctx.startingRound = false;
         if (state && state.roundId) {

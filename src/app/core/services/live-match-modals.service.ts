@@ -512,7 +512,7 @@ export class LiveMatchModalsService {
       return of(null);
     }
     return defer(() => this.engineService.pauseRoundForMatch(careerId, matchId)).pipe(
-      timeout(2_000),
+      timeout(modalName === 'substitution' ? 6_000 : 2_000),
       // The server may have paused the round before the first response timed out.
       retry({ count: 1, delay: error => error instanceof TimeoutError ? of(null) : throwError(() => error) }),
       switchMap(response => {

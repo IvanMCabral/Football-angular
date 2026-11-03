@@ -230,7 +230,7 @@ describe('LiveMatchModalsService pause/resume around tactical modals', () => {
     try {
       service.openSubstitutionModal('match-1', RUNNING_STATE).subscribe();
       expect(dialogSpy.open).not.toHaveBeenCalled();
-      jasmine.clock().tick(2000);
+      jasmine.clock().tick(6000);
       expect(engineServiceSpy.pauseRoundForMatch).toHaveBeenCalledTimes(2);
       expect(dialogSpy.open).toHaveBeenCalledTimes(1);
     } finally {
