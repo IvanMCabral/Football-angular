@@ -1,13 +1,22 @@
 import { Component, inject, OnInit, OnDestroy } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { environment } from '../../environments/environment';
+import { buildRoundStartNavigationState } from './round-start-navigation-state';
 import { CommonModule } from '@angular/common';
 import { Router, ActivatedRoute } from '@angular/router';
 import { CareerService } from '../../core/services/career.service';
 import { Standing } from '../../core/services/career.model';
 import { BehaviorSubject, Observable, forkJoin, of, timer, merge } from 'rxjs';
-import { map, switchMap, exhaustMap, takeUntil, catchError, take, takeWhile, tap } from 'rxjs/operators';
+import { map, switchMap, exhaustMap, distinctUntilChanged, takeUntil, catchError, take, takeWhile, tap } from 'rxjs/operators';
 import { Subject } from 'rxjs';
 import { RoundSummaryViewModel, SummaryMatchVM } from './models/round-summary.model';
 import { readableErrorMessage } from '../../shared/utils/error-message';
+
+interface NextRoundOverview {
+  careerStatus: { careerId: string | null; currentRound: number };
+  careerOverview?: { nextMatch?: { round: number; homeTeamName: string; awayTeamName: string; home: boolean } };
+  squadConditions?: { injured: number; suspended: number };
+}
 
 @Component({
   selector: 'app-round-summary',
@@ -18,6 +27,9 @@ import { readableErrorMessage } from '../../shared/utils/error-message';
 })
 export class RoundSummaryComponent implements OnInit, OnDestroy {
   startingSeason = false;
+  startingRound = false;
+  roundStartError = '';
+  private http = inject(HttpClient);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private careerService = inject(CareerService);
@@ -44,9 +56,19 @@ export class RoundSummaryComponent implements OnInit, OnDestroy {
   });
 
   vm$: Observable<RoundSummaryViewModel>;
+  nextRoundOverview$!: Observable<NextRoundOverview | null>;
 
   constructor() {
     this.vm$ = this.vmSubject.asObservable();
+    this.nextRoundOverview$ = this.vm$.pipe(
+      map(vm => this.canStartNextRound(vm) ? { careerId: vm.careerId, round: vm.tournamentStatus!.currentRound } : null),
+      distinctUntilChanged((before, after) => before?.careerId === after?.careerId && before?.round === after?.round),
+      switchMap(next => next ? this.http.get<NextRoundOverview>(`${environment.apiUrl}/dashboard/entry`).pipe(
+        map(entry => entry.careerStatus.careerId === next.careerId && entry.careerStatus.currentRound === next.round
+          ? entry : null),
+        catchError(() => of(null))
+      ) : of(null))
+    );
 
     this.route.paramMap.pipe(
       tap(() => this.statusRefreshCancelled$.next()),
@@ -291,25 +313,49 @@ export class RoundSummaryComponent implements OnInit, OnDestroy {
     this.router.navigate(['/careers', vm.careerId, 'matches', matchId, 'detail']);
   }
 
-  playNextRound() {
+  managerResult(vm: RoundSummaryViewModel): SummaryMatchVM | undefined {
+    return vm.matches.find(match => match.isUserMatch && this.hasPlayedResult(match.status));
+  }
+
+  canStartNextRound(vm: RoundSummaryViewModel): boolean {
+    const tournament = vm.tournamentStatus;
+    return !!vm.careerId && vm.careerId === vm.gameId && !!tournament?.canPlayCurrentRound
+      && !tournament.isFinished && tournament.currentRound > vm.roundNumber
+      && ['WAITING_USER', 'PRE_MATCH'].includes(vm.careerPhase);
+  }
+
+  playNextRound(simulate = false): void {
     const vm = this.vmSubject.value;
-
-    if (vm.tournamentStatus?.isFinished) {
-      this.router.navigate([`/games/${vm.gameId}/champion`]);
-      return;
-    }
-
-    // Prefer the server-side current round and fall back to the URL round
-    // when status is unavailable. This avoids navigating from a stale summary
-    // if the career has already advanced elsewhere.
-    const nextRound = (vm.tournamentStatus?.currentRound ?? vm.roundNumber) + 1;
-
-    if (vm.tournamentStatus && nextRound > vm.tournamentStatus.totalRounds) {
-      this.router.navigate([`/games/${vm.gameId}/champion`]);
-      return;
-    }
-
-    this.router.navigate([`/games/${vm.gameId}/round/${nextRound}/live`]);
+    const tournament = vm.tournamentStatus;
+    if (this.startingRound || !tournament || !this.canStartNextRound(vm)) return;
+    this.startingRound = true;
+    this.roundStartError = '';
+    this.careerService.advanceToNextRound(vm.careerId).pipe(takeUntil(this.destroy$)).subscribe({
+      next: response => {
+        this.startingRound = false;
+        if (!response.success || response.careerPhase !== 'PRE_MATCH' ||
+            response.currentRound !== tournament.currentRound) {
+          this.roundStartError = response.message || 'La fecha cambió. Volvé a Carreras para actualizarla.';
+          return;
+        }
+        const round = response.currentRound;
+        const state = buildRoundStartNavigationState({
+          careerId: vm.careerId,
+          currentRound: round,
+          totalRounds: tournament.totalRounds,
+          userSessionTeamId: vm.userTeamId,
+          careerPhase: response.careerPhase,
+          season: tournament.season
+        }, round, vm.careerId);
+        this.router.navigate(['/games', vm.careerId, 'round', round, 'live'], {
+          state, ...(simulate ? { queryParams: { simular: 1 } } : {})
+        });
+      },
+      error: error => {
+        this.startingRound = false;
+        this.roundStartError = readableErrorMessage(error, 'No pudimos iniciar la próxima fecha.');
+      }
+    });
   }
 
   goToChampion() {

@@ -7,6 +7,51 @@
 
   <div *ngIf="vm.errorMsg" class="error">{{ vm.errorMsg }}</div>
 
+  <section *ngIf="vm.careerId && !vm.errorMsg" class="card manager-summary" aria-label="Tu fecha">
+    <h3>{{ vm.userTeamName || 'Tu equipo' }}</h3>
+    <div class="manager-summary-grid">
+      <div *ngIf="managerResult(vm) as match">
+        <span>Tu resultado</span>
+        <strong>{{ getTeamName(match.homeTeamId) }} {{ match.homeGoals }}–{{ match.awayGoals }} {{ getTeamName(match.awayTeamId) }}</strong>
+      </div>
+      <div>
+        <span>Posición actual</span>
+        <strong *ngIf="vm.userPosition > 0; else positionUnavailable">{{ vm.userPosition }}°</strong>
+        <ng-template #positionUnavailable><strong>{{ vm.standingsLoading ? 'Consultando…' : 'Sin dato' }}</strong></ng-template>
+      </div>
+      <ng-container *ngIf="canStartNextRound(vm)">
+        <ng-container *ngIf="nextRoundOverview$ | async as overview; else overviewUnavailable">
+          <div>
+            <span>Bajas del plantel</span>
+            <strong *ngIf="overview.squadConditions as conditions; else noConditions">
+              {{ conditions.injured }} lesiones · {{ conditions.suspended }} suspensiones
+            </strong>
+            <ng-template #noConditions><strong>Sin dato</strong></ng-template>
+          </div>
+          <div>
+            <span>Próximo rival · Fecha {{ vm.tournamentStatus?.currentRound }}</span>
+            <strong *ngIf="overview.careerOverview?.nextMatch as next; else noOpponent">
+              {{ next.home ? next.awayTeamName : next.homeTeamName }} · {{ next.home ? 'Local' : 'Visitante' }}
+            </strong>
+            <ng-template #noOpponent><strong>Sin rival confirmado</strong></ng-template>
+          </div>
+        </ng-container>
+        <ng-template #overviewUnavailable>
+          <div><span>Bajas y próximo rival</span><strong>Datos todavía no disponibles</strong></div>
+        </ng-template>
+      </ng-container>
+    </div>
+    <div *ngIf="!vm.tournamentStatus?.isFinished" class="actions manager-summary-actions">
+      <ng-container *ngIf="canStartNextRound(vm)">
+        <button type="button" class="btn btn-primary" [disabled]="startingRound" (click)="playNextRound(true)">Simular próxima fecha</button>
+        <button type="button" class="btn btn-primary" [disabled]="startingRound" (click)="playNextRound()">Jugar en vivo</button>
+      </ng-container>
+      <button type="button" class="btn btn-primary" [disabled]="startingRound" (click)="backToGame()">Revisar el once</button>
+    </div>
+    <p *ngIf="startingRound" role="status">Iniciando próxima fecha…</p>
+    <p *ngIf="roundStartError" role="alert">{{ roundStartError }}</p>
+  </section>
+
   <!-- Resultados de la fecha -->
   <div class="results-section card">
     <h3>⚽ Partidos de la fecha</h3>
@@ -83,16 +128,6 @@
     </div>
   </div>
 
-  <!-- Tu equipo -->
-  <div class="user-team-section card">
-    <h3>⭐ Tu Equipo: {{ vm.userTeamName || 'Cargando...' }}</h3>
-    <p class="info-text">
-      <span *ngIf="vm.userPosition > 0">Posición actual: <strong>{{ vm.userPosition }}°</strong></span>
-      <span *ngIf="vm.standingsLoading">Consultando posición…</span>
-      <span *ngIf="vm.userPosition === 0 && !vm.standingsLoading && !vm.standingsError">Tu equipo no está en esta clasificación</span>
-    </p>
-  </div>
-
   <!-- Botones de acción -->
   <div class="actions">
     <!-- FIN DE TORNEO: Opciones de cierre -->
@@ -111,11 +146,5 @@
       </button>
     </ng-container>
 
-    <!-- TORNEO ACTIVO: Volver al equipo para preparar siguiente fecha -->
-    <ng-container *ngIf="vm.careerPhase !== 'FINISHED'">
-      <button (click)="backToGame()" class="btn btn-primary btn-large">
-        ⬅️ Volver al Equipo
-      </button>
-    </ng-container>
   </div>
 </div>

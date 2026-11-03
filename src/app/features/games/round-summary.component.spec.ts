@@ -21,6 +21,7 @@ describe('RoundSummaryComponent navigation', () => {
 
   beforeEach(async () => {
     careerServiceSpy = jasmine.createSpyObj<CareerService>('CareerService', [
+      'advanceToNextRound',
       'getCareerTeams',
       'getCareerStatus',
       'getFixturesByRoundWithBye',
@@ -73,7 +74,7 @@ describe('RoundSummaryComponent navigation', () => {
     standings.complete();
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).not.toContain('Cargando clasificación');
-    expect(fixture.nativeElement.textContent).toContain('Tu equipo no está');
+    expect(fixture.nativeElement.textContent).toContain('Sin dato');
   });
 
   it('shows a standings error without fabricating a table from one round', () => {
@@ -259,49 +260,42 @@ describe('RoundSummaryComponent navigation', () => {
     expect(rows[1].querySelector('.btn-detail')).not.toBeNull();
   });
 
-  it('playNextRound navigates to tournamentStatus.currentRound + 1 when set', () => {
-    // URL round=2 but careerStatus.currentRound=5 -> must navigate to round 6.
+  it('starts the pending round in simulation mode without skipping a date', () => {
     setVm({
+      careerId: SAMPLE_GAME_ID,
+      roundNumber: 2,
+      careerPhase: 'WAITING_USER',
+      tournamentStatus: {
+        currentRound: 3, totalRounds: 38, hasNextRound: true,
+        isFinished: false, canPlayCurrentRound: true
+      }
+    });
+    careerServiceSpy.advanceToNextRound.and.returnValue(of({
+      success: true, currentRound: 3, careerPhase: 'PRE_MATCH'
+    }));
+
+    component.playNextRound(true);
+
+    expect(careerServiceSpy.advanceToNextRound).toHaveBeenCalledOnceWith(SAMPLE_GAME_ID);
+    expect(router.navigate).toHaveBeenCalledWith(
+      ['/games', SAMPLE_GAME_ID, 'round', 3, 'live'],
+      jasmine.objectContaining({ queryParams: { simular: 1 } })
+    );
+  });
+
+  it('does not start another round until the server has advanced the completed one', () => {
+    setVm({
+      careerId: SAMPLE_GAME_ID,
       roundNumber: 2,
       tournamentStatus: {
-        currentRound: 5,
-        totalRounds: 38,
-        hasNextRound: true,
-        isFinished: false,
-        canPlayCurrentRound: true
+        currentRound: 2, totalRounds: 38, hasNextRound: true,
+        isFinished: false, canPlayCurrentRound: true
       }
     });
 
     component.playNextRound();
 
-    expect(router.navigate).toHaveBeenCalledWith([`/games/${SAMPLE_GAME_ID}/round/6/live`]);
-  });
-
-  it('playNextRound falls back to roundNumber + 1 when tournamentStatus is null', () => {
-    setVm({
-      roundNumber: 2,
-      tournamentStatus: null
-    });
-
-    component.playNextRound();
-
-    expect(router.navigate).toHaveBeenCalledWith([`/games/${SAMPLE_GAME_ID}/round/3/live`]);
-  });
-
-  it('playNextRound navigates to /champion when tournament is finished', () => {
-    setVm({
-      roundNumber: 38,
-      tournamentStatus: {
-        currentRound: 38,
-        totalRounds: 38,
-        hasNextRound: false,
-        isFinished: true,
-        canPlayCurrentRound: false
-      }
-    });
-
-    component.playNextRound();
-
-    expect(router.navigate).toHaveBeenCalledWith([`/games/${SAMPLE_GAME_ID}/champion`]);
+    expect(careerServiceSpy.advanceToNextRound).not.toHaveBeenCalled();
+    expect(router.navigate).not.toHaveBeenCalled();
   });
 });

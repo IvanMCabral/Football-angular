@@ -274,3 +274,20 @@
   .match-vs { padding: 0 .3rem; }
   .team-score { min-width: 1rem; font-size: 1.2rem; }
 }
+
+.manager-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+  gap: 1rem;
+}
+.manager-summary-grid span,
+.manager-summary-grid strong {
+  display: block;
+}
+.manager-summary-grid span {
+  color: #475569;
+  margin-bottom: .25rem;
+}
+.manager-summary-actions {
+  justify-content: flex-start;
+}
