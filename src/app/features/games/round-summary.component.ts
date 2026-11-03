@@ -3,8 +3,8 @@ import { CommonModule } from '@angular/common';
 import { Router, ActivatedRoute } from '@angular/router';
 import { CareerService } from '../../core/services/career.service';
 import { Standing } from '../../core/services/career.model';
-import { BehaviorSubject, Observable, forkJoin, of, timer } from 'rxjs';
-import { map, switchMap, takeUntil, catchError } from 'rxjs/operators';
+import { BehaviorSubject, Observable, forkJoin, of, timer, merge } from 'rxjs';
+import { map, switchMap, exhaustMap, takeUntil, catchError, take, takeWhile, tap } from 'rxjs/operators';
 import { Subject } from 'rxjs';
 import { RoundSummaryViewModel, SummaryMatchVM } from './models/round-summary.model';
 import { readableErrorMessage } from '../../shared/utils/error-message';
@@ -23,6 +23,7 @@ export class RoundSummaryComponent implements OnInit, OnDestroy {
   private careerService = inject(CareerService);
 
   private destroy$ = new Subject<void>();
+  private statusRefreshCancelled$ = new Subject<void>();
 
   private vmSubject = new BehaviorSubject<RoundSummaryViewModel>({
     gameId: '',
@@ -48,6 +49,7 @@ export class RoundSummaryComponent implements OnInit, OnDestroy {
     this.vm$ = this.vmSubject.asObservable();
 
     this.route.paramMap.pipe(
+      tap(() => this.statusRefreshCancelled$.next()),
       map(params => ({
         gameId: params.get('gameId') || '',
         roundNumber: params.get('round') ? parseInt(params.get('round')!) : 1
@@ -104,7 +106,8 @@ export class RoundSummaryComponent implements OnInit, OnDestroy {
           byeTeam: fixtures.byeTeam ?? null
         });
         // Retain the completion-status refresh, bounded by component lifetime.
-        timer(100).pipe(takeUntil(this.destroy$)).subscribe(() => this.reloadCareerStatus());
+        timer(100).pipe(takeUntil(merge(this.destroy$, this.statusRefreshCancelled$)))
+          .subscribe(() => this.reloadCareerStatus());
       },
       error: () => this.updateVm({
         ...this.vmSubject.value, standingsLoading: false,
@@ -162,50 +165,43 @@ export class RoundSummaryComponent implements OnInit, OnDestroy {
   }
 
   public reloadCareerStatus() {
-    let attempts = 0;
-    const maxAttempts = 5;
-    const delayMs = 200;
+    this.statusRefreshCancelled$.next();
+    const summary = this.vmSubject.value;
+    const resultsComplete = summary.matches.length > 0 &&
+      summary.matches.every(match => this.hasPlayedResult(match.status));
 
-    const fetchStatus = () => {
-      this.careerService.getCareerStatus().subscribe({
-        next: (status) => {
-          const vm = this.vmSubject.value;
-          const canPlayNextRound = status.canAdvanceRound && status.currentRound <= status.totalRounds;
-          const hasNextRound = vm.roundNumber < status.totalRounds;
-          const isTournamentEnded = status.careerPhase === 'FINISHED' || status.currentRound > status.totalRounds;
-          const isStaleData = vm.roundNumber >= 21 && status.currentRound === vm.roundNumber && status.canAdvanceRound && status.careerPhase !== 'FINISHED';
-
-          if (isStaleData && attempts < maxAttempts) {
-            attempts++;
-            setTimeout(fetchStatus, delayMs);
-            return;
-          }
-
-          const newTournamentStatus = {
-            currentRound: status.currentRound,
-            totalRounds: status.totalRounds,
-            hasNextRound,
-            isFinished: isTournamentEnded,
-            canPlayCurrentRound: canPlayNextRound,
-            season: status.season
-          };
-
-          this.updateVm({
-            ...vm,
-            careerPhase: status.careerPhase || 'WAITING_USER',
-            tournamentStatus: newTournamentStatus
-          });
-        },
-        error: (err) => {
-          if (attempts < maxAttempts) {
-            attempts++;
-            setTimeout(fetchStatus, delayMs);
-          }
+    // A completed date can reach this page before its durable status update.
+    // Read fresh status until that date advances, regardless of league length.
+    timer(0, 500).pipe(
+      exhaustMap(() => {
+        this.careerService.invalidateCareerStatus();
+        return this.careerService.getCareerStatus().pipe(catchError(() => of(null)));
+      }),
+      take(6),
+      takeWhile(status => status === null || (
+        status.careerId === summary.careerId &&
+        status.season === summary.tournamentStatus?.season &&
+        resultsComplete && status.currentRound <= summary.roundNumber &&
+        status.careerPhase !== 'FINISHED'
+      ), true),
+      takeUntil(merge(this.destroy$, this.statusRefreshCancelled$))
+    ).subscribe(status => {
+      const vm = this.vmSubject.value;
+      if (!status || status.careerId !== summary.careerId ||
+          status.season !== summary.tournamentStatus?.season) return;
+      this.updateVm({
+        ...vm,
+        careerPhase: status.careerPhase || 'WAITING_USER',
+        tournamentStatus: {
+          currentRound: status.currentRound,
+          totalRounds: status.totalRounds,
+          hasNextRound: vm.roundNumber < status.totalRounds,
+          isFinished: status.careerPhase === 'FINISHED' || status.currentRound > status.totalRounds,
+          canPlayCurrentRound: status.canAdvanceRound && status.currentRound <= status.totalRounds,
+          season: status.season
         }
       });
-    };
-
-    fetchStatus();
+    });
   }
 
   private calculateStandingsFromMatches() {
