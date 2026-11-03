@@ -1,5 +1,6 @@
+import { careerReadCacheInterceptor } from '../interceptors/career-read-cache.interceptor';
 import { TestBed } from '@angular/core/testing';
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { CareerService } from './career.service';
 
@@ -167,5 +168,35 @@ describe('CareerService round fixture cache', () => {
     previous.flush({ success: true });
     expect(service.getCareerStatusSnapshot()?.value).toEqual(replacement);
     current.flush({ success: false });
+  });
+});
+
+
+describe('Career status freshness during continuous navigation', () => {
+  it('does not extend the server response TTL when a cached status is revisited', () => {
+    TestBed.configureTestingModule({ providers: [
+      provideHttpClient(withInterceptors([
+        (req, next) => next(req.clone({ setHeaders: { Authorization: 'Bearer synthetic-owner' } })),
+        careerReadCacheInterceptor
+      ])), provideHttpClientTesting()
+    ] });
+    const service = TestBed.inject(CareerService);
+    const backend = TestBed.inject(HttpTestingController);
+    jasmine.clock().install();
+    jasmine.clock().mockDate(new Date(1000));
+    try {
+      const status = { careerId: 'synthetic-career', currentRound: 1, careerPhase: 'PRE_MATCH' };
+      service.getCareerStatus().subscribe();
+      backend.expectOne('/api/v1/career/status').flush(status);
+      for (const elapsed of [6000, 60000, 119000]) {
+        jasmine.clock().mockDate(new Date(1000 + elapsed));
+        service.getCareerStatus().subscribe(value => expect(value.currentRound).toBe(1));
+        backend.expectNone('/api/v1/career/status');
+      }
+      jasmine.clock().mockDate(new Date(126001));
+      service.getCareerStatus().subscribe(value => expect(value.currentRound).toBe(2));
+      backend.expectOne('/api/v1/career/status').flush({ ...status, currentRound: 2 });
+      backend.verify();
+    } finally { jasmine.clock().uninstall(); }
   });
 });

@@ -150,8 +150,9 @@ export class CareerService {
     const request$ = this.http.get<CareerStatus>(`${this.apiUrl}/status`).pipe(
       tap(status => {
         if (this.careerStatusCache?.request$ !== request$) return;
+        const revision = this.readCache.revision;
         this.readCache.observeCareer(status);
-        this.readCache.primeStatus(status);
+        if (this.readCache.revision !== revision) this.readCache.primeStatus(status);
         this.careerStatusCache.revision = this.readCache.revision;
         const key = status.careerId;
         if (key) {
