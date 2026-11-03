@@ -188,6 +188,11 @@ export class CareerService {
     }
   }
 
+  invalidateCompletedRound(round: number): void {
+    this.roundFixtureCache.delete(round);
+    this.invalidateCareerStatus();
+  }
+
   /** Invalidates status after a command that can advance or replace a career. */
   invalidateCareerStatus(): void {
     this.readCache.invalidate();

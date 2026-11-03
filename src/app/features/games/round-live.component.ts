@@ -543,6 +543,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
 
   goToRoundSummary() {
     const vm = this.vmSubject.value;
+    this.careerService.invalidateCompletedRound(vm.roundNumber);
     this.router.navigate([`/games/${vm.gameId}/round/${vm.roundNumber}/summary`]);
   }
 }
