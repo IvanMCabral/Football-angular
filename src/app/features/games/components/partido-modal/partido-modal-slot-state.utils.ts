@@ -1,4 +1,5 @@
 import { clampPartidoPercent } from './partido-modal-player-coords-storage.utils';
+import { tacticalSlotCoords } from '../../../../shared/constants/tactical-layouts';
 
 export interface PartidoSlotCoords {
   x: number;
@@ -33,26 +34,7 @@ export function basePartidoSlotCoords(
   formation: string,
   slotIdx: number
 ): PartidoSlotCoords {
-  const lines = formationLines[formation] ?? [];
-  const lineGap = lines.length <= 1 ? 50 : 100 / (lines.length - 1);
-  let current = 0;
-
-  for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
-    const line = lines[lineIdx];
-    for (let dotIdx = 0; dotIdx < line.length; dotIdx++) {
-      if (current === slotIdx) {
-        const x = line.length <= 1 ? 50 : ((dotIdx + 1) / (line.length + 1)) * 100;
-        const y = lines.length <= 1 ? 50 : lineIdx * lineGap;
-        return {
-          x: Number(clampPartidoPercent(x).toFixed(2)),
-          y: Number(clampPartidoPercent(y).toFixed(2))
-        };
-      }
-      current++;
-    }
-  }
-
-  return { x: 50, y: 50 };
+  return tacticalSlotCoords(formation, slotIdx);
 }
 
 export function partidoSlotsDifferFromInitial(

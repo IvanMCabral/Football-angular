@@ -35,7 +35,6 @@ export function savePartidoModal(ctx: any): void {
   }
 
   const slots = ctx.buildSlotListForBackend();
-  ctx.rememberPlayerCoordsForSavedSlots(slots);
   if (slots.some((slot: any) => !slot.sessionPlayerId)) {
     ctx.isSubmitting = false;
     ctx.errorMsg = 'No se puede confirmar: todos los slots visibles deben tener un jugador real. Cerrá y reabrí el modal si ves sólo roles.';
@@ -136,6 +135,7 @@ function closeSuccessfulPartidoSave(
   substitutionResults: any[],
   slots: any[]
 ): void {
+  ctx.rememberPlayerCoordsForSavedSlots(slots);
   const appliedSubstitutions = ctx.pendingSubstitutions.length;
   ctx.snackBar.open(
     appliedSubstitutions > 0

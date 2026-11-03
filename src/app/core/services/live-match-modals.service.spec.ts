@@ -123,6 +123,55 @@ describe('LiveMatchModalsService pause/resume around tactical modals', () => {
 
   // ========== openSubstitutionModal ==========
 
+  it('expires remembered positions when a newer live snapshot arrives', (done: DoneFn) => {
+    const xi = Array.from({length: 11}, (_, i) => ({playerId: 'p' + i, name: 'Player ' + i, position: i ? 'CM' : 'GK', overall: 75}));
+    const slots = xi.map((p, i) => ({playerId: p.playerId, position: p.position, slotIndex: i, customXPercent: 72.25, customYPercent: 44.5}));
+    httpSpy.get.and.returnValue(of({formation: '4-4-2', players: xi}));
+    teamServiceSpy.getMyTeamSquad.and.returnValue(of(xi.map(p => ({sessionPlayerId: p.playerId, name: p.name, position: p.position})) as any));
+    const state = {...RUNNING_STATE, currentMinute: 74, homeFormation: '4-3-3', homeSlots: slots};
+    engineServiceSpy.getMatchState.and.returnValue(of(state));
+    (service as any).partidoSavedSlotsMemory.set('match-1', slots.map(s => ({...s, sessionPlayerId: s.playerId, customXPercent: 10})));
+    (service as any).partidoSavedFormationMemory.set('match-1', '4-4-2');
+    (service as any).partidoSavedAtMinute.set('match-1', 73);
+    service.openPartidoModal('match-1', state).subscribe(() => {
+      const data = dialogSpy.open.calls.mostRecent().args[1]!.data as any;
+      expect(data.currentFormation).toBe('4-3-3');
+      expect(data.currentSlots[6].customXPercent).toBe(72.25);
+      done();
+    });
+  });
+
+  it('keeps a dismissal gap instead of restoring a remembered eleven-player lineup', (done: DoneFn) => {
+    const xi = Array.from({length: 11}, (_, i) => ({playerId: 'p' + i, name: 'Player ' + i, position: i ? 'CM' : 'GK', overall: 75}));
+    const slots = xi.map((p, i) => ({playerId: p.playerId, position: p.position, slotIndex: i}));
+    httpSpy.get.and.returnValue(of({formation: '4-4-2', players: xi}));
+    teamServiceSpy.getMyTeamSquad.and.returnValue(of(xi.map(p => ({sessionPlayerId: p.playerId, name: p.name, position: p.position})) as any));
+    const state = {...RUNNING_STATE, homeSlots: slots.filter(s => s.slotIndex !== 3),
+      events: [{eventType: 'RED_CARD', teamId: 'team-h', playerId: 'p3', minute: 73}] } as any;
+    engineServiceSpy.getMatchState.and.returnValue(of(state));
+    (service as any).partidoSavedSlotsMemory.set('match-1', slots.map(s => ({...s, sessionPlayerId: s.playerId})));
+    service.openPartidoModal('match-1', state).subscribe(() => {
+      const data = dialogSpy.open.calls.mostRecent().args[1]!.data as any;
+      expect(data.currentSlots.length).toBe(10);
+      expect(data.vacantSlotIndexes).toEqual([3]);
+      expect(data.currentSlots.some((s: any) => s.sessionPlayerId === 'p3')).toBeFalse();
+      expect(data.squad.some((p: any) => p.sessionPlayerId === 'p3')).toBeFalse();
+      done();
+    });
+  });
+
+  it('shows the home opponent as rival when the manager plays away', (done: DoneFn) => {
+    careerServiceSpy.getCareerStatus.and.returnValue(of({userSessionTeamId: 'team-a'} as any));
+    engineServiceSpy.getMatchState.and.returnValue(of({...RUNNING_STATE, homeFormation: '3-5-2', awayFormation: '4-3-3'}));
+    service.openPartidoModal('match-1', RUNNING_STATE).subscribe(() => {
+      const data = dialogSpy.open.calls.mostRecent().args[1]!.data as any;
+      expect(data.currentFormation).toBe('4-3-3');
+      expect(data.rivalFormation).toBe('3-5-2');
+      expect(data.scoreHomeTeamId).toBe('team-h');
+      done();
+    });
+  });
+
   it('openSubstitutionModal - calls engineService.pauseRoundForMatch before dialog.open', (done) => {
     const callOrder: string[] = [];
     engineServiceSpy.pauseRoundForMatch.and.callFake(() => {

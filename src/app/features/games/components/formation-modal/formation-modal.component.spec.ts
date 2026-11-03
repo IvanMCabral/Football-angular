@@ -85,6 +85,20 @@ describe('FormationModalComponent', () => {
     expect(component.selectedFormation()).toBe('4-4-2');
   });
 
+  it('preserves current coordinates on open and does not treat them as a new edit', () => {
+    const original = SAMPLE_DATA.currentSlots;
+    try {
+      SAMPLE_DATA.currentSlots = original.map(s => s.slotIndex === 2 ? {...s, customXPercent: 72.25, customYPercent: 44.5} : s);
+      fixture.destroy(); fixture = TestBed.createComponent(FormationModalComponent); component = fixture.componentInstance;
+      expect(component.slotX(2)).toBe(72.25);
+      expect(component.slotY(2)).toBe(44.5);
+      expect(component.hasAnyChange()).toBeFalse();
+      component.confirm();
+      expect(engineServiceSpy.changeFormation).not.toHaveBeenCalled();
+      expect(dialogRefSpy.close).toHaveBeenCalledWith({success: false, reason: 'no-change'});
+    } finally { SAMPLE_DATA.currentSlots = original; }
+  });
+
   it('normalizes an unknown formation to 4-4-2', () => {
     const unknownData = { ...SAMPLE_DATA, currentFormation: 'banana' };
     (component as any).data = unknownData;
@@ -150,9 +164,9 @@ describe('FormationModalComponent', () => {
 
     // 5-4-1: 5 DEF + 4 MID + 1 ST.
     component.onFormationChange('5-4-1');
-    expect(component.getDotLabel(1, 0, 5, false)).toBe('LB');
+    expect(component.getDotLabel(1, 0, 5, false)).toBe('LWB');
     expect(component.getDotLabel(1, 2, 5, false)).toBe('CB');
-    expect(component.getDotLabel(1, 4, 5, false)).toBe('RB');
+    expect(component.getDotLabel(1, 4, 5, false)).toBe('RWB');
     expect(component.getDotLabel(3, 0, 1, true)).toBe('ST');
 
     // 3-5-2-CDM: GK + 3CB + CDM + 2CM + 2WB + 2ST
@@ -460,15 +474,14 @@ describe('FormationModalComponent', () => {
   });
 
   it('onSlotDrop swaps two players between slots (slot-to-slot)', () => {
-    // Simulate dragging p1 (slot 0) onto p2 (slot 1).
-    const ev = makeDragEvent('slot:0');
-    component.onSlotDragStart(ev as any, 0);
-    component.onSlotDrop(ev as any, 1);
-    // After swap: slot 0 = p2, slot 1 = p1.
-    expect(component.slotAssignments.get(0)).toBe('p2');
-    expect(component.slotAssignments.get(1)).toBe('p1');
-    // Other slots unchanged.
-    expect(component.slotAssignments.get(2)).toBe('p3');
+    const ev = makeDragEvent('slot:1');
+    const first = {x: component.slotX(1), y: component.slotY(1)};
+    component.onSlotDragStart(ev as any, 1);
+    component.onSlotDrop(ev as any, 2);
+    expect(component.slotAssignments.get(0)).toBe('p1');
+    expect(component.slotAssignments.get(1)).toBe('p3');
+    expect(component.slotAssignments.get(2)).toBe('p2');
+    expect({x: component.slotX(1), y: component.slotY(1)}).toEqual(first);
     expect(component.slotAssignments.get(3)).toBe('p4');
   });
 
@@ -480,17 +493,17 @@ describe('FormationModalComponent', () => {
   });
 
   it('onBenchDragStart + onSlotDrop moves a bench player into a slot', () => {
-    // Drag b1 (bench) into slot 0 (currently p1). The displaced
-    // p1 is no longer in slotAssignments (so it falls into the
+    // Drag b1 (bench) into slot 1. The displaced
+    // p2 is no longer in slotAssignments (so it falls into the
     // bench list automatically).
     const ev = makeDragEvent('bench:b1');
     component.onBenchDragStart(ev as any, 'b1');
-    component.onSlotDrop(ev as any, 0);
-    expect(component.slotAssignments.get(0)).toBe('b1');
+    component.onSlotDrop(ev as any, 1);
+    expect(component.slotAssignments.get(1)).toBe('b1');
     // The bench list now contains the displaced p1 (plus the other
     // bench players b2, b3).
     const benchIds = component.benchPlayers.map(p => p.sessionPlayerId);
-    expect(benchIds).toContain('p1');
+    expect(benchIds).toContain('p2');
     expect(benchIds).not.toContain('b1');
     expect(benchIds).toContain('b2');
     expect(benchIds).toContain('b3');
@@ -537,31 +550,31 @@ describe('FormationModalComponent', () => {
   });
 
   it('slotsDifferFromInitial returns true after a drag-drop swap', () => {
-    const ev = makeDragEvent('slot:0');
-    component.onSlotDragStart(ev as any, 0);
-    component.onSlotDrop(ev as any, 1);
+    const ev = makeDragEvent('slot:1');
+    component.onSlotDragStart(ev as any, 1);
+    component.onSlotDrop(ev as any, 2);
     expect((component as any).slotsDifferFromInitial()).toBeTrue();
   });
 
   it('slotsDifferFromInitial returns true when a bench player is moved to a slot', () => {
     const ev = makeDragEvent('bench:b1');
     component.onBenchDragStart(ev as any, 'b1');
-    component.onSlotDrop(ev as any, 0);
+    component.onSlotDrop(ev as any, 1);
     expect((component as any).slotsDifferFromInitial()).toBeTrue();
   });
 
   it('confirm sends the post-drag slot list to the backend', () => {
-    // Setup: drag b1 into slot 0, displacing p1.
+    // Setup: drag b1 into slot 1, displacing p2.
     const ev = makeDragEvent('bench:b1');
     component.onBenchDragStart(ev as any, 'b1');
-    component.onSlotDrop(ev as any, 0);
+    component.onSlotDrop(ev as any, 1);
     engineServiceSpy.changeFormation.and.returnValue(of({ success: true, minuteApplied: 35 }));
     component.confirm();
     expect(engineServiceSpy.changeFormation).toHaveBeenCalledOnceWith(
       'm1',
       jasmine.arrayContaining([
-        jasmine.objectContaining({ slotIndex: 0, sessionPlayerId: 'b1' }),
-        jasmine.objectContaining({ slotIndex: 1, sessionPlayerId: 'p2' }),
+        jasmine.objectContaining({ slotIndex: 0, sessionPlayerId: 'p1' }),
+        jasmine.objectContaining({ slotIndex: 1, sessionPlayerId: 'b1' }),
         jasmine.objectContaining({ slotIndex: 2, sessionPlayerId: 'p3' }),
         jasmine.objectContaining({ slotIndex: 3, sessionPlayerId: 'p4' })
       ]),

@@ -94,6 +94,7 @@
 }
 
 .pitch {
+  position: relative;
   background: linear-gradient(180deg, #2e7d32 0%, #1b5e20 100%);
   border-radius: 8px;
   padding: 0.6rem 0.4rem;
@@ -106,6 +107,21 @@
   justify-content: space-around;
   margin-bottom: 0.75rem;
 }
+
+.pitch .pitch-line { display: contents; }
+.pitch .player-dot {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 10%;
+  min-width: 0;
+  max-width: 68px;
+  height: 40px;
+  border-radius: 10px;
+  box-sizing: border-box;
+}
+.formation-grid .col-pitch .pitch { min-height: 500px; display: block; }
+.pitch .player-dot.is-selected { transform: translate(-50%, -50%) scale(1.08); }
+.pitch .player-dot.is-drag-source { transform: translate(-50%, -50%) scale(0.92); }
 
 .pitch-line {
   display: flex;

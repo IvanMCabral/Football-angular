@@ -1,3 +1,5 @@
+import { tacticalSlotCoords } from '../../../../shared/constants/tactical-layouts';
+
 export interface FormationSlotCoords {
   x: number;
   y: number;
@@ -23,21 +25,7 @@ export function defaultCoordForFormationSlot(
   formation: string,
   slotIdx: number
 ): FormationSlotCoords {
-  const lines = formationLinesFor(formationLinesByFormation, formation);
-  let cursor = 0;
-  for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
-    const line = lines[lineIdx];
-    for (let dotIdx = 0; dotIdx < line.length; dotIdx++) {
-      if (cursor === slotIdx) {
-        return {
-          x: ((dotIdx + 1) / (line.length + 1)) * 100,
-          y: ((lineIdx + 1) / (lines.length + 1)) * 100,
-        };
-      }
-      cursor++;
-    }
-  }
-  return { x: 50, y: 50 };
+  return tacticalSlotCoords(formation, slotIdx);
 }
 
 export function roleForFormationSlot(

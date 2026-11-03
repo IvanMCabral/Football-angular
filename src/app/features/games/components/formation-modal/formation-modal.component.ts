@@ -1,4 +1,6 @@
-﻿import { ChangeDetectionStrategy, Component, HostListener, inject, signal } from '@angular/core';
+import { TACTICAL_ROLE_LINES } from '../../../../shared/constants/tactical-layouts';
+import { reflowTacticalXi } from '../../../../shared/utils/tactical-lineup-reflow.utils';
+import { ChangeDetectionStrategy, Component, HostListener, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   MAT_DIALOG_DATA,
@@ -23,7 +25,6 @@ import { FormationDialogData } from './formation-modal.models';
 import {
   buildFormationBackendSlots,
   defaultCoordForFormationSlot,
-  formationCoordsDifferFromDefault,
   roleForFormationSlot
 } from './formation-modal-slot-geometry.utils';
 
@@ -52,88 +53,7 @@ export const FORMATION_MODAL_RESPONSIVE_CSS = `
     }
   }
 `;
-export const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
-
-  '4-4-2': [
-    ['GK'],
-    ['LB', 'CB', 'CB', 'RB'],
-    ['LM', 'CM', 'CM', 'RM'],
-    ['ST', 'ST']
-  ],
-  '4-3-3': [
-    ['GK'],
-    ['LB', 'CB', 'CB', 'RB'],
-    ['CM', 'CM', 'CM'],
-    ['LW', 'ST', 'RW']
-  ],
-  '3-5-2': [
-    ['GK'],
-    ['CB', 'CB', 'CB'],
-    ['LWB', 'CM', 'CM', 'CM', 'RWB'],
-    ['ST', 'ST']
-  ],
-  '4-2-3-1': [
-    ['GK'],
-    ['LB', 'CB', 'CB', 'RB'],
-    ['CDM', 'CDM'],
-    ['LW', 'CAM', 'RW'],
-    ['ST']
-  ],
-  '5-3-2': [
-    ['GK'],
-    ['LB', 'CB', 'CB', 'CB', 'RB'],
-    ['CM', 'CM', 'CM'],
-    ['ST', 'ST']
-  ],
-  '4-1-4-1': [
-    ['GK'],
-    ['LB', 'CB', 'CB', 'RB'],
-    ['CDM'],
-    ['LM', 'CM', 'CM', 'RM'],
-    ['ST']
-  ],
-  '3-4-3': [
-    ['GK'],
-    ['CB', 'CB', 'CB'],
-    ['LWB', 'CM', 'CM', 'RWB'],
-    ['LW', 'ST', 'RW']
-  ],
-  '3-5-2-CDM': [
-    ['GK'],
-    ['CB', 'CB', 'CB'],
-    ['CDM'],
-    ['CM', 'CM'],
-    ['LWB', 'RWB'],
-    ['ST', 'ST']
-  ],
-  '5-4-1': [
-    ['GK'],
-    ['LB', 'CB', 'CB', 'CB', 'RB'],
-    ['LM', 'CM', 'CM', 'RM'],
-    ['ST']
-  ],
-  '3-4-1-2': [
-    ['GK'],
-    ['CB', 'CB', 'CB'],
-    ['LWB', 'CM', 'CM', 'RWB'],
-    ['CAM'],
-    ['ST', 'ST']
-  ],
-  '4-2-2-2': [
-    ['GK'],
-    ['LB', 'CB', 'CB', 'RB'],
-    ['CDM', 'CDM'],
-    ['LM', 'RM'],
-    ['ST', 'ST']
-  ],
-  '4-1-2-3': [
-    ['GK'],
-    ['LB', 'CB', 'CB', 'RB'],
-    ['CDM'],
-    ['CM', 'CM'],
-    ['LW', 'ST', 'RW']
-  ]
-};
+export const FORMATION_LINES_BY_FORMATION = TACTICAL_ROLE_LINES;
 
 
 @Component({
@@ -171,6 +91,7 @@ export class FormationModalComponent {
   selectedSlotIdx: number | null = null;
 
   private slotCoords: Map<number, { x: number; y: number }> = new Map();
+  private initialSlotCoords: Map<number, { x: number; y: number }> = new Map();
 
   dragSourceSlotIdx: number | null = null;
   dragSourceIsBench: boolean = false;
@@ -204,27 +125,42 @@ export class FormationModalComponent {
       this.slotAssignments.set(s.slotIndex, s.sessionPlayerId || null);
     }
     this.resetAllSlotCoords();
+    for (const slot of this.data.currentSlots ?? []) {
+      if (typeof slot.customXPercent === 'number' && Number.isFinite(slot.customXPercent) &&
+          typeof slot.customYPercent === 'number' && Number.isFinite(slot.customYPercent)) {
+        this.slotCoords.set(slot.slotIndex, {
+          x: Math.max(0, Math.min(100, slot.customXPercent)),
+          y: Math.max(0, Math.min(100, slot.customYPercent))
+        });
+      }
+    }
+    this.initialSlotCoords = new Map(this.slotCoords);
   }
 
   onFormationChange(value: string): void {
     const newFormation = this.normalizeFormation(value);
+    if (newFormation === this.selectedFormation()) return;
+    const reflowed = reflowTacticalXi(this.slotAssignments, this.selectedFormation(), newFormation, this.data.squad);
     this.selectedFormation.set(newFormation);
 
-    const currentXi = Array.from(this.slotAssignments.values()).filter((playerId): playerId is string => !!playerId);
     const newLineCount = (FORMATION_LINES_BY_FORMATION[newFormation] ?? []).reduce(
       (sum, line) => sum + line.length, 0
     );
     this.slotAssignments = new Map();
     for (let i = 0; i < newLineCount; i++) {
-      this.slotAssignments.set(i, currentXi[i] ?? null);
+      this.slotAssignments.set(i, reflowed.get(i) ?? null);
     }
     this.selectedSlotIdx = null;
     this.resetAllSlotCoords();
+    if (this.data.vacantSlotIndexes?.length) {
+      this.data.vacantSlotIndexes = [...this.slotAssignments].filter(([, id]) => !id).map(([idx]) => idx);
+    }
     this.errorMsg = '';
   }
 
 
   onSlotDragStart(event: DragEvent, slotIdx: number): void {
+    if (slotIdx === 0) { event.preventDefault(); return; }
     if (!event.dataTransfer) {
       return;
     }
@@ -257,6 +193,8 @@ export class FormationModalComponent {
     if (this.dragSourceSlotIdx === null) {
       return;
     }
+    if (targetSlotIdx === 0 || this.dragSourceSlotIdx === 0) { this.onSlotDragEnd(); return; }
+    if (this.data.vacantSlotIndexes?.includes(targetSlotIdx)) { this.onSlotDragEnd(); return; }
     if (this.dragSourceIsBench) {
 
 
@@ -291,10 +229,6 @@ export class FormationModalComponent {
       const targetPlayer = this.slotAssignments.get(targetSlotIdx) ?? null;
       this.slotAssignments.set(targetSlotIdx, sourcePlayer);
       this.slotAssignments.set(sourceSlot, targetPlayer);
-      const sourceCoords = this.slotCoords.get(sourceSlot) ?? this.defaultCoordForSlot(sourceSlot);
-      const targetCoords = this.slotCoords.get(targetSlotIdx) ?? this.defaultCoordForSlot(targetSlotIdx);
-      this.slotCoords.set(targetSlotIdx, sourceCoords);
-      this.slotCoords.set(sourceSlot, targetCoords);
 
 
 
@@ -331,6 +265,7 @@ export class FormationModalComponent {
           slotIdx++;
           continue;
         }
+        if (this.data.vacantSlotIndexes?.includes(slotIdx)) { slotIdx++; continue; }
         const roleLabel = line[dotIdx];
         const filled = this.tryFillSlot(slotIdx, roleLabel);
         if (!filled) {
@@ -402,7 +337,8 @@ export class FormationModalComponent {
   }
 
   hasAnyChange(): boolean {
-    return this.slotsDifferFromInitial() || this.coordsDifferFromDefault();
+    return this.selectedFormation() !== this.data.currentFormation ||
+      this.slotsDifferFromInitial() || this.coordsDifferFromInitial();
   }
 
   selectSlot(slotIdx: number): void {
@@ -490,7 +426,7 @@ export class FormationModalComponent {
 
     const formationChanged = this.selectedFormation() !== this.data.currentFormation;
     const slotsChanged = this.slotsDifferFromInitial();
-    const coordsChanged = this.coordsDifferFromDefault();
+    const coordsChanged = this.coordsDifferFromInitial();
     if (!formationChanged && !slotsChanged && !coordsChanged) {
       this.dialogRef.close({ success: false, reason: 'no-change' });
       return;
@@ -541,7 +477,7 @@ export class FormationModalComponent {
       formation: this.selectedFormation(),
       slotAssignments: this.slotAssignments,
       slotCoords: this.slotCoords
-    });
+    }).filter(slot => !this.data.vacantSlotIndexes?.includes(slot.slotIndex));
   }
 
   private resetAllSlotCoords(): void {
@@ -552,13 +488,15 @@ export class FormationModalComponent {
     }
   }
 
-  private coordsDifferFromDefault(): boolean {
-    return formationCoordsDifferFromDefault({
-      formationLinesByFormation: FORMATION_LINES_BY_FORMATION,
-      formation: this.selectedFormation(),
-      slotCoords: this.slotCoords
+  private coordsDifferFromInitial(): boolean {
+    return Array.from(this.slotCoords).some(([idx, coord]) => {
+      const initial = this.initialSlotCoords.get(idx);
+      return !initial || Math.abs(coord.x - initial.x) > 0.001 || Math.abs(coord.y - initial.y) > 0.001;
     });
   }
+
+  slotX(index: number): number { return (this.slotCoords.get(index) ?? this.defaultCoordForSlot(index)).x; }
+  slotY(index: number): number { return (this.slotCoords.get(index) ?? this.defaultCoordForSlot(index)).y; }
 
   private defaultCoordForSlot(slotIdx: number): { x: number; y: number } {
     return defaultCoordForFormationSlot(FORMATION_LINES_BY_FORMATION, this.selectedFormation(), slotIdx);

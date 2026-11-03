@@ -4,6 +4,10 @@ export const buildDebugRoutes = (enableDebugRoutes: boolean, guarded: CanActivat
   enableDebugRoutes
     ? [
         {
+          path: 'debug/positions',
+          loadComponent: () => import('./features/debug/position-lab.component').then(m => m.PositionLabComponent),
+        },
+        {
           path: 'debug/test-harness',
           loadComponent: () => import('./features/debug/test-harness/test-harness-page.component')
             .then((m) => m.TestHarnessPageComponent),

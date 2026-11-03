@@ -11,8 +11,8 @@ const lines = {
 
 describe('formation-modal-slot-geometry utils', () => {
   it('returns default slot coordinates from formation lines', () => {
-    expect(defaultCoordForFormationSlot(lines, '4-4-2', 0)).toEqual({ x: 50, y: 20 });
-    expect(defaultCoordForFormationSlot(lines, '4-4-2', 1)).toEqual({ x: 20, y: 40 });
+    expect(defaultCoordForFormationSlot(lines, '4-4-2', 0)).toEqual({ x: 50, y: 93.5 });
+    expect(defaultCoordForFormationSlot(lines, '4-4-2', 1)).toEqual({ x: 16.65, y: 83 });
   });
 
   it('finds role labels by slot index', () => {
@@ -43,7 +43,7 @@ describe('formation-modal-slot-geometry utils', () => {
     expect(formationCoordsDifferFromDefault({
       formationLinesByFormation: lines,
       formation: '4-4-2',
-      slotCoords: new Map([[0, { x: 50.2, y: 20.2 }]])
+      slotCoords: new Map([[0, { x: 50.2, y: 93.7 }]])
     })).toBeFalse();
     expect(formationCoordsDifferFromDefault({
       formationLinesByFormation: lines,

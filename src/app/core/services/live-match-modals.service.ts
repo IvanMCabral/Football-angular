@@ -77,6 +77,8 @@ export class LiveMatchModalsService {
   }>>();
   private readonly partidoSavedSlotsMemory = new Map<string, PartidoDialogData['currentSlots']>();
   private readonly partidoSavedFormationMemory = new Map<string, string>();
+  private readonly partidoSavedAtMinute = new Map<string, number>();
+  private readonly partidoLastModalMinute = new Map<string, number>();
   private roundResumeHoldCount = 0;
 
   // Optional context for event-driven substitution modals.
@@ -274,6 +276,7 @@ export class LiveMatchModalsService {
       switchMap(({ lineup, squad, status, liveState }) => {
         const userTeamId = status.userSessionTeamId;
         const stateForModal = liveState ?? state;
+        this.refreshPartidoMemoryForSnapshot(matchId, stateForModal);
         if (this.isTerminalLiveState(stateForModal)) {
           this.showTerminalModalNotice('cambiar la formacion');
           return EMPTY;
@@ -285,15 +288,18 @@ export class LiveMatchModalsService {
         const livePlayers = applyLiveSubstitutionsToLineup(lineup, squad, stateForModal, userTeamId, this.confirmedSubstitutionMemory.get(matchId ?? '') ?? []);
         const unavailableBenchIds = unavailableBenchPlayerIds(liveSubstitutionPairs(stateForModal, userTeamId, this.confirmedSubstitutionMemory.get(matchId ?? '') ?? []));
         const squadForModal = mergeSquadWithLivePlayers(squad ?? [], livePlayers)
-          .filter(player => !player.sessionPlayerId || !unavailableBenchIds.has(player.sessionPlayerId));
+          .filter(player => !player.sessionPlayerId || (!unavailableBenchIds.has(player.sessionPlayerId) &&
+            !(stateForModal.events ?? []).some(e => e.eventType === 'RED_CARD' && e.teamId === userTeamId && e.playerId === player.sessionPlayerId)));
         const liveSlots = managerIsHome ? stateForModal.homeSlots : stateForModal.awaySlots;
+        const hasDismissal = (stateForModal.events ?? []).some(e => e.eventType === 'RED_CARD' && e.teamId === userTeamId);
         const currentSlots = ensureUniqueCurrentSlots(
           overlayRememberedPartidoSlots(
-            this.partidoSavedSlotsMemory.get(matchId),
+            hasDismissal ? undefined : this.partidoSavedSlotsMemory.get(matchId),
             buildPartidoCurrentSlots(
               livePlayers,
               liveSlots,
-              liveSubstitutionPairs(stateForModal, userTeamId, this.confirmedSubstitutionMemory.get(matchId ?? '') ?? [])
+              liveSubstitutionPairs(stateForModal, userTeamId, this.confirmedSubstitutionMemory.get(matchId ?? '') ?? []),
+              hasDismissal
             )
           ),
           squadForModal
@@ -307,6 +313,7 @@ export class LiveMatchModalsService {
           currentFormation,
           homeTeamId: userTeamId ?? state.homeTeamId,
           currentSlots,
+          vacantSlotIndexes: hasDismissal ? Array.from({length: 11}, (_, i) => i).filter(i => !currentSlots.some(s => s.slotIndex === i)) : [],
           squad: squadForModal,
           startingIds
         };
@@ -321,7 +328,8 @@ export class LiveMatchModalsService {
 
         // Emit initial data for callers, then the actual close result.
         return merge(dialogRef.afterClosed().pipe(
-          tap(() => {
+          tap((result) => {
+            this.rememberPartidoSavedSlots(matchId, result);
             if (careerId && this.shouldResumeRoundAfterModalClose()) {
               this.engineService.resumeRoundForMatch(careerId, matchId).subscribe({
                 error: (err) => this.logger.warn('Could not resume the round after closing the formation modal:', err)
@@ -365,6 +373,7 @@ export class LiveMatchModalsService {
         const userTeamId = status.userSessionTeamId;
         const useLocalDebugPartidoState = isLocalDebugPartidoState(state);
         const stateForModal = useLocalDebugPartidoState ? state : (liveState ?? state);
+        this.refreshPartidoMemoryForSnapshot(matchId, stateForModal);
         if (this.isTerminalLiveState(stateForModal)) {
           this.showTerminalModalNotice('editar la formacion');
           return EMPTY;
@@ -373,16 +382,18 @@ export class LiveMatchModalsService {
         const livePlayers = applyLiveSubstitutionsToLineup(lineup, squad, stateForModal, userTeamId, this.confirmedSubstitutionMemory.get(matchId ?? '') ?? []);
         const unavailableBenchIds = unavailableBenchPlayerIds(liveSubstitutionPairs(stateForModal, userTeamId, this.confirmedSubstitutionMemory.get(matchId ?? '') ?? []));
         const squadForModal = mergeSquadWithLivePlayers(squad ?? [], livePlayers)
-          .filter(player => !player.sessionPlayerId || !unavailableBenchIds.has(player.sessionPlayerId));
+          .filter(player => !player.sessionPlayerId || (!unavailableBenchIds.has(player.sessionPlayerId) &&
+            !(stateForModal.events ?? []).some(e => e.eventType === 'RED_CARD' && e.teamId === userTeamId && e.playerId === player.sessionPlayerId)));
         const liveSlots = managerIsHome ? stateForModal.homeSlots : stateForModal.awaySlots;
+        const hasDismissal = (stateForModal.events ?? []).some(e => e.eventType === 'RED_CARD' && e.teamId === userTeamId);
         const currentSlots = ensureUniqueCurrentSlots(
           overlayRememberedPartidoSlots(
-            this.partidoSavedSlotsMemory.get(matchId),
+            hasDismissal ? undefined : this.partidoSavedSlotsMemory.get(matchId),
             buildPartidoCurrentSlots(
               livePlayers,
               liveSlots,
               liveSubstitutionPairs(stateForModal, userTeamId, this.confirmedSubstitutionMemory.get(matchId ?? '') ?? []),
-              useLocalDebugPartidoState
+              useLocalDebugPartidoState || hasDismissal
             )
           ),
           squadForModal
@@ -400,11 +411,13 @@ export class LiveMatchModalsService {
           homeTeamId: userTeamId ?? stateForModal.homeTeamId,
           awayTeamId: stateForModal.awayTeamId,
           currentSlots,
+          vacantSlotIndexes: hasDismissal ? Array.from({length: 11}, (_, i) => i).filter(i => !currentSlots.some(s => s.slotIndex === i)) : [],
+          scoreHomeTeamId: stateForModal.homeTeamId,
           squad: squadForModal,
           startingIds,
           preSelectedPlayerId: options?.preSelectedPlayerId,
           reason: options?.reason,
-          rivalFormation: stateForModal.awayFormation || '4-4-2',
+          rivalFormation: (managerIsHome ? stateForModal.awayFormation : stateForModal.homeFormation) || '4-4-2',
           currentMinute: stateForModal.currentMinute ?? 0,
           score: stateForModal.score ?? { home: 0, away: 0 },
           homePossession: stateForModal.homePossession ?? 50,
@@ -545,6 +558,26 @@ export class LiveMatchModalsService {
     const remembered = parseRememberedPartidoSlots(closeResult);
     if (remembered.formation) this.partidoSavedFormationMemory.set(matchId, remembered.formation);
     if (remembered.slots) this.partidoSavedSlotsMemory.set(matchId, remembered.slots);
+    if (remembered.formation || remembered.slots) {
+      const result = closeResult as {result?: {minuteApplied?: number}};
+      const minute = result.result?.minuteApplied ?? this.partidoLastModalMinute.get(matchId);
+      if (minute !== undefined) this.partidoSavedAtMinute.set(matchId, minute);
+    }
+  }
+
+  private refreshPartidoMemoryForSnapshot(matchId: string, state: MatchState): void {
+    const minute = state.currentMinute ?? 0;
+    const savedAt = this.partidoSavedAtMinute.get(matchId);
+    if (savedAt !== undefined && minute > savedAt) {
+      this.partidoSavedSlotsMemory.delete(matchId);
+      this.partidoSavedFormationMemory.delete(matchId);
+      this.partidoSavedAtMinute.delete(matchId);
+    } else if (savedAt === undefined && (this.partidoSavedSlotsMemory.has(matchId) || this.partidoSavedFormationMemory.has(matchId))) {
+      // Legacy responses have no application minute. Anchor their one-tick
+      // bridge to the first snapshot instead of keeping it forever.
+      this.partidoSavedAtMinute.set(matchId, minute);
+    }
+    this.partidoLastModalMinute.set(matchId, minute);
   }
 
   private rememberClosedModalSubstitutions(matchId: string, closeResult: unknown): void {

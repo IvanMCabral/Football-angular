@@ -1,4 +1,5 @@
-﻿import { ChangeDetectionStrategy, ChangeDetectorRef, Component, computed, inject, signal } from '@angular/core';
+import { TACTICAL_ROLE_LINES, tacticalSlotCoords } from '../../../../shared/constants/tactical-layouts';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
@@ -88,6 +89,8 @@ export interface PartidoDialogData {
   /** Current formation string (e.g. "4-4-2") for the manager team. */
   currentFormation: string;
   homeTeamId: string;
+  scoreHomeTeamId?: string;
+  vacantSlotIndexes?: number[];
   /** Rival team id used to split match events into home/away stats. */
   awayTeamId?: string;
   /** Manager-side current slots (sessionPlayerId + position + slotIndex). */
@@ -128,20 +131,7 @@ export interface PartidoDialogData {
 }
 
 /** Role labels rendered by each formation line in the live pitch. */
-export const FORMATION_LINES_BY_FORMATION: Record<string, string[][]> = {
-  '4-4-2':       [['GK'], ['LB', 'CB', 'CB', 'RB'], ['LM', 'CM', 'CM', 'RM'], ['ST', 'ST']],
-  '4-3-3':       [['GK'], ['LB', 'CB', 'CB', 'RB'], ['CM', 'CM', 'CM'], ['LW', 'ST', 'RW']],
-  '3-5-2':       [['GK'], ['CB', 'CB', 'CB'], ['LWB', 'CM', 'CM', 'CM', 'RWB'], ['ST', 'ST']],
-  '4-2-3-1':     [['GK'], ['LB', 'CB', 'CB', 'RB'], ['CDM', 'CDM'], ['LW', 'CAM', 'RW'], ['ST']],
-  '5-3-2':       [['GK'], ['LB', 'CB', 'CB', 'CB', 'RB'], ['CM', 'CM', 'CM'], ['ST', 'ST']],
-  '4-1-4-1':     [['GK'], ['LB', 'CB', 'CB', 'RB'], ['CDM'], ['LM', 'CM', 'CM', 'RM'], ['ST']],
-  '3-4-3':       [['GK'], ['CB', 'CB', 'CB'], ['LWB', 'CM', 'CM', 'RWB'], ['LW', 'ST', 'RW']],
-  '3-5-2-CDM':   [['GK'], ['CB', 'CB', 'CB'], ['CDM'], ['CM', 'CM'], ['LWB', 'RWB'], ['ST', 'ST']],
-  '5-4-1':       [['GK'], ['LB', 'CB', 'CB', 'CB', 'RB'], ['LM', 'CM', 'CM', 'RM'], ['ST']],
-  '3-4-1-2':     [['GK'], ['CB', 'CB', 'CB'], ['LWB', 'CM', 'CM', 'RWB'], ['CAM'], ['ST', 'ST']],
-  '4-2-2-2':     [['GK'], ['LB', 'CB', 'CB', 'RB'], ['CDM', 'CDM'], ['LM', 'RM'], ['ST', 'ST']],
-  '4-1-2-3':     [['GK'], ['LB', 'CB', 'CB', 'RB'], ['CDM'], ['CM', 'CM'], ['LW', 'ST', 'RW']]
-};
+export const FORMATION_LINES_BY_FORMATION = TACTICAL_ROLE_LINES;
 
 /** Live match dialog for formation edits, substitutions, rival view and stats. */
 @Component({
@@ -179,7 +169,7 @@ export class PartidoModalComponent {
   statsRows(): PartidoStatRow[] {
     return buildPartidoStatsRows({
       events: this.eventList(),
-      homeTeamId: this.data.homeTeamId,
+      homeTeamId: this.data.scoreHomeTeamId ?? this.data.homeTeamId,
       awayTeamId: this.data.awayTeamId ?? '',
       score: this.data.score,
       homePossession: this.data.homePossession,
@@ -461,18 +451,12 @@ export class PartidoModalComponent {
   isGoalkeeperSlot(slotIdx: number): boolean { return partidoIsGoalkeeperSlot(this, slotIdx); }
 
   freePositionLeftPercent(slotIdx: number): number | null {
-    const coords = this.freeSlotCoords.get(slotIdx);
-    if (!coords) {
-      return null;
-    }
+    const coords = this.freeSlotCoords.get(slotIdx) ?? this.baseSlotCoords(slotIdx);
     return coords.x;
   }
 
   freePositionTopPercent(slotIdx: number): number | null {
-    const coords = this.freeSlotCoords.get(slotIdx);
-    if (!coords) {
-      return null;
-    }
+    const coords = this.freeSlotCoords.get(slotIdx) ?? this.baseSlotCoords(slotIdx);
     return coords.y;
   }
 
@@ -508,6 +492,13 @@ export class PartidoModalComponent {
       idx += (lines[i]?.length ?? 0);
     }
     return idx + dotIdx;
+  }
+
+  rivalPosition(lineIdx: number, dotIdx: number): { x: number; y: number } {
+    const lines = TACTICAL_ROLE_LINES[this.rivalFormation()] ?? [];
+    const index = lines.slice(0, lineIdx).reduce((n, line) => n + line.length, 0) + dotIdx;
+    const base = tacticalSlotCoords(this.rivalFormation(), index);
+    return {x: Number((100 - base.x).toFixed(2)), y: Number((100 - base.y).toFixed(2))};
   }
 
   get benchPlayers(): SessionPlayer[] {
@@ -573,7 +564,7 @@ export class PartidoModalComponent {
       this.selectedFormation(),
       this.slotAssignments,
       this.freeSlotCoords
-    );
+    ).filter(slot => !this.data.vacantSlotIndexes?.includes(slot.slotIndex));
   }
 
   private swapFreeSlotCoords(a: number, b: number): void {

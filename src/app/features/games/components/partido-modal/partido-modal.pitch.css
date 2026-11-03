@@ -1,9 +1,31 @@
 .manager-pitch {
   /* El XI propio se lee como el editor principal: arco propio abajo,
      ataque arriba. No cambia slotIndex ni motor; sólo la presentación. */
-  flex-direction: column-reverse;
+  display: block;
+  min-height: 430px;
   padding-bottom: clamp(1rem, 2vh, 1.4rem);
 }
+
+.manager-pitch .pitch-line { display: contents; }
+.rival-pitch.pitch { min-height: 500px; display: block; }
+.rival-pitch .pitch-line { display: contents; }
+.rival-pitch.pitch .player-dot {
+  position: absolute; transform: translate(-50%, -50%);
+  width: 10%; min-width: 0; max-width: 68px; height: 40px; box-sizing: border-box;
+}
+.formation-grid .col-pitch .pitch.manager-pitch { min-height: 500px; display: block; }
+.manager-pitch .player-dot.is-positioned {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+  width: 10%;
+  max-width: 68px;
+  min-width: 0;
+  height: 40px;
+  box-sizing: border-box;
+  padding: 2px;
+}
+.manager-pitch .dot-player-name { display: block; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
 
 .player-dot {
   /* : 30px  ->  56px so the full player name (e.g.

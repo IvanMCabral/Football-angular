@@ -1,27 +1,19 @@
 import { FORMATION_LINES_BY_FORMATION } from './partido-modal.component';
 import { MatchEvent } from '../../../../core/services/match-engine.model';
 import { SessionPlayer } from '../../../../shared/models/player.model';
+import { reflowTacticalXi } from '../../../../shared/utils/tactical-lineup-reflow.utils';
 
 export function partidoOnFormationChange(ctx: any, value: string): void {
     const newFormation = ctx.normalizeFormation(value);
+    if (newFormation === ctx.selectedFormation()) return;
+    const reflowed = reflowTacticalXi(ctx.slotAssignments, ctx.selectedFormation(), newFormation, ctx.data.squad);
     ctx.selectedFormation.set(newFormation);
-    const currentXi = Array.from(ctx.slotAssignments.values()).filter((playerId): playerId is string => !!playerId);
     const autoFilledPlayerIds = new Set(Array.from(ctx.autoFilledSlots.values()).filter(Boolean));
     const autoFillSourceByPlayerId = new Map<string, string>();
     for (const [slotIdx, playerId] of ctx.autoFilledSlots) {
       const sourcePlayerId = ctx.autoFillSourcePlayerBySlot.get(slotIdx);
       if (playerId && sourcePlayerId) {
         autoFillSourceByPlayerId.set(playerId, sourcePlayerId);
-      }
-    }
-    const coordsByPlayerId = new Map<string, { x: number; y: number }>();
-    for (const [slotIdx, playerId] of ctx.slotAssignments) {
-      if (!playerId) {
-        continue;
-      }
-      const coords = ctx.freeSlotCoords.get(slotIdx);
-      if (coords) {
-        coordsByPlayerId.set(playerId, coords);
       }
     }
     const newLineCount = (FORMATION_LINES_BY_FORMATION[newFormation] ?? []).reduce(
@@ -33,13 +25,9 @@ export function partidoOnFormationChange(ctx: any, value: string): void {
     ctx.autoFillSourcePlayerBySlot.clear();
     ctx.bumpFreePositionRevision();
     for (let i = 0; i < newLineCount; i++) {
-      const playerId = currentXi[i] ?? null;
+      const playerId = reflowed.get(i) ?? null;
       ctx.slotAssignments.set(i, playerId);
       if (playerId) {
-        const coords = coordsByPlayerId.get(playerId);
-        if (coords) {
-          ctx.freeSlotCoords.set(i, coords);
-        }
         if (autoFilledPlayerIds.has(playerId)) {
           ctx.autoFilledSlots.set(i, playerId);
           const sourcePlayerId = autoFillSourceByPlayerId.get(playerId);
@@ -51,6 +39,14 @@ export function partidoOnFormationChange(ctx: any, value: string): void {
     }
     ctx.errorMsg = '';
     ctx.selectedNudgeSlotIdx = null;
+    if (ctx.data.vacantSlotIndexes?.length) {
+      ctx.data.vacantSlotIndexes = Array.from(ctx.slotAssignments.entries())
+        .filter((entry: any) => !entry[1]).map((entry: any) => entry[0]);
+    }
+    ctx.pendingSubstitutions = ctx.pendingSubstitutions.map((sub: any) => ({
+      ...sub, slotIndex: [...ctx.slotAssignments].find(([, id]: any) => id === sub.playerOnId)?.[0] ?? sub.slotIndex
+    }));
+    ctx.pendingSubstitutionRevision.update((value: number) => value + 1);
   
 }
 
@@ -58,6 +54,10 @@ export function partidoOnSlotDrop(ctx: any, event: DragEvent, targetSlotIdx: num
     event.preventDefault();
     if (ctx.dragSourceSlotIdx === null) {
       return;
+    }
+    if (ctx.data.vacantSlotIndexes?.includes(targetSlotIdx)) {
+      ctx.errorMsg = 'Esta posición quedó vacante por una expulsión.';
+      ctx.onSlotDragEnd(); return;
     }
     if (ctx.isGoalkeeperSlot(targetSlotIdx) || ctx.isGoalkeeperSlot(ctx.dragSourceSlotIdx)) {
       ctx.onSlotDragEnd();
@@ -83,7 +83,6 @@ export function partidoOnSlotDrop(ctx: any, event: DragEvent, targetSlotIdx: num
       }
       ctx.slotAssignments.set(targetSlotIdx, playerId);
       ctx.clearAutoFillMarker(targetSlotIdx);
-      ctx.freeSlotCoords.delete(targetSlotIdx);
       ctx.bumpFreePositionRevision();
     } else {
       const sourceSlot = ctx.dragSourceSlotIdx;
@@ -94,7 +93,6 @@ export function partidoOnSlotDrop(ctx: any, event: DragEvent, targetSlotIdx: num
       const targetPlayer = ctx.slotAssignments.get(targetSlotIdx) ?? null;
       ctx.slotAssignments.set(targetSlotIdx, sourcePlayer);
       ctx.slotAssignments.set(sourceSlot, targetPlayer);
-      ctx.swapFreeSlotCoords(sourceSlot, targetSlotIdx);
       ctx.clearAutoFillMarker(targetSlotIdx);
       ctx.clearAutoFillMarker(sourceSlot);
     }
@@ -233,6 +231,7 @@ export function partidoAutoFillEmptySlots(ctx: any): void {
           slotIdx++;
           continue;
         }
+        if (ctx.data.vacantSlotIndexes?.includes(slotIdx)) { slotIdx++; continue; }
         const roleLabel = line[dotIdx];
         const filled = ctx.tryFillSlot(slotIdx, roleLabel);
         if (!filled) {
@@ -362,7 +361,7 @@ export function partidoHydrateRememberedPlayerCoords(ctx: any): void {
         continue;
       }
       const coords = remembered[playerId];
-      if (!coords) {
+      if (!coords || ctx.freeSlotCoords.has(slotIdx)) {
         continue;
       }
       ctx.freeSlotCoords.set(slotIdx, {

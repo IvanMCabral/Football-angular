@@ -8,6 +8,7 @@
           &larr; Volver al dashboard
         </a>
       </header>
+      <p><a routerLink="/debug/positions">Laboratorio visual de posiciones · previa y DT en vivo</a></p>
       <!-- Empty state: no career active -->
       <div *ngIf="!loading() && !loadError() && !hasCareer()" class="state-container" role="status">
         <div class="state-icon info-icon" aria-hidden="true">i</div>

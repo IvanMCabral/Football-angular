@@ -271,7 +271,7 @@ describe('PartidoModalComponent', () => {
     });
   });
 
-  it('changing formation keeps the same XI players and carries manual pixels with the player', () => {
+  it('changing formation keeps the same XI and applies the new shape instead of old pixels', () => {
     const initialXi = Array.from(component.slotAssignments.values()).filter(Boolean);
     component.freeSlotCoords.set(6, { x: 47.25, y: 58.75 });
     const movedPlayerId = component.slotAssignments.get(6);
@@ -280,13 +280,63 @@ describe('PartidoModalComponent', () => {
     component.onFormationChange('4-3-3');
 
     const nextXi = Array.from(component.slotAssignments.values()).filter(Boolean);
-    expect(nextXi).toEqual(initialXi);
+    expect([...nextXi].sort()).toEqual([...initialXi].sort());
     const movedSlot = Array.from(component.slotAssignments.entries())
       .find(([, playerId]) => playerId === movedPlayerId)?.[0];
     expect(movedSlot).toBeDefined();
-    expect(component.freePositionLeftPercent(movedSlot!)).toBe(47.25);
-    expect(component.freePositionTopPercent(movedSlot!)).toBe(58.75);
+    expect(component.freeSlotCoords.size).toBe(0);
+    expect(component.freePositionLeftPercent(movedSlot!)).toBe(49.95);
+    expect(component.freePositionTopPercent(movedSlot!)).toBe(55);
     expect(component.benchPlayers.some(player => nextXi.includes(player.sessionPlayerId))).toBeFalse();
+  });
+
+  it('rotates the read-only rival view without changing team-relative coordinates', () => {
+    expect(component.rivalPosition(0, 0)).toEqual({x: 50, y: 6.5});
+    expect(component.rivalPosition(1, 0)).toEqual({x: 83.35, y: 17});
+  });
+
+  it('keeps the tactical location when replacing a player from the bench', () => {
+    component.freeSlotCoords.set(1, { x: 13.25, y: 72.5 });
+    component.dragSourceSlotIdx = -1;
+    component.dragSourceIsBench = true;
+    component.onSlotDrop({ preventDefault() {}, dataTransfer: { getData: () => 'bench:s12' } } as any, 1);
+    expect(component.slotAssignments.get(1)).toBe('s12');
+    expect(component.freeSlotCoords.get(1)).toEqual({ x: 13.25, y: 72.5 });
+  });
+
+  it('swaps players between tactical locations rather than moving their old locations with them', () => {
+    component.freeSlotCoords.set(1, { x: 13, y: 72 });
+    component.freeSlotCoords.set(2, { x: 41, y: 79 });
+    component.dragSourceSlotIdx = 1;
+    component.dragSourceIsBench = false;
+    component.onSlotDrop({ preventDefault() {} } as any, 2);
+    expect(component.slotAssignments.get(1)).toBe('s3');
+    expect(component.slotAssignments.get(2)).toBe('s2');
+    expect(component.freeSlotCoords.get(1)).toEqual({ x: 13, y: 72 });
+    expect(component.freeSlotCoords.get(2)).toEqual({ x: 41, y: 79 });
+  });
+
+  it('does not refill a dismissal vacancy or send a fictitious eleventh player', () => {
+    dialogData.currentSlots = dialogData.currentSlots.filter(s => s.slotIndex !== 3);
+    dialogData.vacantSlotIndexes = [3];
+    fixture.destroy(); fixture = TestBed.createComponent(PartidoModalComponent); component = fixture.componentInstance;
+    expect(component.slotAssignments.has(3)).toBeFalse();
+    expect(component.autoFilledSlots.size).toBe(0);
+    component.onFormationChange('4-3-3');
+    component.save();
+    const slots = engineSpy.changeFormation.calls.mostRecent().args[1];
+    expect(slots.length).toBe(10);
+    expect(slots.every(s => !!s.sessionPlayerId)).toBeTrue();
+    expect(new Set(slots.map(s => s.sessionPlayerId)).size).toBe(10);
+  });
+
+  it('does not remember coordinates rejected by the server', () => {
+    spyOn(window.localStorage, 'setItem');
+    engineSpy.changeFormation.and.returnValue(of({ success: false, error: 'rejected' } as any));
+    component.freeSlotCoords.set(6, { x: 53, y: 46 });
+    (component as any).bumpFreePositionRevision();
+    component.save();
+    expect(window.localStorage.setItem).not.toHaveBeenCalled();
   });
 
   it('changing formation moves the auto-filled marker with the auto-filled player', () => {
@@ -335,7 +385,7 @@ describe('PartidoModalComponent', () => {
     expect(component.hasPendingChanges()).toBeFalse();
   });
 
-  it('hydrates remembered player pixels by sessionPlayerId over slot coordinates', () => {
+  it('prefers current authoritative slot coordinates to remembered player pixels', () => {
     spyOn(window.localStorage, 'getItem').and.callFake((key: string) => {
       if (key === 'manager:partido-player-coords:match-1') {
         return JSON.stringify({ s7: { x: 84.3, y: 60 } });
@@ -354,8 +404,8 @@ describe('PartidoModalComponent', () => {
     const s7Slot = Array.from(component.slotAssignments.entries())
       .find(([, playerId]) => playerId === 's7')?.[0];
     expect(s7Slot).toBeDefined();
-    expect(component.freePositionLeftPercent(s7Slot!)).toBe(84.3);
-    expect(component.freePositionTopPercent(s7Slot!)).toBe(60);
+    expect(component.freePositionLeftPercent(s7Slot!)).toBe(16.6);
+    expect(component.freePositionTopPercent(s7Slot!)).toBe(61);
   });
 
   it('does not mark the modal dirty when remembered player pixels are only restored on open', () => {
@@ -457,8 +507,8 @@ describe('PartidoModalComponent', () => {
     expect(component.isFreePositionedSlot(6)).toBeTrue();
     expect(component.freePositionLeftPercent(6)).toBe(47.25);
     expect(component.freePositionTopPercent(6)).toBe(58.75);
-    expect(component.freePositionLeftPercent(5)).toBeNull();
-    expect(component.freePositionTopPercent(5)).toBeNull();
+    expect(component.freePositionLeftPercent(5)).toBe(16.65);
+    expect(component.freePositionTopPercent(5)).toBe(61);
   });
 
   it('nudge controls select a player, move by 1 percent and reset to base slot', () => {
@@ -471,8 +521,8 @@ describe('PartidoModalComponent', () => {
     component.nudgeSelectedSlot(1, -1);
 
     expect(component.isFreePositionedSlot(6)).toBeTrue();
-    expect(component.freePositionLeftPercent(6)).toBe(41);
-    expect(component.freePositionTopPercent(6)).toBe(65.67);
+    expect(component.freePositionLeftPercent(6)).toBe(39.85);
+    expect(component.freePositionTopPercent(6)).toBe(60);
     expect(component.hasPendingChanges()).toBeTrue();
     expect(window.localStorage.setItem).toHaveBeenCalledWith(
       'manager:last-modal-position-move',
@@ -551,8 +601,8 @@ describe('PartidoModalComponent', () => {
         .pop()![1]
     );
     expect(payload.playerName).toBe('MID 2');
-    expect(payload.fromXPercent).toBeCloseTo(40, 2);
-    expect(payload.fromYPercent).toBeCloseTo(66.67, 2);
+    expect(payload.fromXPercent).toBeCloseTo(38.85, 2);
+    expect(payload.fromYPercent).toBeCloseTo(61, 2);
     expect(payload.targetXPercent).toBe(55);
     expect(payload.targetYPercent).toBe(40);
   });
@@ -1487,33 +1537,23 @@ describe('PartidoModalComponent', () => {
 
   // ========== Bigger dots and readable player names ==========
 
-  it('F2: ɵcmp.styles sets .player-dot to 56px (was 30px) so full names fit without ellipsis', () => {
-    // the player-dot grew from 30x30 to 56x56. We assert on
-    // the inlined CSS source (ɵcmp.styles) because jsdom doesn't compute
-    // styles, but the inlined array is what gets applied at runtime
-    // (per angular-testing-patterns memory: only styles:[...] works, no
-    // styleUrls because the Karma webpack config has no CSS loader).
-    const src = stripEncapsulation(stylesSource());
-    const playerDotRule = src.match(/\.player-dot\s*\{[^}]*\}/);
-    expect(playerDotRule).toBeTruthy();
-    const ruleSrc = playerDotRule![0];
-    expect(ruleSrc).toContain('width: clamp(58px, 4.8vw, 78px)');
-    expect(ruleSrc).toContain('height: clamp(48px, 4.1vw, 64px)');
-    expect(ruleSrc).toContain('touch-action: none');
+  it('exposes eleven named pitch markers to keyboard users', () => {
+    fixture.detectChanges();
+    const markers = fixture.nativeElement.querySelectorAll('.manager-pitch .player-dot');
+    expect(markers.length).toBe(11);
+    for (const marker of markers) {
+      expect(marker.getAttribute('role')).toBe('button');
+      expect(marker.getAttribute('tabindex')).toBe('0');
+      expect(marker.getAttribute('aria-label')).toBeTruthy();
+    }
   });
 
-  it('F2: ɵcmp.styles removes the aggressive text-overflow: ellipsis on .dot-player-name (was truncating "Mbappé" → "Mb")', () => {
-    // the .dot-player-name rule went from max-width:26px +
-    // white-space:nowrap + text-overflow:ellipsis to max-width:50px +
-    // white-space:normal + overflow-wrap:anywhere. The aggressive
-    // truncation is gone — long names wrap to 2 lines instead of being
-    // cut to initials.
-    const src = stripEncapsulation(stylesSource());
-    const nameRule = src.match(/\.dot-player-name\s*\{[^}]*\}/);
-    expect(nameRule).toBeTruthy();
-    const ruleSrc = nameRule![0];
-    expect(ruleSrc).toContain('white-space: normal');
-    expect(ruleSrc).not.toContain('text-overflow: ellipsis');
+  it('keeps the complete player name available when compact pitch markers truncate visually', () => {
+    fixture.detectChanges();
+    const marker = fixture.nativeElement.querySelector('.manager-pitch [data-slot-idx="6"] .dot-player-name');
+    expect(marker.getAttribute('title')).toContain('MID 2');
+    component.selectNudgeSlot(6);
+    expect(component.selectedNudgePlayerName()).toContain('MID 2');
   });
 
   it('responsive manager pitch uses fluid dimensions and mobile/tablet/desktop breakpoints', () => {

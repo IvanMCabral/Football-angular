@@ -115,7 +115,7 @@
             <section class="col col-pitch" data-area="pitch" aria-label="Mi formación">
               <h3>
                 <span>Mi XI</span>
-                <small>Cancha editable por píxeles</small>
+                <small>Posiciones tácticas · ataque ↑</small>
               </h3>
               <div class="pitch manager-pitch" role="img"
                    (dragover)="onPitchDragOver($event)"
@@ -128,9 +128,12 @@
                 <div class="pitch-zone-label pitch-zone-mid">Medio</div>
                 <div class="pitch-zone-label pitch-zone-defense">Defensa</div>
                 <div class="pitch-line" *ngFor="let count of formationLines; let lineIdx = index">
-                  <div class="player-dot"
+                  <div class="player-dot is-positioned"
                        *ngFor="let _ of [].constructor(count); let dotIdx = index"
                        [attr.data-slot-idx]="getSlotIndex(lineIdx, dotIdx)"
+                       role="button" tabindex="0"
+                       [attr.aria-label]="(playerAtSlot(getSlotIndex(lineIdx, dotIdx))?.name || 'Vacante') + ' · ' + getDotLabel(lineIdx, dotIdx, count, false)"
+                       (keydown.enter)="onPitchSlotClick(getSlotIndex(lineIdx, dotIdx))"
                        [class.is-gk]="lineIdx === 0"
                        [class.is-def]="lineIdx === 1"
                        [class.is-mid]="lineIdx > 1 && lineIdx < formationLines.length - 1"
@@ -170,7 +173,7 @@
                     </ng-container>
                     <ng-template #emptyDot>
 
-                      <span class="dot-label" data-testid="dot-label-empty">{{ getDotLabel(lineIdx, dotIdx, count, false) }}</span>
+                      <span class="dot-label" data-testid="dot-label-empty">{{ data.vacantSlotIndexes?.includes(getSlotIndex(lineIdx, dotIdx)) ? 'Expulsión' : getDotLabel(lineIdx, dotIdx, count, false) }}</span>
                     </ng-template>
                   </div>
                 </div>
@@ -307,6 +310,8 @@
                 <div class="player-dot is-empty"
                      *ngFor="let _ of [].constructor(count); let dotIdx = index"
                      [attr.data-rival-slot-idx]="lineIdx + '-' + dotIdx"
+                     [style.left.%]="rivalPosition(lineIdx, dotIdx).x"
+                     [style.top.%]="rivalPosition(lineIdx, dotIdx).y"
                      [class.is-gk]="lineIdx === 0"
                      [class.is-def]="lineIdx === 1"
                      [class.is-mid]="lineIdx > 1 && lineIdx < rivalFormationLines.length - 1"
