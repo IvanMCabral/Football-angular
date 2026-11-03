@@ -24,6 +24,7 @@ export class StandingsPageComponent implements OnInit {
   /** Career PromotionCalculator moves the champion and last-place club. */
   readonly TEAMS_PROMOTED_OR_RELEGATED = 1;
   divisionCount = 0;
+  showFullStats = false;
   private readonly cdr = inject(ChangeDetectorRef);
 
   loading$ = new BehaviorSubject<boolean>(true);

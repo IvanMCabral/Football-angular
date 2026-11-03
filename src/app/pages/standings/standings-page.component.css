@@ -222,6 +222,22 @@
   -webkit-overflow-scrolling: touch;
 }
 
+.stats-toggle {
+  display: none;
+  margin: 0 0 0.75rem;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid #667eea;
+  border-radius: 8px;
+  background: #252b50;
+  color: #fff;
+  cursor: pointer;
+}
+
+.stats-toggle:focus-visible {
+  outline: 3px solid #facc15;
+  outline-offset: 2px;
+}
+
 .standings-table {
   width: 100%;
   min-width: 680px;
@@ -317,6 +333,22 @@
 }
 
 @media (max-width: 768px) {
+  .stats-toggle { display: inline-block; }
+
+  .standings-table:not(.full-stats) { min-width: 0; }
+
+  .standings-table:not(.full-stats) .detailed-stat { display: none; }
+
+  .standings-table:not(.full-stats) .pos { width: 28px; }
+
+  .standings-table:not(.full-stats) .team {
+    padding-left: 6px !important;
+    overflow-wrap: anywhere;
+  }
+
+  .standings-table:not(.full-stats) th,
+  .standings-table:not(.full-stats) td { padding: 10px 5px; }
+
   .standings-page {
     padding: 1rem;
   }

@@ -47,6 +47,10 @@
     </ng-container>
 
     <ng-template #standingsContent>
+      <button type="button" class="stats-toggle" [attr.aria-expanded]="showFullStats"
+              (click)="showFullStats = !showFullStats">
+        {{ showFullStats ? 'Vista compacta' : 'Todas las estadísticas' }}
+      </button>
       <mat-tab-group [selectedIndex]="selectedTabIndex$ | async" animationDuration="200ms">
 
         <mat-tab *ngFor="let div of divisions$ | async; let divisionIndex = index">
@@ -59,17 +63,17 @@
 
           <div class="division-content">
             <div class="standings-table-scroll" tabindex="0" role="region" aria-label="Tabla de posiciones desplazable horizontalmente">
-            <table class="standings-table">
+            <table class="standings-table" [class.full-stats]="showFullStats">
               <thead>
                 <tr>
                   <th class="pos">Pos</th>
                   <th class="team">Equipo</th>
                   <th class="stat">PJ</th>
-                  <th class="stat">G</th>
-                  <th class="stat">E</th>
-                  <th class="stat">P</th>
-                  <th class="stat">GF</th>
-                  <th class="stat">GC</th>
+                  <th class="stat detailed-stat">G</th>
+                  <th class="stat detailed-stat">E</th>
+                  <th class="stat detailed-stat">P</th>
+                  <th class="stat detailed-stat">GF</th>
+                  <th class="stat detailed-stat">GC</th>
                   <th class="stat">DG</th>
                   <th class="stat points">PTS</th>
                 </tr>
@@ -85,11 +89,11 @@
                     {{ team.teamName }}
                   </td>
                   <td class="stat">{{ team.played }}</td>
-                  <td class="stat">{{ team.won }}</td>
-                  <td class="stat">{{ team.drawn }}</td>
-                  <td class="stat">{{ team.lost }}</td>
-                  <td class="stat">{{ team.goalsFor }}</td>
-                  <td class="stat">{{ team.goalsAgainst }}</td>
+                  <td class="stat detailed-stat">{{ team.won }}</td>
+                  <td class="stat detailed-stat">{{ team.drawn }}</td>
+                  <td class="stat detailed-stat">{{ team.lost }}</td>
+                  <td class="stat detailed-stat">{{ team.goalsFor }}</td>
+                  <td class="stat detailed-stat">{{ team.goalsAgainst }}</td>
                   <td class="stat">{{ team.goalDifference > 0 ? '+' : '' }}{{ team.goalDifference }}</td>
                   <td class="stat points">{{ team.points }}</td>
                 </tr>
