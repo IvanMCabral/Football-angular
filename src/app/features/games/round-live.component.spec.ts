@@ -500,6 +500,7 @@ describe('RoundLiveComponent live round behavior', () => {
 
   it('Skips a queued injury modal when that injured player was already substituted', (done) => {
     const firstModalClosed$ = new Subject<unknown>();
+    const resume = spyOn(component, 'resumeAll');
     modalsSpy.openPartidoModal.and.returnValue(firstModalClosed$.asObservable());
 
     const state = makeMatchState({ status: 'RUNNING', currentMinute: 62 });
@@ -528,6 +529,7 @@ describe('RoundLiveComponent live round behavior', () => {
       expect(modalsSpy.openPartidoModal)
         .withContext('the stale queued modal must not open after its player was already changed')
         .toHaveBeenCalledTimes(1);
+      expect(resume).toHaveBeenCalledTimes(1);
       done();
     }, 10);
   });

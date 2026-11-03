@@ -494,6 +494,20 @@ describe('MatchEngineService - pause/resume per round', () => {
     });
   });
 
+  it('pauses a freshly started match without resolving its round again', () => {
+    const match = { matchId: 'match-3', homeTeamId: 'home', awayTeamId: 'away' };
+    httpSpy.post.and.returnValues(
+      of({ roundId: 'server-round', matches: [match] }),
+      of({ success: true })
+    );
+
+    service.startRound('requested-round', [match]).subscribe();
+    service.pauseRoundForMatch('career-1', match.matchId).subscribe();
+
+    expect(httpSpy.get).not.toHaveBeenCalled();
+    expect(httpSpy.post).toHaveBeenCalledWith('/api/v1/career/career-1/round/server-round/pause', {});
+  });
+
   it('pauseRoundForMatch — resolves roundId via helper then POSTs to the round pause endpoint', (done) => {
     const careerId = 'career-1';
     const matchId = 'match-3';

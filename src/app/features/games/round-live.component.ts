@@ -171,6 +171,8 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
     if (typeof window !== 'undefined' && window.managerDebugRoundLive === this.debugRoundLiveHook) {
       delete window.managerDebugRoundLive;
     }
+    this.releaseQueuedAutoModalResumeHold?.();
+    this.releaseQueuedAutoModalResumeHold = null;
     this.destroy$.next();
     this.destroy$.complete();
   }
@@ -440,6 +442,12 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
       setTimeout(() => this.openQueuedInjuryAutoModalIfStillNeeded(queued), 0);
       return;
     }
+    if (this.releaseQueuedAutoModalResumeHold) {
+      this.releaseQueuedAutoModalResumeHold();
+      this.releaseQueuedAutoModalResumeHold = null;
+      this.persistInjuryAutoModals();
+      this.resumeAll();
+    }
     const queuedRival = this.queuedRivalCardModal;
     this.queuedRivalCardModal = null;
     this.updatePendingLiveModalNotice();
@@ -457,12 +465,12 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
   }
 
   private openQueuedInjuryAutoModalIfStillNeeded(payload: InjuryAutoModalPayload): void {
-    this.releaseQueuedAutoModalResumeHold?.();
-    this.releaseQueuedAutoModalResumeHold = null;
     if (this.modals.wasPlayerConfirmedSubstitutedOff(payload.matchId, payload.preSelectedPlayerId)) {
       setTimeout(() => this.drainQueuedLiveModals(), 0);
       return;
     }
+    this.releaseQueuedAutoModalResumeHold?.();
+    this.releaseQueuedAutoModalResumeHold = null;
     if (this.queuedAutoModals.length > 0) {
       this.releaseQueuedAutoModalResumeHold = this.modals.holdRoundResumeAfterModalClose();
     }

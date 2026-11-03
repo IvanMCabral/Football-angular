@@ -95,6 +95,15 @@ export class MatchEngineService {
       tap((state: RoundState) => {
         const responseAt = this.monotonicNow();
         const actualRoundId = state?.roundId || roundId;
+        const cachedAt = Date.now();
+        for (const match of state?.matches ?? []) {
+          this.roundIdCache.set(match.matchId, { roundId: actualRoundId, cachedAt });
+        }
+        for (const [matchId, entry] of this.roundIdCache) {
+          if (cachedAt - entry.cachedAt >= MatchEngineService.ROUND_ID_CACHE_TTL_MS) {
+            this.roundIdCache.delete(matchId);
+          }
+        }
         markMatchStartStage('T10_START_POST_RECEIVED');
         this.matchStartTraceByRound.set(actualRoundId, { requestId, clickAt, postAt, responseAt });
         this.markPerformance('manager.match-start.response.received');

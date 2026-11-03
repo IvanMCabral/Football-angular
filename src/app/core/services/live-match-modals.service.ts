@@ -107,129 +107,124 @@ export class LiveMatchModalsService {
     }
     const careerId = this.getCurrentCareerId();
     return this.pauseBeforeModal(careerId, matchId, 'substitution', state.status === 'PAUSED').pipe(
-      switchMap(() => this.careerService.getCareerStatus()),
-      switchMap(status => {
+      switchMap(() => forkJoin({
+        status: this.careerService.getCareerStatus(),
+        lineup: this.http.get<LineupDTO>(`${environment.apiUrl}/career/lineup/current`),
+        squad: this.teamService.getMyTeamSquad(),
+        liveState: this.engineService.getMatchState(matchId).pipe(
+          timeout(1500),
+          catchError(() => of(state))
+        )
+      })),
+      switchMap(({ status, lineup, squad, liveState }) => {
         const userTeamId = status.userSessionTeamId;
         if (!userTeamId) {
-          this.snackBar.open('No se encontr? el equipo del manager', 'OK', { duration: 3000 });
-          return [];
+          this.snackBar.open('No se encontró el equipo del manager', 'OK', { duration: 3000 });
+          return EMPTY;
         }
-        return forkJoin({
-          lineup: this.http.get<LineupDTO>(`${environment.apiUrl}/career/lineup/current`),
-          // Ask the API for the manager's current squad; the backend resolves
-          // the active team from the authenticated career/session.
-          squad: this.teamService.getMyTeamSquad(),
-          liveState: this.engineService.getMatchState(matchId).pipe(
-            timeout(1500),
-            catchError(() => of(state))
-          )
-        }).pipe(
-          switchMap(({ lineup, squad, liveState }) => {
-            // Protect the modal from duplicated live rows: each starter and
-            // bench player should appear once.
-            const stateForModal = liveState ?? state;
-            if (this.isTerminalLiveState(stateForModal)) {
-              this.showTerminalModalNotice('sustituir');
-              return EMPTY;
-            }
-            const livePlayers = applyLiveSubstitutionsToLineup(lineup, squad, stateForModal, userTeamId, this.confirmedSubstitutionMemory.get(matchId ?? '') ?? []);
-            const seenStarters = new Set<string>();
-            const startingXi: SubModalPlayer[] = livePlayers
-              .filter(p => {
-                if (!p.playerId || seenStarters.has(p.playerId)) { return false; }
-                seenStarters.add(p.playerId);
-                return true;
-              })
-              .map(p => toSubModalPlayer(p, true));
-            const startingIds = seenStarters;
-            const unavailableBenchIds = unavailableBenchPlayerIds(liveSubstitutionPairs(stateForModal, userTeamId, this.confirmedSubstitutionMemory.get(matchId ?? '') ?? []));
-            const seenBench = new Set<string>();
-            const bench: SubModalPlayer[] = squad
-              .filter(sp => !startingIds.has(sp.sessionPlayerId))
-              .filter(sp => !unavailableBenchIds.has(sp.sessionPlayerId))
-              .filter(sp => {
-                if (!sp.sessionPlayerId || seenBench.has(sp.sessionPlayerId)) { return false; }
-                seenBench.add(sp.sessionPlayerId);
-                return true;
-              })
-              .map(sp => toSubModalPlayerFromSession(sp, false));
-
-            // Build the slot effectiveness map used by the SALE/ENTRA chips.
-            // When the backend has no effectiveness data, the modal simply
-            // renders without that feedback.
-            const slotToEff: Record<string, number> =
-              lineup?.formationEffectiveness?.perPlayerEffectiveness ?? {};
-            const slotToPlayerId: Record<string, string> = {};
-            (lineup?.slots ?? []).forEach(s => {
-              slotToPlayerId[s.subdivisionId] = s.playerId;
-            });
-            const effectivenessMap: Record<string, number> = {};
-            Object.entries(slotToEff).forEach(([subdivisionId, eff]) => {
-              const playerId = slotToPlayerId[subdivisionId];
-              if (playerId) {
-                effectivenessMap[playerId] = eff;
-              }
-            });
-
-            const data: SubstitutionDialogData = {
-              matchId,
-              currentMinute: stateForModal.currentMinute ?? 0,
-              score: stateForModal.score,
-              startingXi,
-              bench,
-              // The backend computes remaining substitutions from live events.
-              // If no live snapshot has arrived yet, keep the modal permissive
-              // and let the backend validate the final save.
-              substitutionsRemaining: effectiveSubstitutionsRemaining(this.confirmedSubstitutionMemory.get(matchId) ?? [], stateForModal, userTeamId),
-              // Position-effectiveness feedback for the SALE/ENTRA chips.
-              effectivenessMap,
-              // Give the modal the live formation, ratings and manager side so
-              // its pitch and chips reflect the current match state.
-              formation: (userTeamId === stateForModal.homeTeamId)
-                  ? (stateForModal.homeFormation ?? '4-4-2')
-                  : (stateForModal.awayFormation ?? '4-4-2'),
-              playerRatings: (userTeamId === stateForModal.homeTeamId)
-                  ? (stateForModal.homePlayerRatings ?? [])
-                  : (stateForModal.awayPlayerRatings ?? []),
-              managerSide: (userTeamId === stateForModal.homeTeamId) ? 'HOME' : 'AWAY',
-              // Optional pre-selection used by injury-driven modal opens.
-              preSelectedPlayerId: options?.preSelectedPlayerId,
-              reason: options?.reason
-            };
-
-            // The round is paused before opening so the minute the manager saw
-            // remains valid when the substitution is confirmed.
-            const dialogRef = this.dialog.open(SubstitutionModalComponent, {
-              data,
-              width: '920px',
-              maxWidth: '95vw',
-              disableClose: false,
-              autoFocus: 'first-tabbable'
-            });
-
-            // Resume the round when the modal closes, confirmed or cancelled.
-            return merge(dialogRef.afterClosed().pipe(
-              map(closeResult => closeResult as LiveSubstitutionCloseResult | undefined),
-              tap((closeResult) => {
-                if (closeResult?.success && Array.isArray(closeResult.substitutions)) {
-                  for (const substitution of closeResult.substitutions) {
-                    if (substitution.playerOffId && substitution.playerOnId) {
-                      this.rememberConfirmedSubstitution(matchId, substitution.playerOffId, substitution.playerOnId);
-                    }
-                  }
-                } else if (closeResult?.success && closeResult.playerOffId && closeResult.playerOnId) {
-                  this.rememberConfirmedSubstitution(matchId, closeResult.playerOffId, closeResult.playerOnId);
-                }
-                if (careerId && this.shouldResumeRoundAfterModalClose()) {
-                  this.engineService.resumeRoundForMatch(careerId, matchId).subscribe({
-                    error: (err) => this.logger.warn('Could not resume the round after closing the substitution modal:', err)
-                  });
-                }
-              }),
-              ignoreElements()
-            ), of(data));
+        // Protect the modal from duplicated live rows: each starter and
+        // bench player should appear once.
+        const stateForModal = liveState ?? state;
+        if (this.isTerminalLiveState(stateForModal)) {
+          this.showTerminalModalNotice('sustituir');
+          return EMPTY;
+        }
+        const livePlayers = applyLiveSubstitutionsToLineup(lineup, squad, stateForModal, userTeamId, this.confirmedSubstitutionMemory.get(matchId ?? '') ?? []);
+        const seenStarters = new Set<string>();
+        const startingXi: SubModalPlayer[] = livePlayers
+          .filter(p => {
+            if (!p.playerId || seenStarters.has(p.playerId)) { return false; }
+            seenStarters.add(p.playerId);
+            return true;
           })
-        );
+          .map(p => toSubModalPlayer(p, true));
+        const startingIds = seenStarters;
+        const unavailableBenchIds = unavailableBenchPlayerIds(liveSubstitutionPairs(stateForModal, userTeamId, this.confirmedSubstitutionMemory.get(matchId ?? '') ?? []));
+        const seenBench = new Set<string>();
+        const bench: SubModalPlayer[] = squad
+          .filter(sp => !startingIds.has(sp.sessionPlayerId))
+          .filter(sp => !unavailableBenchIds.has(sp.sessionPlayerId))
+          .filter(sp => {
+            if (!sp.sessionPlayerId || seenBench.has(sp.sessionPlayerId)) { return false; }
+            seenBench.add(sp.sessionPlayerId);
+            return true;
+          })
+          .map(sp => toSubModalPlayerFromSession(sp, false));
+
+        // Build the slot effectiveness map used by the SALE/ENTRA chips.
+        // When the backend has no effectiveness data, the modal simply
+        // renders without that feedback.
+        const slotToEff: Record<string, number> =
+          lineup?.formationEffectiveness?.perPlayerEffectiveness ?? {};
+        const slotToPlayerId: Record<string, string> = {};
+        (lineup?.slots ?? []).forEach(s => {
+          slotToPlayerId[s.subdivisionId] = s.playerId;
+        });
+        const effectivenessMap: Record<string, number> = {};
+        Object.entries(slotToEff).forEach(([subdivisionId, eff]) => {
+          const playerId = slotToPlayerId[subdivisionId];
+          if (playerId) {
+            effectivenessMap[playerId] = eff;
+          }
+        });
+
+        const data: SubstitutionDialogData = {
+          matchId,
+          currentMinute: stateForModal.currentMinute ?? 0,
+          score: stateForModal.score,
+          startingXi,
+          bench,
+          // The backend computes remaining substitutions from live events.
+          // If no live snapshot has arrived yet, keep the modal permissive
+          // and let the backend validate the final save.
+          substitutionsRemaining: effectiveSubstitutionsRemaining(this.confirmedSubstitutionMemory.get(matchId) ?? [], stateForModal, userTeamId),
+          // Position-effectiveness feedback for the SALE/ENTRA chips.
+          effectivenessMap,
+          // Give the modal the live formation, ratings and manager side so
+          // its pitch and chips reflect the current match state.
+          formation: (userTeamId === stateForModal.homeTeamId)
+              ? (stateForModal.homeFormation ?? '4-4-2')
+              : (stateForModal.awayFormation ?? '4-4-2'),
+          playerRatings: (userTeamId === stateForModal.homeTeamId)
+              ? (stateForModal.homePlayerRatings ?? [])
+              : (stateForModal.awayPlayerRatings ?? []),
+          managerSide: (userTeamId === stateForModal.homeTeamId) ? 'HOME' : 'AWAY',
+          // Optional pre-selection used by injury-driven modal opens.
+          preSelectedPlayerId: options?.preSelectedPlayerId,
+          reason: options?.reason
+        };
+
+        // The round is paused before opening so the minute the manager saw
+        // remains valid when the substitution is confirmed.
+        const dialogRef = this.dialog.open(SubstitutionModalComponent, {
+          data,
+          width: '920px',
+          maxWidth: '95vw',
+          disableClose: false,
+          autoFocus: 'first-tabbable'
+        });
+
+        // Resume the round when the modal closes, confirmed or cancelled.
+        return merge(dialogRef.afterClosed().pipe(
+          map(closeResult => closeResult as LiveSubstitutionCloseResult | undefined),
+          tap((closeResult) => {
+            if (closeResult?.success && Array.isArray(closeResult.substitutions)) {
+              for (const substitution of closeResult.substitutions) {
+                if (substitution.playerOffId && substitution.playerOnId) {
+                  this.rememberConfirmedSubstitution(matchId, substitution.playerOffId, substitution.playerOnId);
+                }
+              }
+            } else if (closeResult?.success && closeResult.playerOffId && closeResult.playerOnId) {
+              this.rememberConfirmedSubstitution(matchId, closeResult.playerOffId, closeResult.playerOnId);
+            }
+            if (careerId && this.shouldResumeRoundAfterModalClose()) {
+              this.engineService.resumeRoundForMatch(careerId, matchId).subscribe({
+                error: (err) => this.logger.warn('Could not resume the round after closing the substitution modal:', err)
+              });
+            }
+          }),
+          ignoreElements()
+        ), of(data));
       })
     );
   }
@@ -263,11 +258,10 @@ export class LiveMatchModalsService {
     }
     const careerId = this.getCurrentCareerId();
     return this.pauseBeforeModal(careerId, matchId, 'formation', state.status === 'PAUSED').pipe(
-      switchMap(() => this.careerService.getCareerStatus()),
-      switchMap(status => forkJoin({
+      switchMap(() => forkJoin({
         lineup: this.http.get<LineupDTO>(`${environment.apiUrl}/career/lineup/current`),
         squad: this.teamService.getMyTeamSquad(),
-        status: of(status),
+        status: this.careerService.getCareerStatus(),
         liveState: this.engineService.getMatchState(matchId).pipe(
           timeout(1500),
           catchError(() => of(state))
@@ -359,11 +353,10 @@ export class LiveMatchModalsService {
     }
     const careerId = this.getCurrentCareerId();
     return this.pauseBeforeModal(careerId, matchId, 'partido', state.status === 'PAUSED').pipe(
-      switchMap(() => this.careerService.getCareerStatus()),
-      switchMap(status => forkJoin({
+      switchMap(() => forkJoin({
         lineup: this.http.get<LineupDTO>(`${environment.apiUrl}/career/lineup/current`),
         squad: this.teamService.getMyTeamSquad(),
-        status: of(status),
+        status: this.careerService.getCareerStatus(),
         liveState: this.engineService.getMatchState(matchId).pipe(
           timeout(1500),
           catchError(() => of(state))
