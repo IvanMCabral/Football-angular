@@ -105,9 +105,13 @@ export class RoundSummaryComponent implements OnInit, OnDestroy {
           errorMsg: '',
           byeTeam: fixtures.byeTeam ?? null
         });
-        // Retain the completion-status refresh, bounded by component lifetime.
-        timer(100).pipe(takeUntil(merge(this.destroy$, this.statusRefreshCancelled$)))
-          .subscribe(() => this.reloadCareerStatus());
+        // Refresh only while completed results are ahead of durable status.
+        // Historical summaries and an already-finished season need no extra read.
+        if (status.careerPhase !== 'FINISHED' && status.currentRound <= params.roundNumber &&
+            fixtures.matches.length > 0 && fixtures.matches.every(f => this.hasPlayedResult(f.status))) {
+          timer(100).pipe(takeUntil(merge(this.destroy$, this.statusRefreshCancelled$)))
+            .subscribe(() => this.reloadCareerStatus());
+        }
       },
       error: () => this.updateVm({
         ...this.vmSubject.value, standingsLoading: false,

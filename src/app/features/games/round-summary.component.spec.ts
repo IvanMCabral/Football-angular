@@ -126,6 +126,9 @@ describe('RoundSummaryComponent navigation', () => {
     fixture.destroy();
     jasmine.clock().install();
     try {
+      (TestBed.inject(ActivatedRoute).paramMap as BehaviorSubject<any>).next(new Map([
+        ['gameId', SAMPLE_GAME_ID], ['round', String(round)]
+      ]));
       fixture = TestBed.createComponent(RoundSummaryComponent);
       component = fixture.componentInstance;
       setVm({ roundNumber: round,
@@ -145,6 +148,18 @@ describe('RoundSummaryComponent navigation', () => {
     careerId: SAMPLE_GAME_ID, currentRound: round, totalRounds: 38,
     careerPhase: phase, canAdvanceRound: phase === 'WAITING_USER', season
   } as any);
+
+  it('does not fetch status again when a completed summary already has the advanced date', () => {
+    careerServiceSpy.getCareerStatus.and.returnValue(of(statusAt(22)));
+    careerServiceSpy.getFixturesByRoundWithBye.and.returnValue(of({ byeTeam: null, matches: [
+      { matchId: 'done', homeTeamId: 'a', awayTeamId: 'b', status: 'COMPLETED', homeGoals: 1, awayGoals: 0 }
+    ] } as any));
+    withStatusClock(21, () => {
+      jasmine.clock().tick(3000);
+      expect(careerServiceSpy.getCareerStatus).not.toHaveBeenCalled();
+      expect(careerServiceSpy.invalidateCareerStatus).not.toHaveBeenCalled();
+    });
+  });
 
   it('refreshes completed dates before round 21 until canonical status advances', () => {
     withStatusClock(20, () => {
