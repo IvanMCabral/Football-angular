@@ -26,9 +26,14 @@ export class CareerReadCache {
   }
 
   clear(): void { this.revision++; this.entries.clear(); this.session = null; this.careerVersion = null; }
-  invalidate(): void {
+  invalidate(keepLiveLineup = false): void {
     this.revision++;
-    for (const [key, entry] of this.entries) if (!entry.metadata) this.entries.delete(key);
+    for (const [key, entry] of this.entries) {
+      const liveLineup = /^career\/(lineup\/current|teams\/me\/squad|players\/squad)$/.test(
+        key.slice(environment.apiUrl.length + 1)
+      );
+      if (!entry.metadata && !(keepLiveLineup && liveLineup)) this.entries.delete(key);
+    }
   }
   observeCareer(status: { careerId?: string | null; season?: number; currentRound?: number; careerPhase?: string | null }): void {
     const version = JSON.stringify([status.careerId, status.season, status.currentRound, status.careerPhase]);
@@ -96,13 +101,15 @@ export const careerReadCacheInterceptor: HttpInterceptorFn = (req, next) => {
   const cache = inject(CareerReadCache);
   const preview = /^career\/lineup\/preview-(chemistry|ratings)$/.test(path);
   if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !preview) {
-    cache.invalidate();
+    const roundControl = req.method === 'POST' && /^career\/[^/]+\/round\/[^/]+\/(pause|resume)$/.test(path);
+    const invalidate = () => cache.invalidate(roundControl);
+    invalidate();
     let returned = false;
     return next(req).pipe(
       tap({ next: event => {
-        if (event instanceof HttpResponse) { returned = true; cache.invalidate(); }
-      }, error: () => { returned = true; cache.invalidate(); } }),
-      finalize(() => { if (!returned) cache.invalidate(); })
+        if (event instanceof HttpResponse) { returned = true; invalidate(); }
+      }, error: () => { returned = true; invalidate(); } }),
+      finalize(() => { if (!returned) invalidate(); })
     );
   }
   const metadata = /^lineup-editor\/(formations|subdivisions)$/.test(path);

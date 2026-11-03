@@ -112,6 +112,7 @@ describe('RoundLiveComponent live round behavior', () => {
 
     modalsSpy = jasmine.createSpyObj<LiveMatchModalsService>('LiveMatchModalsService', [
       'openSubstitutionModal',
+      'prefetchSubstitutionData',
       'openFormationModal',
       'openPartidoModal',
       // Rival red-card awareness modal.
@@ -120,6 +121,7 @@ describe('RoundLiveComponent live round behavior', () => {
       'holdRoundResumeAfterModalClose'
     ]);
     modalsSpy.openSubstitutionModal.and.returnValue(of({}));
+    modalsSpy.prefetchSubstitutionData.and.returnValue(of(null));
     modalsSpy.openFormationModal.and.returnValue(of({}));
     modalsSpy.openPartidoModal.and.returnValue(of({}));
     modalsSpy.openRivalCardInfoModal.and.returnValue(of({ dismissed: true }));
@@ -1247,6 +1249,28 @@ describe('RoundLiveComponent live round behavior', () => {
 
   // Initial loading state before route, teams, career status and fixtures arrive.
   describe('Initial-load spinner', () => {
+    it('renders the start response and keeps the live state when team names arrive later', () => {
+      const teams = new Subject<any[]>();
+      careerServiceSpy.getCareerTeams.and.returnValue(teams);
+      careerServiceSpy.getFixturesByRoundWithBye.and.returnValue(of({
+        matches: [{ matchId: SAMPLE_MATCH_ID, homeTeamId: SAMPLE_HOME_TEAM_ID,
+          awayTeamId: SAMPLE_AWAY_TEAM_ID, round: 1, status: 'SCHEDULED' }],
+        byeTeam: null
+      } as any));
+      engineServiceSpy.startRound.and.returnValue(of(makeRoundState([
+        makeMatchState({ status: 'RUNNING', currentMinute: 2 })
+      ])));
+
+      fixture = TestBed.createComponent(RoundLiveComponent);
+      component = fixture.componentInstance;
+      const vm = (component as any).vmSubject;
+      expect(vm.value.matches[0].state.currentMinute).toBe(2);
+      teams.next([{ sessionTeamId: SAMPLE_HOME_TEAM_ID, name: 'Home FC' }]);
+      expect(vm.value.teamNameMap[SAMPLE_HOME_TEAM_ID]).toBe('Home FC');
+      expect(vm.value.matches[0].state.currentMinute).toBe(2);
+      expect(engineServiceSpy.streamRoundState).toHaveBeenCalledTimes(1);
+    });
+
     it('loading$ starts true and flips to false after combineLatest emits', (done: DoneFn) => {
       // Cold subjects so combineLatest blocks until we push.
       const teamsSub = new Subject<any[]>();

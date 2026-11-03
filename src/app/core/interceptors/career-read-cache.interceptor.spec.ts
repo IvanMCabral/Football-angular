@@ -51,6 +51,32 @@ describe('Career read reuse', () => {
     const latest: any[] = []; http.get(url, options).subscribe(value => latest.push(value));
     expect(latest[0][0].name).toBe('Saved'); backend.expectNone(url);
   });
+  it('keeps substitution inputs across round controls and refreshes them after a substitution', () => {
+    const lineup = `${environment.apiUrl}/career/lineup/current`;
+    const squad = `${environment.apiUrl}/career/teams/me/squad`;
+    const reads = [lineup, squad];
+    for (const path of reads) {
+      http.get(path, options).subscribe();
+      backend.expectOne(path).flush({ version: 1 });
+    }
+    for (const action of ['pause', 'resume']) {
+      const command = `${environment.apiUrl}/career/career-id/round/round-id/${action}`;
+      http.post(command, {}, options).subscribe();
+      backend.expectOne(command).flush({ success: true });
+    }
+    for (const path of reads) {
+      http.get(path, options).subscribe(value => expect(value).toEqual({ version: 1 }));
+      backend.expectNone(path);
+    }
+    const substitution = `${environment.apiUrl}/match-engine/matches/match-id/substitutions`;
+    http.post(substitution, {}, options).subscribe();
+    backend.expectOne(substitution).flush({ success: true });
+    for (const path of reads) {
+      http.get(path, options).subscribe(value => expect(value).toEqual({ version: 2 }));
+      backend.expectOne(path).flush({ version: 2 });
+    }
+  });
+
   it('also invalidates on rejected commands', () => {
     http.get(url, options).subscribe(); backend.expectOne(url).flush([]);
     const command = `${environment.apiUrl}/career/reset`;

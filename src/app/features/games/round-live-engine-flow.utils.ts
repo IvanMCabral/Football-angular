@@ -1,5 +1,5 @@
 import { filter, switchMap, take, takeUntil, tap } from 'rxjs/operators';
-import { Observable, of } from 'rxjs';
+import { concat, Observable, of } from 'rxjs';
 import { RoundLiveViewModel, RoundMatchVM } from './models/round-live.model';
 import { MatchState, RoundState } from '../../core/services/match-engine.model';
 import {
@@ -38,11 +38,16 @@ export function roundLiveStartRoundEngine(ctx: any, gameId: string, matches: Rou
     const sseStream$: Observable<RoundState> = ctx.resolvedRoundId$.pipe(
       filter((id): id is string => !!id),
       take(1),
-      switchMap((id: string) => ctx.engineService.streamRoundState(id))
+      switchMap((id: string) => {
+        const stream = ctx.engineService.streamRoundState(id);
+        const initial = ctx.autoStartState as RoundState | null;
+        ctx.autoStartState = null;
+        return initial?.roundId === id && initial.matches.length ? concat(of(initial), stream) : stream;
+      })
     );
 
     startRound$.pipe(
-      switchMap(() => sseStream$),
+      switchMap(state => state?.matches?.length ? concat(of(state), sseStream$) : sseStream$),
       takeUntil(ctx.destroy$)
     ).subscribe({
       next: (roundState: RoundState) => {
@@ -192,6 +197,7 @@ export function roundLiveTryAutoStartRound(ctx: any, vm: RoundLiveViewModel): vo
       next: (state: RoundState) => {
         ctx.startingRound = false;
         if (state && state.roundId) {
+          ctx.autoStartState = state;
           ctx.resolvedRoundId$.next(state.roundId);
         }
       },

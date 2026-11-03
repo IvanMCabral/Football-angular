@@ -15,6 +15,13 @@ export function initializeRoundLiveComponent(ctx: any): void {
   setTimeout(() => ctx.registerDebugRoundLiveHook(), 0);
 
   ctx.vm$.pipe(
+    filter((vm: any) => vm.anyStarted && !vm.allFinished),
+    take(1),
+    switchMap(() => ctx.modals.prefetchSubstitutionData()),
+    takeUntil(ctx.destroy$)
+  ).subscribe();
+
+  ctx.vm$.pipe(
     takeUntil(ctx.destroy$),
     filter((vm: any) => vm.matches.length > 0 || !!vm.errorMsg),
     take(1)
@@ -38,6 +45,7 @@ export function initializeRoundLiveComponent(ctx: any): void {
       });
       return teamMap;
     }),
+    catchError(() => of({})),
     shareReplay(1)
   );
 
@@ -105,9 +113,16 @@ export function initializeRoundLiveComponent(ctx: any): void {
     tap(() => markMatchStartStage('T6_FIXTURES_COMPLETED'))
   );
 
+  let initializedFixtures: unknown;
   combineLatest([routeParams$, teamMapForStart$, fixtures$]).pipe(
     takeUntil(ctx.destroy$),
     tap(([params, teamMap, fixturesData]: any[]) => {
+      const hydratedTeamMap = hydrateRoundTeamMap(teamMap, fixturesData.matches);
+      if (initializedFixtures === fixturesData) {
+        ctx.updateVm({ ...ctx.vmSubject.value, teamNameMap: hydratedTeamMap });
+        return;
+      }
+      initializedFixtures = fixturesData;
       ctx.loadingSubject.next(false);
       if (typeof performance !== 'undefined' && typeof performance.mark === 'function') {
         performance.mark('manager.match-start.live.state-ready');
@@ -118,7 +133,6 @@ export function initializeRoundLiveComponent(ctx: any): void {
       ctx.currentUserSessionTeamId = userSessionTeamId || null;
       const fixtures = fixturesData.matches;
       const byeTeam: string | null = fixturesData.byeTeam ?? null;
-      const hydratedTeamMap = hydrateRoundTeamMap(teamMap, fixtures);
 
       if (fixtures.length === 0) {
         ctx.updateVm({

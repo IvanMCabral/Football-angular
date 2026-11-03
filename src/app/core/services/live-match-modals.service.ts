@@ -3,8 +3,8 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { EMPTY, Observable, forkJoin, merge, of, switchMap } from 'rxjs';
-import { catchError, ignoreElements, map, tap, timeout } from 'rxjs/operators';
+import { EMPTY, Observable, TimeoutError, defer, forkJoin, merge, of, switchMap, throwError } from 'rxjs';
+import { catchError, ignoreElements, map, retry, tap, timeout } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 import { MatchEngineService } from './match-engine.service';
 import { AppLoggerService } from './app-logger.service';
@@ -81,6 +81,13 @@ export class LiveMatchModalsService {
   private readonly partidoLastModalMinute = new Map<string, number>();
   private roundResumeHoldCount = 0;
 
+  prefetchSubstitutionData(): Observable<unknown> {
+    return forkJoin({
+      lineup: this.http.get<LineupDTO>(`${environment.apiUrl}/career/lineup/current`),
+      squad: this.teamService.getMyTeamSquad()
+    }).pipe(catchError(() => EMPTY));
+  }
+
   // Optional context for event-driven substitution modals.
   openSubstitutionOptions?: {
     // Starter to pre-select as the outgoing player.
@@ -106,12 +113,15 @@ export class LiveMatchModalsService {
       return new Observable(sub => sub.complete());
     }
     const careerId = this.getCurrentCareerId();
+    const statusSnapshot = careerId ? this.careerService.getCareerStatusSnapshot?.(careerId) : null;
     return this.pauseBeforeModal(careerId, matchId, 'substitution', state.status === 'PAUSED').pipe(
-      switchMap(() => forkJoin({
-        status: this.careerService.getCareerStatus(),
+      switchMap(pauseResponse => forkJoin({
+        status: statusSnapshot?.value.userSessionTeamId
+          ? of(statusSnapshot.value)
+          : this.careerService.getCareerStatus(),
         lineup: this.http.get<LineupDTO>(`${environment.apiUrl}/career/lineup/current`),
         squad: this.teamService.getMyTeamSquad(),
-        liveState: this.engineService.getMatchState(matchId).pipe(
+        liveState: this.matchStateFromPause(pauseResponse, matchId) ?? this.engineService.getMatchState(matchId).pipe(
           timeout(1500),
           catchError(() => of(state))
         )
@@ -218,7 +228,9 @@ export class LiveMatchModalsService {
               this.rememberConfirmedSubstitution(matchId, closeResult.playerOffId, closeResult.playerOnId);
             }
             if (careerId && this.shouldResumeRoundAfterModalClose()) {
-              this.engineService.resumeRoundForMatch(careerId, matchId).subscribe({
+              this.engineService.resumeRoundForMatch(careerId, matchId).pipe(
+                switchMap(() => closeResult?.success ? this.prefetchSubstitutionData() : EMPTY)
+              ).subscribe({
                 error: (err) => this.logger.warn('Could not resume the round after closing the substitution modal:', err)
               });
             }
@@ -468,8 +480,10 @@ export class LiveMatchModalsService {
       this.logger.warn('could not resolve careerId from the current URL; the round will not be paused before opening the modal');
       return of(null);
     }
-    return this.engineService.pauseRoundForMatch(careerId, matchId).pipe(
+    return defer(() => this.engineService.pauseRoundForMatch(careerId, matchId)).pipe(
       timeout(2_000),
+      // The server may have paused the round before the first response timed out.
+      retry({ count: 1, delay: error => error instanceof TimeoutError ? of(null) : throwError(() => error) }),
       switchMap(response => {
         // A race between the injury event and the pause request can finish the
         // round before the modal is hydrated. Never open an editable dialog
@@ -494,6 +508,12 @@ export class LiveMatchModalsService {
   private pauseResponseIsTerminal(response: unknown): boolean {
     return !!response && typeof response === 'object'
       && (response as { alreadyFinished?: boolean }).alreadyFinished === true;
+  }
+
+  private matchStateFromPause(response: unknown, matchId: string): Observable<MatchState> | null {
+    const matches = (response as { matches?: MatchState[] } | null)?.matches;
+    const match = Array.isArray(matches) ? matches.find(state => state.matchId === matchId) : undefined;
+    return match ? of(match) : null;
   }
 
   private isTerminalLiveState(state: MatchState | null | undefined): boolean {

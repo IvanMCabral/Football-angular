@@ -408,7 +408,6 @@ openVisualEditor(): void {
           next: () => {
             markMatchStartStage('T8_LINEUP_COMPLETED');
             this.resetLineupWarning();
-            this.refreshSquad();
             if (!careerStatus) {
               setMatchStartTraceMetadata({
                 statusHttpTriggeredByClick: true,

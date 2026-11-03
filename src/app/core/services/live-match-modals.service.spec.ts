@@ -7,7 +7,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { of, Subject, throwError } from 'rxjs';
+import { NEVER, of, Subject, throwError } from 'rxjs';
 
 import { LiveMatchModalsService } from './live-match-modals.service';
 import { CareerService } from './career.service';
@@ -190,6 +190,37 @@ describe('LiveMatchModalsService pause/resume around tactical modals', () => {
       expect(engineServiceSpy.pauseRoundForMatch).toHaveBeenCalledWith('career-abc', 'match-1');
       done();
     });
+  });
+
+  it('uses the frozen match snapshot returned by pause for substitution', (done) => {
+    engineServiceSpy.pauseRoundForMatch.and.returnValue(of({
+      success: true,
+      matches: [{ ...RUNNING_STATE, matchId: 'match-1', status: 'PAUSED', currentMinute: 23 }]
+    }));
+    service.openSubstitutionModal('match-1', RUNNING_STATE).subscribe(() => {
+      expect(engineServiceSpy.getMatchState).not.toHaveBeenCalled();
+      const data = dialogSpy.open.calls.mostRecent().args[1]?.data as { currentMinute: number };
+      expect(data.currentMinute).toBe(23);
+      done();
+    });
+  });
+
+  it('recovers a pause that took effect before its first response timed out', () => {
+    engineServiceSpy.pauseRoundForMatch.and.returnValues(NEVER, of({
+      success: true,
+      alreadyPaused: true,
+      matches: [{ ...RUNNING_STATE, status: 'PAUSED', currentMinute: 23 }]
+    }));
+    jasmine.clock().install();
+    try {
+      service.openSubstitutionModal('match-1', RUNNING_STATE).subscribe();
+      expect(dialogSpy.open).not.toHaveBeenCalled();
+      jasmine.clock().tick(2000);
+      expect(engineServiceSpy.pauseRoundForMatch).toHaveBeenCalledTimes(2);
+      expect(dialogSpy.open).toHaveBeenCalledTimes(1);
+    } finally {
+      jasmine.clock().uninstall();
+    }
   });
 
   it('openSubstitutionModal - dialog.afterClosed() triggers engineService.resumeRoundForMatch', (done) => {
