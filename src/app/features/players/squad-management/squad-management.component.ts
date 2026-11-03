@@ -177,29 +177,13 @@ private normalizeLineupForDisplay(lineup: LineupDTO | null): LineupDTO | null {
           }
         })
       );
-      this.team$ = careerStatusSource$.pipe(
-        switchMap(status => {
-          if (status && status.userSessionTeamId) {
-            return this.http.get<Team>(`${environment.apiUrl}/career/teams/${status.userSessionTeamId}`).pipe(
-              catchError(err => of(null))
-            );
-          }
-          return of(null);
-        }),
-        shareReplay(1)
+      this.team$ = this.http.get<Team>(`${environment.apiUrl}/career/teams/me`).pipe(
+        catchError(() => of(null)), shareReplay(1)
       );
-this.squad$ = combineLatest([
-        careerStatusSource$,
-        this.refetchSquadTrigger$
-      ]).pipe(
-        switchMap(([status]) => {
-          if (status && status.careerId) {
-            return this.http.get<SessionPlayer[]>(`${environment.apiUrl}/career/players/squad`).pipe(
-              catchError(err => of([]))
-            );
-          }
-          return of([]);
-        }),
+      this.squad$ = this.refetchSquadTrigger$.pipe(
+        switchMap(() => this.http.get<SessionPlayer[]>(`${environment.apiUrl}/career/players/squad`).pipe(
+          catchError(() => of([]))
+        )),
         shareReplay(1)
       );
       this.squadLoading$ = combineLatest([
@@ -233,6 +217,9 @@ this.squad$ = combineLatest([
           })
         )
         .subscribe();
+      for (const resource of ['subdivisions', 'formations']) {
+        this.http.get(`${environment.apiUrl}/lineup-editor/${resource}`).subscribe({ error: () => undefined });
+      }
       this.lineup$ = this.lineupSubject$.asObservable();
     }
     private isSuspendedPlayer(p: { suspended?: boolean; suspensionRemainingMatches?: number }): boolean { return isSuspendedLineupPlayer(p); }

@@ -3,6 +3,7 @@ import { provideRouter } from '@angular/router';
 import { XhrFactory } from '@angular/common';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { authInterceptor } from './core/interceptors/auth.interceptor';
+import { careerReadCacheInterceptor } from './core/interceptors/career-read-cache.interceptor';
 import { errorInterceptor } from './core/interceptors/error.interceptor';
 import { worldMetadataCacheInterceptor } from './core/interceptors/world-metadata-cache.interceptor';
 import { clientHttpDiagnosticsInterceptor } from './core/observability/client-http-diagnostics.interceptor';
@@ -14,7 +15,7 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideRouter(routes),
     provideHttpClient(
-      withInterceptors([authInterceptor, errorInterceptor, worldMetadataCacheInterceptor, clientHttpDiagnosticsInterceptor])
+      withInterceptors([authInterceptor, errorInterceptor, careerReadCacheInterceptor, worldMetadataCacheInterceptor, clientHttpDiagnosticsInterceptor])
     ),
     { provide: XhrFactory, useClass: TeamsDiagnosticXhrFactory },
     provideAnimations()

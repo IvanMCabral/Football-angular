@@ -3,6 +3,7 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { BehaviorSubject, Observable, ReplaySubject } from 'rxjs';
 import { map, share, switchMap, tap } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
+import { CareerReadCache } from '../interceptors/career-read-cache.interceptor';
 import { AuthService } from './auth.service';
 import { AppLoggerService } from './app-logger.service';
 import {
@@ -37,6 +38,7 @@ const RECONNECT_JITTER = 0.2;
   providedIn: 'root'
 })
 export class MatchEngineService {
+  private readonly readCache = inject(CareerReadCache);
   private http = inject(HttpClient);
   private ngZone = inject(NgZone);
   private authService = inject(AuthService);
@@ -357,6 +359,7 @@ export class MatchEngineService {
                       this.logClientTrace(roundId ?? 'unknown');
                       completeMatchStartTrace(roundId ?? 'unknown');
                     }
+                    if (isComplete(payload)) this.readCache.invalidate();
                     observer.next(payload);
                     if (isComplete(payload)) {
                       closed = true;

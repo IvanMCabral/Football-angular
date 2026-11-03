@@ -55,11 +55,11 @@ export class StandingsPageComponent implements OnInit {
     this.loadStandings();
   }
 
-  loadStandings(): void {
+  loadStandings(refresh = false): void {
     this.loading$.next(true);
     this.error$.next(null);
 
-    this.careerService.getAllStandings().subscribe({
+    this.careerService.getAllStandings(refresh).subscribe({
       next: (response) => {
         const divisions = response.divisions || [];
         this.divisionCount = divisions.length;

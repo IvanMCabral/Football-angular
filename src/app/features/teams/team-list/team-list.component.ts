@@ -29,11 +29,11 @@ export class TeamListComponent implements OnInit {
     this.loadSessionTeams();
   }
 
-  loadSessionTeams(): void {
+  loadSessionTeams(refresh = false): void {
     this.loading = true;
     this.errorMessage = '';
 
-    this.teamService.getSessionTeams().subscribe({
+    this.teamService.getSessionTeams(refresh).subscribe({
       next: () => {
         this.loading = false;
         this.changeDetector.markForCheck();

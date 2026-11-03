@@ -6,7 +6,7 @@
    
   <div class="actions-bar">
     <a routerLink="/squad" class="btn btn-primary">Mi equipo</a>
-    <button (click)="loadSessionTeams()" class="btn btn-secondary" [disabled]="loading">
+    <button (click)="loadSessionTeams(true)" class="btn btn-secondary" [disabled]="loading">
       {{ loading ? 'Cargando...' : '🔄 Refrescar' }}
     </button>
   </div>

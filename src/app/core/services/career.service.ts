@@ -1,7 +1,8 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpContext } from '@angular/common/http';
 import { Observable, of } from 'rxjs';
 import { finalize, shareReplay, tap } from 'rxjs/operators';
+import { CareerReadCache, REFRESH_CAREER_READ } from '../interceptors/career-read-cache.interceptor';
 import { environment } from '../../environments/environment';
 import {
   SessionTeam,
@@ -42,6 +43,7 @@ export interface CareerCommandResponse {
 })
 export class CareerService {
   private http = inject(HttpClient);
+  private readCache = inject(CareerReadCache);
   private apiUrl = `${environment.apiUrl}/career`;
 
   /**
@@ -73,7 +75,7 @@ export class CareerService {
 
   /** Shares a very short-lived status read across route transitions. */
   private static readonly CAREER_STATUS_CACHE_TTL_MS = 5_000;
-  private careerStatusCache: { requestedAt: number; request$: Observable<CareerStatus> } | null = null;
+  private careerStatusCache: { requestedAt: number; revision: number; request$: Observable<CareerStatus> } | null = null;
   private readonly careerStatusSnapshots = new Map<string, { value: CareerStatus; receivedAt: number }>();
   private lastCareerStatusKey: string | null = null;
   private pendingSeasonContinuation: Observable<CareerCommandResponse> | null = null;
@@ -99,6 +101,7 @@ export class CareerService {
 
   /** Clears all career-local state on logout or account replacement. */
   clearCareerStatusSnapshot(): void {
+    this.readCache.clear();
     this.careerStatusCache = null;
     this.careerStatusSnapshots.clear();
     this.lastCareerStatusKey = null;
@@ -140,13 +143,16 @@ export class CareerService {
   getCareerStatus(): Observable<CareerStatus> {
     const now = Date.now();
     const cached = this.careerStatusCache;
-    if (cached && now - cached.requestedAt < CareerService.CAREER_STATUS_CACHE_TTL_MS) {
+    if (cached && cached.revision === this.readCache.revision && now - cached.requestedAt < CareerService.CAREER_STATUS_CACHE_TTL_MS) {
       return cached.request$;
     }
 
     const request$ = this.http.get<CareerStatus>(`${this.apiUrl}/status`).pipe(
       tap(status => {
         if (this.careerStatusCache?.request$ !== request$) return;
+        this.readCache.observeCareer(status);
+        this.readCache.primeStatus(status);
+        this.careerStatusCache.revision = this.readCache.revision;
         const key = status.careerId;
         if (key) {
           this.careerStatusSnapshots.set(key, { value: status, receivedAt: Date.now() });
@@ -162,14 +168,16 @@ export class CareerService {
       }),
       shareReplay({ bufferSize: 1, refCount: false })
     );
-    this.careerStatusCache = { requestedAt: now, request$ };
+    this.careerStatusCache = { requestedAt: now, revision: this.readCache.revision, request$ };
     return request$;
   }
 
   /** Reuses the canonical status already returned by the dashboard entry read. */
   seedCareerStatus(status: CareerStatus): void {
+    this.readCache.observeCareer(status);
+    this.readCache.primeStatus(status);
     const receivedAt = Date.now();
-    this.careerStatusCache = { requestedAt: receivedAt, request$: of(status) };
+    this.careerStatusCache = { requestedAt: receivedAt, revision: this.readCache.revision, request$: of(status) };
     if (status.careerId) {
       this.careerStatusSnapshots.set(status.careerId, { value: status, receivedAt });
       this.lastCareerStatusKey = status.careerId;
@@ -181,6 +189,7 @@ export class CareerService {
 
   /** Invalidates status after a command that can advance or replace a career. */
   invalidateCareerStatus(): void {
+    this.readCache.invalidate();
     this.careerStatusCache = null;
   }
 
@@ -325,8 +334,8 @@ export class CareerService {
     *
     * @returns Observable<AllStandingsResponse> Response with divisions array
     */
-   getAllStandings(): Observable<AllStandingsResponse> {
-     return this.http.get<AllStandingsResponse>(`${this.apiUrl}/standings/all`);
+   getAllStandings(refresh = false): Observable<AllStandingsResponse> {
+     return this.http.get<AllStandingsResponse>(`${this.apiUrl}/standings/all`, { context: new HttpContext().set(REFRESH_CAREER_READ, refresh) });
    }
 
   /**

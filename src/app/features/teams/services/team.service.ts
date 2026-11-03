@@ -1,5 +1,6 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { REFRESH_CAREER_READ } from '../../../core/interceptors/career-read-cache.interceptor';
+import { HttpClient, HttpContext } from '@angular/common/http';
 import { Observable, BehaviorSubject, catchError, map, of, switchMap, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AppLoggerService } from '../../../core/services/app-logger.service';
@@ -68,8 +69,8 @@ export class TeamService {
     return this.http.post<SessionTeam>(`${this.careerApiUrl}/clone-team/${realTeamId}`, {});
   }
 
-  getSessionTeams(): Observable<SessionTeam[]> {
-    return this.http.get<SessionTeam[]>(`${this.careerApiUrl}/teams`).pipe(
+  getSessionTeams(refresh = false): Observable<SessionTeam[]> {
+    return this.http.get<SessionTeam[]>(`${this.careerApiUrl}/teams`, { context: new HttpContext().set(REFRESH_CAREER_READ, refresh) }).pipe(
       tap(teams => this.sessionTeamsSubject.next(teams))
     );
   }
