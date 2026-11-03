@@ -1,4 +1,4 @@
-﻿import { Injectable, inject } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { HttpClient } from '@angular/common/http';
@@ -115,18 +115,31 @@ export class LiveMatchModalsService {
     }
     const careerId = this.getCurrentCareerId();
     const statusSnapshot = careerId ? this.careerService.getCareerStatusSnapshot?.(careerId) : null;
-    return this.pauseBeforeModal(careerId, matchId, 'substitution', state.status === 'PAUSED').pipe(
-      switchMap(pauseResponse => forkJoin({
+    let pausedByDialog = false;
+    return forkJoin({
+      pauseResponse: this.pauseBeforeModal(careerId, matchId, 'substitution', state.status === 'PAUSED').pipe(
+        tap(response => { pausedByDialog = response != null && state.status !== 'PAUSED'; })
+      ),
+      data: forkJoin({
         status: statusSnapshot?.value.userSessionTeamId
           ? of(statusSnapshot.value)
           : this.careerService.getCareerStatus(),
         lineup: this.http.get<LineupDTO>(`${environment.apiUrl}/career/lineup/current`),
-        squad: this.teamService.getMyTeamSquad(),
-        liveState: this.matchStateFromPause(pauseResponse, matchId) ?? this.engineService.getMatchState(matchId).pipe(
+        squad: this.teamService.getMyTeamSquad()
+      }).pipe(map(value => ({ value })), catchError(error => of({ error })))
+    }).pipe(
+      switchMap(({ pauseResponse, data }) => {
+        if ('error' in data) {
+          return throwError(() => data.error);
+        }
+        const { status, lineup, squad } = data.value;
+        const pausedState = this.matchStateFromPause(pauseResponse, matchId);
+        const liveState$ = pausedState ?? this.engineService.getMatchState(matchId).pipe(
           timeout(1500),
           catchError(() => of(state))
-        )
-      })),
+        );
+        return liveState$.pipe(map(liveState => ({ status, lineup, squad, liveState })));
+      }),
       switchMap(({ status, lineup, squad, liveState }) => {
         const userTeamId = status.userSessionTeamId;
         if (!userTeamId) {
@@ -241,6 +254,20 @@ export class LiveMatchModalsService {
           }),
           ignoreElements()
         ), of(data));
+      }),
+      catchError(error => {
+        this.logger.warn('Could not open the substitution modal:', error);
+        this.snackBar.open('No se pudieron cargar los cambios', 'OK', { duration: 3500 });
+        if (!pausedByDialog || !careerId || !this.shouldResumeRoundAfterModalClose()) {
+          return EMPTY;
+        }
+        return this.engineService.resumeRoundForMatch(careerId, matchId).pipe(
+          ignoreElements(),
+          catchError(resumeError => {
+            this.logger.warn('Could not recover the round after loading substitutions:', resumeError);
+            return EMPTY;
+          })
+        );
       })
     );
   }

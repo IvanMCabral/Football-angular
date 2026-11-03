@@ -205,6 +205,21 @@ describe('LiveMatchModalsService pause/resume around tactical modals', () => {
     });
   });
 
+  it('releases a confirmed pause if substitution data fails to load', () => {
+    const pause = new Subject<unknown>();
+    engineServiceSpy.pauseRoundForMatch.and.returnValue(pause);
+    httpSpy.get.and.returnValue(throwError(() => new Error('lineup unavailable')));
+
+    service.openSubstitutionModal('match-1', RUNNING_STATE).subscribe();
+    expect(engineServiceSpy.resumeRoundForMatch).not.toHaveBeenCalled();
+
+    pause.next({ success: true });
+    pause.complete();
+
+    expect(dialogSpy.open).not.toHaveBeenCalled();
+    expect(engineServiceSpy.resumeRoundForMatch).toHaveBeenCalledOnceWith('career-abc', 'match-1');
+  });
+
   it('recovers a pause that took effect before its first response timed out', () => {
     engineServiceSpy.pauseRoundForMatch.and.returnValues(NEVER, of({
       success: true,
