@@ -252,6 +252,33 @@ describe('DetailedMatchPageComponent input path', () => {
     expect(component.eventDescriptionLabel('Alex committed a foul')).toBe('Alex cometió una falta');
     expect(component.eventDescriptionLabel('Alex received a yellow card')).toBe('Alex recibió amarilla');
     expect(component.eventDescriptionLabel('Alex was injured')).toBe('Alex se lesionó');
+    expect(component.eventDescriptionLabel("Goal by Alex assisted by José 72'")).toBe("Gol de Alex, asistencia de José (72')");
+    expect(component.eventDescriptionLabel('Substitution: José on for Alex')).toBe('Entra José; sale Alex');
+  });
+
+  it('distinguishes goal assists from incoming substitutes and hides xG on cards and changes', async () => {
+    const detail = makeDetail('event-labels', 'career-1', 1, 1);
+    detail.timeline = [
+      { minute: 10, type: 'GOAL', teamId: 'home', playerId: 'a', playerName: 'Alex',
+        relatedPlayerName: 'José', xg: 0.12, description: "Goal by Alex assisted by José 10'" },
+      { minute: 60, type: 'SUBSTITUTION', teamId: 'home', playerId: 'a', playerName: 'Alex',
+        relatedPlayerName: 'José', xg: 0, description: 'Substitution: José on for Alex' },
+      { minute: 70, type: 'YELLOW_CARD', teamId: 'home', playerId: 'b', playerName: 'José',
+        xg: 0, description: 'José received a yellow card' }
+    ];
+    spyOn(api, 'getMatchDetail').and.returnValue(of(detail));
+    component.inputCareerId = 'career-1';
+    component.inputMatchId = 'event-labels';
+    fixture.detectChanges(); await fixture.whenStable(); fixture.detectChanges();
+    const rows = fixture.nativeElement.querySelectorAll('.timeline-desktop .timeline-item');
+    expect(rows[0].textContent).toContain('Asistencia: José');
+    expect(rows[0].textContent).toContain('xG 0.12');
+    expect(rows[1].textContent).toContain('Sale: Alex');
+    expect(rows[1].textContent).toContain('Entra: José');
+    expect(rows[1].textContent).not.toContain('Asistencia');
+    expect(rows[1].querySelector('.event-xg')).toBeNull();
+    expect(rows[2].querySelector('.event-xg')).toBeNull();
+    expect(component.statsComparison().find(row => row.label === 'Goles')?.delta.formatted).toBe('Iguales');
   });
 
   it('resets collapsed mobile sections when match A changes to match B', async () => {

@@ -142,11 +142,11 @@
           <span class="event-minute">{{ event.minute }}'</span>
           <span class="event-badge" [ngClass]="eventClass(event.type)">{{ eventTypeLabel(event.type) }}</span>
           <div class="event-body">
-            <span class="event-player">{{ event.playerName }}</span>
-            <span class="event-assist" *ngIf="event.relatedPlayerName">asistencia: {{ event.relatedPlayerName }}</span>
+            <span class="event-player">{{ event.type === 'SUBSTITUTION' ? 'Sale: ' : '' }}{{ event.playerName }}</span>
+            <span class="event-assist" *ngIf="relatedPlayerLabel(event) as label">{{ label }}: {{ event.relatedPlayerName }}</span>
           </div>
           <div class="event-meta">
-            <span class="event-xg" *ngIf="event.xg != null">xG {{ event.xg.toFixed(2) }}</span>
+            <span class="event-xg" *ngIf="hasShotXg(event)">xG {{ event.xg!.toFixed(2) }}</span>
             <span class="event-desc">{{ eventDescriptionLabel(event.description) }}</span>
           </div>
         </li>
@@ -160,11 +160,11 @@
             <span class="event-minute">{{ event.minute }}'</span>
             <span class="event-badge" [ngClass]="eventClass(event.type)">{{ eventTypeLabel(event.type) }}</span>
             <div class="event-body">
-              <span class="event-player">{{ event.playerName }}</span>
-              <span class="event-assist" *ngIf="event.relatedPlayerName">asistencia: {{ event.relatedPlayerName }}</span>
+              <span class="event-player">{{ event.type === 'SUBSTITUTION' ? 'Sale: ' : '' }}{{ event.playerName }}</span>
+              <span class="event-assist" *ngIf="relatedPlayerLabel(event) as label">{{ label }}: {{ event.relatedPlayerName }}</span>
               <span class="event-desc">{{ eventDescriptionLabel(event.description) }}</span>
             </div>
-            <span class="event-xg" *ngIf="event.xg != null">xG {{ event.xg.toFixed(2) }}</span>
+            <span class="event-xg" *ngIf="hasShotXg(event)">xG {{ event.xg!.toFixed(2) }}</span>
           </li>
         </ul>
         <details class="supporting-events" *ngIf="supportingEvents().length > 0"
@@ -181,7 +181,7 @@
                 <span class="event-player">{{ event.playerName }}</span>
                 <span class="event-desc">{{ eventDescriptionLabel(event.description) }}</span>
               </div>
-              <span class="event-xg" *ngIf="event.xg != null">xG {{ event.xg.toFixed(2) }}</span>
+              <span class="event-xg" *ngIf="hasShotXg(event)">xG {{ event.xg!.toFixed(2) }}</span>
             </li>
           </ul>
         </details>

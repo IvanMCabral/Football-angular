@@ -185,6 +185,17 @@ export class DetailedMatchPageComponent implements OnInit, OnChanges {
     return this.eventLabelMap[type] ?? type;
   }
 
+  relatedPlayerLabel(event: MatchEvent): string | null {
+    if (!event.relatedPlayerName) return null;
+    if (event.type === 'GOAL') return 'Asistencia';
+    if (event.type === 'SUBSTITUTION') return 'Entra';
+    return null;
+  }
+
+  hasShotXg(event: MatchEvent): boolean {
+    return event.xg != null && ['GOAL', 'SHOT', 'SHOT_ON_TARGET', 'MISS', 'BLOCK'].includes(event.type);
+  }
+
   eventDescriptionLabel(description: string | null | undefined): string {
     if (!description) return '';
     return description
@@ -196,7 +207,10 @@ export class DetailedMatchPageComponent implements OnInit, OnChanges {
       .replace(/^(.+) received a yellow card$/i, '$1 recibió amarilla')
       .replace(/^(.+) received a red card$/i, '$1 recibió roja')
       .replace(/^(.+) scored$/i, 'Gol de $1')
+      .replace(/^Goal by (.+) assisted by (.+) (\d+)'$/i, "Gol de $1, asistencia de $2 ($3')")
+      .replace(/^Goal by (.+) (\d+)'$/i, "Gol de $1 ($2')")
       .replace(/^(.+) was injured$/i, '$1 se lesionó')
+      .replace(/^Substitution: (.+) on for (.+)$/i, 'Entra $1; sale $2')
       .replace(/^Substitution: (.+)$/i, 'Cambio: $1');
   }
 
@@ -263,7 +277,7 @@ export class DetailedMatchPageComponent implements OnInit, OnChanges {
     ) => {
       const value = homeVal - awayVal;
       const winner: 'home' | 'away' | 'even' = value > 0 ? 'home' : value < 0 ? 'away' : 'even';
-      const formatted = value > 0 ? `+${formatFn(value)}` : value < 0 ? formatFn(value) : 'even';
+      const formatted = value > 0 ? `+${formatFn(value)}` : value < 0 ? formatFn(value) : 'Iguales';
       return { label, home: formatFn(homeVal), away: formatFn(awayVal), delta: { value, formatted, winner } };
     };
     return [
