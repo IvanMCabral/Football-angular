@@ -238,6 +238,17 @@
             </div>
 
 
+            <div *ngIf="startersNeedingReview.length" class="confirmation-warning" role="status">
+              <strong>Revisá estos titulares antes de jugar</strong>
+              <ul>
+                <li *ngFor="let player of startersNeedingReview">
+                  {{ player.name }} ·
+                  {{ player.injured ? 'Lesión' : player.suspended ? 'Suspensión' : 'Energía ' + player.energy + '%' }}
+                </li>
+              </ul>
+              <span>Usá Auto seleccionar para revisar el once o ajustalo en el editor visual.</span>
+            </div>
+
             <div *ngIf="lineup.chemistryBreakdown as bd" class="chemistry-breakdown">
               <div class="breakdown-header">
                 Detalle de química

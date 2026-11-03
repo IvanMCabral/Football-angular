@@ -100,6 +100,12 @@ export class SquadManagementComponent implements OnInit {
     selectedContributor$ = new BehaviorSubject<PlayerLineupDTO | null>(null);
     positionGroupOrder: ReadonlyArray<keyof ChemistryBreakdownDTO['positionGroups']> =
         ['GK', 'DEF', 'MID', 'ATT'];
+    get startersNeedingReview(): PlayerLineupDTO[] {
+      return (this.lineupSubject$.value?.players ?? []).filter(player =>
+        player.injured || player.suspended || player.energy <= 30
+      );
+    }
+
     get lineupSlotsCount(): number {
       const lineup = this.lineupSubject$.value;
       if (lineup == null) {
