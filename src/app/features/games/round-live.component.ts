@@ -1,4 +1,4 @@
-﻿import { Component, inject, OnInit, OnDestroy } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 import { MatchEngineService } from '../../core/services/match-engine.service';
@@ -97,7 +97,7 @@ export class RoundLiveComponent implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   get simulateRound(): boolean {
-    return this.route.snapshot.queryParamMap?.get('simular') === '1';
+    return this.route.snapshot?.queryParamMap?.get('simular') === '1';
   }
   private logger = inject(AppLoggerService);
 
