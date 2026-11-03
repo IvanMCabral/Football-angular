@@ -326,13 +326,12 @@ export class SubstitutionModalComponent {
     this.isSubmitting = true;
     this.errorMsg = '';
     let formationSaveAttempted = false;
+    const resumeOnSave = changes.length === 1 && this.positionTweaks.size === 0 && this.data.canResumeOnSave?.();
     from(changes)
       .pipe(
-        concatMap(change => this.engineService.substitutePlayer(
-          this.data.matchId,
-          change.playerOffId,
-          change.playerOnId
-        )),
+        concatMap(change => resumeOnSave
+          ? this.engineService.substitutePlayer(this.data.matchId, change.playerOffId, change.playerOnId, undefined, true)
+          : this.engineService.substitutePlayer(this.data.matchId, change.playerOffId, change.playerOnId)),
         toArray(),
         switchMap(results => {
           const failed = results.find(result => !result.success && !this.isAlreadyAppliedSubstitutionResult(result));

@@ -132,11 +132,12 @@ export class MatchEngineService {
     matchId: string,
     playerOffId: string,
     playerOnId: string,
-    minute?: number
+    minute?: number,
+    resumeRound?: boolean
   ): Observable<SubstitutionResult> {
     return this.http.post<SubstitutionResult>(
       `${this.apiUrl}/matches/${matchId}/substitutions`,
-      { playerOffId, playerOnId, minute: minute ?? null }
+      { playerOffId, playerOnId, minute: minute ?? null, ...(resumeRound ? { resumeRound } : {}) }
     );
   }
 

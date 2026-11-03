@@ -236,6 +236,19 @@ describe('LiveMatchModalsService pause/resume around tactical modals', () => {
     });
   });
 
+  it('does not send a second resume after the server resumed on substitution', (done) => {
+    service.openSubstitutionModal('match-1', RUNNING_STATE).subscribe(() => {
+      const data = dialogSpy.open.calls.mostRecent().args[1]?.data as { canResumeOnSave: () => boolean };
+      expect(data.canResumeOnSave()).toBeTrue();
+      const release = service.holdRoundResumeAfterModalClose();
+      expect(data.canResumeOnSave()).toBeFalse();
+      release();
+      afterClosedSubject.next({ success: true, result: { roundResumed: true } });
+      expect(engineServiceSpy.resumeRoundForMatch).not.toHaveBeenCalled();
+      done();
+    });
+  });
+
   it('openSubstitutionModal - resume fires on cancel too (afterClosed emits regardless of result)', (done) => {
     service.openSubstitutionModal('match-1', RUNNING_STATE).subscribe(() => {
       afterClosedSubject.next(undefined); // simulate cancel

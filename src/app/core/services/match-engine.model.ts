@@ -111,6 +111,7 @@ export interface RoundState {
 /** Response returned after applying a substitution. */
 export interface SubstitutionResult {
   success: boolean;
+  roundResumed?: boolean;
   minuteApplied: number;
   substitutionsRemaining: number;
   error?: string;

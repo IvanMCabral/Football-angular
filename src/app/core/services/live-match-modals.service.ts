@@ -41,6 +41,7 @@ import { overlayRememberedPartidoSlots, parseRememberedPartidoSlots } from './li
 
 interface LiveSubstitutionCloseResult {
   success?: boolean;
+  result?: { roundResumed?: boolean };
   playerOffId?: string;
   playerOnId?: string;
   substitutions?: Array<{
@@ -180,6 +181,7 @@ export class LiveMatchModalsService {
 
         const data: SubstitutionDialogData = {
           matchId,
+          canResumeOnSave: () => !!careerId && this.shouldResumeRoundAfterModalClose(),
           currentMinute: stateForModal.currentMinute ?? 0,
           score: stateForModal.score,
           startingXi,
@@ -227,7 +229,9 @@ export class LiveMatchModalsService {
             } else if (closeResult?.success && closeResult.playerOffId && closeResult.playerOnId) {
               this.rememberConfirmedSubstitution(matchId, closeResult.playerOffId, closeResult.playerOnId);
             }
-            if (careerId && this.shouldResumeRoundAfterModalClose()) {
+            if (closeResult?.result?.roundResumed) {
+              this.prefetchSubstitutionData().subscribe();
+            } else if (careerId && this.shouldResumeRoundAfterModalClose()) {
               this.engineService.resumeRoundForMatch(careerId, matchId).pipe(
                 switchMap(() => closeResult?.success ? this.prefetchSubstitutionData() : EMPTY)
               ).subscribe({

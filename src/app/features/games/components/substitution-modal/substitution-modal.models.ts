@@ -14,6 +14,7 @@ export interface SubstitutionDialogData {
   startingXi: SubModalPlayer[];
   bench: SubModalPlayer[];
   substitutionsRemaining: number;
+  canResumeOnSave?: () => boolean;
   effectivenessMap?: Record<string, number>;
   formation?: string;
   playerRatings?: LivePlayerRating[];
